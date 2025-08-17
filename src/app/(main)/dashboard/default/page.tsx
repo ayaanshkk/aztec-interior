@@ -103,7 +103,7 @@ export default function Page() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error("Backend error response:", errorData);
-        throw new Error(`Server responded with status ${response.status}: ${errorData.error || "Unknown error"}`);
+        throw new Error(`Server responded with status ${response.status}: ${errorData.error ?? "Unknown error"}`);
       }
 
       const resData = await response.json();
@@ -139,7 +139,7 @@ export default function Page() {
   const handleFieldChange = (field: string, value: string) => {
     setExtractedData((prev) => ({
       ...prev,
-      [field]: value || null,
+      [field]: value ?? null,
     }));
   };
 
@@ -261,13 +261,13 @@ export default function Page() {
   const getSoffitLightsColour = (data: FormData) => {
     if (data.soffit_lights_cool_white === "✓") return "Cool White";
     if (data.soffit_lights_warm_white === "✓") return "Warm White";
-    return data.soffit_lights_colour || "-";
+    return data.soffit_lights_colour ?? "-";
   };
 
   const getGableLightsColour = (data: FormData) => {
     if (data.gable_lights_black === "✓") return "Black";
     if (data.gable_lights_white === "✓") return "White";
-    return data.gable_lights_colour || data.gable_lights_profile_colour || "-";
+    return data.gable_lights_colour ?? data.gable_lights_profile_colour ?? "-";
   };
 
   return (
@@ -333,7 +333,7 @@ export default function Page() {
             <Button
               type="submit"
               className="mt-4 w-fit bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md flex items-center"
-              disabled={isLoading || !file}
+              disabled={isLoading ?? !file}
             >
               {isLoading ? (
                 <Loader2 className="mr-2 w-4 h-4 animate-spin" />
@@ -386,7 +386,7 @@ export default function Page() {
                           <TableCell className="font-medium text-gray-700 py-2">Quantity</TableCell>
                           <TableCell className="py-2">
                             <Input
-                              value={extractedData.bedside_cabinets_qty || ""}
+                              value={extractedData.bedside_cabinets_qty ?? ""}
                               onChange={(e) => handleFieldChange("bedside_cabinets_qty", e.target.value)}
                               className="w-full border-none bg-transparent shadow-none focus:ring-0 focus:outline-none"
                             />
@@ -409,7 +409,7 @@ export default function Page() {
                           <TableCell className="font-medium text-gray-700 py-2">Quantity/Size</TableCell>
                           <TableCell className="py-2">
                             <Input
-                              value={extractedData.dresser_desk_qty_size || ""}
+                              value={extractedData.dresser_desk_qty_size ?? ""}
                               onChange={(e) => handleFieldChange("dresser_desk_qty_size", e.target.value)}
                               className="w-full border-none bg-transparent shadow-none focus:ring-0 focus:outline-none"
                             />
@@ -432,7 +432,7 @@ export default function Page() {
                           <TableCell className="font-medium text-gray-700 py-2">Quantity/Size</TableCell>
                           <TableCell className="py-2">
                             <Input
-                              value={extractedData.internal_mirror_qty_size || ""}
+                              value={extractedData.internal_mirror_qty_size ?? ""}
                               onChange={(e) => handleFieldChange("internal_mirror_qty_size", e.target.value)}
                               className="w-full border-none bg-transparent shadow-none focus:ring-0 focus:outline-none"
                             />
@@ -455,7 +455,7 @@ export default function Page() {
                           <TableCell className="font-medium text-gray-700 py-2">Quantity</TableCell>
                           <TableCell className="py-2">
                             <Input
-                              value={extractedData.mirror_qty || ""}
+                              value={extractedData.mirror_qty ?? ""}
                               onChange={(e) => handleFieldChange("mirror_qty", e.target.value)}
                               className="w-full border-none bg-transparent shadow-none focus:ring-0 focus:outline-none"
                             />
@@ -488,7 +488,7 @@ export default function Page() {
                           <TableCell className="font-medium text-gray-700 py-2">Quantity</TableCell>
                           <TableCell className="py-2">
                             <Input
-                              value={extractedData.soffit_lights_qty || ""}
+                              value={extractedData.soffit_lights_qty ?? ""}
                               onChange={(e) => handleFieldChange("soffit_lights_qty", e.target.value)}
                               className="w-full border-none bg-transparent shadow-none focus:ring-0 focus:outline-none"
                             />
@@ -511,7 +511,7 @@ export default function Page() {
                           <TableCell className="font-medium text-gray-700 py-2">Quantity</TableCell>
                           <TableCell className="py-2">
                             <Input
-                              value={extractedData.gable_lights_qty || ""}
+                              value={extractedData.gable_lights_qty ?? ""}
                               onChange={(e) => handleFieldChange("gable_lights_qty", e.target.value)}
                               className="w-full border-none bg-transparent shadow-none focus:ring-0 focus:outline-none"
                             />
@@ -535,7 +535,7 @@ export default function Page() {
                               />
                             ) : (
                               <Input
-                                value={extractedData[field] || ""}
+                                value={extractedData[field] ?? ""}
                                 onChange={(e) => handleFieldChange(field, e.target.value)}
                                 className="w-full border-none bg-transparent shadow-none focus:ring-0 focus:outline-none"
                               />
