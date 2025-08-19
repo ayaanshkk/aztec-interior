@@ -15,6 +15,10 @@ import {
   Banknote,
   Gauge,
   GraduationCap,
+  Home,
+  Briefcase,
+  FileText,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -63,30 +67,41 @@ export const sidebarItems: NavGroup[] = [
         url: "/dashboard/finance",
         icon: Banknote,
       },
-      // {
-      //   title: "Analytics",
-      //   url: "/dashboard/analytics",
-      //   icon: Gauge,
-      //   comingSoon: true,
-      // },
-      // {
-      //   title: "E-commerce",
-      //   url: "/dashboard/e-commerce",
-      //   icon: ShoppingBag,
-      //   comingSoon: true,
-      // },
-      // {
-      //   title: "Academy",
-      //   url: "/dashboard/academy",
-      //   icon: GraduationCap,
-      //   comingSoon: true,
-      // },
-      // {
-      //   title: "Logistics",
-      //   url: "/dashboard/logistics",
-      //   icon: Forklift,
-      //   comingSoon: true,
-      // },
+      {
+        title: "Dashboard",
+        url: "/dashboard/default",
+        icon: Home,
+      },
+      {
+        title: "Customers",
+        url: "/dashboard/customers",
+        icon: Users,
+      },
+      {
+        title: "Jobs",
+        url: "/dashboard/jobs",
+        icon: Briefcase,
+      },
+      {
+        title: "Sales Pipeline",
+        url: "/dashboard/sales_pipeline",
+        icon: Briefcase,
+      },
+      {
+        title: "Forms/Checklists",
+        url: "/forms",
+        icon: FileText,
+      },
+      {
+        title: "Schedule",
+        url: "/schedule",
+        icon: Calendar,
+      },
+      {
+        title: "Settings",
+        url: "/settings",
+        icon: Settings,
+      },
     ],
   },
   {
