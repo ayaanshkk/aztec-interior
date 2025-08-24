@@ -26,13 +26,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useRouter } from "next/navigation";
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [generatedLink, setGeneratedLink] = useState("");
+  const [formType, setFormType] = useState(""); // Track form type (bedroom or kitchen)
   const [linkCopied, setLinkCopied] = useState(false);
+  const router = useRouter();
 
   // Fetch customers from Flask API
   useEffect(() => {
@@ -44,37 +47,38 @@ export default function CustomersPage() {
 
   const filteredCustomers = customers.filter(
     (customer) =>
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.address.toLowerCase().includes(searchTerm.toLowerCase())
+      (customer.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (customer.address || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const generateFormLink = async () => {
+  const generateFormLink = async (type: "bedroom" | "kitchen") => {
     try {
-      console.log("🔗 Attempting to generate form link...");
-      
+      console.log(`🔗 Attempting to generate ${type} form link...`);
+
       const response = await fetch("http://127.0.0.1:5000/generate-form-link", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ formType: type }), // Send formType to backend
       });
-      
+
       console.log("📡 Response status:", response.status);
-      
+
       if (response.ok) {
         const data = await response.json();
-        console.log("✅ Form link generated:", data);
-        const fullLink = `${window.location.origin}/form/${data.token}`;
+        console.log(`✅ ${type} form link generated:`, data);
+        const fullLink = `${window.location.origin}/form/${data.token}?type=${type}`;
         setGeneratedLink(fullLink);
+        setFormType(type);
         setShowLinkDialog(true);
       } else {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        console.error("❌ Failed to generate form link:", errorData);
-        alert(`Failed to generate form link: ${errorData.error || 'Unknown error'}`);
+        console.error(`❌ Failed to generate ${type} form link:`, errorData);
+        alert(`Failed to generate ${type} form link: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error("❌ Network error generating form link:", error);
-      // alert(`Network error: ${error.message}. Make sure the backend server is running at http://127.0.0.1:5000`);
+      console.error(`❌ Network error generating ${type} form link:`, error);
     }
   };
 
@@ -82,6 +86,20 @@ export default function CustomersPage() {
     navigator.clipboard.writeText(generatedLink);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  const deleteCustomer = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this customer?")) return;
+    try {
+      const res = await fetch(`http://127.0.0.1:5000/customers/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete customer");
+      setCustomers(customers.filter(c => c.id !== id));
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("Error deleting customer");
+    }
   };
 
   return (
@@ -113,9 +131,13 @@ export default function CustomersPage() {
                 <Plus className="mr-2 h-4 w-4" />
                 Add Manually
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={generateFormLink}>
+              <DropdownMenuItem onClick={() => generateFormLink("kitchen")}>
                 <Link className="mr-2 h-4 w-4" />
-                Generate Form Link
+                Generate Kitchen Form Link
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => generateFormLink("bedroom")}>
+                <Link className="mr-2 h-4 w-4" />
+                Generate Bedroom Form Link
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -132,16 +154,36 @@ export default function CustomersPage() {
           </TableHeader>
           <TableBody>
             {filteredCustomers.map((customer) => (
-              <TableRow key={customer.id}>
+              <TableRow
+                key={customer.id}
+                onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                className="cursor-pointer hover:bg-muted"
+                role="button"
+                tabIndex={0}
+              >
                 <TableCell>{customer.name}</TableCell>
                 <TableCell>{customer.address}</TableCell>
                 <TableCell>{customer.phone}</TableCell>
                 <TableCell>{customer.status}</TableCell>
                 <TableCell className="flex gap-2">
-                  <Button variant="ghost" size="sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/customers/${customer.id}/edit`);
+                    }}
+                  >
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteCustomer(customer.id);
+                    }}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </TableCell>
@@ -153,9 +195,9 @@ export default function CustomersPage() {
         <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Customer Form Link Generated</DialogTitle>
+              <DialogTitle>{formType === "kitchen" ? "Kitchen" : "Bedroom"} Checklist Form Link Generated</DialogTitle>
               <DialogDescription>
-                Share this link with your customer to fill out the kitchen design form. 
+                Share this link with your customer to fill out the {formType === "kitchen" ? "kitchen" : "bedroom"} checklist form. 
                 Once submitted, they will be automatically added to your customer list.
               </DialogDescription>
             </DialogHeader>
