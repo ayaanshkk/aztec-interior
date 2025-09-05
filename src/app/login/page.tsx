@@ -1,11 +1,10 @@
 "use client";
-
 import Link from "next/link";
 import Image from "next/image";
 import { Globe } from "lucide-react";
 import { APP_CONFIG } from "@/config/app-config";
-import { LoginForm } from "/Users/razataiab/Desktop/next-shadcn-admin-dashboard/src/app/(main)/auth/_components/login-form";
-import { GoogleButton } from "/Users/razataiab/Desktop/next-shadcn-admin-dashboard/src/app/(main)/auth/_components/social-auth/google-button";
+import { LoginForm } from "../(main)/auth/_components/login-form";
+import { GoogleButton } from "../(main)/auth/_components/social-auth/google-button";
 
 export default function LoginV2Enhanced() {
   return (
