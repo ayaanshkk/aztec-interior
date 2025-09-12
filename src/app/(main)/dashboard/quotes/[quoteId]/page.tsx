@@ -87,7 +87,7 @@ export default function QuoteDetailsPage() {
               </div>
               <div className="flex flex-col">
                 <span className="text-sm text-gray-500 font-medium">Total</span>
-                <span className="text-gray-900 mt-1 text-base">£{quotation.total.toFixed(2)}</span>
+                <p className="text-sm text-gray-500">Total: £{Number(quotation.total)?.toFixed(2) ?? "—"}</p>
               </div>
               <div className="flex flex-col">
                 <span className="text-sm text-gray-500 font-medium">Notes</span>

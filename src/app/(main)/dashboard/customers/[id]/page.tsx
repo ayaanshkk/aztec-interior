@@ -30,7 +30,10 @@ import {
   Mail,
   MessageSquare,
   Calendar,
-  MapPin
+  MapPin,
+  Plus,
+  Receipt,
+  DollarSign
 } from "lucide-react";
 
 interface Customer {
@@ -50,11 +53,29 @@ interface Customer {
   updated_at: string;
   created_by: string;
   updated_by: string;
-  form_submissions: any[];
+  form_submissions: FormSubmission[];
+}
+
+interface FormSubmission {
+  id: number;
+  token_used: string;
+  submitted_at: string;
+  form_data: any;
 }
 
 // Mapping known form keys to friendly labels
 const FIELD_LABELS: Record<string, string> = {
+  customer_name: "Customer Name",
+  customer_phone: "Phone Number",
+  customer_address: "Address",
+  room: "Room",
+  survey_date: "Survey Date",
+  appointment_date: "Appointment Date",
+  installation_date: "Installation Date",
+  completion_date: "Completion Date",
+  deposit_date: "Deposit Date",
+  form_type: "Form Type",
+  signature_data: "Signature",
   first_name: "First Name",
   last_name: "Last Name",
   email: "Email",
@@ -92,6 +113,7 @@ export default function CustomerDetailsPage() {
   const [generatedLink, setGeneratedLink] = useState("");
   const [formType, setFormType] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -127,6 +149,9 @@ export default function CustomerDetailsPage() {
   }, [id]);
 
   const generateFormLink = async (type: "bedroom" | "kitchen") => {
+    if (generating) return;
+    
+    setGenerating(true);
     try {
       const response = await fetch(`http://127.0.0.1:5000/customers/${id}/generate-form-link`, {
         method: "POST",
@@ -138,16 +163,23 @@ export default function CustomerDetailsPage() {
 
       if (response.ok) {
         const data = await response.json();
-        const fullLink = `${window.location.origin}/form/${data.token}?type=${type}&customerId=${id}`;
-        setGeneratedLink(fullLink);
-        setFormType(type);
-        setShowLinkDialog(true);
+        if (data.success) {
+          const fullLink = `${window.location.origin}/form/${data.token}?type=${type}&customerId=${id}`;
+          setGeneratedLink(fullLink);
+          setFormType(type);
+          setShowLinkDialog(true);
+        } else {
+          alert(`Failed to generate ${type} form link: ${data.error}`);
+        }
       } else {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
         alert(`Failed to generate ${type} form link: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error(`Network error generating ${type} form link:`, error);
+      alert(`Network error: Please check your connection and try again.`);
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -187,6 +219,46 @@ export default function CustomerDetailsPage() {
     router.push(`/dashboard/checklists/create?customerId=${id}`);
   };
 
+  // Handlers for additional create items
+  const buildCustomerQuery = () => {
+    const qp = new URLSearchParams({
+      customerId: String(id),
+      customerName: customer?.name || '',
+      customerAddress: customer?.address || '',
+      customerPhone: customer?.phone || '',
+      customerEmail: customer?.email || ''
+    });
+    return qp.toString();
+  };
+
+  const handleCreateRemedialChecklist = () => {
+    router.push(`/dashboard/checklists/remedial/create?${buildCustomerQuery()}`);
+  };
+
+  const handleCreateReceipt = () => {
+    router.push(`/dashboard/receipts/create?type=receipt&${buildCustomerQuery()}`);
+  };
+
+  const handleCreateDepositReceipt = () => {
+    router.push(`/dashboard/receipts/create?type=deposit&${buildCustomerQuery()}`);
+  };
+
+  const handleCreateFinalReceipt = () => {
+    router.push(`/dashboard/receipts/create?type=final&${buildCustomerQuery()}`);
+  };
+
+  const handleCreateInvoice = () => {
+    router.push(`/dashboard/invoices/create?${buildCustomerQuery()}`);
+  };
+
+  const handleCreateProformaInvoice = () => {
+    router.push(`/dashboard/invoices/create?type=proforma&${buildCustomerQuery()}`);
+  };
+
+  const handleCreatePaymentTerms = () => {
+    router.push(`/dashboard/payment-terms/create?${buildCustomerQuery()}`);
+  };
+
   const handleViewQuote = (quoteId: string) => {
     router.push(`/dashboard/quotes/${quoteId}`);
   };
@@ -212,7 +284,7 @@ export default function CustomerDetailsPage() {
     }
   };
 
-  const renderFormSubmission = (submission: any) => {
+  const renderFormSubmission = (submission: FormSubmission) => {
     let formData;
     try {
       formData =
@@ -225,8 +297,9 @@ export default function CustomerDetailsPage() {
 
     if (!formData || typeof formData !== "object") {
       return (
-        <div className="bg-gray-50 p-4 rounded">
-          <pre className="text-sm overflow-x-auto">
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="font-medium text-gray-900 mb-2">Form Data</h4>
+          <pre className="text-sm overflow-x-auto text-gray-600">
             {JSON.stringify(formData, null, 2)}
           </pre>
         </div>
@@ -234,36 +307,55 @@ export default function CustomerDetailsPage() {
     }
 
     return (
-      <div className="space-y-6">
+      <div className="bg-white border rounded-lg p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Form Submission</h2>
-          <span className="text-sm text-gray-500">
-            Submitted: {formatDate(submission.submitted_at)}
-          </span>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              {formData.form_type ? `${formData.form_type.charAt(0).toUpperCase() + formData.form_type.slice(1)} Checklist` : 'Form Submission'}
+            </h3>
+            <span className="text-sm text-gray-500">
+              Submitted: {formatDate(submission.submitted_at)}
+            </span>
+          </div>
+          {formData.form_type && (
+            <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-blue-100 text-blue-800">
+              {formData.form_type}
+            </span>
+          )}
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-          {Object.entries(formData).map(([key, value]) => (
-            <div key={key} className="flex flex-col">
-              <span className="text-sm text-gray-500 font-medium">
-                {FIELD_LABELS[key] || key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
-              </span>
-              <span className="text-gray-900 mt-1 text-base">
-                {typeof value === "object" ? JSON.stringify(value) : String(value) || "—"}
-              </span>
-            </div>
-          ))}
+          {Object.entries(formData).map(([key, value]) => {
+            // Skip signature data and form type as they're displayed separately
+            if (key === 'signature_data' || key === 'form_type') return null;
+            
+            return (
+              <div key={key} className="flex flex-col">
+                <span className="text-sm text-gray-500 font-medium">
+                  {FIELD_LABELS[key] || key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                </span>
+                <span className="text-gray-900 mt-1 text-base">
+                  {typeof value === "object" ? JSON.stringify(value) : String(value) || "—"}
+                </span>
+              </div>
+            );
+          })}
         </div>
+
+        {formData.signature_data && (
+          <div className="border-t pt-4">
+            <span className="text-sm text-gray-500 font-medium">Customer Signature</span>
+            <div className="mt-2 p-4 border rounded-lg bg-gray-50">
+              <span className="text-sm text-gray-600">Signature captured</span>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
 
   if (loading) return <div className="p-8">Loading...</div>;
   if (!customer) return <div className="p-8">Customer not found.</div>;
-
-  const formSubmission = Array.isArray(customer.form_submissions) && customer.form_submissions.length > 0 
-    ? customer.form_submissions[0] 
-    : null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -281,51 +373,91 @@ export default function CustomerDetailsPage() {
           </div>
 
           <div className="flex items-center space-x-3">
-            {/* Create Dropdown Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center space-x-2">
-                  <span>Create</span>
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={handleCreateQuote} className="flex items-center space-x-2">
-                  <FileText className="h-4 w-4" />
-                  <span>Quote</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleCreateJob} className="flex items-center space-x-2">
-                  <Briefcase className="h-4 w-4" />
-                  <span>Job</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleCreateChecklist} className="flex items-center space-x-2">
-                  <CheckSquare className="h-4 w-4" />
-                  <span>Checklist</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
             {/* Generate Form Links Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center space-x-2">
+                <Button 
+                  variant="outline" 
+                  className="flex items-center space-x-2"
+                  disabled={generating}
+                >
                   <Link className="h-4 w-4" />
-                  <span>Generate Form</span>
+                  <span>{generating ? 'Generating...' : 'Generate Form'}</span>
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => generateFormLink("kitchen")} className="flex items-center space-x-2">
+                <DropdownMenuItem 
+                  onClick={() => generateFormLink("kitchen")} 
+                  className="flex items-center space-x-2"
+                  disabled={generating}
+                >
                   <Link className="h-4 w-4" />
                   <span>Kitchen Form Link</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => generateFormLink("bedroom")} className="flex items-center space-x-2">
+                <DropdownMenuItem 
+                  onClick={() => generateFormLink("bedroom")} 
+                  className="flex items-center space-x-2"
+                  disabled={generating}
+                >
                   <Link className="h-4 w-4" />
                   <span>Bedroom Form Link</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            
+
+            {/* Create Dropdown Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center p-2" aria-label="Create">
+                  <Plus className="h-4 w-4" />
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={handleCreateRemedialChecklist} className="flex items-center space-x-2">
+                  <CheckSquare className="h-4 w-4" />
+                  <span>Remedial Action Checklist</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCreateChecklist} className="flex items-center space-x-2">
+                  <CheckSquare className="h-4 w-4" />
+                  <span>Checklist</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCreateQuote} className="flex items-center space-x-2">
+                  <FileText className="h-4 w-4" />
+                  <span>Quotation</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCreateInvoice} className="flex items-center space-x-2">
+                  <FileText className="h-4 w-4" />
+                  <span>Invoice</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCreateProformaInvoice} className="flex items-center space-x-2">
+                  <FileText className="h-4 w-4" />
+                  <span>Proforma Invoice</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCreateReceipt} className="flex items-center space-x-2">
+                  <Receipt className="h-4 w-4" />
+                  <span>Receipt</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCreateDepositReceipt} className="flex items-center space-x-2">
+                  <Receipt className="h-4 w-4" />
+                  <span>Deposit Receipt</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCreateFinalReceipt} className="flex items-center space-x-2">
+                  <Receipt className="h-4 w-4" />
+                  <span>Final Receipt</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCreatePaymentTerms} className="flex items-center space-x-2">
+                  <DollarSign className="h-4 w-4" />
+                  <span>Payment Terms</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCreateJob} className="flex items-center space-x-2">
+                  <Briefcase className="h-4 w-4" />
+                  <span>Job</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button onClick={handleEdit} className="flex items-center space-x-2">
               <Edit className="h-4 w-4" />
               <span>Edit</span>
@@ -421,18 +553,22 @@ export default function CustomerDetailsPage() {
           )}
         </div>
 
-        {/* Form Submission */}
+        {/* Form Submissions */}
         <div className="border-t border-gray-200 pt-8 mb-8">
-          {formSubmission ? (
-            renderFormSubmission(formSubmission)
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Form Submissions</h2>
+          {customer.form_submissions && customer.form_submissions.length > 0 ? (
+            <div className="space-y-6">
+              {customer.form_submissions.map((submission) => (
+                <div key={submission.id}>
+                  {renderFormSubmission(submission)}
+                </div>
+              ))}
+            </div>
           ) : (
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Form Submission</h2>
-              <div className="text-gray-500 bg-gray-50 p-6 rounded-lg text-center">
-                <CheckSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="mb-2">No form submission found for this customer.</p>
-                <p className="text-sm">Generate a form link above to collect customer information.</p>
-              </div>
+            <div className="text-gray-500 bg-gray-50 p-6 rounded-lg text-center">
+              <CheckSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="mb-2">No form submissions found for this customer.</p>
+              <p className="text-sm">Generate a form link above to collect customer information.</p>
             </div>
           )}
         </div>
@@ -494,7 +630,7 @@ export default function CustomerDetailsPage() {
                     <div>
                       <h3 className="font-medium">Quote #{quote.id}</h3>
                       <p className="text-sm text-gray-500">Created: {formatDate(quote.created_at)}</p>
-                      <p className="text-sm text-gray-500">Total: £{quote.total.toFixed(2)}</p>
+                      <p className="text-sm text-gray-500">Total: £{Number(quote.total)?.toFixed(2) ?? "—"}</p>
                     </div>
                     <Button
                       onClick={() => handleViewQuote(quote.id)}
@@ -524,7 +660,7 @@ export default function CustomerDetailsPage() {
             <DialogTitle>{formType === "kitchen" ? "Kitchen" : "Bedroom"} Checklist Form Link Generated</DialogTitle>
             <DialogDescription>
               Share this link with {customer.name} to fill out the {formType === "kitchen" ? "kitchen" : "bedroom"} checklist form. 
-              The form data will be associated with their existing customer record.
+              The form data will be linked to their existing customer record.
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center space-x-2">

@@ -184,22 +184,25 @@ export default function CreateQuotePage() {
     setLoading(true);
 
     try {
-      const customerId = searchParams.get('customerId');
-      if (!customerId) {
-        throw new Error("Customer ID is required to save the quotation");
-      }
+      // --- inside handleSubmit, replace the quoteData block with this ---
+const customerId = searchParams.get('customerId');
+if (!customerId) {
+  throw new Error("Customer ID is required to save the quotation");
+}
 
-      const quoteData = {
-        customer_id: parseInt(customerId),
-        total,
-        notes: formData.notes,
-        items: items.map(item => ({
-          item: item.item,
-          description: item.description,
-          color: item.colour,
-          amount: item.amount
-        }))
-      };
+const quoteData = {
+  // send the UUID string directly (not parseInt)
+  customer_id: customerId,
+  total: Number(total), // ensure it's a Number
+  notes: formData.notes,
+  items: items.map(item => ({
+    item: item.item,
+    description: item.description,
+    color: item.colour,       // backend expects 'color'
+    amount: Number(item.amount) // ensure numeric
+  }))
+};
+
 
       const response = await fetch('http://127.0.0.1:5000/quotations', {
         method: 'POST',

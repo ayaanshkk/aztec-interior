@@ -19,36 +19,48 @@ export function CreateCustomerModal({ isOpen, onClose, onCustomerCreated }: Crea
     address: '',
     phone: '',
     email: '',
-    date_of_measure: '',
-    contact_made: 'Unknown',
-    preferred_contact_method: '',
     marketing_opt_in: false,
-    notes: ''
+    notes: '',
+    salesperson: '',
+    project_types: [] as string[], // Changed back to array for multiple types
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleInputChange = (field: string, value: string | boolean) => {
+  const handleInputChange = (field: string, value: string | boolean | string[]) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
+  const toggleProjectType = (type: string) => {
+    setFormData(prev => {
+      const exists = prev.project_types.includes(type);
+      return {
+        ...prev,
+        project_types: exists ? prev.project_types.filter(t => t !== type) : [...prev.project_types, type]
+      };
+    });
+  };
+
   const handleSubmit = async () => {
     if (!formData.name) return;
-    
+
     setIsSubmitting(true);
 
     try {
+      // Prepare payload
+      const payload = {
+        ...formData,
+        created_by: 'Current User'
+      };
+
       const response = await fetch('http://127.0.0.1:5000/customers', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...formData,
-          created_by: 'Current User' // You might want to get this from auth context
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -57,20 +69,19 @@ export function CreateCustomerModal({ isOpen, onClose, onCustomerCreated }: Crea
 
       const result = await response.json();
       console.log('Customer created:', result);
-      
+
       // Reset form
       setFormData({
         name: '',
         address: '',
         phone: '',
         email: '',
-        date_of_measure: '',
-        contact_made: 'Unknown',
-        preferred_contact_method: '',
         marketing_opt_in: false,
-        notes: ''
+        notes: '',
+        salesperson: '',
+        project_types: []
       });
-      
+
       onCustomerCreated();
       onClose();
     } catch (error) {
@@ -81,6 +92,12 @@ export function CreateCustomerModal({ isOpen, onClose, onCustomerCreated }: Crea
     }
   };
 
+  const salespeople = [
+    { id: 'alice', name: 'Alice Smith' },
+    { id: 'ben', name: 'Ben Johnson' },
+    { id: 'clara', name: 'Clara Jones' },
+  ];
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -90,7 +107,7 @@ export function CreateCustomerModal({ isOpen, onClose, onCustomerCreated }: Crea
             Add a new customer to your database. You can generate forms for them later.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -102,7 +119,7 @@ export function CreateCustomerModal({ isOpen, onClose, onCustomerCreated }: Crea
                 placeholder="Enter customer name"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
               <Input
@@ -115,27 +132,15 @@ export function CreateCustomerModal({ isOpen, onClose, onCustomerCreated }: Crea
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="Enter email address"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="date_of_measure">Date of Measure</Label>
-              <Input
-                id="date_of_measure"
-                type="date"
-                value={formData.date_of_measure}
-                onChange={(e) => handleInputChange('date_of_measure', e.target.value)}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+              placeholder="Enter email address"
+            />
           </div>
 
           <div className="space-y-2">
@@ -144,44 +149,53 @@ export function CreateCustomerModal({ isOpen, onClose, onCustomerCreated }: Crea
               id="address"
               value={formData.address}
               onChange={(e) => handleInputChange('address', e.target.value)}
-              placeholder="Enter full address (postcode will be auto-extracted)"
+              placeholder="Enter full address"
               rows={3}
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Contact Made?</Label>
+              <Label>Salesperson</Label>
               <Select
-                value={formData.contact_made}
-                onValueChange={(value) => handleInputChange('contact_made', value)}
+                value={formData.salesperson}
+                onValueChange={(value) => handleInputChange('salesperson', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select contact status" />
+                  <SelectValue placeholder="Select salesperson" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Yes">Yes</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
-                  <SelectItem value="Unknown">Unknown</SelectItem>
+                  {salespeople.map(sp => (
+                    <SelectItem key={sp.id} value={sp.name}>{sp.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
-              <Label>Preferred Contact Method</Label>
-              <Select
-                value={formData.preferred_contact_method}
-                onValueChange={(value) => handleInputChange('preferred_contact_method', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select contact method" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Phone">Phone</SelectItem>
-                  <SelectItem value="Email">Email</SelectItem>
-                  <SelectItem value="WhatsApp">WhatsApp</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Job Type</Label>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="project-bedroom"
+                    checked={formData.project_types.includes('Bedroom')}
+                    onCheckedChange={() => toggleProjectType('Bedroom')}
+                  />
+                  <Label htmlFor="project-bedroom" className="text-sm font-normal">
+                    Bedroom
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="project-kitchen"
+                    checked={formData.project_types.includes('Kitchen')}
+                    onCheckedChange={() => toggleProjectType('Kitchen')}
+                  />
+                  <Label htmlFor="project-kitchen" className="text-sm font-normal">
+                    Kitchen
+                  </Label>
+                </div>
+              </div>
             </div>
           </div>
 

@@ -74,7 +74,7 @@ export const sidebarItems: NavGroup[] = [
       },
       {
         title: "Schedule",
-        url: "/schedule",
+        url: "/dashboard/schedule",
         icon: Calendar,
       },
       {
@@ -89,7 +89,7 @@ export const sidebarItems: NavGroup[] = [
       },
       {
         title: "Settings",
-        url: "/settings",
+        url: "/dashboard/settings",
         icon: Settings,
       },
     ],
