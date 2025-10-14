@@ -59,11 +59,6 @@ export const sidebarItems: NavGroup[] = [
         icon: Home,
       },
       {
-        title: "Chatbot",
-        url: "/dashboard/chatbot",
-        icon: Bot,
-      },
-      {
         title: "Customers",
         url: "/dashboard/customers",
         icon: Users,
@@ -92,6 +87,11 @@ export const sidebarItems: NavGroup[] = [
         title: "Appliances",
         url: "/dashboard/appliances",
         icon: Forklift,
+      },
+      {
+        title: "Chatbot",
+        url: "/dashboard/chatbot",
+        icon: Bot,
       },
       {
         title: "Settings",

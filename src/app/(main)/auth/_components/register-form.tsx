@@ -31,16 +31,10 @@ const FormSchema = z
     first_name: z.string().min(1, { message: "First name is required." }),
     last_name: z.string().min(1, { message: "Last name is required." }),
     email: z.string().email({ message: "Please enter a valid email address." }),
-    phone: z
-      .string()
-      .optional()
-      .refine((v) => v === undefined || v === "" || /^\+?[\d\s\-()]{7,}$/.test(v), {
-        message: "Please enter a valid phone number.",
-      }),
-    department: z
-      .enum(["sales", "design", "installation", "admin", "management"])
-      .optional()
-      .or(z.string().optional()),
+    // phone removed
+    role: z.enum(["Admin", "Staff", "Secratary"], {
+      errorMap: () => ({ message: "Please select a role." }),
+    }),
     password: z
       .string()
       .min(8, { message: "Password must be at least 8 characters." })
@@ -66,8 +60,7 @@ export function RegisterForm() {
       first_name: "",
       last_name: "",
       email: "",
-      phone: "",
-      department: "",
+      role: "Staff", // default role
       password: "",
       confirmPassword: "",
     },
@@ -81,8 +74,7 @@ export function RegisterForm() {
       password: data.password,
       first_name: data.first_name,
       last_name: data.last_name,
-      phone: data.phone || "",
-      department: (data.department as string) || "",
+      role: (data.role as string) || "",
     };
 
     try {
@@ -172,55 +164,36 @@ export function RegisterForm() {
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="phone"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Phone</FormLabel>
-                <FormControl>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+1234567890"
-                    autoComplete="tel"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+<div className="grid grid-cols-2 gap-4">
+  <FormField
+    control={form.control}
+    name="role"
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>Role *</FormLabel>
+        <FormControl>
+          <Select
+            onValueChange={(val) => field.onChange(val)}
+            value={(field.value as string) || ""}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Admin">Admin</SelectItem>
+              <SelectItem value="Staff">Staff</SelectItem>
+              <SelectItem value="Secratary">Secratary</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
 
-          <FormField
-            control={form.control}
-            name="department"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Department</FormLabel>
-                <FormControl>
-                  <Select
-                    onValueChange={(val) => field.onChange(val)}
-                    value={(field.value as string) || ""}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sales">Sales</SelectItem>
-                      <SelectItem value="design">Design</SelectItem>
-                      <SelectItem value="installation">Installation</SelectItem>
-                      <SelectItem value="admin">Administration</SelectItem>
-                      <SelectItem value="management">Management</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+  <div /> {/* Empty right column to maintain alignment */}
+</div>
+
 
         <FormField
           control={form.control}

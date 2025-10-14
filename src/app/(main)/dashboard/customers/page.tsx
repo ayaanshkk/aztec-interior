@@ -11,8 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
+import { useAuth } from "@/contexts/AuthContext";
 
-// Job stages enum to match your backend
 type JobStage = 
   | 'Lead' 
   | 'Quote' 
@@ -29,6 +29,8 @@ type JobStage =
   | 'Complete' 
   | 'Remedial' 
   | 'Cancelled';
+
+type ProjectType = 'Bedroom' | 'Kitchen' | 'Other';
 
 interface Customer {
   id: string;
@@ -47,10 +49,9 @@ interface Customer {
   created_at: string;
   created_by: string;
   salesperson?: string;
-  project_types?: string[]; // Changed from project_type to project_types array
+  project_types?: ProjectType[];
 }
 
-// Helper function to get stage badge colors
 const getStageColor = (stage: JobStage): string => {
   switch (stage) {
     case 'Lead':
@@ -83,14 +84,27 @@ const getStageColor = (stage: JobStage): string => {
   }
 };
 
+const getProjectTypeColor = (type: ProjectType): string => {
+  switch (type) {
+    case 'Bedroom':
+      return 'bg-purple-100 text-purple-800';
+    case 'Kitchen':
+      return 'bg-blue-100 text-blue-800';
+    case 'Other':
+      return 'bg-gray-100 text-gray-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
+
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState<JobStage | 'All'>('All');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const router = useRouter();
+  const { user } = useAuth();
 
-  // Fetch customers from Flask API
   useEffect(() => {
     fetchCustomers();
   }, []);
@@ -107,7 +121,8 @@ export default function CustomersPage() {
       (customer.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer.address || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (customer.phone || "").toLowerCase().includes(searchTerm.toLowerCase());
+      (customer.phone || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (customer.postcode || "").toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStage = stageFilter === 'All' || customer.stage === stageFilter;
     
@@ -134,7 +149,7 @@ export default function CustomersPage() {
         method: "POST",
       });
       if (!res.ok) throw new Error("Failed to sync stage");
-      fetchCustomers(); // Refresh data
+      fetchCustomers();
     } catch (err) {
       console.error("Sync error:", err);
       alert("Error syncing customer stage");
@@ -155,15 +170,12 @@ export default function CustomersPage() {
     }
   };
 
-  // Get unique stages for filter dropdown
   const uniqueStages = Array.from(new Set(customers.map(c => c.stage)));
 
   return (
     <div className="w-full p-6">
-      {/* Header */}
       <h1 className="text-3xl font-bold mb-6">Customers</h1>
       
-      {/* Controls */}
       <div className="flex justify-between mb-6">
         <div className="flex gap-3">
           <div className="relative w-64">
@@ -195,25 +207,32 @@ export default function CustomersPage() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="mr-2 h-4 w-4" /> 
-          Add Customer
-        </Button>
+        {user?.role !== "Staff" && (
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Customer
+          </Button>
+        )}
       </div>
 
-      {/* Table */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact Info</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Postcode</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stage</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesperson</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Types</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                {user?.role !== "Staff" && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -226,20 +245,19 @@ export default function CustomersPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="font-medium text-gray-900">{customer.name}</div>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{customer.phone}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-500">{customer.email || "—"}</div>
+                  </td>
                   <td className="px-6 py-4">
                     <div className="max-w-xs">
                       <div className="text-sm text-gray-900">{customer.address}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="space-y-1">
-                      {customer.phone && (
-                        <div className="text-sm text-gray-900">{customer.phone}</div>
-                      )}
-                      {customer.email && (
-                        <div className="text-sm text-gray-500">{customer.email}</div>
-                      )}
-                    </div>
+                    <div className="text-sm text-gray-900">{customer.postcode || "—"}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStageColor(customer.stage)}`}>
@@ -255,46 +273,44 @@ export default function CustomersPage() {
                         {customer.project_types.map((type, index) => (
                           <span 
                             key={index}
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              type === 'Kitchen' 
-                                ? 'bg-blue-100 text-blue-800' 
-                                : 'bg-purple-100 text-purple-800'
-                            }`}
+                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getProjectTypeColor(type)}`}
                           >
                             {type}
                           </span>
                         ))}
                       </div>
                     ) : (
-                      <span className="text-sm text-gray-900">—</span>
+                      <span className="text-sm text-gray-500">—</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/customers/${customer.id}/edit`);
-                        }}
-                        title="Edit customer"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteCustomer(customer.id);
-                        }}
-                        title="Delete customer"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
+                  {user?.role !== "Staff" && (
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/customers/${customer.id}/edit`);
+                          }}
+                          title="Edit customer"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteCustomer(customer.id);
+                          }}
+                          title="Delete customer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -302,7 +318,6 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Create Customer Modal */}
       <CreateCustomerModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}

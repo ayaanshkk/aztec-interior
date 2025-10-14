@@ -1,7 +1,6 @@
+// /src/app/register/page.tsx
 import Link from "next/link";
-
 import { Command } from "lucide-react";
-
 import { RegisterForm } from "../(main)/auth/_components/register-form";
 import { GoogleButton } from "../(main)/auth/_components/social-auth/google-button";
 
