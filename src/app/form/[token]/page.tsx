@@ -347,10 +347,10 @@ export default function FormPage() {
       form_type: formType,
       customer_id: customerIdFromUrl || formData.customer_id || '',
     };
-  
+
     setIsSubmitting(true);
     setSubmitStatus({ type: null, message: '' });
-  
+
     try {
       const response = await fetch('http://localhost:5000/submit-customer-form', {
         method: 'POST',
@@ -360,14 +360,25 @@ export default function FormPage() {
           formData: finalFormData
         }),
       });
-  
+
       const result = await response.json();
-  
+
       if (response.ok && result.success) {
         setSubmitStatus({ 
           type: 'success', 
-          message: result.message || 'Form submitted successfully!' 
+          message: result.message || 'Form submitted successfully! Redirecting...' 
         });
+        
+        // Redirect after 2 seconds
+        setTimeout(() => {
+          if (result.customer_id) {
+            // Redirect to customer details page
+            window.location.href = `/dashboard/customers/${result.customer_id}`;
+          } else {
+            // Fallback: redirect to customers list
+            window.location.href = '/dashboard/customers';
+          }
+        }, 2000);
       } else {
         setSubmitStatus({ 
           type: 'error', 
@@ -383,7 +394,7 @@ export default function FormPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }; 	
+  };	
 
   if (!valid) return <p className="p-6 text-center">Invalid or expired link.</p>;
 

@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Maximize } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,8 +34,8 @@ import {
   Plus,
   Receipt,
   DollarSign,
-  Download,
   X,
+  Trash2,
 } from "lucide-react";
 
 interface Customer {
@@ -72,6 +71,10 @@ const FIELD_LABELS: Record<string, string> = {
   customer_phone: "Phone Number",
   customer_address: "Address",
   room: "Room",
+  date: "Date",
+  fitters: "Fitters",
+  items: "Items",
+  checklistType: "Checklist Type",
   survey_date: "Survey Date",
   appointment_date: "Appointment Date",
   installation_date: "Professional Installation Date",
@@ -117,6 +120,9 @@ const FIELD_LABELS: Record<string, string> = {
   signature_data: "Signature",
   signature_date: "Signature Date",
   form_type: "Form Type",
+  // Auxiliary fields used for logic, should be filtered out from general display
+  sink_tap_customer_owned: "Sink/Tap Customer Owned",
+  appliances_customer_owned: "Appliances Customer Owned",
 };
 
 const formatDate = (dateString: string) => {
@@ -152,9 +158,16 @@ export default function CustomerDetailsPage() {
   const [generating, setGenerating] = useState(false);
   const [selectedForm, setSelectedForm] = useState<FormSubmission | null>(null);
   const [showFormDialog, setShowFormDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [formToDelete, setFormToDelete] = useState<FormSubmission | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
+    loadCustomerData();
+  }, [id]);
+
+  const loadCustomerData = () => {
     setLoading(true);
 
     fetch(`http://127.0.0.1:5000/customers/${id}`)
@@ -181,7 +194,7 @@ export default function CustomerDetailsPage() {
       .then((data) => setJobs(data))
       .catch((err) => console.error("Error loading jobs:", err))
       .finally(() => setLoading(false));
-  }, [id]);
+  };
 
   const generateFormLink = async (type: "bedroom" | "kitchen") => {
     if (generating) return;
@@ -222,10 +235,38 @@ export default function CustomerDetailsPage() {
         alert(`Failed to generate ${type} form link: ${errorData.error || "Unknown error"}`);
       }
     } catch (error) {
-      console.error(`Network error generating ${type} form link:`, error);
+      console.      console.error(`Network error generating ${type} form link:`, error);
       alert(`Network error: Please check your connection and try again.`);
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleDeleteForm = async () => {
+    if (!formToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:5000/form-submissions/${formToDelete.id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (response.ok) {
+        loadCustomerData();
+        setShowDeleteDialog(false);
+        setFormToDelete(null);
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        alert(`Failed to delete form: ${errorData.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Error deleting form:", error);
+      alert("Network error: Could not delete form");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -277,7 +318,7 @@ export default function CustomerDetailsPage() {
   };
 
   const handleCreateRemedialChecklist = () => {
-    router.push(`/dashboard/checklists/remedial/create?${buildCustomerQuery()}`);
+    router.push(`/dashboard/checklists/remedial?${buildCustomerQuery()}`);
   };
 
   const handleCreateReceipt = () => {
@@ -364,7 +405,7 @@ export default function CustomerDetailsPage() {
     return String(val);
   };
 
-  const renderFormSubmission = (submission: FormSubmission) => {
+  const getFormType = (submission: FormSubmission) => {
     let formDataRaw;
     try {
       formDataRaw =
@@ -375,27 +416,113 @@ export default function CustomerDetailsPage() {
       formDataRaw = submission.form_data || {};
     }
 
-    const formTypeLocal =
-      (formDataRaw?.form_type || "")
-        .toString()
-        .toLowerCase()
-        .includes("bed")
-        ? "bedroom"
-        : (formDataRaw?.form_type || "").toString().toLowerCase().includes("kitchen")
-        ? "kitchen"
-        : (submission.token_used || "").toLowerCase().includes("bed")
-        ? "bedroom"
-        : (submission.token_used || "").toLowerCase().includes("kit")
-        ? "kitchen"
-        : (formType || "").toLowerCase();
+    const checklistType = (formDataRaw?.checklistType || "").toString().toLowerCase();
+    if (checklistType === "remedial") {
+      return "remedial";
+    }
 
+    const formType = (formDataRaw?.form_type || "").toString().toLowerCase();
+    if (formType.includes("bed")) return "bedroom";
+    if (formType.includes("kitchen")) return "kitchen";
+    
+    return "form";
+  };
+
+  const getFormTitle = (submission: FormSubmission) => {
+    const type = getFormType(submission);
+    switch (type) {
+      case "remedial":
+        return "Remedial Action Checklist";
+      case "bedroom":
+        return "Bedroom Checklist";
+      case "kitchen":
+        return "Kitchen Checklist";
+      default:
+        return "Form Submission";
+    }
+  };
+
+  const renderRemedialForm = (formData: any) => {
+    const items = formData.items || [];
+    
+    // Extract customer info from the form submission for consistency
+    const customerName = formData.customerName || formData.customer_name || "—";
+    const customerPhone = formData.customerPhone || formData.customer_phone || "—";
+    const customerAddress = formData.customerAddress || formData.customer_address || "—";
+
+    return (
+      <div className="space-y-6">
+        <section>
+          <h3 className="text-md font-semibold mb-3 text-gray-900">Customer Information</h3>
+          <div className="bg-white rounded-lg p-4 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b">
+              <div className="text-sm font-medium text-gray-700">Checklist Type</div>
+              <div className="md:col-span-2 text-sm text-gray-900">Remedial Action</div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b">
+              <div className="text-sm font-medium text-gray-700">Customer Name</div>
+              <div className="md:col-span-2 text-sm text-gray-900">{customerName}</div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b">
+              <div className="text-sm font-medium text-gray-700">Phone Number</div>
+              <div className="md:col-span-2 text-sm text-gray-900">{customerPhone}</div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b">
+              <div className="text-sm font-medium text-gray-700">Address</div>
+              <div className="md:col-span-2 text-sm text-gray-900">{customerAddress}</div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 border-b">
+              <div className="text-sm font-medium text-gray-700">Date</div>
+              <div className="md:col-span-2 text-sm text-gray-900">{formatDate(formData.date)}</div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3">
+              <div className="text-sm font-medium text-gray-700">Fitters</div>
+              <div className="md:col-span-2 text-sm text-gray-900">{formData.fitters || "—"}</div>
+            </div>
+          </div>
+        </section>
+
+        {items.length > 0 && (
+          <section>
+            <h3 className="text-md font-semibold mb-3 text-gray-900">Items Required for Remedial Action</h3>
+            <div className="bg-white rounded-lg p-4 shadow-sm overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remedial Action</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Colour</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {items.map((item: any, index: number) => (
+                    <tr key={index}>
+                      <td className="px-4 py-3 text-sm text-gray-900">{index + 1}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{item.item || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{item.remedialAction || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{item.colour || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{item.size || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{item.qty || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+      </div>
+    );
+  };
+
+  const renderFormSubmission = (submission: FormSubmission) => {
     return (
       <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50 hover:bg-gray-100 transition">
         <div className="flex flex-col">
           <h3 className="text-lg font-semibold text-gray-900">
-            {formDataRaw?.form_type
-              ? `${String(formDataRaw.form_type).charAt(0).toUpperCase() + String(formDataRaw.form_type).slice(1)} Checklist`
-              : "Checklist"}
+            {getFormTitle(submission)}
           </h3>
           <span className="text-sm text-gray-500">
             Submitted: {formatDate(submission.submitted_at)}
@@ -408,33 +535,23 @@ export default function CustomerDetailsPage() {
             onClick={() => {
               setSelectedForm(submission);
               setShowFormDialog(true);
-              setFormType(formTypeLocal);
+              setFormType(getFormType(submission));
             }}
             className="flex items-center space-x-1"
           >
             <span>Open</span>
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Options">
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-32">
-              <DropdownMenuItem onClick={() => alert("Edit clicked")}>
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => alert("Download clicked")}>
-                Download
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => alert("Delete clicked")}
-                className="text-red-600 focus:text-red-600"
-              >
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setFormToDelete(submission);
+              setShowDeleteDialog(true);
+            }}
+            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     );
@@ -597,7 +714,7 @@ export default function CustomerDetailsPage() {
                         <span
                           key={index}
                           className={`inline-flex px-2 py-1 text-sm font-semibold rounded-full ${
-                            type === "Kitchen" ? "bg-blue-100 text-blue-800" : 
+                            type === "Kitchen " ? "bg-blue-100 text-blue-800" : 
                             type === "Bedroom" ? "bg-purple-100 text-purple-800" :
                             "bg-gray-100 text-gray-800"
                           }`}
@@ -651,7 +768,7 @@ export default function CustomerDetailsPage() {
             <div className="text-gray-500 bg-gray-50 p-6 rounded-lg text-center">
               <CheckSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
               <p className="mb-2">No form submissions found for this customer.</p>
-              <p className="text-sm">Generate a form link above to collect customer information.</p>
+              <p className="text-sm">Generate a form link or create a checklist to collect customer information.</p>
             </div>
           )}
         </div>
@@ -757,72 +874,46 @@ export default function CustomerDetailsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Form Submission</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this form submission? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setFormToDelete(null);
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteForm}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showFormDialog} onOpenChange={setShowFormDialog}>
         <DialogContent className="w-[75vw] h-[75vh] max-w-none rounded-lg p-0 overflow-hidden">
           <div className="flex items-start justify-between px-6 py-4 border-b bg-white">
             <div>
               <DialogTitle className="text-lg font-semibold">
-                {selectedForm
-                  ? (() => {
-                      try {
-                        const data =
-                          typeof selectedForm.form_data === "string"
-                            ? JSON.parse(selectedForm.form_data)
-                            : selectedForm.form_data;
-                        const type = data?.form_type || "form";
-                        return type.charAt(0).toUpperCase() + type.slice(1) + " Checklist";
-                      } catch {
-                        return "Form Checklist";
-                      }
-                    })()
-                  : "Form Submission"}
+                {selectedForm ? getFormTitle(selectedForm) : "Form Submission"}
               </DialogTitle>
               <DialogDescription className="text-sm text-gray-500">
                 Submitted: {selectedForm ? formatDate(selectedForm.submitted_at) : "—"}
               </DialogDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (!selectedForm) return;
-                  try {
-                    const raw = selectedForm.form_data;
-                    const payload = typeof raw === "string" ? JSON.parse(raw) : raw;
-                    const dataToDownload = { ...payload, submitted_at: selectedForm.submitted_at };
-                    const blob = new Blob([JSON.stringify(dataToDownload, null, 2)], { type: "application/json" });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `form-${selectedForm.id}.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  } catch (error) {
-                    console.error("Error downloading form data:", error);
-                    alert("Failed to download form data");
-                  }
-                }}
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  alert("Edit functionality - implement as needed");
-                }}
-              >
-                Edit
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowFormDialog(false)}
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </Button>
             </div>
           </div>
           <div className="p-6 overflow-auto h-[calc(75vh-72px)] bg-gray-50">
@@ -835,6 +926,12 @@ export default function CustomerDetailsPage() {
                     : selectedForm.form_data || {};
                 } catch {
                   rawData = selectedForm.form_data || {};
+                }
+
+                const currentFormType = getFormType(selectedForm);
+                
+                if (currentFormType === "remedial") {
+                  return renderRemedialForm(rawData);
                 }
 
                 const inferredType = (rawData.form_type || "")
@@ -861,6 +958,7 @@ export default function CustomerDetailsPage() {
                   return <span className="text-sm">{humanizeValue(v)}</span>;
                 };
 
+                // Helper component for rendering rows
                 const Row: React.FC<{ label: string; value: any }> = ({ label, value }) => (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3 items-start border-b last:border-b-0">
                     <div className="md:col-span-1">
@@ -872,23 +970,6 @@ export default function CustomerDetailsPage() {
                   </div>
                 );
 
-                const isBedroomField = (k: string) => {
-                  return [
-                    "bedside_cabinets_type", "bedside_cabinets_qty", "dresser_desk", "dresser_desk_details",
-                    "internal_mirror", "internal_mirror_details", "mirror_type", "mirror_qty",
-                    "soffit_lights_type", "soffit_lights_color", "gable_lights_light_color", "gable_lights_light_qty",
-                    "gable_lights_profile_color", "gable_lights_profile_qty", "other_accessories", "floor_protection"
-                  ].includes(k);
-                };
-
-                const isKitchenField = (k: string) => {
-                  return [
-                    "worktop_features", "worktop_other_details", "worktop_size", "under_wall_unit_lights_color",
-                    "under_wall_unit_lights_profile", "under_worktop_lights_color", "kitchen_accessories",
-                    "sink_details", "tap_details", "other_appliances", "appliances", "drawer_color"
-                  ].includes(k);
-                };
-
                 const keys = Object.keys(rawData).filter((k) => {
                   const low = k.toLowerCase();
                   if (low.includes("customer_id") || low === "customerid" || low === "customer id") return false;
@@ -897,7 +978,6 @@ export default function CustomerDetailsPage() {
                 });
 
                 const customerInfoFields = ["customer_name", "customer_phone", "customer_address", "room"];
-                const dateFields = ["survey_date", "appointment_date", "installation_date", "completion_date", "deposit_date"];
                 const designFields = ["fitting_style", "door_color", "drawer_color", "end_panel_color", "plinth_filler_color", "cabinet_color", "worktop_color"];
                 const termsFields = ["terms_date", "gas_electric_info", "appliance_promotion_info"];
                 const signatureFields = ["signature_data", "signature_date"];
@@ -912,6 +992,9 @@ export default function CustomerDetailsPage() {
                   "under_wall_unit_lights_profile", "under_worktop_lights_color", "kitchen_accessories",
                   "sink_details", "tap_details", "other_appliances", "appliances"
                 ];
+                
+                // Fields to always skip in general sections, but might be used conditionally (like above)
+                const auxiliaryFields = ['sink_tap_customer_owned', 'appliances_customer_owned'];
 
                 return (
                   <div className="space-y-6">
@@ -920,18 +1003,6 @@ export default function CustomerDetailsPage() {
                       <div className="bg-white rounded-lg p-4 shadow-sm">
                         {customerInfoFields
                           .filter(k => keys.includes(k) && (k !== "room" || inferredType === "bedroom"))
-                          .map(k => {
-                            displayed.add(k);
-                            return <Row key={k} label={humanizeLabel(k)} value={rawData[k]} />;
-                          })}
-                      </div>
-                    </section>
-
-                    <section>
-                      <h3 className="text-md font-semibold mb-3 text-gray-900">Important Dates</h3>
-                      <div className="bg-white rounded-lg p-4 shadow-sm">
-                        {dateFields
-                          .filter(k => keys.includes(k))
                           .map(k => {
                             displayed.add(k);
                             return <Row key={k} label={humanizeLabel(k)} value={rawData[k]} />;
@@ -973,6 +1044,45 @@ export default function CustomerDetailsPage() {
                             .filter(k => keys.includes(k))
                             .map(k => {
                               displayed.add(k);
+                              
+                              // Check the sink/tap owned status (assuming this key exists in your form data)
+                              const sinkTapOwned = String(rawData.sink_tap_customer_owned).trim().toLowerCase();
+                              
+                              // Sink and Tap Logic
+                              if (k === 'sink_details' || k === 'tap_details') {
+                                if (sinkTapOwned === 'yes') {
+                                  return <Row key={k} label={humanizeLabel(k)} value="Customer Owned" />;
+                                } else if (String(rawData[k]).trim().toLowerCase() === 'no') {
+                                  return <Row key={k} label={humanizeLabel(k)} value="No" />;
+                                }
+                                // Fall through to default rendering if it contains a value other than 'yes'/'no' or is empty/null
+                                return <Row key={k} label={humanizeLabel(k)} value={rawData[k]} />;
+                              }
+                              
+                              // Check the appliances owned status
+                              const appliancesOwned = String(rawData.appliances_customer_owned).trim().toLowerCase();
+                              
+                              // Other Appliances / Appliances Logic
+                              if (k === 'other_appliances' || k === 'appliances') {
+                                if (appliancesOwned === 'yes') {
+                                  return <Row key={k} label={humanizeLabel(k)} value="Customer Owned" />;
+                                } else if (rawData[k] && Array.isArray(rawData[k])) {
+                                   // Logic to flatten appliance array for display if 'no' or value is provided
+                                   const appliancesList = rawData[k]
+                                     .filter((app: any) => app.details || app.order_date)
+                                     .map((app: any) => {
+                                       const details = app.details || 'N/A';
+                                       const orderDate = app.order_date ? ` (Order Date: ${formatDate(app.order_date)})` : '';
+                                       return `${details}${orderDate}`;
+                                     })
+                                     .join(', ');
+                                  return <Row key={k} label={humanizeLabel(k)} value={appliancesList || '—'} />;
+                                }
+                                
+                                // Show raw value if it's a string (for 'other_appliances') or dash
+                                return <Row key={k} label={humanizeLabel(k)} value={rawData[k]} />;
+                              }
+                              
                               return <Row key={k} label={humanizeLabel(k)} value={rawData[k]} />;
                             })}
                         </div>
@@ -1017,12 +1127,23 @@ export default function CustomerDetailsPage() {
                       </div>
                     </section>
 
-                    {keys.filter(k => !displayed.has(k)).length > 0 && (
+                    {keys.filter(k => !displayed.has(k) && !auxiliaryFields.includes(k)).length > 0 && (
                       <section>
                         <h3 className="text-md font-semibold mb-3 text-gray-900">Additional Information</h3>
                         <div className="bg-white rounded-lg p-4 shadow-sm">
                           {keys
-                            .filter(k => !displayed.has(k))
+                            .filter(k => {
+                              // Filter out fields already displayed, including auxiliary ones
+                              const allSpecificFields = [
+                                ...customerInfoFields, ...designFields, ...termsFields, 
+                                ...signatureFields, ...bedroomFields, ...kitchenFields, 
+                                ...auxiliaryFields
+                              ];
+
+                              if (allSpecificFields.includes(k) || displayed.has(k)) return false;
+                              
+                              return true;
+                            })
                             .map(k => {
                               displayed.add(k);
                               return <Row key={k} label={humanizeLabel(k)} value={rawData[k]} />;

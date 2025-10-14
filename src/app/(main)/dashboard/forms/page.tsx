@@ -53,11 +53,11 @@ const FormsAndChecklistsPage = () => {
   const [selectedForm, setSelectedForm] = useState<FormItem | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
   const [confirmationMessage, setConfirmationMessage] = useState<string>("");
-  
+
   // Customers state
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
-  
+
   // Link generation states
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [generatedLink, setGeneratedLink] = useState("");
@@ -106,7 +106,7 @@ const FormsAndChecklistsPage = () => {
     // KITCHEN/BEDROOM FORMS: Always require link generation for the client
     if (selectedForm?.requiresLink && selectedForm?.type) {
       await generateFormLink(selectedForm.type as "kitchen" | "bedroom", customer);
-    } 
+    }
     // REMEDIAL/GENERAL CHECKLISTS: Staff navigates directly using the shared route
     else if (selectedForm?.route) {
       const queryParams = new URLSearchParams({
@@ -116,12 +116,12 @@ const FormsAndChecklistsPage = () => {
         customerPhone: customer.phone,
         customerEmail: customer.email || "",
         // Pass the specific checklist type for the destination page
-        type: selectedForm.type || "general", 
+        type: selectedForm.type || "general",
       });
-      
+
       router.push(`${selectedForm.route}?${queryParams.toString()}`);
       setIsDialogOpen(false);
-    } 
+    }
     // For other documents
     else {
       setConfirmationMessage(`✅ ${selectedForm?.label} generated/linked for ${customer.name}.`);
@@ -133,7 +133,7 @@ const FormsAndChecklistsPage = () => {
 
     setGenerating(true);
     setConfirmationMessage(""); // Clear any previous messages
-    
+
     try {
       const response = await fetch(
         `http://127.0.0.1:5000/customers/${customer.id}/generate-form-link`,
@@ -193,29 +193,29 @@ const FormsAndChecklistsPage = () => {
     {
       title: "Checklists",
       items: [
-        { 
-          label: "Remedial Action Checklist", 
-          icon: CheckSquare, 
-          // Consolidate these internal staff checklists to a single page path
-          route: "/dashboard/checklists/internal",
+        {
+          label: "Remedial Action Checklist",
+          icon: CheckSquare,
+          // *** UPDATED ROUTE: Specific page for Remedial ***
+          route: "/dashboard/checklists/remedial",
           type: "remedial" as const,
         },
-        { 
-          label: "Checklist", 
-          icon: CheckSquare, 
-          // Consolidate these internal staff checklists to a single page path
-          route: "/dashboard/checklists/internal",
+        {
+          label: "Checklist",
+          icon: CheckSquare,
+          // Keep internal route for General Checklist
+          route: "/dashboard/checklists/internal", 
           type: "general" as const,
         },
-        { 
-          label: "Kitchen Checklist Form (Client Link)", 
-          icon: Link, 
+        {
+          label: "Kitchen Checklist Form (Client Link)",
+          icon: Link,
           type: "kitchen" as const,
           requiresLink: true // Uses generateFormLink
         },
-        { 
-          label: "Bedroom Checklist Form (Client Link)", 
-          icon: Link, 
+        {
+          label: "Bedroom Checklist Form (Client Link)",
+          icon: Link,
           type: "bedroom" as const,
           requiresLink: true // Uses generateFormLink
         },
@@ -258,7 +258,7 @@ const FormsAndChecklistsPage = () => {
               return (
                 <button
                   key={i}
-                  onClick={() => handleFormClick(item)} 
+                  onClick={() => handleFormClick(item)}
                   className="flex items-center p-4 rounded-xl border hover:bg-accent hover:text-accent-foreground transition-all space-x-3"
                 >
                   <Icon className="h-5 w-5 text-muted-foreground" />
@@ -342,7 +342,7 @@ const FormsAndChecklistsPage = () => {
             <DialogDescription>
               Share this link with{" "}
               {customers.find((c) => c.id === selectedCustomer)?.name || "the customer"} to fill out the{" "}
-              {formType === "kitchen" ? "kitchen" : "bedroom"} checklist form. 
+              {formType === "kitchen" ? "kitchen" : "bedroom"} checklist form.
               The form data will be linked to their existing customer record.
             </DialogDescription>
           </DialogHeader>
