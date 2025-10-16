@@ -70,9 +70,9 @@ type Stage = (typeof STAGES)[number];
 
 const stageColors: Record<Stage, string> = {
     Lead: "#6B7280",         
-    Survey: "#EC4899",        
-    Design: "#10B981",        
-    Quote: "#3B82F6",         
+    Survey: "#EC4899",       
+    Design: "#10B981",       
+    Quote: "#3B82F6",        
     Consultation: "#8B5CF6", 
     Quoted: "#06B6D4",
     Accepted: "#059669",
@@ -324,36 +324,40 @@ export default function EnhancedPipelinePage() {
         return false;
     };
     
-    // NOTE: filterAuditNotes function is removed as per user request to remove all notes.
-    // The previous implementation was only to prevent linting errors when the call was removed.
-    // Since the user is asking again, we remove the function definition entirely, 
-    // as it is not used in the rendering logic anymore.
+    // NOTE: All logic related to displaying notes has been removed from the rendering sections.
 
 
     // Function to map PipelineItem to Kanban features
-    const mapPipelineToFeatures = (items: PipelineItem[]) => {
-        return items.map((item) => ({
-            id: item.id,
-            name: `${item.reference} — ${item.name}`,
-            column: stageToColumnId(item.stage),
-            itemId: item.id,
-            itemType: item.type,
-            customer: item.customer,
-            job: item.job,
-            reference: item.reference,
-            stage: item.stage,
-            jobType: item.jobType,
-            quotePrice: item.quotePrice,
-            agreedPrice: item.agreedPrice,
-            soldAmount: item.soldAmount,
-            deposit1: item.deposit1,
-            deposit2: item.deposit2,
-            deposit1Paid: item.deposit1Paid,
-            deposit2Paid: item.deposit2Paid,
-            measureDate: item.measureDate,
-            deliveryDate: item.deliveryDate,
-            salesperson: item.salesperson,
-        }));
+const mapPipelineToFeatures = (items: PipelineItem[]) => {
+        return items.map((item) => {
+            // DESTRUCTURE the customer/job objects to explicitly REMOVE the 'notes' field
+            const { notes: customerNotes, ...customerWithoutNotes } = item.customer;
+            const jobWithoutNotes = item.job ? (({ notes: jobNotes, ...rest }) => rest)(item.job) : undefined;
+
+            return {
+                id: item.id,
+                name: `${item.reference} — ${item.name}`,
+                column: stageToColumnId(item.stage),
+                itemId: item.id,
+                itemType: item.type,
+                // PASS the new objects that DO NOT have the notes field
+                customer: customerWithoutNotes,
+                job: jobWithoutNotes,
+                reference: item.reference,
+                stage: item.stage,
+                jobType: item.jobType,
+                quotePrice: item.quotePrice,
+                agreedPrice: item.agreedPrice,
+                soldAmount: item.soldAmount,
+                deposit1: item.deposit1,
+                deposit2: item.deposit2,
+                deposit1Paid: item.deposit1Paid,
+                deposit2Paid: item.deposit2Paid,
+                measureDate: item.measureDate,
+                deliveryDate: item.deliveryDate,
+                salesperson: item.salesperson,
+            };
+        });
     }
 
 
@@ -1179,7 +1183,7 @@ export default function EnhancedPipelinePage() {
                                                             salesperson: feature.salesperson,
                                                         } as PipelineItem);
                                                         
-                                                        // NOTE: All notes rendering logic is explicitly removed here.
+                                                        // CONFIRMED: All notes rendering logic is explicitly removed from this return block.
 
                                                         return (
                                                             <KanbanCard
@@ -1315,10 +1319,7 @@ export default function EnhancedPipelinePage() {
                                                                             </div>
                                                                         )}
                                                                     </div>
-
-                                                                    {/* Comments - REMOVED for this version */}
                                                                     
-
                                                                     {/* Action Buttons (fixed to the bottom with padding) */}
                                                                     <div className="flex gap-1 pt-2 pb-1">
                                                                         <Button
@@ -1531,7 +1532,7 @@ export default function EnhancedPipelinePage() {
                                                         {item.customer.email}
                                                     </div>
                                                 )}
-                                                {/* Removed Notes block from here */}
+                                                {/* CONFIRMED: Notes block is removed from here */}
                                                 
                                                 {permissions.canViewFinancials && (item.deposit1 || item.deposit2) && (
                                                     <div className="flex gap-4">

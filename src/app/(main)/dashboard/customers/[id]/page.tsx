@@ -1039,7 +1039,7 @@ export default function CustomerDetailsPage() {
               </div>
             </div>
           </div>
-          {customer.notes && (
+          {customer.notes && !customer.notes.includes('Stage changed from') && (
             <div className="mt-6">
               <span className="text-sm text-gray-500 font-medium">Notes</span>
               <div className="mt-2 p-3 bg-gray-50 rounded-lg">
