@@ -94,7 +94,7 @@ export function CreateCustomerModal({
     setShowManualAddress(false);
 
     try {
-      const apiKey = process.env.NEXT_PUBLIC_GETADDRESS_API_KEY; // Your API key
+      const apiKey = '4cu8sEIbO0-xTvMTuNam1A48205'; // Your API key
       // Use autocomplete endpoint with postcode filter
       const response = await fetch(
         `https://api.getaddress.io/autocomplete/${encodeURIComponent(formData.postcode)}?api-key=${apiKey}&all=true`

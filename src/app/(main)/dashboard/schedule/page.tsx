@@ -713,11 +713,6 @@ export default function SchedulePage() {
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, day)}
                   >
-                    {overbooked && (
-                      <div className="absolute top-1 right-1">
-                        <AlertTriangle className="h-4 w-4 text-red-500" />
-                      </div>
-                    )}
 
                     <div className="text-xs text-gray-500 mb-1 flex items-center justify-between">
                       <div

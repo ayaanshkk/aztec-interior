@@ -1,6 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Download } from "lucide-react";
+import { ColumnDef } from "@tanstack/react-table";
+import { format } from "date-fns";
 
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
@@ -9,14 +12,102 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardAction } from "@/components/ui/card";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
 
-import { recentLeadsColumns } from "./columns.crm";
-import { recentLeadsData } from "./crm.config";
+// --- Define Types for Fetched Data ---
+
+// This type must match the structure from your /db/pipeline endpoint
+interface PipelineItem {
+  id: string; // 'customer-uuid' or 'job-uuid'
+  type: 'customer' | 'job';
+  customer: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    salesperson: string;
+    created_at: string; // ISO date string
+    stage: string;
+  };
+  job?: {
+    id: string;
+    stage: string;
+  };
+}
+
+// --- Define Columns for Recent Leads Table ---
+// This replaces the 'recentLeadsColumns' from the original config file
+export const recentLeadsColumns: ColumnDef<PipelineItem>[] = [
+  {
+    accessorKey: "customer.name",
+    header: "Name",
+    cell: ({ row }) => <span>{row.original.customer.name}</span>,
+  },
+  {
+    accessorKey: "customer.email",
+    header: "Email",
+    cell: ({ row }) => <span>{row.original.customer.email}</span>,
+  },
+  {
+    accessorKey: "customer.phone",
+    header: "Phone",
+    cell: ({ row }) => <span>{row.original.customer.phone}</span>,
+  },
+  {
+    accessorKey: "customer.salesperson",
+    header: "Salesperson",
+    cell: ({ row }) => <span>{row.original.customer.salesperson || "N/A"}</span>,
+  },
+  {
+    accessorKey: "customer.created_at",
+    header: "Date Added",
+    cell: ({ row }) => {
+      const date = row.original.customer.created_at;
+      return <span>{format(new Date(date), "dd MMM yyyy")}</span>;
+    },
+  },
+];
 
 export function TableCards() {
+  const [recentLeads, setRecentLeads] = useState<PipelineItem[]>([]);
+
+  useEffect(() => {
+    const fetchRecentLeads = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.error("No auth token found");
+        return;
+      }
+      
+      const headers = { 'Authorization': `Bearer ${token}` };
+
+      try {
+        const res = await fetch("http://127.0.0.1:5000/pipeline", { headers });
+        if (!res.ok) throw new Error("Failed to fetch pipeline data");
+        
+        const pipelineItems: PipelineItem[] = await res.json();
+        
+        // Filter for items in the 'Lead' stage
+        // We also sort by creation date, descending, to show newest first
+        const newLeads = pipelineItems
+          .filter(item => {
+            const stage = item.job?.stage || item.customer.stage;
+            return stage === "Lead";
+          })
+          .sort((a, b) => new Date(b.customer.created_at).getTime() - new Date(a.customer.created_at).getTime());
+          
+        setRecentLeads(newLeads);
+        
+      } catch (error) {
+        console.error("Error fetching recent leads:", error);
+      }
+    };
+
+    fetchRecentLeads();
+  }, []);
+
   const table = useDataTableInstance({
-    data: recentLeadsData,
-    columns: recentLeadsColumns,
-    getRowId: (row) => row.id.toString(),
+    data: recentLeads, // Use dynamic data
+    columns: recentLeadsColumns, // Use our new columns
+    getRowId: (row) => row.id,
   });
 
   return (

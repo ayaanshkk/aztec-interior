@@ -5,13 +5,8 @@ import {
   User, 
   Building2, 
   Users, 
-  Palette, 
-  Bell, 
-  Mail, 
   Shield, 
   Database, 
-  Calendar,
-  DollarSign,
   FileText,
   Save,
   Plus,
@@ -32,155 +27,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 // Types for settings data
 interface CompanySettings {
   name: string;
-  address: string;
+  address: string; // Keeping address as it was in original, but not on "fixed" list
   postcode: string;
   phone: string;
-  email: string;
   website: string;
-  vat_number: string;
-  registration_number: string;
-  logo_url: string;
 }
 
 interface UserSettings {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
-  role: 'Admin' | 'Manager' | 'Sales' | 'Designer' | 'Installer';
-  phone: string;
-  department: string;
+  role: 'Manager' | 'HR' | 'Sales' | 'Production' | 'Staff' | string;
   is_active: boolean;
-}
-
-interface NotificationSettings {
-  email_new_leads: boolean;
-  email_stage_changes: boolean;
-  email_reminders: boolean;
-  sms_notifications: boolean;
-  desktop_notifications: boolean;
-  daily_digest: boolean;
-}
-
-interface ProjectType {
-  id: string;
-  name: string;
-  description: string;
-  default_markup: number;
-  is_active: boolean;
-}
-
-interface JobStage {
-  id: string;
-  name: string;
-  order: number;
-  color: string;
-  is_active: boolean;
-}
-
-interface PricingSettings {
-  default_markup_percentage: number;
-  discount_approval_threshold: number;
-  hourly_rate: number;
-  consultation_fee: number;
-  design_fee: number;
-  survey_fee: number;
 }
 
 export default function SettingsPage() {
   // State management
   const [activeTab, setActiveTab] = useState("company");
   const [companySettings, setCompanySettings] = useState<CompanySettings>({
-    name: "Elite Kitchen Designs",
-    address: "123 Design Street, Leicester",
+    name: "Aztec Interiors",
+    address: "123 Design Street, Leicester", // This field remains editable as it wasn't on the "fixed" list
     postcode: "LE1 1AA",
     phone: "0116 123 4567",
-    email: "info@elitekitchens.co.uk",
-    website: "www.elitekitchens.co.uk",
-    vat_number: "GB123456789",
-    registration_number: "12345678",
-    logo_url: ""
+    website: "www.aztec-interiors.co.uk",
   });
 
-  const [users, setUsers] = useState<UserSettings[]>([
-    {
-      id: "1",
-      name: "John Smith",
-      email: "john@elitekitchens.co.uk",
-      role: "Admin",
-      phone: "0116 123 4568",
-      department: "Management",
-      is_active: true
-    },
-    {
-      id: "2", 
-      name: "Sarah Johnson",
-      email: "sarah@elitekitchens.co.uk",
-      role: "Designer",
-      phone: "0116 123 4569",
-      department: "Design",
-      is_active: true
-    }
-  ]);
-
-  const [notifications, setNotifications] = useState<NotificationSettings>({
-    email_new_leads: true,
-    email_stage_changes: true,
-    email_reminders: true,
-    sms_notifications: false,
-    desktop_notifications: true,
-    daily_digest: true
-  });
-
-  const [projectTypes, setProjectTypes] = useState<ProjectType[]>([
-    {
-      id: "1",
-      name: "Kitchen",
-      description: "Full kitchen design and installation",
-      default_markup: 35,
-      is_active: true
-    },
-    {
-      id: "2",
-      name: "Bedroom",
-      description: "Fitted bedroom furniture",
-      default_markup: 30,
-      is_active: true
-    },
-    {
-      id: "3",
-      name: "Study",
-      description: "Home office and study furniture",
-      default_markup: 25,
-      is_active: true
-    }
-  ]);
-
-  const [jobStages, setJobStages] = useState<JobStage[]>([
-    { id: "1", name: "Lead", order: 1, color: "#6B7280", is_active: true },
-    { id: "2", name: "Quote", order: 2, color: "#3B82F6", is_active: true },
-    { id: "3", name: "Consultation", order: 3, color: "#3B82F6", is_active: true },
-    { id: "4", name: "Survey", order: 4, color: "#F59E0B", is_active: true },
-    { id: "5", name: "Measure", order: 5, color: "#F59E0B", is_active: true },
-    { id: "6", name: "Design", order: 6, color: "#F97316", is_active: true },
-    { id: "7", name: "Quoted", order: 7, color: "#F97316", is_active: true },
-    { id: "8", name: "Accepted", order: 8, color: "#8B5CF6", is_active: true },
-    { id: "9", name: "Production", order: 9, color: "#8B5CF6", is_active: true },
-    { id: "10", name: "Installation", order: 10, color: "#6366F1", is_active: true },
-    { id: "11", name: "Complete", order: 11, color: "#10B981", is_active: true }
-  ]);
-
-  const [pricing, setPricing] = useState<PricingSettings>({
-    default_markup_percentage: 35,
-    discount_approval_threshold: 10,
-    hourly_rate: 75,
-    consultation_fee: 150,
-    design_fee: 500,
-    survey_fee: 100
-  });
+  // --- CHANGE HERE ---
+  // Initial user state is now an empty array instead of dummy data.
+  // The list will be populated by the fetchSettings function on component load.
+  const [users, setUsers] = useState<UserSettings[]>([]);
+  // --- END CHANGE ---
 
   const [editingUser, setEditingUser] = useState<string | null>(null);
-  const [editingProjectType, setEditingProjectType] = useState<string | null>(null);
-  const [editingJobStage, setEditingJobStage] = useState<string | null>(null);
 
   // Load settings from API
   useEffect(() => {
@@ -189,22 +68,41 @@ export default function SettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      // In real implementation, these would be separate API calls
-      // const companyRes = await fetch("http://127.0.0.1:5000/settings/company");
-      // const usersRes = await fetch("http://127.0.0.1:5000/settings/users");
-      // etc.
-      console.log("Loading settings...");
+      // Fetch all users
+      const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
+      if (!token) {
+        console.warn("No auth token found, cannot fetch users.");
+        return;
+      }
+
+      // This endpoint correctly fetches ALL users as requested previously
+      const usersRes = await fetch("http://127.0.0.1:5000/auth/users", {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!usersRes.ok) {
+        throw new Error('Failed to fetch users');
+      }
+      
+      const usersData = await usersRes.json();
+      setUsers(usersData.users); // Assuming API returns { users: [...] }
+      
+      console.log("Users loaded successfully");
+
     } catch (err) {
       console.error("Error loading settings:", err);
     }
   };
 
   const saveCompanySettings = async () => {
+    // This only saves the address now, as other fields are read-only
     try {
       const res = await fetch("http://127.0.0.1:5000/settings/company", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(companySettings)
+        body: JSON.stringify({ address: companySettings.address }) // Only send editable fields
       });
       if (!res.ok) throw new Error("Failed to save company settings");
       alert("Company settings saved successfully!");
@@ -214,44 +112,14 @@ export default function SettingsPage() {
     }
   };
 
-  const saveNotificationSettings = async () => {
-    try {
-      const res = await fetch("http://127.0.0.1:5000/settings/notifications", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(notifications)
-      });
-      if (!res.ok) throw new Error("Failed to save notification settings");
-      alert("Notification settings saved successfully!");
-    } catch (err) {
-      console.error("Save error:", err);
-      alert("Error saving notification settings");
-    }
-  };
-
-  const savePricingSettings = async () => {
-    try {
-      const res = await fetch("http://127.0.0.1:5000/settings/pricing", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pricing)
-      });
-      if (!res.ok) throw new Error("Failed to save pricing settings");
-      alert("Pricing settings saved successfully!");
-    } catch (err) {
-      console.error("Save error:", err);
-      alert("Error saving pricing settings");
-    }
-  };
 
   const addUser = () => {
     const newUser: UserSettings = {
       id: Date.now().toString(),
-      name: "",
+      first_name: "",
+      last_name: "",
       email: "",
-      role: "Sales",
-      phone: "",
-      department: "",
+      role: "Staff",
       is_active: true
     };
     setUsers([...users, newUser]);
@@ -267,8 +135,13 @@ export default function SettingsPage() {
   const deleteUser = async (id: string) => {
     if (!confirm("Are you sure you want to delete this user?")) return;
     try {
-      const res = await fetch(`http://127.0.0.1:5000/settings/users/${id}`, {
-        method: "DELETE"
+      // Assuming you need to pass a token for auth
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://127.0.0.1:5000/settings/users/${id}`, { // This endpoint might need to be /auth/users/<id>
+        method: "DELETE",
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       if (!res.ok) throw new Error("Failed to delete user");
       setUsers(users.filter(u => u.id !== id));
@@ -277,53 +150,30 @@ export default function SettingsPage() {
       alert("Error deleting user");
     }
   };
-
-  const addProjectType = () => {
-    const newProjectType: ProjectType = {
-      id: Date.now().toString(),
-      name: "",
-      description: "",
-      default_markup: 30,
-      is_active: true
-    };
-    setProjectTypes([...projectTypes, newProjectType]);
-    setEditingProjectType(newProjectType.id);
+  
+  // This function would be called by the switch, but the backend route
+  // /auth/users/<int:user_id>/toggle-status is a POST route, so
+  // updateUser state change should be followed by a save/API call.
+  // For simplicity, we just update state, but a real save would be needed.
+  const toggleUserStatus = async (id: string, newStatus: boolean) => {
+    updateUser(id, 'is_active', newStatus);
+    // In a real app, you'd call the /toggle-status endpoint here
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://127.0.0.1:5000/auth/users/${id}/toggle-status`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to toggle status');
+      console.log("User status toggled successfully");
+    } catch (err) {
+      console.error("Error toggling user status:", err);
+      // Revert state on failure
+      updateUser(id, 'is_active', !newStatus);
+      alert("Error updating user status");
+    }
   };
 
-  const updateProjectType = (id: string, field: keyof ProjectType, value: any) => {
-    setProjectTypes(projectTypes.map(type => 
-      type.id === id ? { ...type, [field]: value } : type
-    ));
-  };
-
-  const deleteProjectType = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this project type?")) return;
-    setProjectTypes(projectTypes.filter(t => t.id !== id));
-  };
-
-  const addJobStage = () => {
-    const maxOrder = Math.max(...jobStages.map(s => s.order), 0);
-    const newStage: JobStage = {
-      id: Date.now().toString(),
-      name: "",
-      order: maxOrder + 1,
-      color: "#6B7280",
-      is_active: true
-    };
-    setJobStages([...jobStages, newStage]);
-    setEditingJobStage(newStage.id);
-  };
-
-  const updateJobStage = (id: string, field: keyof JobStage, value: any) => {
-    setJobStages(jobStages.map(stage => 
-      stage.id === id ? { ...stage, [field]: value } : stage
-    ));
-  };
-
-  const deleteJobStage = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this job stage?")) return;
-    setJobStages(jobStages.filter(s => s.id !== id));
-  };
 
   return (
     <div className="w-full p-6">
@@ -335,7 +185,7 @@ export default function SettingsPage() {
 
       {/* Settings Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="company" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             Company
@@ -343,22 +193,6 @@ export default function SettingsPage() {
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Users
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="projects" className="flex items-center gap-2">
-            <Palette className="h-4 w-4" />
-            Project Types
-          </TabsTrigger>
-          <TabsTrigger value="stages" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Job Stages
-          </TabsTrigger>
-          <TabsTrigger value="pricing" className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            Pricing
           </TabsTrigger>
           <TabsTrigger value="system" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
@@ -382,7 +216,8 @@ export default function SettingsPage() {
                   <Input
                     id="company-name"
                     value={companySettings.name}
-                    onChange={(e) => setCompanySettings({...companySettings, name: e.target.value})}
+                    readOnly
+                    className="bg-gray-100"
                   />
                 </div>
                 <div className="space-y-2">
@@ -390,27 +225,29 @@ export default function SettingsPage() {
                   <Input
                     id="company-phone"
                     value={companySettings.phone}
-                    onChange={(e) => setCompanySettings({...companySettings, phone: e.target.value})}
+                    readOnly
+                    className="bg-gray-100"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="company-email">Email Address</Label>
-                  <Input
-                    id="company-email"
-                    type="email"
-                    value={companySettings.email}
-                    onChange={(e) => setCompanySettings({...companySettings, email: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="company-website">Website</Label>
                   <Input
                     id="company-website"
                     value={companySettings.website}
-                    onChange={(e) => setCompanySettings({...companySettings, website: e.target.value})}
+                    readOnly
+                    className="bg-gray-100"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company-postcode">Postcode</Label>
+                  <Input
+                    id="company-postcode"
+                    value={companySettings.postcode}
+                    readOnly
+                    className="bg-gray-100"
                   />
                 </div>
               </div>
@@ -421,40 +258,15 @@ export default function SettingsPage() {
                   id="company-address"
                   value={companySettings.address}
                   onChange={(e) => setCompanySettings({...companySettings, address: e.target.value})}
+                  placeholder="Enter company address"
                 />
-              </div>
-
-              <div className="grid grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="company-postcode">Postcode</Label>
-                  <Input
-                    id="company-postcode"
-                    value={companySettings.postcode}
-                    onChange={(e) => setCompanySettings({...companySettings, postcode: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company-vat">VAT Number</Label>
-                  <Input
-                    id="company-vat"
-                    value={companySettings.vat_number}
-                    onChange={(e) => setCompanySettings({...companySettings, vat_number: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company-reg">Company Registration</Label>
-                  <Input
-                    id="company-reg"
-                    value={companySettings.registration_number}
-                    onChange={(e) => setCompanySettings({...companySettings, registration_number: e.target.value})}
-                  />
-                </div>
+                 <p className="text-sm text-gray-500">Only the address is editable.</p>
               </div>
 
               <div className="flex justify-end">
                 <Button onClick={saveCompanySettings}>
                   <Save className="mr-2 h-4 w-4" />
-                  Save Changes
+                  Save Address
                 </Button>
               </div>
             </CardContent>
@@ -486,9 +298,15 @@ export default function SettingsPage() {
                       <div className="grid grid-cols-12 gap-4 items-center">
                         <Input
                           className="col-span-2"
-                          value={user.name}
-                          onChange={(e) => updateUser(user.id, 'name', e.target.value)}
-                          placeholder="Name"
+                          value={user.first_name}
+                          onChange={(e) => updateUser(user.id, 'first_name', e.target.value)}
+                          placeholder="First Name"
+                        />
+                        <Input
+                          className="col-span-2"
+                          value={user.last_name}
+                          onChange={(e) => updateUser(user.id, 'last_name', e.target.value)}
+                          placeholder="Last Name"
                         />
                         <Input
                           className="col-span-3"
@@ -501,42 +319,43 @@ export default function SettingsPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Admin">Admin</SelectItem>
                             <SelectItem value="Manager">Manager</SelectItem>
+                            <SelectItem value="HR">HR</SelectItem>
                             <SelectItem value="Sales">Sales</SelectItem>
-                            <SelectItem value="Designer">Designer</SelectItem>
-                            <SelectItem value="Installer">Installer</SelectItem>
+                            <SelectItem value="Production">Production</SelectItem>
+                            <SelectItem value="Staff">Staff</SelectItem>
                           </SelectContent>
                         </Select>
-                        <Input
-                          className="col-span-2"
-                          value={user.phone}
-                          onChange={(e) => updateUser(user.id, 'phone', e.target.value)}
-                          placeholder="Phone"
-                        />
-                        <Input
-                          className="col-span-2"
-                          value={user.department}
-                          onChange={(e) => updateUser(user.id, 'department', e.target.value)}
-                          placeholder="Department"
-                        />
+                        <div className="col-span-2 flex items-center gap-2">
+                           <Switch
+                            checked={user.is_active}
+                            onCheckedChange={(checked) => updateUser(user.id, 'is_active', checked)}
+                          />
+                          <Label>{user.is_active ? "Active" : "Inactive"}</Label>
+                        </div>
                         <div className="col-span-1 flex gap-1">
                           <Button size="sm" variant="ghost" onClick={() => setEditingUser(null)}>
+                            {/* TODO: Add save user logic here */}
                             <Check className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
                     ) : (
                       <div className="grid grid-cols-12 gap-4 items-center">
-                        <div className="col-span-2 font-medium">{user.name}</div>
+                        <div className="col-span-4 font-medium">{user.first_name} {user.last_name}</div>
                         <div className="col-span-3 text-sm text-gray-600">{user.email}</div>
                         <div className="col-span-2">
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                             {user.role}
                           </span>
                         </div>
-                        <div className="col-span-2 text-sm text-gray-600">{user.phone}</div>
-                        <div className="col-span-2 text-sm text-gray-600">{user.department}</div>
+                        <div className="col-span-2">
+                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {user.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
                         <div className="col-span-1 flex gap-1">
                           <Button
                             size="sm"
@@ -557,372 +376,6 @@ export default function SettingsPage() {
                     )}
                   </div>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Notification Settings */}
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>
-                Configure how and when you receive notifications
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>New Lead Notifications</Label>
-                    <p className="text-sm text-gray-500">Get notified when new leads are created</p>
-                  </div>
-                  <Switch
-                    checked={notifications.email_new_leads}
-                    onCheckedChange={(checked) => setNotifications({...notifications, email_new_leads: checked})}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Stage Change Notifications</Label>
-                    <p className="text-sm text-gray-500">Get notified when job stages change</p>
-                  </div>
-                  <Switch
-                    checked={notifications.email_stage_changes}
-                    onCheckedChange={(checked) => setNotifications({...notifications, email_stage_changes: checked})}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Reminder Notifications</Label>
-                    <p className="text-sm text-gray-500">Get reminder notifications for appointments and tasks</p>
-                  </div>
-                  <Switch
-                    checked={notifications.email_reminders}
-                    onCheckedChange={(checked) => setNotifications({...notifications, email_reminders: checked})}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>SMS Notifications</Label>
-                    <p className="text-sm text-gray-500">Receive important notifications via SMS</p>
-                  </div>
-                  <Switch
-                    checked={notifications.sms_notifications}
-                    onCheckedChange={(checked) => setNotifications({...notifications, sms_notifications: checked})}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Desktop Notifications</Label>
-                    <p className="text-sm text-gray-500">Show desktop notifications in your browser</p>
-                  </div>
-                  <Switch
-                    checked={notifications.desktop_notifications}
-                    onCheckedChange={(checked) => setNotifications({...notifications, desktop_notifications: checked})}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Daily Digest</Label>
-                    <p className="text-sm text-gray-500">Receive a daily summary of activities</p>
-                  </div>
-                  <Switch
-                    checked={notifications.daily_digest}
-                    onCheckedChange={(checked) => setNotifications({...notifications, daily_digest: checked})}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={saveNotificationSettings}>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Project Types */}
-        <TabsContent value="projects">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Project Types</CardTitle>
-                  <CardDescription>
-                    Manage the types of projects your company handles
-                  </CardDescription>
-                </div>
-                <Button onClick={addProjectType}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Project Type
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {projectTypes.map((type) => (
-                  <div key={type.id} className="border rounded-lg p-4">
-                    {editingProjectType === type.id ? (
-                      <div className="grid grid-cols-12 gap-4 items-center">
-                        <Input
-                          className="col-span-3"
-                          value={type.name}
-                          onChange={(e) => updateProjectType(type.id, 'name', e.target.value)}
-                          placeholder="Project Type Name"
-                        />
-                        <Input
-                          className="col-span-5"
-                          value={type.description}
-                          onChange={(e) => updateProjectType(type.id, 'description', e.target.value)}
-                          placeholder="Description"
-                        />
-                        <Input
-                          className="col-span-2"
-                          type="number"
-                          value={type.default_markup}
-                          onChange={(e) => updateProjectType(type.id, 'default_markup', parseFloat(e.target.value))}
-                          placeholder="Markup %"
-                        />
-                        <div className="col-span-1 flex items-center">
-                          <Switch
-                            checked={type.is_active}
-                            onCheckedChange={(checked) => updateProjectType(type.id, 'is_active', checked)}
-                          />
-                        </div>
-                        <div className="col-span-1 flex gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => setEditingProjectType(null)}>
-                            <Check className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-12 gap-4 items-center">
-                        <div className="col-span-3 font-medium">{type.name}</div>
-                        <div className="col-span-5 text-sm text-gray-600">{type.description}</div>
-                        <div className="col-span-2 text-sm">{type.default_markup}% markup</div>
-                        <div className="col-span-1">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            type.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {type.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                        <div className="col-span-1 flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditingProjectType(type.id)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => deleteProjectType(type.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Job Stages */}
-        <TabsContent value="stages">
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Job Stages</CardTitle>
-                  <CardDescription>
-                    Configure the stages that jobs progress through
-                  </CardDescription>
-                </div>
-                <Button onClick={addJobStage}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Stage
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {jobStages.sort((a, b) => a.order - b.order).map((stage) => (
-                  <div key={stage.id} className="border rounded-lg p-4">
-                    {editingJobStage === stage.id ? (
-                      <div className="grid grid-cols-12 gap-4 items-center">
-                        <Input
-                          className="col-span-3"
-                          value={stage.name}
-                          onChange={(e) => updateJobStage(stage.id, 'name', e.target.value)}
-                          placeholder="Stage Name"
-                        />
-                        <Input
-                          className="col-span-2"
-                          type="number"
-                          value={stage.order}
-                          onChange={(e) => updateJobStage(stage.id, 'order', parseInt(e.target.value))}
-                          placeholder="Order"
-                        />
-                        <Input
-                          className="col-span-3"
-                          type="color"
-                          value={stage.color}
-                          onChange={(e) => updateJobStage(stage.id, 'color', e.target.value)}
-                        />
-                        <div className="col-span-2 flex items-center gap-2">
-                          <Switch
-                            checked={stage.is_active}
-                            onCheckedChange={(checked) => updateJobStage(stage.id, 'is_active', checked)}
-                          />
-                          <span className="text-sm">Active</span>
-                        </div>
-                        <div className="col-span-2 flex gap-1">
-                          <Button size="sm" variant="ghost" onClick={() => setEditingJobStage(null)}>
-                            <Check className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-12 gap-4 items-center">
-                        <div className="col-span-3 font-medium">{stage.name}</div>
-                        <div className="col-span-2 text-sm text-gray-600">Order: {stage.order}</div>
-                        <div className="col-span-3 flex items-center gap-2">
-                          <div 
-                            className="w-6 h-6 rounded-full border" 
-                            style={{ backgroundColor: stage.color }}
-                          ></div>
-                          <span className="text-sm text-gray-600">{stage.color}</span>
-                        </div>
-                        <div className="col-span-2">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            stage.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {stage.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                        <div className="col-span-2 flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditingJobStage(stage.id)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => deleteJobStage(stage.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Pricing Settings */}
-        <TabsContent value="pricing">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pricing Settings</CardTitle>
-              <CardDescription>
-                Configure default pricing and markup settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="default-markup">Default Markup Percentage</Label>
-                  <Input
-                    id="default-markup"
-                    type="number"
-                    value={pricing.default_markup_percentage}
-                    onChange={(e) => setPricing({...pricing, default_markup_percentage: parseFloat(e.target.value)})}
-                  />
-                  <p className="text-sm text-gray-500">Default markup applied to supplier costs</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="discount-threshold">Discount Approval Threshold (%)</Label>
-                  <Input
-                    id="discount-threshold"
-                    type="number"
-                    value={pricing.discount_approval_threshold}
-                    onChange={(e) => setPricing({...pricing, discount_approval_threshold: parseFloat(e.target.value)})}
-                  />
-                  <p className="text-sm text-gray-500">Discounts above this require manager approval</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="hourly-rate">Hourly Rate (£)</Label>
-                  <Input
-                    id="hourly-rate"
-                    type="number"
-                    value={pricing.hourly_rate}
-                    onChange={(e) => setPricing({...pricing, hourly_rate: parseFloat(e.target.value)})}
-                  />
-                  <p className="text-sm text-gray-500">Standard hourly rate for labour</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="consultation-fee">Consultation Fee (£)</Label>
-                  <Input
-                    id="consultation-fee"
-                    type="number"
-                    value={pricing.consultation_fee}
-                    onChange={(e) => setPricing({...pricing, consultation_fee: parseFloat(e.target.value)})}
-                  />
-                  <p className="text-sm text-gray-500">Fee for initial consultation visits</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="design-fee">Design Fee (£)</Label>
-                  <Input
-                    id="design-fee"
-                    type="number"
-                    value={pricing.design_fee}
-                    onChange={(e) => setPricing({...pricing, design_fee: parseFloat(e.target.value)})}
-                  />
-                  <p className="text-sm text-gray-500">Fee for design and planning services</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="survey-fee">Survey Fee (£)</Label>
-                  <Input
-                    id="survey-fee"
-                    type="number"
-                    value={pricing.survey_fee}
-                    onChange={(e) => setPricing({...pricing, survey_fee: parseFloat(e.target.value)})}
-                  />
-                  <p className="text-sm text-gray-500">Fee for site surveys and measurements</p>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={savePricingSettings}>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -958,66 +411,6 @@ export default function SettingsPage() {
                   <Button variant="outline">
                     <FileText className="mr-2 h-4 w-4" />
                     Export CSV
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Email Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Email Configuration</CardTitle>
-                <CardDescription>
-                  Configure SMTP settings for sending emails
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="smtp-server">SMTP Server</Label>
-                    <Input
-                      id="smtp-server"
-                      placeholder="smtp.gmail.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="smtp-port">Port</Label>
-                    <Input
-                      id="smtp-port"
-                      placeholder="587"
-                      type="number"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="smtp-username">Username</Label>
-                    <Input
-                      id="smtp-username"
-                      placeholder="your-email@gmail.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="smtp-password">Password</Label>
-                    <Input
-                      id="smtp-password"
-                      type="password"
-                      placeholder="••••••••"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch id="smtp-ssl" />
-                  <Label htmlFor="smtp-ssl">Use SSL/TLS encryption</Label>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline">
-                    <Mail className="mr-2 h-4 w-4" />
-                    Test Connection
-                  </Button>
-                  <Button>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Email Settings
                   </Button>
                 </div>
               </CardContent>
@@ -1066,97 +459,6 @@ export default function SettingsPage() {
                   <Button>
                     <Shield className="mr-2 h-4 w-4" />
                     Save Security Settings
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Integration Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Integrations</CardTitle>
-                <CardDescription>
-                  Configure third-party integrations and API settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Mail className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium">Google Calendar</h4>
-                        <p className="text-sm text-gray-500">Sync appointments with Google Calendar</p>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Configure
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                        <FileText className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium">QuickBooks</h4>
-                        <p className="text-sm text-gray-500">Sync invoices and financial data</p>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Connect
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <Bell className="h-5 w-5 text-purple-600" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium">Slack</h4>
-                        <p className="text-sm text-gray-500">Send notifications to Slack channels</p>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Connect
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* API Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle>API Settings</CardTitle>
-                <CardDescription>
-                  Manage API keys and webhook configurations
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-4">
-                  <div>
-                    <Label>API Base URL</Label>
-                    <Input value="http://127.0.0.1:5000" readOnly className="bg-gray-50" />
-                  </div>
-                  <div>
-                    <Label>API Version</Label>
-                    <Input value="v1" readOnly className="bg-gray-50" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Webhook URL</Label>
-                    <Input placeholder="https://your-domain.com/webhook" />
-                    <p className="text-sm text-gray-500">URL to receive webhook notifications</p>
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <Button>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save API Settings
                   </Button>
                 </div>
               </CardContent>

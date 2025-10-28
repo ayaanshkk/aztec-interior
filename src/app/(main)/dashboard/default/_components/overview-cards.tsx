@@ -1,6 +1,7 @@
 "use client";
 
-import { format, subMonths } from "date-fns";
+import { useState, useEffect } from "react";
+import { format, subDays, startOfDay } from "date-fns";
 import { Wallet, BadgeDollarSign, Clock } from "lucide-react";
 import { Area, AreaChart, Line, LineChart, Bar, BarChart, XAxis, Label, Pie, PieChart, FunnelChart, Funnel, LabelList } from "recharts";
 
@@ -11,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { formatCurrency, cn } from "@/lib/utils";
 
 import {
-  leadsChartData,
+  leadsChartData, // Using dummy data for the small bar chart
   leadsChartConfig,
   proposalsChartData,
   proposalsChartConfig,
@@ -19,28 +20,151 @@ import {
   revenueChartConfig,
   leadsBySourceChartData,
   leadsBySourceChartConfig,
-  salesPipelineChartData,
+  // salesPipelineChartData, // We will now fetch this
   salesPipelineChartConfig,
-  actionItems,
+  // actionItems, // We will now fetch this
 } from "./crm.config";
 
-const lastMonth = format(subMonths(new Date(), 1), "LLLL");
+// --- Define Types for Fetched Data ---
+
+// Simplified type for pipeline items
+interface PipelineItem {
+  id: string;
+  type: 'customer' | 'job';
+  customer: {
+    id: string;
+    created_at: string;
+    stage: string;
+  };
+  job?: {
+    id: string;
+    stage: string;
+  };
+}
+
+// Type for Assignment (Action Item)
+interface AssignmentItem {
+  id: string;
+  title: string;
+  priority: 'High' | 'Medium' | 'Low' | string;
+  date: string; // ISO date string
+  status: 'Scheduled' | 'Complete' | string;
+}
+
+// Type for our processed action item
+interface ActionItem {
+  id: string;
+  title: string;
+  priority: string;
+  due: string;
+  checked: boolean;
+}
+
+// Type for our processed pipeline data
+interface PipelineStage {
+  stage: string;
+  value: number;
+  fill: string;
+}
 
 export function OverviewCards() {
+  const [newLeadsCount, setNewLeadsCount] = useState(0);
+  const [pipelineData, setPipelineData] = useState<PipelineStage[]>([]);
+  const [userActionItems, setUserActionItems] = useState<ActionItem[]>([]);
+  
   const totalLeads = leadsBySourceChartData.reduce((acc, curr) => acc + curr.leads, 0);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        console.error("No auth token found");
+        return;
+      }
+      
+      const headers = { 'Authorization': `Bearer ${token}` };
+
+      try {
+        // Fetch both pipeline and assignments data in parallel
+        const [pipelineRes, assignmentsRes] = await Promise.all([
+          fetch("http://127.0.0.1:5000/pipeline", { headers }),
+          fetch("http://127.0.0.1:5000/assignments", { headers }),
+        ]);
+
+        if (!pipelineRes.ok) throw new Error("Failed to fetch pipeline data");
+        if (!assignmentsRes.ok) throw new Error("Failed to fetch assignments data");
+        
+        const pipelineItems: PipelineItem[] = await pipelineRes.json();
+        const assignmentsData: AssignmentItem[] = await assignmentsRes.json();
+        
+        // --- 1. Process New Leads (Last 30 Days) ---
+        const thirtyDaysAgo = subDays(new Date(), 30);
+        const newLeads = pipelineItems.filter(item => {
+          // We only count new customers, not new jobs for existing customers
+          return item.type === 'customer' && new Date(item.customer.created_at) >= thirtyDaysAgo;
+        });
+        setNewLeadsCount(newLeads.length);
+
+        // --- 2. Process Sales Pipeline ---
+        const requiredStages = ["Lead", "Quoted", "Accepted", "Production", "Complete"];
+        const stageCounts: { [key: string]: number } = {
+          "Lead": 0, "Quoted": 0, "Accepted": 0, "Production": 0, "Complete": 0
+        };
+        
+        pipelineItems.forEach(item => {
+          // Use job stage if it exists, otherwise fall back to customer stage
+          const stage = item.job?.stage || item.customer.stage;
+          if (stage in stageCounts) {
+            stageCounts[stage]++;
+          }
+        });
+        
+        // Map counts to funnel chart data format
+        const newPipelineData = requiredStages.map(stage => ({
+          stage: stage,
+          value: stageCounts[stage],
+          // @ts-ignore
+          fill: salesPipelineChartConfig[stage.toLowerCase()]?.fill || "var(--color-other)",
+        }));
+        setPipelineData(newPipelineData);
+
+        // --- 3. Process Action Items ---
+        const today = startOfDay(new Date());
+        const upcomingAssignments = assignmentsData
+          .filter(item => new Date(item.date) >= today)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .slice(0, 3);
+          
+        const formattedActionItems = upcomingAssignments.map(item => ({
+          id: item.id,
+          title: item.title,
+          priority: item.priority || 'Medium',
+          due: format(new Date(item.date), "MMM d"),
+          checked: item.status === 'Complete',
+        }));
+        setUserActionItems(formattedActionItems);
+        
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   return (
     <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs sm:grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader>
           <CardTitle>New Leads</CardTitle>
-          <CardDescription>Last Month</CardDescription>
+          <CardDescription>Last 30 Days</CardDescription>
         </CardHeader>
         <CardContent className="size-full">
+          {/* This chart remains based on dummy data as requested */}
           <ChartContainer className="size-full min-h-24" config={leadsChartConfig}>
             <BarChart accessibilityLayer data={leadsChartData} barSize={8}>
               <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} hide />
-              <ChartTooltip content={<ChartTooltipContent labelFormatter={(label) => `${lastMonth}: ${label}`} />} />
+              <ChartTooltip content={<ChartTooltipContent />} />
               <Bar
                 background={{ fill: "var(--color-background)", radius: 4, opacity: 0.07 }}
                 dataKey="newLeads"
@@ -53,8 +177,9 @@ export function OverviewCards() {
           </ChartContainer>
         </CardContent>
         <CardFooter className="flex items-center justify-between">
-          <span className="text-xl font-semibold tabular-nums">635</span>
-          <span className="text-sm font-medium text-green-500">+54.6%</span>
+          {/* Dynamic Count */}
+          <span className="text-xl font-semibold tabular-nums">{newLeadsCount}</span>
+          {/* Percentage removed as it requires more complex historical data */}
         </CardFooter>
       </Card>
 
@@ -63,9 +188,10 @@ export function OverviewCards() {
           <CardTitle>Sales Pipeline</CardTitle>
         </CardHeader>
         <CardContent className="size-full">
+          {/* Dynamic Funnel Chart */}
           <ChartContainer config={salesPipelineChartConfig} className="size-full">
             <FunnelChart margin={{ left: 0, right: 0, top: 0, bottom: 0 }}>
-              <Funnel className="stroke-card stroke-2" dataKey="value" data={salesPipelineChartData}>
+              <Funnel className="stroke-card stroke-2" dataKey="value" data={pipelineData}>
                 <LabelList className="fill-foreground stroke-0 text-xs" dataKey="stage" position="right" offset={8} />
                 <LabelList className="fill-foreground stroke-0 text-xs" dataKey="value" position="left" offset={8} />
               </Funnel>
@@ -73,7 +199,7 @@ export function OverviewCards() {
           </ChartContainer>
         </CardContent>
         <CardFooter>
-          <p className="text-muted-foreground text-xs">Leads increased by 18.2% since last month.</p>
+          <p className="text-muted-foreground text-xs">Live data from all customer jobs.</p>
         </CardFooter>
       </Card>
 
@@ -82,29 +208,34 @@ export function OverviewCards() {
           <CardTitle>Action Items</CardTitle>
         </CardHeader>
         <CardContent>
+          {/* Dynamic Action Items List */}
           <ul className="space-y-2">
-            {actionItems.slice(0, 3).map((item) => (
-              <li key={item.id} className="space-y-1.5 rounded-md border px-2 py-1.5">
-                <div className="flex items-center gap-2">
-                  <Checkbox defaultChecked={item.checked} className="size-3" />
-                  <span className="text-xs font-medium">{item.title}</span>
-                  <span
-                    className={cn(
-                      "w-fit rounded-md px-1.5 py-0.5 text-xs font-medium",
-                      item.priority === "High" && "text-destructive bg-destructive/20",
-                      item.priority === "Medium" && "bg-yellow-500/20 text-yellow-500",
-                      item.priority === "Low" && "bg-green-500/20 text-green-500",
-                    )}
-                  >
-                    {item.priority}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Clock className="text-muted-foreground size-2.5" />
-                  <span className="text-muted-foreground text-xs font-medium">{item.due}</span>
-                </div>
-              </li>
-            ))}
+            {userActionItems.length > 0 ? (
+              userActionItems.map((item) => (
+                <li key={item.id} className="space-y-1.5 rounded-md border px-2 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <Checkbox defaultChecked={item.checked} className="size-3" />
+                    <span className="text-xs font-medium">{item.title}</span>
+                    <span
+                      className={cn(
+                        "w-fit rounded-md px-1.5 py-0.5 text-xs font-medium",
+                        item.priority === "High" && "text-destructive bg-destructive/20",
+                        item.priority === "Medium" && "bg-yellow-500/20 text-yellow-500",
+                        item.priority === "Low" && "bg-green-500/20 text-green-500",
+                      )}
+                    >
+                      {item.priority}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Clock className="text-muted-foreground size-2.5" />
+                    <span className="text-muted-foreground text-xs font-medium">{item.due}</span>
+                  </div>
+                </li>
+              ))
+            ) : (
+              <p className="text-xs text-muted-foreground">No upcoming action items.</p>
+            )}
           </ul>
         </CardContent>
       </Card>
@@ -114,6 +245,7 @@ export function OverviewCards() {
           <CardTitle>Leads by Source</CardTitle>
         </CardHeader>
         <CardContent className="max-h-40">
+          {/* This chart remains based on dummy data as requested */}
           <ChartContainer config={leadsBySourceChartConfig} className="size-full">
             <PieChart
               className="m-0"

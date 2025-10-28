@@ -39,6 +39,17 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
+// --- NEW INTERFACES FOR MULTI-PROJECT SUPPORT ---
+interface Project {
+  id: string;
+  project_name: string;
+  project_type: "Kitchen" | "Bedroom" | "Wardrobe" | "Remedial" | "Other";
+  stage: string;
+  date_of_measure: string | null;
+  notes: string;
+  form_count: number;
+}
+
 interface Customer {
   id: string;
   name: string;
@@ -58,8 +69,10 @@ interface Customer {
   updated_by: string;
   salesperson?: string;
   form_submissions: FormSubmission[];
-  project_types?: string[];
+  project_types?: string[]; // Legacy field - still included but projects array is primary
+  projects?: Project[]; // 💡 ADDED: Projects array
 }
+// ---------------------------------------------
 
 interface FormSubmission {
   id: number;
@@ -206,13 +219,13 @@ export default function CustomerDetailsPage() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         console.log('Page became visible, reloading financial docs...');
-        loadFinancialDocuments();
+        loadCustomerData(); 
       }
     };
 
     const handleFocus = () => {
       console.log('Window focused, reloading financial docs...');
-      loadFinancialDocuments();
+      loadCustomerData(); 
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -261,7 +274,7 @@ export default function CustomerDetailsPage() {
       .catch((err) => console.error("Error loading customer:", err));
     
     // Load financial documents
-    loadFinancialDocuments();
+    loadFinancialDocuments(headers);
     
     // Fetch jobs
     fetch(`http://127.0.0.1:5000/jobs?customer_id=${id}`, { headers })
@@ -282,32 +295,32 @@ export default function CustomerDetailsPage() {
       .finally(() => setLoading(false));
   };
 
-  const loadFinancialDocuments = () => {
-    const token = localStorage.getItem('auth_token');
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json'
-    };
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
+  const loadFinancialDocuments = (headers: HeadersInit) => {
     console.log('Fetching financial documents for customer:', id);
     
     // Fetch from multiple endpoints and combine
     Promise.all([
       fetch(`http://127.0.0.1:5000/invoices?customer_id=${id}`, { headers }).catch(() => ([] as any[])),
-      fetch(`http://127.0.0.1:5000/quotations?customer_id=${id}`, { headers }).catch(() => ([] as any[])),
+      fetch(`http://127.0.0.1:5000/quotations?customer_id=${id}`, { headers }).catch(() => ([] as any[]))
     ])
     .then(async ([invoicesRes, quotesRes]) => {
       let invoices: any[] = [];
       let quotes: any[] = [];
       
-      if (invoicesRes && invoicesRes.ok) {
-        invoices = await invoicesRes.json();
+      // Handle potential empty catch returns (which are not Response objects)
+      if (invoicesRes && 'ok' in invoicesRes && invoicesRes.ok) {
+        try {
+          invoices = await invoicesRes.json();
+        } catch (e) {
+          console.error("Failed to parse invoices JSON", e);
+        }
       }
-      if (quotesRes && quotesRes.ok) {
-        quotes = await quotesRes.json();
+      if (quotesRes && 'ok' in quotesRes && quotesRes.ok) {
+        try {
+          quotes = await quotesRes.json();
+        } catch (e) {
+          console.error("Failed to parse quotes JSON", e);
+        }
       }
       
       // Transform into unified format
@@ -316,9 +329,9 @@ export default function CustomerDetailsPage() {
           id: inv.id,
           type: "invoice" as const,
           title: `Invoice #${inv.id}`,
-          total: inv.total,
-          amount_paid: inv.amount_paid,
-          balance: inv.balance,
+          total: parseFloat(inv.total) || undefined,
+          amount_paid: parseFloat(inv.amount_paid) || undefined,
+          balance: parseFloat(inv.balance) || undefined,
           created_at: inv.created_at,
           created_by: inv.created_by,
         })),
@@ -326,9 +339,9 @@ export default function CustomerDetailsPage() {
           id: quote.id,
           type: "proforma" as const,
           title: `Quote #${quote.id}`,
-          total: quote.total,
+          total: parseFloat(quote.total) || undefined,
           amount_paid: 0,
-          balance: quote.total,
+          balance: parseFloat(quote.total) || undefined,
           created_at: quote.created_at,
           created_by: quote.created_by,
         })),
@@ -414,6 +427,19 @@ export default function CustomerDetailsPage() {
       return;
     }
     router.push(`/dashboard/customers/${id}/edit`);
+  };
+  
+  // 💡 NEW: Handle Create Project
+  const handleCreateProject = () => {
+      if (!canEdit() || !customer) return;
+
+      const queryParams = new URLSearchParams({
+          customerId: customer.id,
+          customerName: customer.name || '',
+      });
+
+      // Navigate to the new page
+      router.push(`/dashboard/projects/create?${queryParams.toString()}`);
   };
 
   const handleCreateQuote = () => {
@@ -1046,17 +1072,17 @@ export default function CustomerDetailsPage() {
               <h3 className="font-semibold text-gray-900 truncate">{doc.title}</h3>
               <p className="text-sm text-gray-500 mt-1">Created: {formatDate(doc.created_at)}</p>
               <div className="mt-2 space-y-1">
-                {doc.total && (
+                {doc.total !== undefined && doc.total !== null && (
                   <p className="text-sm font-medium text-gray-900">
                     Total: <span className="text-blue-600">£{doc.total.toFixed(2)}</span>
                   </p>
                 )}
-                {doc.amount_paid && doc.amount_paid > 0 && (
+                {doc.amount_paid !== undefined && doc.amount_paid !== null && doc.amount_paid > 0 && (
                   <p className="text-sm text-green-600">
                     Paid: £{doc.amount_paid.toFixed(2)}
                   </p>
                 )}
-                {doc.balance && doc.balance > 0 && (
+                {doc.balance !== undefined && doc.balance !== null && doc.balance > 0 && (
                   <p className="text-sm font-medium text-red-600">
                     Balance: £{doc.balance.toFixed(2)}
                   </p>
@@ -1081,7 +1107,6 @@ export default function CustomerDetailsPage() {
     if (!formToDelete || !canDelete()) return;
     setIsDeleting(true);
     try {
-        // ✅ Get the auth token
         const token = localStorage.getItem('auth_token');
         if (!token) {
         alert('You must be logged in to delete form submissions');
@@ -1089,13 +1114,12 @@ export default function CustomerDetailsPage() {
         return;
         }
 
-        // ✅ Include Authorization header
         const response = await fetch(
         `http://127.0.0.1:5000/form-submissions/${formToDelete.id}`,
         {
             method: "DELETE",
             headers: {
-            'Authorization': `Bearer ${token}`,  // ✅ This was missing!
+            'Authorization': `Bearer ${token}`, 
             'Content-Type': 'application/json',
             },
         }
@@ -1172,6 +1196,13 @@ export default function CustomerDetailsPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
+                  {/* NEW PROJECT BUTTON */}
+                  <DropdownMenuItem onClick={handleCreateProject} className="flex items-center space-x-2">
+                    <Briefcase className="h-4 w-4" />
+                    <span>New Project</span>
+                  </DropdownMenuItem>
+                  {/* END NEW PROJECT BUTTON */}
+                  
                   {user?.role !== "Sales" && (
                     <DropdownMenuItem onClick={handleCreateRemedialChecklist} className="flex items-center space-x-2">
                       <CheckSquare className="h-4 w-4" />
@@ -1305,7 +1336,7 @@ export default function CustomerDetailsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
               <div className="flex flex-col">
-                <span className="text-sm text-gray-500 font-medium">Project Type</span>
+                <span className="text-sm text-gray-500 font-medium">Project Type (Legacy)</span>
                 <div className="mt-1">
                   {customer.project_types && customer.project_types.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
@@ -1355,6 +1386,68 @@ export default function CustomerDetailsPage() {
             </div>
           )}
         </div>
+        
+        {/* ------------------------------------- */}
+        {/* 💡 NEW: PROJECTS SECTION (Multi-Project) */}
+        {/* ------------------------------------- */}
+        <div className="border-t border-gray-200 pt-8 mb-8">
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">
+                    Projects ({customer.projects?.length || 0})
+                </h2>
+                {canEdit() && (
+                    <Button onClick={handleCreateProject} className="flex items-center space-x-2">
+                        <Plus className="h-4 w-4" />
+                        <span>New Project</span>
+                    </Button>
+                )}
+            </div>
+            
+            {customer.projects && customer.projects.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {customer.projects.map((project) => (
+                        <div key={project.id} className="p-6 border rounded-lg bg-blue-50/50 shadow-sm hover:shadow-md transition-all duration-200">
+                            <div className="flex items-start justify-between">
+                                <div className="flex-1 min-w-0 pr-4">
+                                    <h3 className="font-semibold text-lg text-gray-900 truncate">{project.project_name}</h3>
+                                    <p className="text-sm text-gray-600 mt-1">Type: {project.project_type}</p>
+                                    <p className="text-sm text-gray-600">Measure Date: {formatDate(project.date_of_measure || '')}</p>
+                                    <span className={`
+                                        inline-flex px-3 py-1 text-xs font-medium rounded-full mt-2
+                                        ${project.stage === "Complete" ? "bg-green-100 text-green-800" :
+                                          project.stage === "Production" ? "bg-blue-100 text-blue-800" :
+                                          "bg-gray-100 text-gray-800"
+                                        }`}>
+                                        {project.stage}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col items-end space-y-2 ml-4">
+                                     <Button
+                                        onClick={() => router.push(`/dashboard/projects/${project.id}`)}
+                                        variant="outline"
+                                        size="sm"
+                                    >
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        View Details
+                                    </Button>
+                                    <p className="text-xs text-gray-500">{project.form_count} Forms</p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-gray-500 bg-gray-50 p-8 rounded-lg text-center">
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Projects Yet</h3>
+                    <p className="text-sm">Create a new project to track specific kitchen/bedroom work.</p>
+                </div>
+            )}
+        </div>
+        
+        {/* ------------------------------------- */}
+        {/* END NEW: PROJECTS SECTION */}
+        {/* ------------------------------------- */}
+
 
         {/* FORM SUBMISSIONS SECTION */}
         <div className="border-t border-gray-200 pt-8 mb-8">
