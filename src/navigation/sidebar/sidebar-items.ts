@@ -61,49 +61,49 @@ const allSidebarItems: NavGroup[] = [
         title: "Dashboard",
         url: "/dashboard/default",
         icon: Home,
-        roles: ["manager", "HR", "sales", "production"],
+        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
       },
       {
         title: "Customers",
         url: "/dashboard/customers",
         icon: Users,
-        roles: ["manager", "HR", "sales", "production"],
+        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
       },
       {
         title: "Jobs",
         url: "/dashboard/jobs",
         icon: Briefcase,
-        roles: ["manager", "HR", "production"],
+        roles: ["manager", "hr", "production"], // ✅ Changed HR to hr
       },
       {
         title: "Sales Pipeline",
         url: "/dashboard/sales_pipeline",
         icon: Briefcase,
-        roles: ["manager", "HR", "sales", "production"],
+        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
       },
       {
         title: "Schedule",
         url: "/dashboard/schedule",
         icon: Calendar,
-        roles: ["manager", "HR", "sales", "production"],
+        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
       },
       {
         title: "Forms/Checklists",
         url: "/dashboard/forms",
         icon: FileText,
-        roles: ["manager", "HR", "sales", "production"],
+        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
       },
       {
         title: "Appliances",
         url: "/dashboard/appliances",
         icon: Forklift,
-        roles: ["manager", "HR", "production"],
+        roles: ["manager", "hr", "production"], // ✅ Changed HR to hr
       },
       {
         title: "Chatbot",
         url: "/dashboard/chatbot",
         icon: Bot,
-        roles: ["manager", "HR", "sales", "production"],
+        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
       },
       {
         title: "Approvals",
@@ -115,7 +115,7 @@ const allSidebarItems: NavGroup[] = [
         title: "Settings",
         url: "/dashboard/settings",
         icon: Settings,
-        roles: ["manager", "HR", "sales", "production"],
+        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
       },
     ],
   },
@@ -123,6 +123,7 @@ const allSidebarItems: NavGroup[] = [
 
 // Filter sidebar items based on user role
 export const getSidebarItems = (userRole: string): NavGroup[] => {
+  const normalizedRole = userRole?.toLowerCase();
   return allSidebarItems
     .map((group) => ({
       ...group,
