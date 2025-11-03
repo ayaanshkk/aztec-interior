@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchWithAuth } from "@/lib/api"; // ✅ Import fetchWithAuth
 
 const FIELD_LABELS: Record<string, string> = {
   first_name: "First Name",
@@ -53,7 +54,7 @@ export default function CustomerEditPage() {
     if (!id) return;
     setLoading(true);
 
-    fetch(`https://aztec-interiors.onrender.com/customers/${id}`)
+    fetchWithAuth(`/customers/${id}`) // ✅ Use fetchWithAuth
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch customer");
         return res.json();
@@ -175,29 +176,25 @@ export default function CustomerEditPage() {
 
     try {
       const apiKey = process.env.NEXT_PUBLIC_GETADDRESS_API_KEY;
+      // ✅ Use Find endpoint instead of autocomplete (saves API calls)
+      const cleanPostcode = customer.postcode.replace(/\s/g, '');
       const response = await fetch(
-        `https://api.getaddress.io/autocomplete/${encodeURIComponent(customer.postcode)}?api-key=${apiKey}&all=true`,
+        `https://api.getaddress.io/find/${encodeURIComponent(cleanPostcode)}?api-key=${apiKey}&expand=true`
       );
 
       if (response.ok) {
         const data = await response.json();
 
-        if (data.suggestions && data.suggestions.length > 0) {
-          const addressPromises = data.suggestions.map((suggestion: any) =>
-            fetch(`https://api.getaddress.io/get/${suggestion.id}?api-key=${apiKey}`).then((res) => res.json()),
-          );
-
-          const addressDetails = await Promise.all(addressPromises);
-
-          const formattedAddresses: Address[] = addressDetails.map((addr: any) => ({
-            line_1: addr.line_1,
-            line_2: addr.line_2,
-            line_3: addr.line_3,
-            post_town: addr.town_or_city,
+        if (data.addresses && data.addresses.length > 0) {
+          const formattedAddresses: Address[] = data.addresses.map((addr: any) => ({
+            line_1: addr.line_1 || addr.formatted_address?.[0] || '',
+            line_2: addr.line_2 || addr.formatted_address?.[1] || '',
+            line_3: addr.line_3 || addr.formatted_address?.[2] || '',
+            post_town: addr.town_or_city || addr.formatted_address?.[5] || '',
             postcode: customer.postcode,
-            formatted_address: [addr.line_1, addr.line_2, addr.line_3, addr.town_or_city, customer.postcode]
-              .filter(Boolean)
-              .join(", "),
+            formatted_address: addr.formatted_address?.filter(Boolean).join(', ') || 
+                             [addr.line_1, addr.line_2, addr.line_3, addr.town_or_city, customer.postcode]
+                               .filter(Boolean).join(', ')
           }));
 
           setAddresses(formattedAddresses);
@@ -210,7 +207,7 @@ export default function CustomerEditPage() {
 
         if (response.status === 404) {
           alert(
-            "API Key Error: The getAddress.io API key appears to be invalid. Please check your API key configuration.",
+            "No addresses found for this postcode, or API key issue. Please enter manually.",
           );
         }
         setShowManualAddress(true);
@@ -273,9 +270,9 @@ export default function CustomerEditPage() {
         form_submissions: [{ form_data: formData }],
       };
 
-      const response = await fetch(`https://aztec-interiors.onrender.com/customers/${id}`, {
+      // ✅ Use fetchWithAuth for authenticated PUT request
+      const response = await fetchWithAuth(`/customers/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedCustomer),
       });
 
