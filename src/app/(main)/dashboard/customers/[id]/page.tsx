@@ -568,6 +568,46 @@ export default function CustomerDetailsPage() {
     window.open(viewUrl, "_blank"); // Open in a new tab
   };
 
+  const handleDeleteDrawing = async (drawing: DrawingDocument) => {
+  if (isDeletingDrawing) return;
+
+  setDrawingToDelete(drawing);
+  setShowDeleteDrawingDialog(true);
+};
+
+const handleConfirmDeleteDrawing = async () => {
+  if (!drawingToDelete) return;
+
+  setIsDeletingDrawing(true);
+  const token = localStorage.getItem("auth_token");
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  try {
+    const res = await fetch(
+      `https://aztec-interiors.onrender.com/files/drawings/${drawingToDelete.id}`,
+      { method: "DELETE", headers }
+    );
+
+    if (res.ok) {
+      // Remove from UI
+      setDrawingDocuments((prev) =>
+        prev.filter((d) => d.id !== drawingToDelete.id)
+      );
+      setShowDeleteDrawingDialog(false);
+      setDrawingToDelete(null);
+    } else {
+      const err = await res.json().catch(() => ({ error: "Server error" }));
+      alert(`Failed to delete: ${err.error}`);
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Network error");
+  } finally {
+    setIsDeletingDrawing(false);
+  }
+};
+
   // NEW FUNCTION: Render Drawing Document Card
   const renderDrawingDocument = (doc: DrawingDocument) => {
     const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
@@ -715,11 +755,10 @@ export default function CustomerDetailsPage() {
 
   const canEdit = (): boolean => {
     if (!customer) return false;
-    if (user?.role === "Manager" || user?.role === "HR" || user?.role === "Production") return true;
-    if (user?.role === "Sales") {
-      return customer.created_by === String(user.id) || customer.salesperson === user.name;
-    }
-    return false;
+    
+    // All staff roles can edit customers
+    const allowedRoles = ["Manager", "HR", "Production", "Sales"];
+    return allowedRoles.includes(user?.role || "");
   };
 
   const canDelete = (): boolean => {
@@ -1879,12 +1918,57 @@ export default function CustomerDetailsPage() {
               </Button>
             )}
           </div>
+
           {drawingDocuments.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Sort documents by creation date, newest first */}
               {drawingDocuments
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                .map((doc) => renderDrawingDocument(doc))}
+                .map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex flex-1 items-start space-x-4">
+                        <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
+                          {DRAWING_DOCUMENT_ICONS[doc.type] || <FileText className="h-5 w-5 text-gray-600" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
+                          <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
+                          {doc.project_id && <p className="mt-1 text-xs text-blue-500">Project ID: {doc.project_id}</p>}
+                        </div>
+                      </div>
+
+                      {/* ⭐ THIS IS THE CRITICAL SECTION - BUTTONS GO HERE ⭐ */}
+                      <div className="ml-6 flex items-center space-x-2">
+                        <Button
+                          onClick={() => handleViewDrawing(doc)}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center space-x-2"
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span>View</span>
+                        </Button>
+
+                        {canEdit() && (
+                          <Button
+                            onClick={() => handleDeleteDrawing(doc)}
+                            disabled={isDeletingDrawing}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>Delete</span>
+                          </Button>
+                        )}
+                      </div>
+                      {/* ⭐ END OF CRITICAL SECTION ⭐ */}
+                    </div>
+                  </div>
+                ))}
             </div>
           ) : (
             <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-8 text-center">
@@ -1893,7 +1977,6 @@ export default function CustomerDetailsPage() {
               <p className="text-sm text-gray-600">Upload CADs, sketches, photos, or client documentation here.</p>
             </div>
           )}
-        </div>
 
         {/* FORM SUBMISSIONS SECTION */}
         <div className="mb-8 border-t border-gray-200 pt-8">
@@ -2293,11 +2376,15 @@ export default function CustomerDetailsPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDrawingDialog(false)} disabled={isDeletingDrawing}>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDrawingDialog(false)}
+              disabled={isDeletingDrawing}
+            >
               Cancel
             </Button>
             <Button
-              onClick={handleDeleteDrawing}
+              onClick={handleConfirmDeleteDrawing}   // <-- call the real delete
               disabled={isDeletingDrawing}
               className="bg-red-600 text-white hover:bg-red-700"
             >

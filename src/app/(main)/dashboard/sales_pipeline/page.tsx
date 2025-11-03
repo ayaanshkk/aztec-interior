@@ -42,6 +42,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { format, addDays, isWithinInterval } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { fetchWithAuth } from "@/lib/api";
+import { useRouter } from "next/navigation";
+
+const router = useRouter();
+
 // --- START OF STAGE AND ROLE DEFINITIONS ---
 
 const STAGES = [
@@ -252,6 +256,7 @@ const columnIdToStage = (colId: string): Stage => {
 const stageToColumnId = (stage: Stage) => `col-${stage.toLowerCase().replace(/\s+/g, "-")}`;
 
 export default function EnhancedPipelinePage() {
+  const router = useRouter();
   // State management
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -1055,7 +1060,11 @@ export default function EnhancedPipelinePage() {
   };
 
   const handleOpenCustomer = (customerId: string) => {
-    window.location.href = `/dashboard/customers/${customerId}`;
+    // Clean the ID just in case it has prefixes
+    const cleanId = customerId.replace('customer-', '');
+    
+    // Use router for smooth navigation
+    router.push(`/dashboard/customers/${cleanId}`);
   };
 
   const handleCreateJob = () => {
@@ -1063,7 +1072,7 @@ export default function EnhancedPipelinePage() {
       alert("You don't have permission to create new jobs.");
       return;
     }
-    window.location.href = "/dashboard/jobs/new";
+    router.push("/dashboard/jobs");  // Use router.push instead
   };
 
   const handleCreateCustomer = () => {
@@ -1632,14 +1641,12 @@ export default function EnhancedPipelinePage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenItem(item.id, item.type)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Open {item.type === "customer" ? "Customer" : item.type === "project" ? "Project" : "Job"}
-                          </DropdownMenuItem>
+                          {/* REMOVED: "Open Customer" - keeping only View Customer */}
                           <DropdownMenuItem onClick={() => handleOpenCustomer(item.customer.id)}>
                             <Users className="mr-2 h-4 w-4" />
                             View Customer
                           </DropdownMenuItem>
+                          
                           {/* Conditional menu items based on permissions and stage */}
                           {permissions.canSendQuotes &&
                             isEditable &&
@@ -1649,6 +1656,7 @@ export default function EnhancedPipelinePage() {
                                 Send Quote
                               </DropdownMenuItem>
                             )}
+                          
                           {permissions.canSchedule &&
                             (item.stage === "Survey" || item.stage === "Installation" || item.stage === "Delivery") && (
                               <DropdownMenuItem onClick={() => handleSchedule(item.id)}>
@@ -1656,30 +1664,45 @@ export default function EnhancedPipelinePage() {
                                 Schedule
                               </DropdownMenuItem>
                             )}
+                          
                           {(item.type === "job" || item.type === "project") && (
                             <DropdownMenuItem onClick={() => handleViewDocuments(item.id)}>
                               <File className="mr-2 h-4 w-4" />
                               View Documents
                             </DropdownMenuItem>
                           )}
-                          {permissions.canEdit &&
-                            isEditable &&
-                            item.stage !== "Accepted" &&
-                            item.stage !== "Complete" && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  setEditDialog({
-                                    open: true,
-                                    itemId: item.id,
-                                    newStage: "Accepted",
-                                    itemType: item.type,
-                                  })
-                                }
-                              >
-                                <Check className="mr-2 h-4 w-4" />
-                                Mark Accepted
-                              </DropdownMenuItem>
-                            )}
+                          
+                          {/* NEW: Change Stage submenu - shows all available stages */}
+                          {permissions.canEdit && isEditable && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel>Change Stage</DropdownMenuLabel>
+                              {STAGES.filter(stage => stage !== item.stage).map((stage) => {
+                                // Get the stage color for visual indicator
+                                const stageColor = stageColors[stage];
+                                
+                                return (
+                                  <DropdownMenuItem
+                                    key={stage}
+                                    onClick={() =>
+                                      setEditDialog({
+                                        open: true,
+                                        itemId: item.id,
+                                        newStage: stage,
+                                        itemType: item.type,
+                                      })
+                                    }
+                                  >
+                                    <div 
+                                      className="mr-2 h-3 w-3 rounded-full" 
+                                      style={{ backgroundColor: stageColor }}
+                                    />
+                                    Move to {stage}
+                                  </DropdownMenuItem>
+                                );
+                              })}
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
