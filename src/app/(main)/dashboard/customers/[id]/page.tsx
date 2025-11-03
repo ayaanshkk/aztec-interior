@@ -3,46 +3,45 @@ import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
 import {
-  ArrowLeft,
-  Edit,
-  FileText,
-  ChevronDown,
-  Briefcase,
-  CheckSquare,
-  Copy,
-  Check,
-  Phone,
-  Mail,
-  MessageSquare,
-  Calendar,
-  MapPin,
-  Plus,
-  Receipt,
-  DollarSign,
-  Trash2,
-  AlertCircle,
-  Eye,
-  X,
-  Package,
-  Image,
-  Upload,
+  ArrowLeft,
+  Edit,
+  FileText,
+  ChevronDown,
+  Briefcase,
+  CheckSquare,
+  Copy,
+  Check,
+  Phone,
+  Mail,
+  MessageSquare,
+  Calendar,
+  MapPin,
+  Plus,
+  Receipt,
+  DollarSign,
+  Trash2,
+  AlertCircle,
+  Eye,
+  X,
+  Package,
+  Image,
+  Upload,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Label } from "@/components/ui/label"; // <-- ADD THIS
@@ -299,10 +298,13 @@ export default function CustomerDetailsPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectForms, setProjectForms] = useState<FormSubmission[]>([]);
   const [projectDocs, setProjectDocs] = useState<FinancialDocument[]>([]);
-
   const [showEditProjectDialog, setShowEditProjectDialog] = useState(false);
   const [editProjectData, setEditProjectData] = useState<Partial<Project>>({});
   const [isSavingProject, setIsSavingProject] = useState(false);
+
+  const [showDeleteDrawingDialog, setShowDeleteDrawingDialog] = useState(false);
+  const [drawingToDelete, setDrawingToDelete] = useState<DrawingDocument | null>(null);
+  const [isDeletingDrawing, setIsDeletingDrawing] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -1549,7 +1551,7 @@ export default function CustomerDetailsPage() {
   if (!customer) return <div className="p-8">Customer not found.</div>;
 
   // Get all project types for display
-  const allProjectTypes = customer.projects?.map((p) => p.project_type) || customer.project_types || [];
+  const allProjectTypes = customer.projects?.map((p) => p.project_type).filter(Boolean) || [];
 
   return (
     <div className="min-h-screen bg-white">
@@ -2282,29 +2284,26 @@ export default function CustomerDetailsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <Dialog open={showDeleteDrawingDialog} onOpenChange={setShowDeleteDrawingDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Form Submission</DialogTitle>
+            <DialogTitle>Delete Drawing</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this form submission? This action cannot be undone.
+              Are you sure you want to delete <strong>{drawingToDelete?.filename}</strong>? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4 flex justify-end space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowDeleteDialog(false);
-                setFormToDelete(null);
-              }}
-              disabled={isDeleting}
-            >
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDrawingDialog(false)} disabled={isDeletingDrawing}>
               Cancel
             </Button>
-            <Button onClick={handleDeleteForm} disabled={isDeleting} className="bg-red-600 text-white hover:bg-red-700">
-              {isDeleting ? "Deleting..." : "Delete"}
+            <Button
+              onClick={handleDeleteDrawing}
+              disabled={isDeletingDrawing}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isDeletingDrawing ? "Deleting..." : "Delete"}
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

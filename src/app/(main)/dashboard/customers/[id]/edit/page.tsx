@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Save, Search, AlertCircle } from "lucide-react";
@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchWithAuth } from "@/lib/api"; // ✅ Import fetchWithAuth
+import { fetchWithAuth } from "@/lib/api";
 
 const FIELD_LABELS: Record<string, string> = {
   first_name: "First Name",
@@ -31,8 +31,13 @@ interface Address {
   formatted_address: string;
 }
 
-// Sales role can only update customer through Quoted stage
-const SALES_ALLOWED_STAGES = ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted"];
+// Define stage permissions by role
+const ROLE_STAGE_PERMISSIONS: Record<string, string[]> = {
+  Sales: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted"],
+  Production: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "OnHold", "Production", "Delivery", "Installation"],
+  Manager: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "OnHold", "Production", "Delivery", "Installation", "Complete", "Remedial", "Cancelled"],
+  HR: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "OnHold", "Production", "Delivery", "Installation", "Complete", "Remedial", "Cancelled"],
+};
 
 export default function CustomerEditPage() {
   const params = useParams();
@@ -48,28 +53,17 @@ export default function CustomerEditPage() {
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [showManualAddress, setShowManualAddress] = useState(false);
   const [selectedAddressIndex, setSelectedAddressIndex] = useState<string>("");
-  const [hasAccess, setHasAccess] = useState(true);
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
 
-    fetchWithAuth(`/customers/${id}`) // ✅ Use fetchWithAuth
+    fetchWithAuth(`/customers/${id}`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch customer");
         return res.json();
       })
       .then((data) => {
-        // Check if user has permission to edit this customer
-        if (user?.role === "Sales") {
-          const hasPermission = data.created_by === user.id || data.salesperson === user.name;
-          setHasAccess(hasPermission);
-          if (!hasPermission) {
-            setLoading(false);
-            return;
-          }
-        }
-
         // Check for receipt submission redirect
         const receiptSubmission = data.form_submissions?.find((sub: any) => {
           const submissionData =
@@ -176,7 +170,6 @@ export default function CustomerEditPage() {
 
     try {
       const apiKey = process.env.NEXT_PUBLIC_GETADDRESS_API_KEY;
-      // ✅ Use Find endpoint instead of autocomplete (saves API calls)
       const cleanPostcode = customer.postcode.replace(/\s/g, '');
       const response = await fetch(
         `https://api.getaddress.io/find/${encodeURIComponent(cleanPostcode)}?api-key=${apiKey}&expand=true`
@@ -270,7 +263,6 @@ export default function CustomerEditPage() {
         form_submissions: [{ form_data: formData }],
       };
 
-      // ✅ Use fetchWithAuth for authenticated PUT request
       const response = await fetchWithAuth(`/customers/${id}`, {
         method: "PUT",
         body: JSON.stringify(updatedCustomer),
@@ -291,57 +283,35 @@ export default function CustomerEditPage() {
   };
 
   const getAvailableStages = () => {
-    if (user?.role === "Sales") {
-      return SALES_ALLOWED_STAGES;
+    const userRole = user?.role || "Sales";
+    // Default to all stages if role not found in permissions
+    return ROLE_STAGE_PERMISSIONS[userRole] || ROLE_STAGE_PERMISSIONS["Sales"];
+  };
+
+  const getRoleMessage = () => {
+    const userRole = user?.role || "";
+    
+    if (userRole === "Sales") {
+      return {
+        title: "Sales User Permissions",
+        message: "You can edit customer details and update stages up to 'Quoted'. For production stages and beyond, please contact your manager."
+      };
+    } else if (userRole === "Production") {
+      return {
+        title: "Production User Permissions",
+        message: "You can edit customer details and update stages up to 'Installation'. For final stages, please contact your manager."
+      };
     }
-    return [
-      "Lead",
-      "Quote",
-      "Consultation",
-      "Survey",
-      "Measure",
-      "Design",
-      "Quoted",
-      "Accepted",
-      "OnHold",
-      "Production",
-      "Delivery",
-      "Installation",
-      "Complete",
-      "Remedial",
-      "Cancelled",
-    ];
+    
+    return null;
   };
 
   if (loading) return <div className="p-8">Loading...</div>;
 
-  if (!hasAccess) {
-    return (
-      <div className="min-h-screen bg-white">
-        <div className="border-b border-gray-200 bg-white px-8 py-6">
-          <div className="flex items-center space-x-2">
-            <div
-              onClick={() => router.push("/dashboard/customers")}
-              className="flex cursor-pointer items-center text-gray-500 hover:text-gray-700"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </div>
-            <h1 className="text-3xl font-semibold text-gray-900">Access Denied</h1>
-          </div>
-        </div>
-        <div className="px-8 py-12 text-center">
-          <AlertCircle className="mx-auto mb-4 h-16 w-16 text-red-500" />
-          <h2 className="mb-2 text-2xl font-semibold text-gray-900">No Access</h2>
-          <p className="mb-6 text-gray-600">You don't have permission to edit this customer's details.</p>
-          <Button onClick={() => router.push("/dashboard/customers")}>Return to Customers</Button>
-        </div>
-      </div>
-    );
-  }
-
   if (!customer) return <div className="p-8">Customer not found.</div>;
 
   const availableStages = getAvailableStages();
+  const roleMessage = getRoleMessage();
 
   return (
     <div className="min-h-screen bg-white">
@@ -358,16 +328,13 @@ export default function CustomerEditPage() {
       </div>
 
       <div className="px-8 py-6">
-        {user?.role === "Sales" && (
+        {roleMessage && (
           <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
             <div className="flex items-start space-x-2">
               <AlertCircle className="mt-0.5 h-5 w-5 text-blue-600" />
               <div>
-                <p className="text-sm font-medium text-blue-800">Sales User Permissions</p>
-                <p className="mt-1 text-sm text-blue-700">
-                  You can edit customer details and update stages up to "Quoted". For production stages and beyond,
-                  please contact your manager.
-                </p>
+                <p className="text-sm font-medium text-blue-800">{roleMessage.title}</p>
+                <p className="mt-1 text-sm text-blue-700">{roleMessage.message}</p>
               </div>
             </div>
           </div>
@@ -501,6 +468,7 @@ export default function CustomerEditPage() {
               <Label className="mb-1 text-sm font-medium text-gray-500">
                 Stage
                 {user?.role === "Sales" && <span className="ml-2 text-xs text-gray-500">(Up to Quoted)</span>}
+                {user?.role === "Production" && <span className="ml-2 text-xs text-gray-500">(Up to Installation)</span>}
               </Label>
               <Select
                 value={customer.status || "Lead"}
