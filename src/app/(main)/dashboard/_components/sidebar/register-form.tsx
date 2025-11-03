@@ -123,30 +123,20 @@ export function RegisterForm() {
       />
 
       <label className="text-sm">Role</label>
-      <select
-        name="role"
-        value={form.role}
-        onChange={onChange}
-        className="select"
-        aria-label="Select role"
-      >
+      <select name="role" value={form.role} onChange={onChange} className="select" aria-label="Select role">
         <option>Admin</option>
         <option>Staff</option>
         <option>Secratary</option>
       </select>
 
-      {error && <div className="text-sm text-destructive">{error}</div>}
-      {success && <div className="text-sm text-success">{success}</div>}
+      {error && <div className="text-destructive text-sm">{error}</div>}
+      {success && <div className="text-success text-sm">{success}</div>}
 
-      <button
-        type="submit"
-        className="btn"
-        disabled={loading}
-      >
+      <button type="submit" className="btn" disabled={loading}>
         {loading ? "Registering..." : "Create account"}
       </button>
 
-      <p className="text-muted-foreground text-xs text-center">
+      <p className="text-muted-foreground text-center text-xs">
         Already have an account?{" "}
         <Link href="/login" className="text-primary">
           Login

@@ -3,7 +3,21 @@
 import { useState, useEffect } from "react";
 import { format, subDays, startOfDay } from "date-fns";
 import { Wallet, BadgeDollarSign, Clock } from "lucide-react";
-import { Area, AreaChart, Line, LineChart, Bar, BarChart, XAxis, Label, Pie, PieChart, FunnelChart, Funnel, LabelList } from "recharts";
+import {
+  Area,
+  AreaChart,
+  Line,
+  LineChart,
+  Bar,
+  BarChart,
+  XAxis,
+  Label,
+  Pie,
+  PieChart,
+  FunnelChart,
+  Funnel,
+  LabelList,
+} from "recharts";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +44,7 @@ import {
 // Simplified type for pipeline items
 interface PipelineItem {
   id: string;
-  type: 'customer' | 'job';
+  type: "customer" | "job";
   customer: {
     id: string;
     created_at: string;
@@ -46,9 +60,9 @@ interface PipelineItem {
 interface AssignmentItem {
   id: string;
   title: string;
-  priority: 'High' | 'Medium' | 'Low' | string;
+  priority: "High" | "Medium" | "Low" | string;
   date: string; // ISO date string
-  status: 'Scheduled' | 'Complete' | string;
+  status: "Scheduled" | "Complete" | string;
 }
 
 // Type for our processed action item
@@ -71,56 +85,60 @@ export function OverviewCards() {
   const [newLeadsCount, setNewLeadsCount] = useState(0);
   const [pipelineData, setPipelineData] = useState<PipelineStage[]>([]);
   const [userActionItems, setUserActionItems] = useState<ActionItem[]>([]);
-  
+
   const totalLeads = leadsBySourceChartData.reduce((acc, curr) => acc + curr.leads, 0);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem("auth_token");
       if (!token) {
         console.error("No auth token found");
         return;
       }
-      
-      const headers = { 'Authorization': `Bearer ${token}` };
+
+      const headers = { Authorization: `Bearer ${token}` };
 
       try {
         // Fetch both pipeline and assignments data in parallel
         const [pipelineRes, assignmentsRes] = await Promise.all([
-          fetch("http://127.0.0.1:5000/pipeline", { headers }),
-          fetch("http://127.0.0.1:5000/assignments", { headers }),
+          fetch("https://aztec-interiors.onrender.com/pipeline", { headers }),
+          fetch("https://aztec-interiors.onrender.com/assignments", { headers }),
         ]);
 
         if (!pipelineRes.ok) throw new Error("Failed to fetch pipeline data");
         if (!assignmentsRes.ok) throw new Error("Failed to fetch assignments data");
-        
+
         const pipelineItems: PipelineItem[] = await pipelineRes.json();
         const assignmentsData: AssignmentItem[] = await assignmentsRes.json();
-        
+
         // --- 1. Process New Leads (Last 30 Days) ---
         const thirtyDaysAgo = subDays(new Date(), 30);
-        const newLeads = pipelineItems.filter(item => {
+        const newLeads = pipelineItems.filter((item) => {
           // We only count new customers, not new jobs for existing customers
-          return item.type === 'customer' && new Date(item.customer.created_at) >= thirtyDaysAgo;
+          return item.type === "customer" && new Date(item.customer.created_at) >= thirtyDaysAgo;
         });
         setNewLeadsCount(newLeads.length);
 
         // --- 2. Process Sales Pipeline ---
         const requiredStages = ["Lead", "Quoted", "Accepted", "Production", "Complete"];
         const stageCounts: { [key: string]: number } = {
-          "Lead": 0, "Quoted": 0, "Accepted": 0, "Production": 0, "Complete": 0
+          Lead: 0,
+          Quoted: 0,
+          Accepted: 0,
+          Production: 0,
+          Complete: 0,
         };
-        
-        pipelineItems.forEach(item => {
+
+        pipelineItems.forEach((item) => {
           // Use job stage if it exists, otherwise fall back to customer stage
           const stage = item.job?.stage || item.customer.stage;
           if (stage in stageCounts) {
             stageCounts[stage]++;
           }
         });
-        
+
         // Map counts to funnel chart data format
-        const newPipelineData = requiredStages.map(stage => ({
+        const newPipelineData = requiredStages.map((stage) => ({
           stage: stage,
           value: stageCounts[stage],
           // @ts-ignore
@@ -131,19 +149,18 @@ export function OverviewCards() {
         // --- 3. Process Action Items ---
         const today = startOfDay(new Date());
         const upcomingAssignments = assignmentsData
-          .filter(item => new Date(item.date) >= today)
+          .filter((item) => new Date(item.date) >= today)
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
           .slice(0, 3);
-          
-        const formattedActionItems = upcomingAssignments.map(item => ({
+
+        const formattedActionItems = upcomingAssignments.map((item) => ({
           id: item.id,
           title: item.title,
-          priority: item.priority || 'Medium',
+          priority: item.priority || "Medium",
           due: format(new Date(item.date), "MMM d"),
-          checked: item.status === 'Complete',
+          checked: item.status === "Complete",
         }));
         setUserActionItems(formattedActionItems);
-        
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       }
@@ -234,7 +251,7 @@ export function OverviewCards() {
                 </li>
               ))
             ) : (
-              <p className="text-xs text-muted-foreground">No upcoming action items.</p>
+              <p className="text-muted-foreground text-xs">No upcoming action items.</p>
             )}
           </ul>
         </CardContent>
@@ -299,7 +316,7 @@ export function OverviewCards() {
                           <span className="size-2 rounded-full" style={{ background: item.fill }} />
                           <span className="text-xs">{leadsBySourceChartConfig[item.source].label}</span>
                         </span>
-                        <span className="tabular-nums text-xs">{item.leads}</span>
+                        <span className="text-xs tabular-nums">{item.leads}</span>
                       </li>
                     ))}
                   </ul>

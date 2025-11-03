@@ -2,20 +2,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
-  DropdownMenuItem, // <-- ADDED
-  DropdownMenuLabel, // <-- ADDED
-  DropdownMenuSeparator, // <-- ADDED
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -40,11 +34,13 @@ import {
   RefreshCw,
   Trash2,
   ChevronDown,
-  Check, // <-- ADDED
-  X, // <-- ADDED
-  Archive, // <-- ADDED
+  Check,
+  X,
+  Archive,
 } from "lucide-react";
+import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
 
+// ... interfaces stay the same ...
 interface Employee {
   id: number;
   full_name: string;
@@ -82,23 +78,22 @@ interface Assignment {
   priority?: string;
   status?: string;
   user_id?: number;
-  team_member?: string; // Assigned To (Name)
-  job_type?: string; // <-- ADDED (Task 1)
-  created_by?: number; // <-- ADDED (Task 2)
-  created_by_name?: string; // <-- ADDED (Task 2)
-  updated_by?: number; // <-- ADDED (Task 2)
-  updated_by_name?: string; // <-- ADDED (Task 2)
+  team_member?: string;
+  job_type?: string;
+  created_by?: number;
+  created_by_name?: string;
+  updated_by?: number;
+  updated_by_name?: string;
 }
 
-// --- CONSTANTS FOR WEEK VIEW ---
-const START_HOUR_WEEK = 7; // 7 AM
-const HOUR_HEIGHT_PX = 60; // 60px per hour
-const timeSlotsWeek = Array.from({ length: 14 }, (_, i) => { // 7 AM to 8 PM (14 hours)
+// ... constants stay the same ...
+const START_HOUR_WEEK = 7;
+const HOUR_HEIGHT_PX = 60;
+const timeSlotsWeek = Array.from({ length: 14 }, (_, i) => {
   const hour = i + START_HOUR_WEEK;
-  return `${String(hour).padStart(2, '0')}:00`;
+  return `${String(hour).padStart(2, "0")}:00`;
 });
 
-// --- NEW STATIC LIST FOR JOB TYPES ---
 const interiorDesignJobTypes = [
   "Consultation",
   "Space Planning",
@@ -119,14 +114,12 @@ export default function SchedulePage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  
-  // --- MODIFIED STATE FOR VIEW/EDIT MODAL (Task 3) ---
+
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
-  const [originalAssignment, setOriginalAssignment] = useState<Assignment | null>(null); // To restore on cancel
+  const [originalAssignment, setOriginalAssignment] = useState<Assignment | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showAssignmentDialog, setShowAssignmentDialog] = useState(false); // Renamed from showEditDialog
-  const [isEditingAssignment, setIsEditingAssignment] = useState(false); // Controls view/edit state
-  // --- END MODIFIED STATE ---
+  const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
+  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -137,14 +130,13 @@ export default function SchedulePage() {
     start_time: "09:00",
     end_time: "17:00",
     priority: "Medium",
-    status: "Scheduled", // Default status
+    status: "Scheduled",
     estimated_hours: 8,
   });
 
   const [viewMode, setViewMode] = useState<"month" | "week" | "year">("month");
 
-  // --- MEMOS FOR CALENDAR DAYS ---
-
+  // ... all memos stay the same ...
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -178,7 +170,7 @@ export default function SchedulePage() {
   const daysOfWeek = useMemo(() => {
     const startOfWeek = new Date(currentDate);
     const day = startOfWeek.getDay();
-    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
     startOfWeek.setDate(diff);
 
     const days: Date[] = [];
@@ -191,25 +183,25 @@ export default function SchedulePage() {
   }, [currentDate]);
 
   const assignmentsByDate = useMemo(() => {
-    return assignments.reduce((acc, assignment) => {
-      const dateKey = assignment.date;
-      if (!acc[dateKey]) {
-        acc[dateKey] = [];
-      }
-      acc[dateKey].push(assignment);
-      return acc;
-    }, {} as Record<string, Assignment[]>);
+    return assignments.reduce(
+      (acc, assignment) => {
+        const dateKey = assignment.date;
+        if (!acc[dateKey]) {
+          acc[dateKey] = [];
+        }
+        acc[dateKey].push(assignment);
+        return acc;
+      },
+      {} as Record<string, Assignment[]>,
+    );
   }, [assignments]);
 
-  // --- NEW MEMO FOR DECLINED ASSIGNMENTS (Task 7) ---
   const declinedAssignments = useMemo(() => {
-    if (user?.role === 'Manager') return [];
-    return assignments.filter(a => a.user_id === user?.id && a.status === 'Declined');
+    if (user?.role === "Manager") return [];
+    return assignments.filter((a) => a.user_id === user?.id && a.status === "Declined");
   }, [assignments, user]);
 
-
-  // --- FORMATTING & NAVIGATION ---
-
+  // ... formatting & navigation functions stay the same ...
   const formatDateKey = (date: Date | string) => {
     if (typeof date === "string") return date;
     const yyyy = date.getFullYear();
@@ -219,10 +211,10 @@ export default function SchedulePage() {
   };
 
   const formatHeaderDate = (date: Date, view: "month" | "week" | "year") => {
-    if (view === 'year') {
+    if (view === "year") {
       return date.getFullYear().toString();
     }
-    if (view === 'week') {
+    if (view === "week") {
       const startOfWeek = new Date(date);
       const day = startOfWeek.getDay();
       const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
@@ -236,7 +228,6 @@ export default function SchedulePage() {
       }
       return `${startOfWeek.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} - ${endOfWeek.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
     }
-    // default to month
     return date.toLocaleDateString("en-GB", {
       month: "long",
       year: "numeric",
@@ -245,56 +236,52 @@ export default function SchedulePage() {
 
   const navigateView = (direction: "prev" | "next") => {
     const newDate = new Date(currentDate);
-    if (viewMode === 'month') {
+    if (viewMode === "month") {
       newDate.setMonth(newDate.getMonth() + (direction === "prev" ? -1 : 1));
-    } else if (viewMode === 'week') {
+    } else if (viewMode === "week") {
       newDate.setDate(newDate.getDate() + (direction === "prev" ? -7 : 7));
-    } else if (viewMode === 'year') {
+    } else if (viewMode === "year") {
       newDate.setFullYear(newDate.getFullYear() + (direction === "prev" ? -1 : 1));
     }
     setCurrentDate(newDate);
   };
 
-  // --- TIME & ASSIGNMENT HELPERS ---
-
   const calculateHours = (start?: string, end?: string) => {
-    if (!start || !end) return '';
+    if (!start || !end) return "";
     const startDate = new Date(`2000-01-01T${start}:00`);
     const endDate = new Date(`2000-01-01T${end}:00`);
     const diffMs = endDate.getTime() - startDate.getTime();
-    if (diffMs <= 0) return '';
+    if (diffMs <= 0) return "";
     return (diffMs / (1000 * 60 * 60)).toFixed(2);
   };
 
   const timeToMinutes = (time: string = "00:00") => {
-    const [hours, minutes] = time.split(':').map(Number);
+    const [hours, minutes] = time.split(":").map(Number);
     return hours * 60 + (minutes || 0);
   };
 
   const getAssignmentWeekStyle = (start?: string, end?: string): React.CSSProperties => {
     if (!start || !end) {
-      // Default for untimed (e.g., 'note', 'delivery')
       return { top: 0, height: `${HOUR_HEIGHT_PX}px` };
     }
 
     const startMinutes = timeToMinutes(start);
     const endMinutes = timeToMinutes(end);
 
-    const top = ((startMinutes - (START_HOUR_WEEK * 60)) / 60) * HOUR_HEIGHT_PX;
-    const durationMinutes = Math.max(30, endMinutes - startMinutes); // Min 30 min height
+    const top = ((startMinutes - START_HOUR_WEEK * 60) / 60) * HOUR_HEIGHT_PX;
+    const durationMinutes = Math.max(30, endMinutes - startMinutes);
     const height = (durationMinutes / 60) * HOUR_HEIGHT_PX;
 
     return {
       top: `${top}px`,
       height: `${height}px`,
-      position: 'absolute',
-      left: '0.25rem', // p-1
-      right: '0.25rem'
+      position: "absolute",
+      left: "0.25rem",
+      right: "0.25rem",
     };
   };
 
-  // --- DATA FETCHING & CRUD ---
-
+  // --- UPDATED DATA FETCHING ---
   const fetchData = async () => {
     if (!token || !user) return;
 
@@ -303,19 +290,13 @@ export default function SchedulePage() {
       setError(null);
 
       const [assignmentsRes, jobsRes, customersRes] = await Promise.all([
-        fetch('http://127.0.0.1:5000/assignments', {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch('http://127.0.0.1:5000/jobs/available', {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch('http://127.0.0.1:5000/customers/active', {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        fetchWithAuth("assignments"), // Updated
+        fetchWithAuth("jobs/available"), // Updated
+        fetchWithAuth("customers/active"), // Updated
       ]);
 
       if (!assignmentsRes.ok || !jobsRes.ok || !customersRes.ok) {
-        throw new Error('API not available');
+        throw new Error("API not available");
       }
 
       const [assignmentsData, jobsData, customersData] = await Promise.all([
@@ -328,30 +309,30 @@ export default function SchedulePage() {
       setAvailableJobs(jobsData);
       setCustomers(customersData);
     } catch (err) {
-      console.error('Error fetching data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load data');
+      console.error("Error fetching data:", err);
+      setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
     }
   };
 
-  // --- MODIFIED createAssignment ---
+  // --- UPDATED CRUD OPERATIONS ---
   const createAssignment = async (assignmentData: Partial<Assignment>) => {
-    if (!token) throw new Error('Not authenticated');
+    if (!token) throw new Error("Not authenticated");
 
     try {
       setSaving(true);
 
-      let title = assignmentData.title || ""; // <-- Check for pre-set title (e.g., from job_type)
+      let title = assignmentData.title || "";
 
-      if (!title) { // If no title, generate one
+      if (!title) {
         switch (assignmentData.type) {
           case "job":
             if (assignmentData.job_id) {
-              const job = availableJobs.find(j => j.id === assignmentData.job_id);
+              const job = availableJobs.find((j) => j.id === assignmentData.job_id);
               title = job ? `${job.job_reference} - ${job.customer_name}` : "Job Assignment";
             } else if (assignmentData.customer_id) {
-              const customer = customers.find(c => c.id === assignmentData.customer_id);
+              const customer = customers.find((c) => c.id === assignmentData.customer_id);
               title = customer ? `Job - ${customer.name}` : "Job Assignment";
             } else {
               title = "Job Assignment";
@@ -370,41 +351,37 @@ export default function SchedulePage() {
             title = "Assignment";
         }
       } else if (assignmentData.type === "job" && assignmentData.customer_id && !assignmentData.job_id) {
-        // If title *was* set (e.g., "Consultation") and customer was *also* set, but it's not a full job
-        const customer = customers.find(c => c.id === assignmentData.customer_id);
+        const customer = customers.find((c) => c.id === assignmentData.customer_id);
         if (customer) {
-          title = `${title} - ${customer.name}`; // e.g., "Consultation - John Doe"
+          title = `${title} - ${customer.name}`;
         }
       }
 
       const finalAssignmentData = {
         ...assignmentData,
-        title, // Use the determined title
+        title,
         user_id: assignmentData.user_id || user?.id,
-        status: (user?.role === 'Manager' || assignmentData.user_id === user?.id) ? 'Accepted' : 'Scheduled', // Auto-accept self-assigned/manager-assigned
+        status: user?.role === "Manager" || assignmentData.user_id === user?.id ? "Accepted" : "Scheduled",
       };
 
-      console.log('Sending assignment data:', finalAssignmentData);
+      console.log("Sending assignment data:", finalAssignmentData);
 
-      const response = await fetch('http://127.0.0.1:5000/assignments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+      const response = await fetchWithAuth("assignments", {
+        // Updated
+        method: "POST",
         body: JSON.stringify(finalAssignmentData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create assignment');
+        throw new Error(errorData.error || "Failed to create assignment");
       }
 
       const result = await response.json();
-      setAssignments(prev => [...prev, result.assignment]);
+      setAssignments((prev) => [...prev, result.assignment]);
       return result.assignment;
     } catch (err) {
-      console.error('Error creating assignment:', err);
+      console.error("Error creating assignment:", err);
       throw err;
     } finally {
       setSaving(false);
@@ -412,30 +389,26 @@ export default function SchedulePage() {
   };
 
   const updateAssignment = async (id: string, assignmentData: Partial<Assignment>) => {
-    if (!token) throw new Error('Not authenticated');
+    if (!token) throw new Error("Not authenticated");
 
     try {
       setSaving(true);
-      const response = await fetch(`http://127.0.0.1:5000/assignments/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+      const response = await fetchWithAuth(`assignments/${id}`, {
+        // Updated
+        method: "PUT",
         body: JSON.stringify(assignmentData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update assignment');
+        throw new Error(errorData.error || "Failed to update assignment");
       }
 
       const result = await response.json();
-      setAssignments(prev => prev.map(a => a.id === id ? result.assignment : a));
+      setAssignments((prev) => prev.map((a) => (a.id === id ? result.assignment : a)));
       return result.assignment;
-    } catch (err)
- {
-      console.error('Error updating assignment:', err);
+    } catch (err) {
+      console.error("Error updating assignment:", err);
       throw err;
     } finally {
       setSaving(false);
@@ -443,56 +416,48 @@ export default function SchedulePage() {
   };
 
   const deleteAssignment = async (id: string) => {
-    if (!token) throw new Error('Not authenticated');
+    if (!token) throw new Error("Not authenticated");
 
     try {
       setSaving(true);
-      const response = await fetch(`http://127.0.0.1:5000/assignments/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await fetchWithAuth(`assignments/${id}`, {
+        // Updated
+        method: "DELETE",
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete assignment');
+        throw new Error(errorData.error || "Failed to delete assignment");
       }
 
-      setAssignments(prev => prev.filter(a => a.id !== id));
+      setAssignments((prev) => prev.filter((a) => a.id !== id));
     } catch (err) {
-      console.error('Error deleting assignment:', err);
+      console.error("Error deleting assignment:", err);
       throw err;
     } finally {
       setSaving(false);
     }
   };
 
-  // --- NEW HANDLER FOR ASSIGNMENT RESPONSE (Task 6) ---
   const handleAssignmentResponse = async (assignment: Assignment, newStatus: "Accepted" | "Declined") => {
     try {
       await updateAssignment(assignment.id, { status: newStatus });
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to update status');
+      alert(err instanceof Error ? err.message : "Failed to update status");
     }
   };
 
   // --- USE EFFECTS ---
-
-  // Fetch employees if manager
   useEffect(() => {
     if (!user || !token) return;
 
-    // Set default visible calendar for all users
     setVisibleCalendars([user.full_name]);
 
     const fetchEmployees = async () => {
-      if (user.role !== 'Manager') return;
+      if (user.role !== "Manager") return;
 
       try {
-        const res = await fetch('http://127.0.0.1:5000/auth/users/staff', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetchWithAuth("auth/users/staff"); // Updated
 
         if (!res.ok) {
           throw new Error(`Failed to fetch staff: ${res.status}`);
@@ -501,50 +466,39 @@ export default function SchedulePage() {
         const data = await res.json();
         setEmployees(data.users || []);
       } catch (err) {
-        console.error('Error fetching employees:', err);
+        console.error("Error fetching employees:", err);
       }
     };
 
     fetchEmployees();
   }, [user, token]);
 
-  // Fetch data on mount
   useEffect(() => {
     if (user && token) {
       fetchData();
     }
   }, [user, token]);
 
-  // --- EVENT HANDLERS & HELPERS ---
-
+  // ... rest of the event handlers and helper functions stay the same ...
   const toggleCalendarVisibility = (name: string) => {
-    setVisibleCalendars(prev =>
-      prev.includes(name)
-        ? prev.filter(n => n !== name)
-        : [...prev, name]
-    );
+    setVisibleCalendars((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
   };
 
-  // --- MODIFIED getAssignmentsForDate (Task 6) ---
   const getAssignmentsForDate = (date: Date) => {
     const dateKey = formatDateKey(date);
-    const allDayAssignments = assignments.filter(a => a.date === dateKey);
+    const allDayAssignments = assignments.filter((a) => a.date === dateKey);
 
-    if (user?.role === 'Manager') {
-      return allDayAssignments.filter(a =>
-        visibleCalendars.includes(a.team_member ?? '')
-      );
+    if (user?.role === "Manager") {
+      return allDayAssignments.filter((a) => visibleCalendars.includes(a.team_member ?? ""));
     }
 
-    // Non-manager: Filter out declined
-    // Backend already filters by user_id for non-managers
-    return allDayAssignments.filter(a => a.status !== 'Declined');
+    return allDayAssignments.filter((a) => a.status !== "Declined");
   };
 
   const getDailyHours = (date: Date) => {
     const dayAssignments = getAssignmentsForDate(date);
     return dayAssignments.reduce((total, a) => {
-      const h = typeof a.estimated_hours === 'string' ? parseFloat(a.estimated_hours) : (a.estimated_hours || 0);
+      const h = typeof a.estimated_hours === "string" ? parseFloat(a.estimated_hours) : a.estimated_hours || 0;
       return total + (isNaN(h) ? 0 : h);
     }, 0);
   };
@@ -552,8 +506,6 @@ export default function SchedulePage() {
   const isOverbooked = (date: Date) => getDailyHours(date) > 8;
 
   const getAssignmentColor = (assignment: Assignment) => {
-    // Pending status is handled by a separate component render
-    
     switch (assignment.type) {
       case "off":
         return "bg-gray-200 text-gray-800 border-gray-300";
@@ -562,7 +514,6 @@ export default function SchedulePage() {
       case "note":
         return "bg-yellow-100 text-yellow-800 border-yellow-300";
       case "job":
-        // Accepted, Scheduled (by self), or Manager view
         return "bg-green-100 text-green-800 border-green-300";
       default:
         return "bg-gray-100 text-gray-800 border-gray-300";
@@ -571,7 +522,7 @@ export default function SchedulePage() {
 
   const handleAddAssignment = async () => {
     if (!newAssignment.date || !newAssignment.type) {
-      alert('Please fill in required fields');
+      alert("Please fill in required fields");
       return;
     }
 
@@ -587,11 +538,10 @@ export default function SchedulePage() {
         estimated_hours: 8,
       });
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to create assignment');
+      alert(err instanceof Error ? err.message : "Failed to create assignment");
     }
   };
 
-  // --- MODIFIED handleEditAssignment (Task 3) ---
   const handleEditAssignment = async () => {
     if (!selectedAssignment) return;
     try {
@@ -601,14 +551,12 @@ export default function SchedulePage() {
       setOriginalAssignment(null);
       setIsEditingAssignment(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to update assignment');
+      alert(err instanceof Error ? err.message : "Failed to update assignment");
     }
   };
 
-  // --- MODIFIED handleDeleteAssignment (Task 8) ---
-  // This function is no longer called from the modal but is kept for potential future use
   const handleDeleteAssignment = async (assignmentId: string) => {
-    if (!confirm('Are you sure you want to delete this assignment?')) return;
+    if (!confirm("Are you sure you want to delete this assignment?")) return;
 
     try {
       await deleteAssignment(assignmentId);
@@ -617,7 +565,7 @@ export default function SchedulePage() {
       setOriginalAssignment(null);
       setIsEditingAssignment(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete assignment');
+      alert(err instanceof Error ? err.message : "Failed to delete assignment");
     }
   };
 
@@ -633,10 +581,11 @@ export default function SchedulePage() {
     e.preventDefault();
     if (!draggedAssignment) return;
 
-    // Prevent dropping a pending assignment (Task 6)
-    if (user?.role !== 'Manager' &&
+    if (
+      user?.role !== "Manager" &&
       draggedAssignment.created_by !== user?.id &&
-      draggedAssignment.status === 'Scheduled') {
+      draggedAssignment.status === "Scheduled"
+    ) {
       alert("Please accept or decline the assignment before moving it.");
       setDraggedAssignment(null);
       return;
@@ -647,18 +596,18 @@ export default function SchedulePage() {
       await updateAssignment(draggedAssignment.id, { date: dateKey });
       setDraggedAssignment(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to move assignment');
+      alert(err instanceof Error ? err.message : "Failed to move assignment");
       setDraggedAssignment(null);
     }
   };
 
   const gridColumnStyle = { gridTemplateColumns: `repeat(7, 156.4px)` } as React.CSSProperties;
-  const weekdayShort = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   // --- LOADING / ERROR (Unchanged) ---
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="flex items-center space-x-2">
           <Loader2 className="h-6 w-6 animate-spin" />
           <span>Loading schedule...</span>
@@ -669,28 +618,27 @@ export default function SchedulePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-red-900 mb-2">Error Loading Schedule</h3>
-          <p className="text-red-600 mb-4">{error}</p>
+          <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-500" />
+          <h3 className="mb-2 text-lg font-medium text-red-900">Error Loading Schedule</h3>
+          <p className="mb-4 text-red-600">{error}</p>
           <Button onClick={fetchData}>Try Again</Button>
         </div>
       </div>
     );
   }
 
-
   // --- RENDER FUNCTIONS ---
 
   // --- MODIFIED renderMonthView (Task 6) ---
   const renderMonthView = () => (
     <div className="p-6 pr-0">
-      <div className="border rounded-lg overflow-auto shadow-sm">
-        <div className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+      <div className="overflow-auto rounded-lg border shadow-sm">
+        <div className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50">
           <div className="grid" style={gridColumnStyle}>
             {weekdayShort.map((wd, idx) => (
-              <div key={idx} className="p-3 border-r border-gray-200 text-center min-w-[140px]">
+              <div key={idx} className="min-w-[140px] border-r border-gray-200 p-3 text-center">
                 <div className="text-xs font-medium text-gray-900">{wd}</div>
               </div>
             ))}
@@ -709,42 +657,39 @@ export default function SchedulePage() {
                 return (
                   <div
                     key={dayIndex}
-                    className="p-2 border-r border-gray-200 min-h-[120px] relative bg-white"
+                    className="relative min-h-[120px] border-r border-gray-200 bg-white p-2"
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, day)}
                   >
-
-                    <div className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                    <div className="mb-1 flex items-center justify-between text-xs text-gray-500">
                       <div
-                        className={`flex items-center justify-center w-6 h-6 text-[13px] rounded-full ${day.toDateString() === new Date().toDateString()
-                            ? 'bg-black text-white'
-                            : 'text-gray-500'
-                          }`}
+                        className={`flex h-6 w-6 items-center justify-center rounded-full text-[13px] ${
+                          day.toDateString() === new Date().toDateString() ? "bg-black text-white" : "text-gray-500"
+                        }`}
                       >
                         {day.getDate()}
                       </div>
-                      {dailyHours > 0 && (
-                        <div className="text-[11px] text-gray-500">{dailyHours}h</div>
-                      )}
+                      {dailyHours > 0 && <div className="text-[11px] text-gray-500">{dailyHours}h</div>}
                     </div>
 
                     <div className="flex flex-col space-y-1">
                       {dayAssignments.map((assignment) => {
                         // --- NEW PENDING LOGIC (Task 6) ---
-                        const isPending = user?.role !== 'Manager' &&
+                        const isPending =
+                          user?.role !== "Manager" &&
                           assignment.created_by !== user?.id &&
-                          (assignment.status === 'Scheduled' || assignment.status === 'Pending');
+                          (assignment.status === "Scheduled" || assignment.status === "Pending");
 
                         if (isPending) {
                           return (
                             <div
                               key={assignment.id}
-                              className="relative rounded text-xs border p-1 bg-orange-100 border-orange-300"
+                              className="relative rounded border border-orange-300 bg-orange-100 p-1 text-xs"
                               title={assignment.title}
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex-1 truncate">
-                                  <div className="font-medium text-[11px] truncate">{assignment.title}</div>
+                                  <div className="truncate text-[11px] font-medium">{assignment.title}</div>
                                   <div className="text-[10px] text-orange-700">New assignment</div>
                                 </div>
                                 <div className="flex space-x-1">
@@ -752,7 +697,10 @@ export default function SchedulePage() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-6 w-6 text-green-600 hover:bg-green-100"
-                                    onClick={(e) => { e.stopPropagation(); handleAssignmentResponse(assignment, 'Accepted'); }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAssignmentResponse(assignment, "Accepted");
+                                    }}
                                     title="Accept"
                                   >
                                     <Check className="h-4 w-4" />
@@ -761,7 +709,10 @@ export default function SchedulePage() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-6 w-6 text-red-600 hover:bg-red-100"
-                                    onClick={(e) => { e.stopPropagation(); handleAssignmentResponse(assignment, 'Declined'); }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleAssignmentResponse(assignment, "Declined");
+                                    }}
                                     title="Decline"
                                   >
                                     <X className="h-4 w-4" />
@@ -776,10 +727,11 @@ export default function SchedulePage() {
                         return (
                           <div
                             key={assignment.id}
-                            className={`relative rounded text-xs border p-1 cursor-pointer ${getAssignmentColor(assignment)}`}
+                            className={`relative cursor-pointer rounded border p-1 text-xs ${getAssignmentColor(assignment)}`}
                             draggable
                             onDragStart={() => handleDragStart(assignment)}
-                            onClick={() => { // --- MODIFIED CLICK (Task 3) ---
+                            onClick={() => {
+                              // --- MODIFIED CLICK (Task 3) ---
                               setSelectedAssignment(assignment);
                               setOriginalAssignment(assignment); // Store original
                               setIsEditingAssignment(false); // Start in view mode
@@ -792,7 +744,7 @@ export default function SchedulePage() {
                                 <Calendar className="h-2.5 w-2.5" />
                               </div>
                               <div className="flex-1 truncate">
-                                <div className="font-medium text-[11px] truncate">{assignment.title}</div>
+                                <div className="truncate text-[11px] font-medium">{assignment.title}</div>
                               </div>
                             </div>
                           </div>
@@ -833,44 +785,45 @@ export default function SchedulePage() {
   const renderWeekView = () => (
     <div className="p-6">
       <div
-        className="border rounded-lg shadow-sm overflow-auto"
-        style={{ maxHeight: 'calc(100vh - 200px)' }} // Limit height and make scrollable
+        className="overflow-auto rounded-lg border shadow-sm"
+        style={{ maxHeight: "calc(100vh - 200px)" }} // Limit height and make scrollable
       >
-        <div
-          className="grid"
-          style={{ gridTemplateColumns: '60px repeat(7, minmax(140px, 1fr))' }}
-        >
+        <div className="grid" style={{ gridTemplateColumns: "60px repeat(7, minmax(140px, 1fr))" }}>
           {/* Header Row */}
-          <div className="bg-gray-50 border-b border-r sticky top-0 z-10"></div> {/* Top-left corner */}
-          {daysOfWeek.map(day => (
-            <div key={day.toISOString()} className="bg-gray-50 border-b border-r p-3 text-center sticky top-0 z-10">
+          <div className="sticky top-0 z-10 border-r border-b bg-gray-50"></div> {/* Top-left corner */}
+          {daysOfWeek.map((day) => (
+            <div key={day.toISOString()} className="sticky top-0 z-10 border-r border-b bg-gray-50 p-3 text-center">
               <div className="text-xs font-medium text-gray-900">
-                {day.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}
+                {day.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()}
               </div>
-              <div className={`text-2xl font-semibold ${day.toDateString() === new Date().toDateString() ? 'text-black' : 'text-gray-700'}`}>
+              <div
+                className={`text-2xl font-semibold ${day.toDateString() === new Date().toDateString() ? "text-black" : "text-gray-700"}`}
+              >
                 {day.getDate()}
               </div>
             </div>
           ))}
-
           {/* Time Gutter Column */}
-          <div className="border-r bg-gray-50 sticky left-0 z-10">
-            {timeSlotsWeek.map(time => (
-              <div key={time} style={{ height: `${HOUR_HEIGHT_PX}px` }} className="border-b text-right p-1 pr-2 text-xs text-gray-500">
+          <div className="sticky left-0 z-10 border-r bg-gray-50">
+            {timeSlotsWeek.map((time) => (
+              <div
+                key={time}
+                style={{ height: `${HOUR_HEIGHT_PX}px` }}
+                className="border-b p-1 pr-2 text-right text-xs text-gray-500"
+              >
                 {time}
               </div>
             ))}
           </div>
-
           {/* Day Columns */}
-          {daysOfWeek.map(day => {
+          {daysOfWeek.map((day) => {
             const dayKey = formatDateKey(day);
             const dayAssignments = getAssignmentsForDate(day);
 
             return (
               <div
                 key={dayKey}
-                className="border-r relative"
+                className="relative border-r"
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, day)}
               >
@@ -880,28 +833,32 @@ export default function SchedulePage() {
                 ))}
 
                 {/* Assignments */}
-                {dayAssignments.map(a => {
+                {dayAssignments.map((a) => {
                   // --- NEW PENDING LOGIC (Task 6) ---
-                  const isPending = user?.role !== 'Manager' &&
+                  const isPending =
+                    user?.role !== "Manager" &&
                     a.created_by !== user?.id &&
-                    (a.status === 'Scheduled' || a.status === 'Pending');
+                    (a.status === "Scheduled" || a.status === "Pending");
 
                   if (isPending) {
                     return (
                       <div
                         key={a.id}
-                        className="px-2 py-1 rounded border bg-orange-100 border-orange-300 z-20"
+                        className="z-20 rounded border border-orange-300 bg-orange-100 px-2 py-1"
                         style={getAssignmentWeekStyle(a.start_time, a.end_time)}
                         title={a.title}
                       >
-                        <div className="font-medium text-xs truncate">{a.title}</div>
-                        <div className="text-[10px] text-orange-700 mb-1">New assignment</div>
+                        <div className="truncate text-xs font-medium">{a.title}</div>
+                        <div className="mb-1 text-[10px] text-orange-700">New assignment</div>
                         <div className="flex items-center justify-end space-x-1">
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6 text-green-600 hover:bg-green-100"
-                            onClick={(e) => { e.stopPropagation(); handleAssignmentResponse(a, 'Accepted'); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAssignmentResponse(a, "Accepted");
+                            }}
                             title="Accept"
                           >
                             <Check className="h-4 w-4" />
@@ -910,7 +867,10 @@ export default function SchedulePage() {
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6 text-red-600 hover:bg-red-100"
-                            onClick={(e) => { e.stopPropagation(); handleAssignmentResponse(a, 'Declined'); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAssignmentResponse(a, "Declined");
+                            }}
                             title="Decline"
                           >
                             <X className="h-4 w-4" />
@@ -924,11 +884,12 @@ export default function SchedulePage() {
                   return (
                     <div
                       key={a.id}
-                      className={`px-2 py-1 rounded border ${getAssignmentColor(a)} cursor-pointer overflow-hidden z-20`}
+                      className={`rounded border px-2 py-1 ${getAssignmentColor(a)} z-20 cursor-pointer overflow-hidden`}
                       style={getAssignmentWeekStyle(a.start_time, a.end_time)}
                       draggable
                       onDragStart={() => handleDragStart(a)}
-                      onClick={() => { // --- MODIFIED CLICK (Task 3) ---
+                      onClick={() => {
+                        // --- MODIFIED CLICK (Task 3) ---
                         setSelectedAssignment(a);
                         setOriginalAssignment(a); // Store original
                         setIsEditingAssignment(false); // Start in view mode
@@ -936,15 +897,11 @@ export default function SchedulePage() {
                       }}
                       title={a.title}
                     >
-                      <div className="font-medium text-xs truncate">{a.title}</div>
+                      <div className="truncate text-xs font-medium">{a.title}</div>
                       <div className="text-[11px] text-gray-600">
                         {a.start_time} - {a.end_time}
                       </div>
-                      {a.team_member && (
-                        <div className="text-[10px] text-gray-500 mt-1 truncate">
-                          {a.team_member}
-                        </div>
-                      )}
+                      {a.team_member && <div className="mt-1 truncate text-[10px] text-gray-500">{a.team_member}</div>}
                     </div>
                   );
                 })}
@@ -958,7 +915,7 @@ export default function SchedulePage() {
 
   // --- Internal Component for Year View (Unchanged) ---
   const MiniCalendar = ({ month, year }: { month: number; year: number }) => {
-    const monthName = new Date(year, month).toLocaleDateString('en-US', { month: 'long' });
+    const monthName = new Date(year, month).toLocaleDateString("en-US", { month: "long" });
 
     // Logic to get days (copied and adapted from calendarDays)
     const firstDay = new Date(year, month, 1);
@@ -983,29 +940,35 @@ export default function SchedulePage() {
     const todayKey = formatDateKey(today);
 
     // Get assignments relevant to this user for the dots
-    const relevantAssignments = (user?.role === 'Manager')
-      ? assignmentsByDate
-      : Object.entries(assignmentsByDate).reduce((acc, [date, assignments]) => {
-          const userAssignments = assignments.filter(a => a.user_id === user?.id && a.status !== 'Declined');
-          if (userAssignments.length > 0) {
-            acc[date] = userAssignments;
-          }
-          return acc;
-        }, {} as Record<string, Assignment[]>);
+    const relevantAssignments =
+      user?.role === "Manager"
+        ? assignmentsByDate
+        : Object.entries(assignmentsByDate).reduce(
+            (acc, [date, assignments]) => {
+              const userAssignments = assignments.filter((a) => a.user_id === user?.id && a.status !== "Declined");
+              if (userAssignments.length > 0) {
+                acc[date] = userAssignments;
+              }
+              return acc;
+            },
+            {} as Record<string, Assignment[]>,
+          );
 
     return (
-      <div className="border rounded-lg p-4">
+      <div className="rounded-lg border p-4">
         <button
-          className="text-lg font-semibold text-center w-full mb-2 hover:text-black"
+          className="mb-2 w-full text-center text-lg font-semibold hover:text-black"
           onClick={() => {
             setCurrentDate(new Date(year, month, 1));
-            setViewMode('month');
+            setViewMode("month");
           }}
         >
           {monthName}
         </button>
-        <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 mb-1">
-          {weekdayShort.map(wd => <div key={wd}>{wd}</div>)}
+        <div className="mb-1 grid grid-cols-7 gap-1 text-center text-xs text-gray-500">
+          {weekdayShort.map((wd) => (
+            <div key={wd}>{wd}</div>
+          ))}
         </div>
         <div className="grid grid-cols-7 gap-1">
           {days.map((day, idx) => {
@@ -1017,15 +980,11 @@ export default function SchedulePage() {
             return (
               <div
                 key={idx}
-                className={`
-                  h-8 w-full flex items-center justify-center rounded text-xs relative
-                  ${isCurrentMonth ? 'text-gray-900' : 'text-gray-300'}
-                  ${isToday ? 'bg-black text-white rounded-full' : ''}
-                `}
+                className={`relative flex h-8 w-full items-center justify-center rounded text-xs ${isCurrentMonth ? "text-gray-900" : "text-gray-300"} ${isToday ? "rounded-full bg-black text-white" : ""} `}
               >
                 {day.getDate()}
                 {dayAssignments.length > 0 && isCurrentMonth && (
-                  <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-500 rounded-full"></div>
+                  <div className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-green-500"></div>
                 )}
               </div>
             );
@@ -1041,9 +1000,9 @@ export default function SchedulePage() {
 
     return (
       <div className="p-6">
-        <h2 className="text-3xl font-bold text-center mb-6">{year}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {months.map(month => (
+        <h2 className="mb-6 text-center text-3xl font-bold">{year}</h2>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {months.map((month) => (
             <MiniCalendar key={month} month={month} year={year} />
           ))}
         </div>
@@ -1051,13 +1010,12 @@ export default function SchedulePage() {
     );
   };
 
-
   // --- MAIN RETURN ---
 
   return (
     <div className="min-h-screen bg-white">
       {/* --- MAIN HEADER (Unchanged) --- */}
-      <div className="border-b border-gray-200 bg-white px-6 py-5 flex items-center justify-between sticky top-0 z-20">
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-5">
         <div className="flex items-center space-x-4">
           <h1 className="text-2xl font-semibold text-gray-900">Schedule</h1>
 
@@ -1066,9 +1024,7 @@ export default function SchedulePage() {
             <Button variant="outline" size="sm" onClick={() => navigateView("prev")}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-lg font-medium px-4 w-64 text-center">
-              {formatHeaderDate(currentDate, viewMode)}
-            </span>
+            <span className="w-64 px-4 text-center text-lg font-medium">{formatHeaderDate(currentDate, viewMode)}</span>
             <Button variant="outline" size="sm" onClick={() => navigateView("next")}>
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -1080,7 +1036,7 @@ export default function SchedulePage() {
 
         <div className="flex items-center space-x-3">
           <Button variant="ghost" size="sm" onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           <Button onClick={() => setShowAddDialog(true)}>Add Assignment</Button>
@@ -1088,13 +1044,10 @@ export default function SchedulePage() {
       </div>
 
       {/* --- MODIFIED CONTROLS BAR (Task 7) --- */}
-      <div className="border-b border-gray-200 bg-white px-6 py-3 flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
         <div className="flex items-center space-x-4">
           {/* --- View Switcher --- */}
-          <Select
-            value={viewMode}
-            onValueChange={(value: "month" | "week" | "year") => setViewMode(value)}
-          >
+          <Select value={viewMode} onValueChange={(value: "month" | "week" | "year") => setViewMode(value)}>
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Select view" />
             </SelectTrigger>
@@ -1106,7 +1059,7 @@ export default function SchedulePage() {
           </Select>
 
           {/* --- Employee Selection Dropdown --- */}
-          {user?.role === 'Manager' && employees.length > 0 && (
+          {user?.role === "Manager" && employees.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -1118,17 +1071,17 @@ export default function SchedulePage() {
                   checked={showOwnCalendar && visibleCalendars.includes(user.full_name)}
                   onCheckedChange={(checked) => {
                     if (checked) {
-                      setVisibleCalendars(prev => [...prev, user.full_name]);
+                      setVisibleCalendars((prev) => [...prev, user.full_name]);
                     } else {
-                      setVisibleCalendars(prev => prev.filter(n => n !== user.full_name));
+                      setVisibleCalendars((prev) => prev.filter((n) => n !== user.full_name));
                     }
                     setShowOwnCalendar(checked);
                   }}
                 >
                   Your Calendar
                 </DropdownMenuCheckboxItem>
-                <div className="border-t my-1" />
-                {employees.map(emp => (
+                <div className="my-1 border-t" />
+                {employees.map((emp) => (
                   <DropdownMenuCheckboxItem
                     key={emp.id}
                     checked={visibleCalendars.includes(emp.full_name)}
@@ -1145,7 +1098,7 @@ export default function SchedulePage() {
         {/* --- Right-aligned Controls --- */}
         <div className="flex items-center space-x-3">
           {/* --- Declined Events Dropdown (Task 7) --- */}
-          {user?.role !== 'Manager' && declinedAssignments.length > 0 && (
+          {user?.role !== "Manager" && declinedAssignments.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -1156,21 +1109,21 @@ export default function SchedulePage() {
               <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuLabel>Declined Events</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {declinedAssignments.map(a => (
+                {declinedAssignments.map((a) => (
                   <DropdownMenuItem
                     key={a.id}
                     className="group flex items-center justify-between p-2 text-sm"
                     onSelect={(e) => e.preventDefault()} // Prevent closing
                   >
                     <div className="flex-1 truncate">
-                      <div className="font-medium truncate">{a.title}</div>
+                      <div className="truncate font-medium">{a.title}</div>
                       <div className="text-xs text-gray-500">{formatDateKey(a.date)}</div>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-green-600 opacity-0 group-hover:opacity-100"
-                      onClick={() => handleAssignmentResponse(a, 'Accepted')}
+                      onClick={() => handleAssignmentResponse(a, "Accepted")}
                       title="Re-accept"
                     >
                       <Check className="h-4 w-4" />
@@ -1182,12 +1135,12 @@ export default function SchedulePage() {
           )}
 
           {/* --- Active Filters Display --- */}
-          {user?.role === 'Manager' && visibleCalendars.length > 0 && (
+          {user?.role === "Manager" && visibleCalendars.length > 0 && (
             <div className="flex items-center space-x-2 text-sm text-gray-700">
               <span className="font-medium">Viewing:</span>
-              {visibleCalendars.map(name => (
-                <span key={name} className="px-2 py-1 bg-gray-200 rounded">
-                  {name === user.full_name ? 'Your Calendar' : name}
+              {visibleCalendars.map((name) => (
+                <span key={name} className="rounded bg-gray-200 px-2 py-1">
+                  {name === user.full_name ? "Your Calendar" : name}
                 </span>
               ))}
             </div>
@@ -1196,10 +1149,9 @@ export default function SchedulePage() {
       </div>
 
       {/* --- CALENDAR GRID (CONDITIONAL) --- */}
-      {viewMode === 'month' && renderMonthView()}
-      {viewMode === 'week' && renderWeekView()}
-      {viewMode === 'year' && renderYearView()}
-
+      {viewMode === "month" && renderMonthView()}
+      {viewMode === "week" && renderWeekView()}
+      {viewMode === "year" && renderYearView()}
 
       {/* --- DIALOGS --- */}
 
@@ -1238,9 +1190,7 @@ export default function SchedulePage() {
                 <Input
                   type="date"
                   value={newAssignment.date || ""}
-                  onChange={(e) =>
-                    setNewAssignment({ ...newAssignment, date: e.target.value })
-                  }
+                  onChange={(e) => setNewAssignment({ ...newAssignment, date: e.target.value })}
                 />
               </div>
             </div>
@@ -1287,26 +1237,21 @@ export default function SchedulePage() {
                   <Label>Assign To</Label>
                   <Select
                     value={newAssignment.user_id?.toString() || ""}
-                    onValueChange={(value) =>
-                      setNewAssignment({ ...newAssignment, user_id: parseInt(value) })
-                    }
+                    onValueChange={(value) => setNewAssignment({ ...newAssignment, user_id: parseInt(value) })}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select team member" />
                     </SelectTrigger>
                     <SelectContent>
                       {/* Self-assignment option for everyone */}
-                      {user && (
-  <SelectItem value={user.id.toString()}>
-    {user.full_name} (Me)
-  </SelectItem>
-)}
+                      {user && <SelectItem value={user.id.toString()}>{user.full_name} (Me)</SelectItem>}
                       {/* Manager can assign to others */}
-                      {user?.role === 'Manager' && employees.map((emp) => (
-                        <SelectItem key={emp.id} value={emp.id.toString()}>
-                          {emp.full_name}
-                        </SelectItem>
-                      ))}
+                      {user?.role === "Manager" &&
+                        employees.map((emp) => (
+                          <SelectItem key={emp.id} value={emp.id.toString()}>
+                            {emp.full_name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1351,8 +1296,10 @@ export default function SchedulePage() {
                       <SelectContent>
                         <SelectGroup>
                           <SelectLabel>Tasks</SelectLabel>
-                          {interiorDesignJobTypes.map(task => (
-                            <SelectItem key={task} value={task}>{task}</SelectItem>
+                          {interiorDesignJobTypes.map((task) => (
+                            <SelectItem key={task} value={task}>
+                              {task}
+                            </SelectItem>
                           ))}
                         </SelectGroup>
                         <SelectGroup>
@@ -1371,9 +1318,7 @@ export default function SchedulePage() {
                     <Label>Customer</Label>
                     <Select
                       value={newAssignment.customer_id || ""}
-                      onValueChange={(value) =>
-                        setNewAssignment({ ...newAssignment, customer_id: value })
-                      }
+                      onValueChange={(value) => setNewAssignment({ ...newAssignment, customer_id: value })}
                       // Disable if a job is selected (customer is auto-set)
                       disabled={!!newAssignment.job_id}
                     >
@@ -1417,9 +1362,7 @@ export default function SchedulePage() {
               <Label>Notes</Label>
               <Textarea
                 value={newAssignment.notes || ""}
-                onChange={(e) =>
-                  setNewAssignment({ ...newAssignment, notes: e.target.value })
-                }
+                onChange={(e) => setNewAssignment({ ...newAssignment, notes: e.target.value })}
                 placeholder="Enter notes..."
               />
             </div>
@@ -1429,7 +1372,7 @@ export default function SchedulePage() {
                 Cancel
               </Button>
               <Button onClick={handleAddAssignment} disabled={saving}>
-                {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Add Assignment
               </Button>
             </div>
@@ -1438,8 +1381,8 @@ export default function SchedulePage() {
       </Dialog>
 
       {/* --- MODIFIED View/Edit Dialog (Task 3, 8) --- */}
-      <Dialog 
-        open={showAssignmentDialog} 
+      <Dialog
+        open={showAssignmentDialog}
         onOpenChange={(isOpen) => {
           setShowAssignmentDialog(isOpen);
           if (!isOpen) {
@@ -1452,14 +1395,11 @@ export default function SchedulePage() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {isEditingAssignment ? "Edit Assignment" : "View Assignment"}
-            </DialogTitle>
+            <DialogTitle>{isEditingAssignment ? "Edit Assignment" : "View Assignment"}</DialogTitle>
             <DialogDescription>
               {isEditingAssignment
                 ? "Modify the details of this assignment."
-                : "View the details. Click 'Edit' to make changes."
-              }
+                : "View the details. Click 'Edit' to make changes."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1470,9 +1410,7 @@ export default function SchedulePage() {
                   <Label>Type</Label>
                   <Select
                     value={selectedAssignment.type}
-                    onValueChange={(value: any) =>
-                      setSelectedAssignment({ ...selectedAssignment, type: value })
-                    }
+                    onValueChange={(value: any) => setSelectedAssignment({ ...selectedAssignment, type: value })}
                     disabled={!isEditingAssignment} // <-- (Task 3)
                   >
                     <SelectTrigger>
@@ -1492,9 +1430,7 @@ export default function SchedulePage() {
                   <Input
                     type="date"
                     value={selectedAssignment.date}
-                    onChange={(e) =>
-                      setSelectedAssignment({ ...selectedAssignment, date: e.target.value })
-                    }
+                    onChange={(e) => setSelectedAssignment({ ...selectedAssignment, date: e.target.value })}
                     disabled={!isEditingAssignment} // <-- (Task 3)
                   />
                 </div>
@@ -1505,11 +1441,11 @@ export default function SchedulePage() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="space-y-1">
                     <Label className="text-gray-500">Assigned To</Label>
-                    <p>{selectedAssignment.team_member || 'N/A'}</p>
+                    <p>{selectedAssignment.team_member || "N/A"}</p>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-gray-500">Created By</Label>
-                    <p>{selectedAssignment.created_by_name || 'N/A'}</p>
+                    <p>{selectedAssignment.created_by_name || "N/A"}</p>
                   </div>
                 </div>
               )}
@@ -1571,17 +1507,14 @@ export default function SchedulePage() {
                       </SelectTrigger>
                       <SelectContent>
                         {/* Self-assignment option for everyone */}
-                        {user && (
-  <SelectItem value={user.id.toString()}>
-    {user.full_name} (Me)
-  </SelectItem>
-)}
+                        {user && <SelectItem value={user.id.toString()}>{user.full_name} (Me)</SelectItem>}
                         {/* Manager can assign to others */}
-                        {user?.role === 'Manager' && employees.map((emp) => (
-                          <SelectItem key={emp.id} value={emp.id.toString()}>
-                            {emp.full_name}
-                          </SelectItem>
-                        ))}
+                        {user?.role === "Manager" &&
+                          employees.map((emp) => (
+                            <SelectItem key={emp.id} value={emp.id.toString()}>
+                              {emp.full_name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1622,8 +1555,10 @@ export default function SchedulePage() {
                         <SelectContent>
                           <SelectGroup>
                             <SelectLabel>Tasks</SelectLabel>
-                            {interiorDesignJobTypes.map(task => (
-                              <SelectItem key={task} value={task}>{task}</SelectItem>
+                            {interiorDesignJobTypes.map((task) => (
+                              <SelectItem key={task} value={task}>
+                                {task}
+                              </SelectItem>
                             ))}
                           </SelectGroup>
                           <SelectGroup>
@@ -1642,9 +1577,7 @@ export default function SchedulePage() {
                       <Label>Customer</Label>
                       <Select
                         value={selectedAssignment.customer_id || ""}
-                        onValueChange={(value) =>
-                          setSelectedAssignment({ ...selectedAssignment, customer_id: value })
-                        }
+                        onValueChange={(value) => setSelectedAssignment({ ...selectedAssignment, customer_id: value })}
                         disabled={!isEditingAssignment || !!selectedAssignment.job_id} // <-- (Task 3)
                       >
                         <SelectTrigger>
@@ -1688,9 +1621,7 @@ export default function SchedulePage() {
                 <Label>Notes</Label>
                 <Textarea
                   value={selectedAssignment.notes || ""}
-                  onChange={(e) =>
-                    setSelectedAssignment({ ...selectedAssignment, notes: e.target.value })
-                  }
+                  onChange={(e) => setSelectedAssignment({ ...selectedAssignment, notes: e.target.value })}
                   placeholder="Enter notes..."
                   disabled={!isEditingAssignment} // <-- (Task 3)
                 />
@@ -1698,7 +1629,6 @@ export default function SchedulePage() {
 
               {/* --- MODIFIED FOOTER (Task 3, 8) --- */}
               <div className="flex justify-end space-x-2 pt-4">
-                
                 {/* Delete button removed per Task 8 */}
 
                 {!isEditingAssignment ? (
@@ -1707,21 +1637,22 @@ export default function SchedulePage() {
                     <Button variant="outline" onClick={() => setShowAssignmentDialog(false)}>
                       Close
                     </Button>
-                    <Button onClick={() => setIsEditingAssignment(true)}>
-                      Edit
-                    </Button>
+                    <Button onClick={() => setIsEditingAssignment(true)}>Edit</Button>
                   </>
                 ) : (
                   // --- EDIT MODE ---
                   <>
-                    <Button variant="outline" onClick={() => {
-                      setIsEditingAssignment(false);
-                      setSelectedAssignment(originalAssignment); // Restore original on cancel
-                    }}>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsEditingAssignment(false);
+                        setSelectedAssignment(originalAssignment); // Restore original on cancel
+                      }}
+                    >
                       Cancel
                     </Button>
                     <Button onClick={handleEditAssignment} disabled={saving}>
-                      {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Save Changes
                     </Button>
                   </>

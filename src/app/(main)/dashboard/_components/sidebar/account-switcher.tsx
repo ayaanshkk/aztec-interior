@@ -34,7 +34,7 @@ export function AccountSwitcher() {
           avatar: currentUser.avatar,
           role: currentUser.role,
         }
-      : null
+      : null,
   );
   const [loading, setLoading] = useState(false);
 
@@ -49,12 +49,12 @@ export function AccountSwitcher() {
   };
 
   const handleLogout = async () => {
-    console.log('🖱️ Logout button clicked');
+    console.log("🖱️ Logout button clicked");
     setLoading(true);
     try {
-      console.log('🔄 Calling logout from AuthContext...');
+      console.log("🔄 Calling logout from AuthContext...");
       await logout();
-      console.log('✅ Logout completed, navigating...');
+      console.log("✅ Logout completed, navigating...");
       router.push("/login");
     } catch (err) {
       console.error("❌ Logout failed:", err);
@@ -71,18 +71,10 @@ export function AccountSwitcher() {
           <AvatarFallback className="rounded-lg">{getInitials(activeUser.name)}</AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        className="min-w-56 space-y-1 rounded-lg"
-        side="bottom"
-        align="end"
-        sideOffset={4}
-      >
+      <DropdownMenuContent className="min-w-56 space-y-1 rounded-lg" side="bottom" align="end" sideOffset={4}>
         <DropdownMenuItem
           key={user.email}
-          className={cn(
-            "p-0",
-            user.id === activeUser.id && "bg-accent/50 border-l-primary border-l-2"
-          )}
+          className={cn("p-0", user.id === activeUser.id && "bg-accent/50 border-l-primary border-l-2")}
           onClick={() => setActiveUser(user)}
         >
           <div className="flex w-full items-center justify-between gap-2 px-1 py-1.5">

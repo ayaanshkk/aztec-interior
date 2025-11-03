@@ -33,12 +33,12 @@ export function NavUser({
   const [loading, setLoading] = useState(false);
 
   const handleLogout = async () => {
-    console.log('🖱️ NavUser logout button clicked');
+    console.log("🖱️ NavUser logout button clicked");
     setLoading(true);
     try {
-      console.log('🔄 Calling logout from AuthContext...');
+      console.log("🔄 Calling logout from AuthContext...");
       await logout();
-      console.log('✅ Logout completed');
+      console.log("✅ Logout completed");
     } catch (err) {
       console.error("❌ Logout failed:", err);
       // Fallback navigation if logout fails

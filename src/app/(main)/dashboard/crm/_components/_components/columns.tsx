@@ -1,5 +1,5 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { CircleCheck, Loader, EllipsisVertical } from "lucide-react";
+import { CircleCheck, Loader, EllipsisVertical, ArrowUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -17,9 +17,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { DataTableColumnHeader } from "../../../../../components/data-table/data-table-column-header";
+// Create a simple DataTableColumnHeader component inline
+const DataTableColumnHeader = ({ column, title, className }: { column: any; title: string; className?: string }) => {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className={className}
+      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    >
+      {title}
+      <ArrowUpDown className="ml-2 h-4 w-4" />
+    </Button>
+  );
+};
 
-import { sectionSchema } from "./schema";
+import { sectionSchema } from "../schema"; // Changed from "./schema" to "../schema"
 import { TableCellViewer } from "./table-cell-viewer";
 
 export const dashboardColumns: ColumnDef<z.infer<typeof sectionSchema>>[] = [

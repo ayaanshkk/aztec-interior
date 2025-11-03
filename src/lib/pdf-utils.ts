@@ -1,18 +1,18 @@
 // First install: npm install handlebars @types/handlebars
-import Handlebars from 'handlebars';
+import Handlebars from "handlebars";
 
 // Register Handlebars helpers
-Handlebars.registerHelper('formatCurrency', function(value: number) {
+Handlebars.registerHelper("formatCurrency", function (value: number) {
   return `£${value.toFixed(2)}`;
 });
 
-Handlebars.registerHelper('formatDate', function(dateString: string) {
-  return new Date(dateString).toLocaleDateString('en-GB');
+Handlebars.registerHelper("formatDate", function (dateString: string) {
+  return new Date(dateString).toLocaleDateString("en-GB");
 });
 
-Handlebars.registerHelper('breaklines', function(text: string) {
-  if (!text) return '';
-  return new Handlebars.SafeString(text.replace(/\n/g, '<br>'));
+Handlebars.registerHelper("breaklines", function (text: string) {
+  if (!text) return "";
+  return new Handlebars.SafeString(text.replace(/\n/g, "<br>"));
 });
 
 export function compileTemplate(templateContent: string, data: any): string {

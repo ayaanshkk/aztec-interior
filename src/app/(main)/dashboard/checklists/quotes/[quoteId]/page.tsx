@@ -4,17 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  ArrowLeft, 
-  Download, 
-  Printer, 
-  CheckCircle, 
-  Clock, 
-  XCircle, 
-  AlertCircle,
-  Trash2,
-  Loader2
-} from "lucide-react";
+import { ArrowLeft, Download, Printer, CheckCircle, Clock, XCircle, AlertCircle, Trash2, Loader2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,10 +40,10 @@ const formatDate = (dateString: string) => {
   if (!dateString) return "—";
   try {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric'
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
     });
   } catch {
     return dateString;
@@ -61,19 +51,19 @@ const formatDate = (dateString: string) => {
 };
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'GBP'
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
   }).format(amount || 0);
 };
 
 export default function QuoteDetailsPage() {
   const params = useParams();
   const router = useRouter();
-  
+
   // Handle both [id] and [quoteId] route parameters
   const quoteId = (params?.quoteId || params?.id) as string;
-  
+
   const [quotation, setQuotation] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -82,11 +72,11 @@ export default function QuoteDetailsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
-    console.log('Route params:', params);
-    console.log('Quote ID:', quoteId);
-    
+    console.log("Route params:", params);
+    console.log("Quote ID:", quoteId);
+
     if (!quoteId) {
-      setError('No quote ID provided');
+      setError("No quote ID provided");
       setLoading(false);
       return;
     }
@@ -98,31 +88,31 @@ export default function QuoteDetailsPage() {
     setError("");
 
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem("auth_token");
       const headers: HeadersInit = {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       };
-      
+
       if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+        headers["Authorization"] = `Bearer ${token}`;
       }
 
-      console.log('Fetching quotation:', quoteId);
+      console.log("Fetching quotation:", quoteId);
 
-      const response = await fetch(`http://127.0.0.1:5000/quotations/${quoteId}`, {
-        headers
+      const response = await fetch(`https://aztec-interiors.onrender.com/quotations/${quoteId}`, {
+        headers,
       });
 
       if (!response.ok) {
-        throw new Error('Failed to load quotation');
+        throw new Error("Failed to load quotation");
       }
 
       const data = await response.json();
-      console.log('Quotation loaded:', data);
+      console.log("Quotation loaded:", data);
       setQuotation(data);
     } catch (err) {
-      console.error('Error loading quotation:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load quotation');
+      console.error("Error loading quotation:", err);
+      setError(err instanceof Error ? err.message : "Failed to load quotation");
     } finally {
       setLoading(false);
     }
@@ -131,41 +121,41 @@ export default function QuoteDetailsPage() {
   const handleDownloadPDF = async () => {
     setDownloading(true);
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem("auth_token");
       const headers: HeadersInit = {};
-      
+
       if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+        headers["Authorization"] = `Bearer ${token}`;
       }
 
-      console.log('Downloading PDF for quotation:', quoteId);
+      console.log("Downloading PDF for quotation:", quoteId);
 
-      const response = await fetch(`http://127.0.0.1:5000/quotations/${quoteId}/pdf`, {
-        headers
+      const response = await fetch(`https://aztec-interiors.onrender.com/quotations/${quoteId}/pdf`, {
+        headers,
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to generate PDF');
+        throw new Error(errorData.error || "Failed to generate PDF");
       }
 
       // Get the blob
       const blob = await response.blob();
-      
+
       // Create download link
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = `quotation-${quoteId}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
-      console.log('PDF downloaded successfully');
+
+      console.log("PDF downloaded successfully");
     } catch (err) {
-      console.error('Error downloading PDF:', err);
-      alert(`Failed to download PDF: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error("Error downloading PDF:", err);
+      alert(`Failed to download PDF: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       setDownloading(false);
     }
@@ -174,34 +164,34 @@ export default function QuoteDetailsPage() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem("auth_token");
       const headers: HeadersInit = {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       };
-      
+
       if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+        headers["Authorization"] = `Bearer ${token}`;
       }
 
-      console.log('Deleting quotation:', quoteId);
+      console.log("Deleting quotation:", quoteId);
 
-      const response = await fetch(`http://127.0.0.1:5000/quotations/${quoteId}`, {
-        method: 'DELETE',
-        headers
+      const response = await fetch(`https://aztec-interiors.onrender.com/quotations/${quoteId}`, {
+        method: "DELETE",
+        headers,
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to delete quotation');
+        throw new Error(errorData.error || "Failed to delete quotation");
       }
 
-      console.log('Quotation deleted successfully');
-      
+      console.log("Quotation deleted successfully");
+
       // Navigate back to customer details or quotes list
       router.back();
     } catch (err) {
-      console.error('Error deleting quotation:', err);
-      alert(`Failed to delete quotation: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error("Error deleting quotation:", err);
+      alert(`Failed to delete quotation: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       setDeleting(false);
       setShowDeleteDialog(false);
@@ -214,12 +204,12 @@ export default function QuoteDetailsPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'approved':
+      case "approved":
         return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case 'pending':
-      case 'draft':
+      case "pending":
+      case "draft":
         return <Clock className="h-5 w-5 text-yellow-600" />;
-      case 'rejected':
+      case "rejected":
         return <XCircle className="h-5 w-5 text-red-600" />;
       default:
         return <AlertCircle className="h-5 w-5 text-gray-600" />;
@@ -228,23 +218,23 @@ export default function QuoteDetailsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
-      case 'approved':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'pending':
-      case 'draft':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'rejected':
-        return 'bg-red-100 text-red-800 border-red-200';
+      case "approved":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "pending":
+      case "draft":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "rejected":
+        return "bg-red-100 text-red-800 border-red-200";
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-gray-900"></div>
           <p className="text-gray-600">Loading quotation...</p>
         </div>
       </div>
@@ -253,13 +243,13 @@ export default function QuoteDetailsPage() {
 
   if (error || !quotation) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Quotation</h2>
-          <p className="text-gray-600 mb-4">{error || 'Quotation not found'}</p>
+          <XCircle className="mx-auto mb-4 h-12 w-12 text-red-500" />
+          <h2 className="mb-2 text-xl font-semibold text-gray-900">Error Loading Quotation</h2>
+          <p className="mb-4 text-gray-600">{error || "Quotation not found"}</p>
           <Button onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Go Back
           </Button>
         </div>
@@ -278,48 +268,42 @@ export default function QuoteDetailsPage() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Quotation #{quotation.id}</h1>
-              <p className="text-sm text-gray-600">
-                Created {formatDate(quotation.created_at)}
-              </p>
+              <p className="text-sm text-gray-600">Created {formatDate(quotation.created_at)}</p>
             </div>
           </div>
 
           <div className="flex items-center space-x-3">
-            <Button 
-              variant="outline" 
-              onClick={handlePrint}
-              className="border-gray-300"
-            >
-              <Printer className="h-4 w-4 mr-2" />
+            <Button variant="outline" onClick={handlePrint} className="border-gray-300">
+              <Printer className="mr-2 h-4 w-4" />
               Print
             </Button>
-            
-            <Button 
+
+            <Button
               variant="outline"
-              onClick={handleDownloadPDF} 
+              onClick={handleDownloadPDF}
               disabled={downloading}
               className="border-blue-300 text-blue-600 hover:bg-blue-50"
             >
               {downloading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Generating...
                 </>
               ) : (
                 <>
-                  <Download className="h-4 w-4 mr-2" />
+                  <Download className="mr-2 h-4 w-4" />
                   Download PDF
                 </>
               )}
             </Button>
-            
-            <Button 
+
+            <Button
               variant="outline"
               onClick={() => setShowDeleteDialog(true)}
               disabled={deleting}
               className="border-red-300 text-red-600 hover:bg-red-50"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
+              <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>
           </div>
@@ -327,20 +311,22 @@ export default function QuoteDetailsPage() {
       </div>
 
       {/* Print-only header */}
-      <div className="hidden print:block border-b-2 border-gray-800 pb-4 mb-6 px-8 pt-6">
+      <div className="mb-6 hidden border-b-2 border-gray-800 px-8 pt-6 pb-4 print:block">
         <div className="text-center">
-          <h1 className="text-3xl font-bold mb-2">QUOTATION</h1>
+          <h1 className="mb-2 text-3xl font-bold">QUOTATION</h1>
           <p className="text-lg text-gray-700">Quotation #{quotation.id}</p>
-          <p className="text-sm text-gray-600 mt-1">{formatDate(quotation.created_at)}</p>
+          <p className="mt-1 text-sm text-gray-600">{formatDate(quotation.created_at)}</p>
         </div>
       </div>
 
       {/* Content */}
-      <div className="px-8 py-6 max-w-5xl mx-auto">
+      <div className="mx-auto max-w-5xl px-8 py-6">
         {/* Status Badge */}
         {quotation.status && (
           <div className="mb-6 flex items-center space-x-3">
-            <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-md border ${getStatusColor(quotation.status)}`}>
+            <div
+              className={`inline-flex items-center space-x-2 rounded-md border px-4 py-2 ${getStatusColor(quotation.status)}`}
+            >
               {getStatusIcon(quotation.status)}
               <span className="font-semibold capitalize">{quotation.status}</span>
             </div>
@@ -353,14 +339,14 @@ export default function QuoteDetailsPage() {
             <CardTitle>Customer Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
-                <p className="text-sm text-gray-600 font-medium mb-1">Customer Name</p>
-                <p className="text-base text-gray-900">{quotation.customer_name || '—'}</p>
+                <p className="mb-1 text-sm font-medium text-gray-600">Customer Name</p>
+                <p className="text-base text-gray-900">{quotation.customer_name || "—"}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 font-medium mb-1">Customer ID</p>
-                <p className="text-base text-gray-900 font-mono text-xs">{quotation.customer_id}</p>
+                <p className="mb-1 text-sm font-medium text-gray-600">Customer ID</p>
+                <p className="font-mono text-base text-xs text-gray-900">{quotation.customer_id}</p>
               </div>
             </div>
           </CardContent>
@@ -377,33 +363,27 @@ export default function QuoteDetailsPage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                         Item
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                         Description
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                         Color
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase">
                         Amount
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="divide-y divide-gray-200 bg-white">
                     {quotation.items.map((item, index) => (
                       <tr key={item.id || index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                          {item.item || '—'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          {item.description || '—'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          {item.color || '—'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right font-semibold">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.item || "—"}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{item.description || "—"}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">{item.color || "—"}</td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
                           {formatCurrency(item.amount)}
                         </td>
                       </tr>
@@ -412,7 +392,7 @@ export default function QuoteDetailsPage() {
                 </table>
               </div>
             ) : (
-              <p className="text-gray-500 text-center py-8">No items in this quotation</p>
+              <p className="py-8 text-center text-gray-500">No items in this quotation</p>
             )}
           </CardContent>
         </Card>
@@ -424,19 +404,15 @@ export default function QuoteDetailsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex justify-between items-center pb-3 border-b border-gray-200">
+              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                 <span className="text-lg font-medium text-gray-600">Total Amount</span>
-                <span className="text-3xl font-bold text-gray-900">
-                  {formatCurrency(quotation.total)}
-                </span>
+                <span className="text-3xl font-bold text-gray-900">{formatCurrency(quotation.total)}</span>
               </div>
-              
+
               {quotation.notes && (
                 <div className="pt-3">
-                  <p className="text-sm text-gray-600 font-medium mb-2">Notes</p>
-                  <p className="text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded-md">
-                    {quotation.notes}
-                  </p>
+                  <p className="mb-2 text-sm font-medium text-gray-600">Notes</p>
+                  <p className="rounded-md bg-gray-50 p-3 whitespace-pre-wrap text-gray-900">{quotation.notes}</p>
                 </div>
               )}
             </div>
@@ -449,23 +425,21 @@ export default function QuoteDetailsPage() {
             <CardTitle>Quotation Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
-                <p className="text-sm text-gray-600 font-medium mb-1">Quotation Number</p>
-                <p className="text-base text-gray-900 font-semibold">#{quotation.id}</p>
+                <p className="mb-1 text-sm font-medium text-gray-600">Quotation Number</p>
+                <p className="text-base font-semibold text-gray-900">#{quotation.id}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 font-medium mb-1">Status</p>
-                <p className="text-base text-gray-900 capitalize font-medium">
-                  {quotation.status || 'Draft'}
-                </p>
+                <p className="mb-1 text-sm font-medium text-gray-600">Status</p>
+                <p className="text-base font-medium text-gray-900 capitalize">{quotation.status || "Draft"}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 font-medium mb-1">Created Date</p>
+                <p className="mb-1 text-sm font-medium text-gray-600">Created Date</p>
                 <p className="text-base text-gray-900">{formatDate(quotation.created_at)}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 font-medium mb-1">Last Updated</p>
+                <p className="mb-1 text-sm font-medium text-gray-600">Last Updated</p>
                 <p className="text-base text-gray-900">{formatDate(quotation.updated_at)}</p>
               </div>
             </div>
@@ -484,18 +458,14 @@ export default function QuoteDetailsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-red-600 hover:bg-red-700">
               {deleting ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Deleting...
                 </>
               ) : (
-                'Delete'
+                "Delete"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

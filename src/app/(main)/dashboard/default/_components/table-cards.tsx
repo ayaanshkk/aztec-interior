@@ -11,20 +11,20 @@ import { DataTableViewOptions } from "@/components/data-table/data-table-view-op
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardAction } from "@/components/ui/card";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
 
 // --- Define Types for Fetched Data ---
 
-// This type must match the structure from your /db/pipeline endpoint
 interface PipelineItem {
-  id: string; // 'customer-uuid' or 'job-uuid'
-  type: 'customer' | 'job';
+  id: string;
+  type: "customer" | "job";
   customer: {
     id: string;
     name: string;
     email: string;
     phone: string;
     salesperson: string;
-    created_at: string; // ISO date string
+    created_at: string;
     stage: string;
   };
   job?: {
@@ -34,7 +34,6 @@ interface PipelineItem {
 }
 
 // --- Define Columns for Recent Leads Table ---
-// This replaces the 'recentLeadsColumns' from the original config file
 export const recentLeadsColumns: ColumnDef<PipelineItem>[] = [
   {
     accessorKey: "customer.name",
@@ -71,31 +70,24 @@ export function TableCards() {
 
   useEffect(() => {
     const fetchRecentLeads = async () => {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        console.error("No auth token found");
-        return;
-      }
-      
-      const headers = { 'Authorization': `Bearer ${token}` };
-
       try {
-        const res = await fetch("http://127.0.0.1:5000/pipeline", { headers });
+        // Use centralized fetchWithAuth
+        const res = await fetchWithAuth("pipeline");
+
         if (!res.ok) throw new Error("Failed to fetch pipeline data");
-        
+
         const pipelineItems: PipelineItem[] = await res.json();
-        
+
         // Filter for items in the 'Lead' stage
-        // We also sort by creation date, descending, to show newest first
+        // Sort by creation date, descending, to show newest first
         const newLeads = pipelineItems
-          .filter(item => {
+          .filter((item) => {
             const stage = item.job?.stage || item.customer.stage;
             return stage === "Lead";
           })
           .sort((a, b) => new Date(b.customer.created_at).getTime() - new Date(a.customer.created_at).getTime());
-          
+
         setRecentLeads(newLeads);
-        
       } catch (error) {
         console.error("Error fetching recent leads:", error);
       }
@@ -105,8 +97,8 @@ export function TableCards() {
   }, []);
 
   const table = useDataTableInstance({
-    data: recentLeads, // Use dynamic data
-    columns: recentLeadsColumns, // Use our new columns
+    data: recentLeads,
+    columns: recentLeadsColumns,
     getRowId: (row) => row.id,
   });
 

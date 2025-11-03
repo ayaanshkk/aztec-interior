@@ -222,12 +222,7 @@ export function NavMain({ items }: NavMainProps) {
                   return <NavItemCollapsed key={item.title} item={item} isActive={isItemActive} />;
                 }
                 return (
-                  <NavItemExpanded
-                    key={item.title}
-                    item={item}
-                    isActive={isItemActive}
-                    isSubmenuOpen={isSubmenuOpen}
-                  />
+                  <NavItemExpanded key={item.title} item={item} isActive={isItemActive} isSubmenuOpen={isSubmenuOpen} />
                 );
               })}
             </SidebarMenu>

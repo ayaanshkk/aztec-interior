@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-import { sectionSchema } from "./schema";
+import { sectionSchema } from "../schema"; // Changed from "./schema" to "../schema"
 
 const chartData = [
   { month: "January", desktop: 186, mobile: 80 },

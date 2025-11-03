@@ -1,6 +1,6 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { EllipsisVertical } from "lucide-react";
-import z from "zod";
+import { z } from "zod"; // Changed from "import z from 'zod'"
 
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { Badge } from "@/components/ui/badge";

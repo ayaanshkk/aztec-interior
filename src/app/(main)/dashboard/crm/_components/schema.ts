@@ -1,4 +1,4 @@
-import z from "zod";
+import { z } from "zod";
 
 export const recentLeadSchema = z.object({
   id: z.string(),
@@ -8,3 +8,16 @@ export const recentLeadSchema = z.object({
   source: z.string(),
   lastActivity: z.string(),
 });
+
+export const sectionSchema = z.object({
+  id: z.string(),
+  header: z.string(),
+  type: z.string(),
+  status: z.enum(["Done", "In Progress", "Pending"]),
+  target: z.union([z.number(), z.string()]),
+  limit: z.union([z.number(), z.string()]),
+  reviewer: z.string(),
+});
+
+export type RecentLead = z.infer<typeof recentLeadSchema>;
+export type Section = z.infer<typeof sectionSchema>;

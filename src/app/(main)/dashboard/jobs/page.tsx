@@ -6,15 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Plus, X, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
 
 const JOB_TYPES = ["Kitchen", "Bedroom", "Wardrobe", "Remedial", "Other"];
 
@@ -54,7 +49,8 @@ export default function CreateJobPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const customersRes = await fetch("http://127.0.0.1:5000/customers");
+        // Use centralized fetchWithAuth
+        const customersRes = await fetchWithAuth("customers");
         if (customersRes.ok) setCustomers(await customersRes.json());
 
         // Mock team members
@@ -65,9 +61,8 @@ export default function CreateJobPage() {
         ]);
 
         if (formData.customer_id) {
-          const formsRes = await fetch(
-            `http://127.0.0.1:5000/forms/unlinked?customer_id=${formData.customer_id}`
-          );
+          // Use centralized fetchWithAuth
+          const formsRes = await fetchWithAuth(`forms/unlinked?customer_id=${formData.customer_id}`);
           if (formsRes.ok) setAvailableForms(await formsRes.json());
         }
       } catch (error) {
@@ -126,9 +121,9 @@ export default function CreateJobPage() {
         attached_forms: attachedForms.map((f) => f.id),
       };
 
-      const response = await fetch("http://127.0.0.1:5000/jobs", {
+      // Use centralized fetchWithAuth
+      const response = await fetchWithAuth("jobs", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitData),
       });
 
@@ -151,32 +146,24 @@ export default function CreateJobPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="border-b bg-white px-8 py-6 flex items-center space-x-3">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center text-gray-500 hover:text-gray-700"
-        >
-          <ArrowLeft className="h-5 w-5 mr-1" />
+      <header className="flex items-center space-x-3 border-b bg-white px-8 py-6">
+        <button onClick={() => router.back()} className="flex items-center text-gray-500 hover:text-gray-700">
+          <ArrowLeft className="mr-1 h-5 w-5" />
         </button>
         <h1 className="text-3xl font-semibold text-gray-900">Create Job</h1>
       </header>
 
       {/* Main Form */}
-      <main className="max-w-3xl mx-auto px-8 py-10">
+      <main className="mx-auto max-w-3xl px-8 py-10">
         <form onSubmit={handleSubmit} className="space-y-10">
           {/* --- Basic Information --- */}
           <section>
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              Basic Information
-            </h2>
+            <h2 className="mb-4 text-xl font-semibold text-gray-800">Basic Information</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
                 <Label>Job Type *</Label>
-                <Select
-                  value={formData.job_type}
-                  onValueChange={(v) => handleInputChange("job_type", v)}
-                >
+                <Select value={formData.job_type} onValueChange={(v) => handleInputChange("job_type", v)}>
                   <SelectTrigger className={errors.job_type ? "border-red-500" : ""}>
                     <SelectValue placeholder="Select job type" />
                   </SelectTrigger>
@@ -188,9 +175,7 @@ export default function CreateJobPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.job_type && (
-                  <p className="text-sm text-red-500 mt-1">{errors.job_type}</p>
-                )}
+                {errors.job_type && <p className="mt-1 text-sm text-red-500">{errors.job_type}</p>}
               </div>
 
               <div>
@@ -206,17 +191,12 @@ export default function CreateJobPage() {
 
           {/* --- Customer & Team --- */}
           <section>
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              Customer & Team
-            </h2>
+            <h2 className="mb-4 text-xl font-semibold text-gray-800">Customer & Team</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
                 <Label>Customer *</Label>
-                <Select
-                  value={formData.customer_id}
-                  onValueChange={(v) => handleInputChange("customer_id", v)}
-                >
+                <Select value={formData.customer_id} onValueChange={(v) => handleInputChange("customer_id", v)}>
                   <SelectTrigger className={errors.customer_id ? "border-red-500" : ""}>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
@@ -228,17 +208,12 @@ export default function CreateJobPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.customer_id && (
-                  <p className="text-sm text-red-500 mt-1">{errors.customer_id}</p>
-                )}
+                {errors.customer_id && <p className="mt-1 text-sm text-red-500">{errors.customer_id}</p>}
               </div>
 
               <div>
                 <Label>Team Member</Label>
-                <Select
-                  value={formData.team_member}
-                  onValueChange={(v) => handleInputChange("team_member", v)}
-                >
+                <Select value={formData.team_member} onValueChange={(v) => handleInputChange("team_member", v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select team member" />
                   </SelectTrigger>
@@ -256,9 +231,9 @@ export default function CreateJobPage() {
 
           {/* --- Schedule --- */}
           <section>
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Schedule</h2>
+            <h2 className="mb-4 text-xl font-semibold text-gray-800">Schedule</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
                 <Label>Start Date *</Label>
                 <Input
@@ -267,9 +242,7 @@ export default function CreateJobPage() {
                   onChange={(e) => handleInputChange("start_date", e.target.value)}
                   className={errors.start_date ? "border-red-500" : ""}
                 />
-                {errors.start_date && (
-                  <p className="text-sm text-red-500 mt-1">{errors.start_date}</p>
-                )}
+                {errors.start_date && <p className="mt-1 text-sm text-red-500">{errors.start_date}</p>}
               </div>
 
               <div>
@@ -280,16 +253,14 @@ export default function CreateJobPage() {
                   onChange={(e) => handleInputChange("end_date", e.target.value)}
                   className={errors.end_date ? "border-red-500" : ""}
                 />
-                {errors.end_date && (
-                  <p className="text-sm text-red-500 mt-1">{errors.end_date}</p>
-                )}
+                {errors.end_date && <p className="mt-1 text-sm text-red-500">{errors.end_date}</p>}
               </div>
             </div>
           </section>
 
           {/* --- Notes --- */}
           <section>
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Notes</h2>
+            <h2 className="mb-4 text-xl font-semibold text-gray-800">Notes</h2>
             <div className="space-y-4">
               <div>
                 <Label>Tags</Label>
@@ -315,30 +286,19 @@ export default function CreateJobPage() {
           {/* --- Attach Forms --- */}
           {availableForms.length > 0 && (
             <section>
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                Attach Existing Forms
-              </h2>
+              <h2 className="mb-4 text-xl font-semibold text-gray-800">Attach Existing Forms</h2>
 
               <div className="space-y-3">
                 {availableForms.map((form) => (
-                  <div
-                    key={form.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
+                  <div key={form.id} className="flex items-center justify-between rounded-lg border p-3">
                     <div>
                       <p className="font-medium">Form #{form.id}</p>
                       <p className="text-sm text-gray-500">
-                        Submitted:{" "}
-                        {new Date(form.submitted_at).toLocaleDateString()}
+                        Submitted: {new Date(form.submitted_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => attachForm(form.id.toString())}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
+                    <Button type="button" variant="outline" size="sm" onClick={() => attachForm(form.id.toString())}>
+                      <Plus className="mr-2 h-4 w-4" />
                       Attach
                     </Button>
                   </div>
@@ -350,29 +310,21 @@ export default function CreateJobPage() {
           {/* --- Attached Forms --- */}
           {attachedForms.length > 0 && (
             <section>
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">
-                Attached Forms
-              </h2>
+              <h2 className="mb-4 text-xl font-semibold text-gray-800">Attached Forms</h2>
 
               <div className="space-y-3">
                 {attachedForms.map((form) => (
                   <div
                     key={form.id}
-                    className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+                    className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3"
                   >
                     <div>
                       <p className="font-medium">Form #{form.id}</p>
                       <p className="text-sm text-gray-600">
-                        Submitted:{" "}
-                        {new Date(form.submitted_at).toLocaleDateString()}
+                        Submitted: {new Date(form.submitted_at).toLocaleDateString()}
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => detachForm(form.id)}
-                    >
+                    <Button type="button" variant="ghost" size="sm" onClick={() => detachForm(form.id)}>
                       <X className="h-4 w-4" />
                     </Button>
                   </div>

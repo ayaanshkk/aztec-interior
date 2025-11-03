@@ -13,7 +13,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
-import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
 
 import { NavMain } from "./nav-main";
@@ -58,7 +58,7 @@ const data = {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const currentUser = useCurrentUser();
-  
+
   if (!currentUser) return null;
 
   // ✅ Debug: Log the user role
@@ -68,9 +68,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // ✅ Get filtered sidebar items - with fallback to show all if role doesn't match
   const userRole = currentUser.role?.toLowerCase();
   const sidebarItems = getSidebarItems(userRole);
-  
+
   console.log("Filtered sidebar items:", sidebarItems);
-  
+
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -78,12 +78,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="flex items-center gap-1.5 px-2">
               <a href="#">
-                <Image
-                  src="/images/file2.svg"
-                  alt="Logo"
-                  width={35}
-                  height={35}
-                />
+                <Image src="/images/file2.svg" alt="Logo" width={35} height={35} />
                 <span className="text-base font-semibold">{APP_CONFIG.name}</span>
               </a>
             </SidebarMenuButton>

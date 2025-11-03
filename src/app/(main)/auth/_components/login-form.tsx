@@ -39,22 +39,22 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
 
   const onSubmit = async (data: z.infer<typeof FormSchema>) => {
     setLoading(true);
-    
+
     try {
-      console.log('🔄 Attempting login with:', data.email);
+      console.log("🔄 Attempting login with:", data.email);
       const result = await login(data.email, data.password);
-      
+
       if (result.success) {
         toast.success("Login successful!", {
           description: "Welcome back! Redirecting to dashboard...",
         });
-        
+
         // Call onSuccess callback if provided
         if (onSuccess) {
           onSuccess();
         } else {
           // Default behavior: redirect to dashboard
-          router.replace("/dashboard");
+          router.push('/dashboard/default');
         }
       } else {
         toast.error("Login failed", {
@@ -81,13 +81,13 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             <FormItem>
               <FormLabel>Email Address</FormLabel>
               <FormControl>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="you@example.com" 
-                  autoComplete="email" 
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  autoComplete="email"
                   disabled={loading}
-                  {...field} 
+                  {...field}
                 />
               </FormControl>
               <FormMessage />

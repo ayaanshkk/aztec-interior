@@ -8,22 +8,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { APP_CONFIG } from "@/config/app-config";
 import { useAuth } from "@/contexts/AuthContext";
 
 // The Zod Schema needs a slight adjustment to allow the field to be initially undefined/empty
@@ -38,22 +26,21 @@ const FormSchema = z
     first_name: z.string().min(1, { message: "First name is required." }),
     last_name: z.string().min(1, { message: "Last name is required." }),
     email: z.string().email({ message: "Please enter a valid email address." }),
-    
+
     // 🌟 CHANGE 1: Define 'role' as a string that must be one of the enum values
     // but allow it to be initially undefined or empty.
     role: z.string().pipe(
       z.enum(Roles, {
         errorMap: () => ({ message: "Please select a role." }),
-      })
+      }),
     ),
 
     password: z
       .string()
       .min(8, { message: "Password must be at least 8 characters." })
-      .refine(
-        (val) => /[a-z]/.test(val) && /[A-Z]/.test(val) && /\d/.test(val),
-        { message: "Password must include uppercase, lowercase, and a number." }
-      ),
+      .refine((val) => /[a-z]/.test(val) && /[A-Z]/.test(val) && /\d/.test(val), {
+        message: "Password must include uppercase, lowercase, and a number.",
+      }),
     confirmPassword: z.string().min(1, { message: "Confirm your password." }),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -72,7 +59,7 @@ export function RegisterForm() {
       first_name: "",
       last_name: "",
       email: "",
-      role: "" as RoleType, 
+      role: "" as RoleType,
       password: "",
       confirmPassword: "",
     },
@@ -97,7 +84,7 @@ export function RegisterForm() {
           description: "Your account has been created. Redirecting to login...",
         });
         setTimeout(() => {
-          router.push("/login?message=Registration successful. Please sign in.");
+          router.push('/login?message=Registration successful. Please sign in.');
         }, 900);
         form.reset();
       } else {
@@ -121,12 +108,7 @@ export function RegisterForm() {
               <FormItem>
                 <FormLabel>First Name *</FormLabel>
                 <FormControl>
-                  <Input
-                    id="first_name"
-                    placeholder="First name"
-                    autoComplete="given-name"
-                    {...field}
-                  />
+                  <Input id="first_name" placeholder="First name" autoComplete="given-name" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -140,12 +122,7 @@ export function RegisterForm() {
               <FormItem>
                 <FormLabel>Last Name *</FormLabel>
                 <FormControl>
-                  <Input
-                    id="last_name"
-                    placeholder="Last name"
-                    autoComplete="family-name"
-                    {...field}
-                  />
+                  <Input id="last_name" placeholder="Last name" autoComplete="family-name" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -160,13 +137,7 @@ export function RegisterForm() {
             <FormItem>
               <FormLabel>Email Address *</FormLabel>
               <FormControl>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  {...field}
-                />
+                <Input id="email" type="email" placeholder="you@example.com" autoComplete="email" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -184,7 +155,7 @@ export function RegisterForm() {
                   <Select
                     // 🌟 We now rely on Select's internal handling of the empty string.
                     onValueChange={(val) => field.onChange(val)}
-                    value={field.value} 
+                    value={field.value}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
@@ -205,7 +176,6 @@ export function RegisterForm() {
           <div />
         </div>
 
-
         <FormField
           control={form.control}
           name="password"
@@ -213,15 +183,9 @@ export function RegisterForm() {
             <FormItem>
               <FormLabel>Password *</FormLabel>
               <FormControl>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  autoComplete="new-password"
-                  {...field}
-                />
+                <Input id="password" type="password" placeholder="••••••••" autoComplete="new-password" {...field} />
               </FormControl>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="mt-1 text-xs text-gray-500">
                 Must be at least 8 characters with uppercase, lowercase, and number
               </p>
               <FormMessage />

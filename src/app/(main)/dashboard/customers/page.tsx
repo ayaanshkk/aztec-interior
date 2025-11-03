@@ -13,24 +13,24 @@ import { useRouter } from "next/navigation";
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 import { useAuth } from "@/contexts/AuthContext";
 
-type JobStage = 
-  | 'Lead' 
-  | 'Quote' 
-  | 'Consultation' 
-  | 'Survey' 
-  | 'Measure' 
-  | 'Design' 
-  | 'Quoted' 
-  | 'Accepted'
-  | 'OnHold' 
-  | 'Production' 
-  | 'Delivery' 
-  | 'Installation' 
-  | 'Complete' 
-  | 'Remedial' 
-  | 'Cancelled';
+type JobStage =
+  | "Lead"
+  | "Quote"
+  | "Consultation"
+  | "Survey"
+  | "Measure"
+  | "Design"
+  | "Quoted"
+  | "Accepted"
+  | "OnHold"
+  | "Production"
+  | "Delivery"
+  | "Installation"
+  | "Complete"
+  | "Remedial"
+  | "Cancelled";
 
-type ProjectType = 'Bedroom' | 'Kitchen' | 'Other';
+type ProjectType = "Bedroom" | "Kitchen" | "Other";
 
 interface Customer {
   id: string;
@@ -39,8 +39,8 @@ interface Customer {
   postcode: string;
   phone: string;
   email: string;
-  contact_made: 'Yes' | 'No' | 'Unknown';
-  preferred_contact_method: 'Phone' | 'Email' | 'WhatsApp';
+  contact_made: "Yes" | "No" | "Unknown";
+  preferred_contact_method: "Phone" | "Email" | "WhatsApp";
   marketing_opt_in: boolean;
   date_of_measure: string;
   status: string;
@@ -54,46 +54,46 @@ interface Customer {
 
 const getStageColor = (stage: JobStage): string => {
   switch (stage) {
-    case 'Lead':
-      return 'bg-gray-100 text-gray-800';
-    case 'Quote':
-    case 'Consultation':
-      return 'bg-blue-100 text-blue-800';
-    case 'Survey':
-    case 'Measure':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'Design':
-    case 'Quoted':
-      return 'bg-orange-100 text-orange-800';
-    case 'Accepted':
-    case 'Production':
-      return 'bg-purple-100 text-purple-800';
-    case 'Delivery':
-    case 'Installation':
-      return 'bg-indigo-100 text-indigo-800';
-    case 'Complete':
-      return 'bg-green-100 text-green-800';
-    case 'OnHold':
-      return 'bg-gray-100 text-gray-600';
-    case 'Remedial':
-      return 'bg-red-100 text-red-800';
-    case 'Cancelled':
-      return 'bg-red-100 text-red-600';
+    case "Lead":
+      return "bg-gray-100 text-gray-800";
+    case "Quote":
+    case "Consultation":
+      return "bg-blue-100 text-blue-800";
+    case "Survey":
+    case "Measure":
+      return "bg-yellow-100 text-yellow-800";
+    case "Design":
+    case "Quoted":
+      return "bg-orange-100 text-orange-800";
+    case "Accepted":
+    case "Production":
+      return "bg-purple-100 text-purple-800";
+    case "Delivery":
+    case "Installation":
+      return "bg-indigo-100 text-indigo-800";
+    case "Complete":
+      return "bg-green-100 text-green-800";
+    case "OnHold":
+      return "bg-gray-100 text-gray-600";
+    case "Remedial":
+      return "bg-red-100 text-red-800";
+    case "Cancelled":
+      return "bg-red-100 text-red-600";
     default:
-      return 'bg-gray-100 text-gray-800';
+      return "bg-gray-100 text-gray-800";
   }
 };
 
 const getProjectTypeColor = (type: ProjectType): string => {
   switch (type) {
-    case 'Bedroom':
-      return 'bg-purple-100 text-purple-800';
-    case 'Kitchen':
-      return 'bg-blue-100 text-blue-800';
-    case 'Other':
-      return 'bg-gray-100 text-gray-800';
+    case "Bedroom":
+      return "bg-purple-100 text-purple-800";
+    case "Kitchen":
+      return "bg-blue-100 text-blue-800";
+    case "Other":
+      return "bg-gray-100 text-gray-800";
     default:
-      return 'bg-gray-100 text-gray-800';
+      return "bg-gray-100 text-gray-800";
   }
 };
 
@@ -101,7 +101,7 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [stageFilter, setStageFilter] = useState<JobStage | 'All'>('All');
+  const [stageFilter, setStageFilter] = useState<JobStage | "All">("All");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const router = useRouter();
   const { user } = useAuth();
@@ -115,23 +115,23 @@ export default function CustomersPage() {
     if (user?.role === "Sales") {
       console.log("Current user:", user);
       console.log("All customers:", allCustomers);
-      
+
       const filteredData = allCustomers.filter((customer: Customer) => {
         const matchesCreatedBy = customer.created_by === String(user.id);
         const matchesSalesperson = customer.salesperson === user.name;
-        
+
         console.log(`Customer ${customer.name}:`, {
           created_by: customer.created_by,
           salesperson: customer.salesperson,
           matchesCreatedBy,
-          matchesSalesperson
+          matchesSalesperson,
         });
-        
+
         return matchesCreatedBy || matchesSalesperson;
       });
-      
+
       console.log("Filtered customers for Sales:", filteredData);
-      
+
       // TEMPORARY: If no customers match, show all customers
       // Remove this after fixing the data
       if (filteredData.length === 0 && allCustomers.length > 0) {
@@ -148,18 +148,19 @@ export default function CustomersPage() {
 
   const fetchCustomers = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      
-      const response = await fetch("http://127.0.0.1:5000/customers", {
+      const token = localStorage.getItem("auth_token");
+
+      const response = await fetch("https://aztec-interiors.onrender.com/customers", {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
-      
+
       if (response.ok) {
-        const data = await response.json();
-        setAllCustomers(data);
-      } else {
+        const data = await response.json();
+        console.log("Raw API Response:", data); // <-- Add this line*
+        setAllCustomers(data);
+      } else {
         console.error("Failed to fetch customers:", response.status);
         setAllCustomers([]); // Set empty array on error
       }
@@ -170,15 +171,15 @@ export default function CustomersPage() {
   };
 
   const filteredCustomers = customers.filter((customer) => {
-    const matchesSearch = 
+    const matchesSearch =
       (customer.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer.address || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer.phone || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer.postcode || "").toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStage = stageFilter === 'All' || customer.stage === stageFilter;
-    
+
+    const matchesStage = stageFilter === "All" || customer.stage === stageFilter;
+
     return matchesSearch && matchesStage;
   });
 
@@ -196,25 +197,25 @@ export default function CustomersPage() {
   };
 
   const deleteCustomer = async (id: string) => {
-    if (!canDeleteCustomer(customers.find(c => c.id === id)!)) {
+    if (!canDeleteCustomer(customers.find((c) => c.id === id)!)) {
       alert("You don't have permission to delete customers.");
       return;
     }
-    
+
     if (!confirm("Are you sure you want to delete this customer?")) return;
-    
+
     try {
-      const token = localStorage.getItem('auth_token');
-      
-      const res = await fetch(`http://127.0.0.1:5000/customers/${id}`, {
+      const token = localStorage.getItem("auth_token");
+
+      const res = await fetch(`https://aztec-interiors.onrender.com/customers/${id}`, {
         method: "DELETE",
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (!res.ok) throw new Error("Failed to delete customer");
-      setCustomers(customers.filter(c => c.id !== id));
-      setAllCustomers(allCustomers.filter(c => c.id !== id));
+      setCustomers(customers.filter((c) => c.id !== id));
+      setAllCustomers(allCustomers.filter((c) => c.id !== id));
     } catch (err) {
       console.error("Delete error:", err);
       alert("Error deleting customer");
@@ -225,28 +226,26 @@ export default function CustomersPage() {
     if (!dateString) return "—";
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
+      return date.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
       });
     } catch {
       return dateString;
     }
   };
 
-  const uniqueStages = Array.from(new Set(customers.map(c => c.stage)));
+  const uniqueStages = Array.from(new Set(customers.map((c) => c.stage)));
 
   return (
     <div className="w-full p-6">
-      <h1 className="text-3xl font-bold mb-6">
-        {user?.role === "Sales" ? "My Customers" : "Customers"}
-      </h1>
-      
-      <div className="flex justify-between mb-6">
+      <h1 className="mb-6 text-3xl font-bold">{user?.role === "Sales" ? "My Customers" : "Customers"}</h1>
+
+      <div className="mb-6 flex justify-between">
         <div className="flex gap-3">
           <div className="relative w-64">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="text-muted-foreground absolute top-2.5 left-2 h-4 w-4" />
             <Input
               placeholder="Search customers..."
               className="pl-8"
@@ -258,14 +257,12 @@ export default function CustomersPage() {
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
                 <Filter className="mr-2 h-4 w-4" />
-                {stageFilter === 'All' ? 'All Stages' : stageFilter}
+                {stageFilter === "All" ? "All Stages" : stageFilter}
                 <ChevronDown className="ml-1 h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setStageFilter('All')}>
-                All Stages
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStageFilter("All")}>All Stages</DropdownMenuItem>
               {uniqueStages.map((stage) => (
                 <DropdownMenuItem key={stage} onClick={() => setStageFilter(stage)}>
                   {stage}
@@ -275,37 +272,50 @@ export default function CustomersPage() {
           </DropdownMenu>
         </div>
         {user?.role !== "Staff" && user?.role !== "Production" && (
-  <Button onClick={() => setShowCreateModal(true)}>
-    <Plus className="mr-2 h-4 w-4" />
-    Add Customer
-  </Button>
-)}
-
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Customer
+          </Button>
+        )}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Postcode</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stage</th>
+                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  Phone
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  Email
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  Address
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  Postcode
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  Stage
+                </th>
                 {(user?.role === "Manager" || user?.role === "HR") && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesperson</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                    Salesperson
+                  </th>
                 )}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project Types</th>
+                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  Project Types
+                </th>
                 {user?.role !== "Staff" && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                     Actions
                   </th>
                 )}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200 bg-white">
               {filteredCustomers.map((customer) => (
                 <tr
                   key={customer.id}
@@ -330,22 +340,22 @@ export default function CustomersPage() {
                     <div className="text-sm text-gray-900">{customer.postcode || "—"}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStageColor(customer.stage)}`}>
+                    <span
+                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStageColor(customer.stage)}`}
+                    >
                       {customer.stage}
                     </span>
                   </td>
                   {(user?.role === "Manager" || user?.role === "HR") && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {customer.salesperson || "—"}
-                    </td>
+                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-900">{customer.salesperson || "—"}</td>
                   )}
                   <td className="px-6 py-4 whitespace-nowrap">
                     {customer.project_types && customer.project_types.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {customer.project_types.map((type, index) => (
-                          <span 
+                          <span
                             key={index}
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getProjectTypeColor(type)}`}
+                            className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getProjectTypeColor(type)}`}
                           >
                             {type}
                           </span>
@@ -356,7 +366,7 @@ export default function CustomersPage() {
                     )}
                   </td>
                   {user?.role !== "Staff" && (
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-6 py-4 text-right text-sm font-medium whitespace-nowrap">
                       <div className="flex gap-2">
                         {canEditCustomer(customer) && (
                           <Button
@@ -395,11 +405,9 @@ export default function CustomersPage() {
       </div>
 
       {filteredCustomers.length === 0 && (
-        <div className="text-center py-12 text-gray-500">
+        <div className="py-12 text-center text-gray-500">
           <p className="text-lg">No customers found.</p>
-          {user?.role === "Sales" && (
-            <p className="text-sm mt-2">Create your first customer to get started!</p>
-          )}
+          {user?.role === "Sales" && <p className="mt-2 text-sm">Create your first customer to get started!</p>}
         </div>
       )}
 

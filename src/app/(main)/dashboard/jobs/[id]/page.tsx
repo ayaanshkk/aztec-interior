@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  ArrowLeft, 
-  Edit, 
-  Calendar, 
-  MapPin, 
-  User, 
-  FileText, 
-  CheckSquare, 
+import {
+  ArrowLeft,
+  Edit,
+  Calendar,
+  MapPin,
+  User,
+  FileText,
+  CheckSquare,
   Clock,
   DollarSign,
   Users,
@@ -21,18 +21,19 @@ import {
   Upload,
   Plus,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
 
 const formatDate = (dateString: string) => {
   if (!dateString) return "—";
   try {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric'
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
     });
   } catch {
     return dateString;
@@ -46,26 +47,26 @@ const formatCurrency = (amount: number | null | undefined) => {
 
 const getStageColor = (stage: string) => {
   const colors: Record<string, string> = {
-    'Lead': 'bg-gray-100 text-gray-800',
-    'Survey': 'bg-blue-100 text-blue-800',
-    'Quote': 'bg-yellow-100 text-yellow-800',
-    'Consultation': 'bg-purple-100 text-purple-800',
-    'Accepted': 'bg-green-100 text-green-800',
-    'Production': 'bg-orange-100 text-orange-800',
-    'Delivery': 'bg-indigo-100 text-indigo-800',
-    'Complete': 'bg-emerald-100 text-emerald-800',
+    Lead: "bg-gray-100 text-gray-800",
+    Survey: "bg-blue-100 text-blue-800",
+    Quote: "bg-yellow-100 text-yellow-800",
+    Consultation: "bg-purple-100 text-purple-800",
+    Accepted: "bg-green-100 text-green-800",
+    Production: "bg-orange-100 text-orange-800",
+    Delivery: "bg-indigo-100 text-indigo-800",
+    Complete: "bg-emerald-100 text-emerald-800",
   };
-  return colors[stage] || 'bg-gray-100 text-gray-800';
+  return colors[stage] || "bg-gray-100 text-gray-800";
 };
 
 const getPriorityColor = (priority: string) => {
   const colors: Record<string, string> = {
-    'Low': 'bg-green-100 text-green-800',
-    'Medium': 'bg-yellow-100 text-yellow-800',
-    'High': 'bg-orange-100 text-orange-800',
-    'Urgent': 'bg-red-100 text-red-800',
+    Low: "bg-green-100 text-green-800",
+    Medium: "bg-yellow-100 text-yellow-800",
+    High: "bg-orange-100 text-orange-800",
+    Urgent: "bg-red-100 text-red-800",
   };
-  return colors[priority] || 'bg-gray-100 text-gray-800';
+  return colors[priority] || "bg-gray-100 text-gray-800";
 };
 
 export default function JobDetailsPage() {
@@ -73,8 +74,8 @@ export default function JobDetailsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const jobId = params?.id;
-  const showSuccess = searchParams?.get('success') === 'created';
-  
+  const showSuccess = searchParams?.get("success") === "created";
+
   const [job, setJob] = useState<any | null>(null);
   const [customer, setCustomer] = useState<any | null>(null);
   const [quote, setQuote] = useState<any | null>(null);
@@ -92,15 +93,15 @@ export default function JobDetailsPage() {
     try {
       setLoading(true);
 
-      // Load job details
-      const jobRes = await fetch(`http://127.0.0.1:5000/jobs/${jobId}`);
+      // Load job details using centralized fetchWithAuth
+      const jobRes = await fetchWithAuth(`jobs/${jobId}`);
       if (!jobRes.ok) throw new Error("Failed to fetch job");
       const jobData = await jobRes.json();
       setJob(jobData);
 
       // Load customer details
       if (jobData.customer_id) {
-        const customerRes = await fetch(`http://127.0.0.1:5000/customers/${jobData.customer_id}`);
+        const customerRes = await fetchWithAuth(`customers/${jobData.customer_id}`);
         if (customerRes.ok) {
           const customerData = await customerRes.json();
           setCustomer(customerData);
@@ -109,7 +110,7 @@ export default function JobDetailsPage() {
 
       // Load linked quote
       if (jobData.quote_id) {
-        const quoteRes = await fetch(`http://127.0.0.1:5000/quotations/${jobData.quote_id}`);
+        const quoteRes = await fetchWithAuth(`quotations/${jobData.quote_id}`);
         if (quoteRes.ok) {
           const quoteData = await quoteRes.json();
           setQuote(quoteData);
@@ -127,7 +128,6 @@ export default function JobDetailsPage() {
         { id: 1, name: "Pre-Installation Checklist", status: "Complete", items_completed: 8, total_items: 8 },
         { id: 2, name: "Quality Control Checklist", status: "In Progress", items_completed: 3, total_items: 12 },
       ]);
-
     } catch (error) {
       console.error("Error loading job data:", error);
     } finally {
@@ -167,8 +167,8 @@ export default function JobDetailsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Success Alert */}
       {showSuccess && (
-        <div className="bg-white border-b">
-          <div className="max-w-7xl mx-auto px-8 py-4">
+        <div className="border-b bg-white">
+          <div className="mx-auto max-w-7xl px-8 py-4">
             <Alert className="border-green-200 bg-green-50">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
@@ -181,7 +181,7 @@ export default function JobDetailsPage() {
 
       {/* Header */}
       <div className="border-b border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-8 py-6">
+        <div className="mx-auto max-w-7xl px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
@@ -190,35 +190,31 @@ export default function JobDetailsPage() {
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              
+
               <div>
                 <div className="flex items-center space-x-3">
-                  <h1 className="text-3xl font-semibold text-gray-900">
-                    {job.job_reference || `Job #${job.id}`}
-                  </h1>
-                  <Badge className={getStageColor(job.stage)}>
-                    {job.stage}
-                  </Badge>
+                  <h1 className="text-3xl font-semibold text-gray-900">{job.job_reference || `Job #${job.id}`}</h1>
+                  <Badge className={getStageColor(job.stage)}>{job.stage}</Badge>
                   {job.priority && (
                     <Badge variant="outline" className={getPriorityColor(job.priority)}>
                       {job.priority}
                     </Badge>
                   )}
                 </div>
-                <p className="text-lg text-gray-600 mt-1">{job.job_name || job.type}</p>
+                <p className="mt-1 text-lg text-gray-600">{job.job_name || job.type}</p>
               </div>
             </div>
 
             <div className="flex items-center space-x-3">
               <Button variant="outline" onClick={handleEdit}>
-                <Edit className="h-4 w-4 mr-2" />
+                <Edit className="mr-2 h-4 w-4" />
                 Edit Job
               </Button>
             </div>
           </div>
 
           {/* Quick Info Cards */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
@@ -261,8 +257,8 @@ export default function JobDetailsPage() {
                   <MapPin className="h-5 w-5 text-gray-500" />
                   <div>
                     <p className="text-sm font-medium">Location</p>
-                    <p className="text-sm text-gray-600 truncate">
-                      {job.installation_address ? job.installation_address.split(',')[0] : "—"}
+                    <p className="truncate text-sm text-gray-600">
+                      {job.installation_address ? job.installation_address.split(",")[0] : "—"}
                     </p>
                   </div>
                 </div>
@@ -274,8 +270,8 @@ export default function JobDetailsPage() {
 
       {/* Next Steps CTA Panel */}
       {showSuccess && (
-        <div className="bg-blue-50 border-b border-blue-200">
-          <div className="max-w-7xl mx-auto px-8 py-4">
+        <div className="border-b border-blue-200 bg-blue-50">
+          <div className="mx-auto max-w-7xl px-8 py-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-medium text-blue-900">Next Steps</h3>
@@ -301,7 +297,7 @@ export default function JobDetailsPage() {
       )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-8 py-8">
+      <div className="mx-auto max-w-7xl px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="details">Details</TabsTrigger>
@@ -314,7 +310,7 @@ export default function JobDetailsPage() {
           </TabsList>
 
           <TabsContent value="details" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {/* Job Information */}
               <Card>
                 <CardHeader>
@@ -336,8 +332,8 @@ export default function JobDetailsPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-500">Priority</p>
-                      <Badge variant="outline" className={getPriorityColor(job.priority || 'Medium')}>
-                        {job.priority || 'Medium'}
+                      <Badge variant="outline" className={getPriorityColor(job.priority || "Medium")}>
+                        {job.priority || "Medium"}
                       </Badge>
                     </div>
                     <div>
@@ -377,8 +373,8 @@ export default function JobDetailsPage() {
                         <p className="text-base">{customer.address}</p>
                       </div>
                       <div className="pt-2">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
                         >
@@ -433,7 +429,7 @@ export default function JobDetailsPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle>Documents</CardTitle>
                   <Button>
-                    <Upload className="h-4 w-4 mr-2" />
+                    <Upload className="mr-2 h-4 w-4" />
                     Upload Document
                   </Button>
                 </div>
@@ -441,25 +437,31 @@ export default function JobDetailsPage() {
               <CardContent>
                 {documents.length > 0 ? (
                   <div className="space-y-3">
-                    {documents.map(doc => (
-                      <div key={doc.id} className="flex items-center justify-between p-3 border rounded">
+                    {documents.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between rounded border p-3">
                         <div className="flex items-center space-x-3">
                           <FileText className="h-5 w-5 text-gray-500" />
                           <div>
                             <p className="font-medium">{doc.name}</p>
-                            <p className="text-sm text-gray-500">{doc.size} • {formatDate(doc.uploaded_at)}</p>
+                            <p className="text-sm text-gray-500">
+                              {doc.size} • {formatDate(doc.uploaded_at)}
+                            </p>
                           </div>
                         </div>
                         <div className="flex space-x-2">
-                          <Button variant="ghost" size="sm">View</Button>
-                          <Button variant="ghost" size="sm">Download</Button>
+                          <Button variant="ghost" size="sm">
+                            View
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            Download
+                          </Button>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <div className="py-8 text-center text-gray-500">
+                    <FileText className="mx-auto mb-4 h-12 w-12 opacity-50" />
                     <p>No documents uploaded yet</p>
                   </div>
                 )}
@@ -473,7 +475,7 @@ export default function JobDetailsPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle>Checklists</CardTitle>
                   <Button onClick={handleCreateCountingSheet}>
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="mr-2 h-4 w-4" />
                     Create Checklist
                   </Button>
                 </div>
@@ -481,8 +483,8 @@ export default function JobDetailsPage() {
               <CardContent>
                 {checklists.length > 0 ? (
                   <div className="space-y-3">
-                    {checklists.map(checklist => (
-                      <div key={checklist.id} className="flex items-center justify-between p-3 border rounded">
+                    {checklists.map((checklist) => (
+                      <div key={checklist.id} className="flex items-center justify-between rounded border p-3">
                         <div className="flex items-center space-x-3">
                           <CheckSquare className="h-5 w-5 text-gray-500" />
                           <div>
@@ -493,17 +495,25 @@ export default function JobDetailsPage() {
                           </div>
                         </div>
                         <div className="flex items-center space-x-3">
-                          <Badge className={checklist.status === 'Complete' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                          <Badge
+                            className={
+                              checklist.status === "Complete"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-yellow-100 text-yellow-800"
+                            }
+                          >
                             {checklist.status}
                           </Badge>
-                          <Button variant="outline" size="sm">View</Button>
+                          <Button variant="outline" size="sm">
+                            View
+                          </Button>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <CheckSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <div className="py-8 text-center text-gray-500">
+                    <CheckSquare className="mx-auto mb-4 h-12 w-12 opacity-50" />
                     <p>No checklists created yet</p>
                   </div>
                 )}
@@ -517,23 +527,23 @@ export default function JobDetailsPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle>Schedule</CardTitle>
                   <Button onClick={handleCreateSchedule}>
-                    <Calendar className="h-4 w-4 mr-2" />
+                    <Calendar className="mr-2 h-4 w-4" />
                     Create Schedule
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <div className="py-8 text-center text-gray-500">
+                  <Calendar className="mx-auto mb-4 h-12 w-12 opacity-50" />
                   <p>No schedule created yet</p>
-                  <p className="text-sm mt-2">Create a schedule to track project milestones and deadlines</p>
+                  <p className="mt-2 text-sm">Create a schedule to track project milestones and deadlines</p>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="financials" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {/* Pricing Information */}
               <Card>
                 <CardHeader>
@@ -558,13 +568,13 @@ export default function JobDetailsPage() {
                       <span className="text-base">{formatDate(job.deposit_due_date)}</span>
                     </div>
                   </div>
-                  
+
                   {quote && (
-                    <div className="pt-4 border-t">
+                    <div className="border-t pt-4">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Linked Quote</span>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => router.push(`/dashboard/quotes/${quote.id}`)}
                         >
@@ -582,16 +592,16 @@ export default function JobDetailsPage() {
                   <div className="flex items-center justify-between">
                     <CardTitle>Invoices & Payments</CardTitle>
                     <Button size="sm" onClick={handleCreateInvoice}>
-                      <Plus className="h-4 w-4 mr-2" />
+                      <Plus className="mr-2 h-4 w-4" />
                       Create Invoice
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-8 text-gray-500">
-                    <DollarSign className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <div className="py-8 text-center text-gray-500">
+                    <DollarSign className="mx-auto mb-4 h-12 w-12 opacity-50" />
                     <p>No invoices created yet</p>
-                    <p className="text-sm mt-2">Create invoices to track payments and billing</p>
+                    <p className="mt-2 text-sm">Create invoices to track payments and billing</p>
                   </div>
                 </CardContent>
               </Card>
@@ -604,7 +614,7 @@ export default function JobDetailsPage() {
                 <CardTitle>Team Assignment</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div>
                     <p className="text-sm font-medium text-gray-500">Assigned Team</p>
                     <p className="text-base">{job.assigned_team_name || "—"}</p>
@@ -628,7 +638,7 @@ export default function JobDetailsPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle>Notes & Comments</CardTitle>
                   <Button size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="mr-2 h-4 w-4" />
                     Add Note
                   </Button>
                 </div>
@@ -636,22 +646,22 @@ export default function JobDetailsPage() {
               <CardContent>
                 {job.notes ? (
                   <div className="space-y-4">
-                    <div className="p-4 bg-gray-50 rounded border">
+                    <div className="rounded border bg-gray-50 p-4">
                       <div className="flex items-start space-x-3">
-                        <MessageSquare className="h-5 w-5 text-gray-500 mt-0.5" />
+                        <MessageSquare className="mt-0.5 h-5 w-5 text-gray-500" />
                         <div className="flex-1">
                           <p className="text-sm font-medium">Initial Notes</p>
-                          <p className="text-sm text-gray-600 mt-1">{job.notes}</p>
-                          <p className="text-xs text-gray-500 mt-2">Added: {formatDate(job.created_at)}</p>
+                          <p className="mt-1 text-sm text-gray-600">{job.notes}</p>
+                          <p className="mt-2 text-xs text-gray-500">Added: {formatDate(job.created_at)}</p>
                         </div>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <div className="py-8 text-center text-gray-500">
+                    <MessageSquare className="mx-auto mb-4 h-12 w-12 opacity-50" />
                     <p>No notes added yet</p>
-                    <p className="text-sm mt-2">Add notes to track important information and updates</p>
+                    <p className="mt-2 text-sm">Add notes to track important information and updates</p>
                   </div>
                 )}
               </CardContent>

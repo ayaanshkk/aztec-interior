@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
 
 type ProjectType = 'Bedroom' | 'Kitchen' | 'Other';
 
@@ -94,54 +95,41 @@ export function CreateCustomerModal({
     setShowManualAddress(false);
 
     try {
-      const apiKey = '4cu8sEIbO0-xTvMTuNam1A48205'; // Your API key
-      // Use autocomplete endpoint with postcode filter
+      const apiKey = '4cu8sEIbO0-xTvMTuNam1A48205';
+      // Use the Find endpoint - returns all addresses in ONE call
+      const cleanPostcode = formData.postcode.replace(/\s/g, '');
       const response = await fetch(
-        `https://api.getaddress.io/autocomplete/${encodeURIComponent(formData.postcode)}?api-key=${apiKey}&all=true`
+        `https://api.getaddress.io/find/${encodeURIComponent(cleanPostcode)}?api-key=${apiKey}&expand=true`
       );
 
       if (response.ok) {
         const data = await response.json();
-        console.log("API Response:", data); // Debug log
+        console.log("API Response:", data);
         
-        if (data.suggestions && data.suggestions.length > 0) {
-          // Fetch full address details for each suggestion
-          const addressPromises = data.suggestions.map((suggestion: any) =>
-            fetch(`https://api.getaddress.io/get/${suggestion.id}?api-key=${apiKey}`)
-              .then(res => res.json())
-          );
-          
-          const addressDetails = await Promise.all(addressPromises);
-          
-          const formattedAddresses: Address[] = addressDetails.map((addr: any) => ({
-            line_1: addr.line_1,
-            line_2: addr.line_2,
-            line_3: addr.line_3,
-            post_town: addr.town_or_city,
+        if (data.addresses && data.addresses.length > 0) {
+          const formattedAddresses: Address[] = data.addresses.map((addr: any) => ({
+            line_1: addr.line_1 || addr.formatted_address?.[0] || '',
+            line_2: addr.line_2 || addr.formatted_address?.[1] || '',
+            line_3: addr.line_3 || addr.formatted_address?.[2] || '',
+            post_town: addr.town_or_city || addr.formatted_address?.[5] || '',
             postcode: formData.postcode,
-            formatted_address: [
-              addr.line_1,
-              addr.line_2,
-              addr.line_3,
-              addr.town_or_city,
-              formData.postcode
-            ].filter(Boolean).join(', ')
+            formatted_address: addr.formatted_address?.filter(Boolean).join(', ') || 
+                            [addr.line_1, addr.line_2, addr.line_3, addr.town_or_city, formData.postcode]
+                              .filter(Boolean).join(', ')
           }));
           
           setAddresses(formattedAddresses);
-          console.log("Formatted addresses:", formattedAddresses); // Debug log
+          console.log("Formatted addresses:", formattedAddresses);
         } else {
-          // No addresses found - show manual entry with warning
-          console.log("No addresses in response"); // Debug log
+          console.log("No addresses in response");
           setShowManualAddress(true);
         }
       } else {
-        // API error - show manual entry with warning
         const errorText = await response.text();
-        console.error("API Error:", response.status, response.statusText, errorText); // Debug log
+        console.error("API Error:", response.status, response.statusText, errorText);
         
         if (response.status === 404) {
-          alert("API Key Error: The getAddress.io API key appears to be invalid. Please check your API key configuration.");
+          alert("No addresses found for this postcode, or API key issue.");
         }
         setShowManualAddress(true);
       }
@@ -198,14 +186,10 @@ export function CreateCustomerModal({
     setSubmitting(true);
 
     try {
-      const token = localStorage.getItem('auth_token'); // GET AUTH TOKEN
-
-      const response = await fetch("http://127.0.0.1:5000/customers", {
+      // Use the centralized fetchWithAuth function
+      // It will automatically handle the token and construct the correct URL
+      const response = await fetchWithAuth('/customers', { // ✅ Add leading slash
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` // ADD AUTH HEADER
-        },
         body: JSON.stringify(formData),
       });
 

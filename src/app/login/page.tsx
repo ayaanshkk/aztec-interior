@@ -17,7 +17,7 @@ export default function LoginV2Enhanced() {
             <Image
               src="/images/file1.svg"
               alt="Logo"
-              width={80}  // adjust size as needed
+              width={80} // adjust size as needed
               height={80} // adjust size as needed
               className="mx-auto"
             />
@@ -30,12 +30,12 @@ export default function LoginV2Enhanced() {
       </div>
 
       {/* Right Panel - Enhanced Login Page 2 design */}
-      <div className="bg-background flex w-full items-center justify-center p-8 lg:w-2/3 relative">
+      <div className="bg-background relative flex w-full items-center justify-center p-8 lg:w-2/3">
         {/* Top Navigation */}
         <div className="absolute top-5 flex w-full justify-end px-10">
           <div className="text-muted-foreground text-sm">
             Don&apos;t have an account?{" "}
-            <Link className="text-foreground" href="register">
+            <Link className="text-foreground" href="/register">
               Register
             </Link>
           </div>
@@ -47,7 +47,7 @@ export default function LoginV2Enhanced() {
             <h1 className="text-3xl font-medium">Login to your account</h1>
             <p className="text-muted-foreground text-sm">Please enter your details to login.</p>
           </div>
-          
+
           <div className="space-y-4">
             <GoogleButton className="w-full" />
             <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">

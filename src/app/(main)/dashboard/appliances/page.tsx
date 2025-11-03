@@ -4,26 +4,14 @@ import { useState, useEffect } from "react";
 import { Search, Plus, Upload, Filter, Edit, Trash2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
-import DataImportComponent from "./products/new/DataImportComponent";
+import DataImportComponent from "@/components/DataImportComponent";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
 
 // --- New Imports for Modals ---
 import {
@@ -176,24 +164,14 @@ export default function ApplianceCatalogPage() {
     if (!loading) {
       loadProducts();
     }
-  }, [
-    selectedBrands,
-    selectedCategory,
-    selectedTier,
-    searchTerm,
-    pagination.page,
-    loading,
-  ]);
+  }, [selectedBrands, selectedCategory, selectedTier, searchTerm, pagination.page, loading]);
 
   const loadData = async () => {
     try {
       setLoading(true);
 
-      // Await brands and categories first
-      const [brandsRes, categoriesRes] = await Promise.all([
-        fetch("http://127.0.0.1:5000/brands"),
-        fetch("http://127.0.0.1:5000/categories"),
-      ]);
+      // Use centralized fetchWithAuth for brands and categories
+      const [brandsRes, categoriesRes] = await Promise.all([fetchWithAuth("brands"), fetchWithAuth("categories")]);
 
       if (brandsRes.ok) {
         const brandsData = await brandsRes.json();
@@ -240,7 +218,8 @@ export default function ApplianceCatalogPage() {
       }
       // --- End New Logic ---
 
-      const response = await fetch(`http://127.0.0.1:5000/products?${params}`);
+      // Use centralized fetchWithAuth
+      const response = await fetchWithAuth(`products?${params}`);
 
       if (response.ok) {
         const data = await response.json();
@@ -279,10 +258,7 @@ export default function ApplianceCatalogPage() {
   };
 
   // Handler for brand checkboxes
-  const handleBrandCheckboxChange = (
-    brandName: string,
-    checked: boolean | "indeterminate"
-  ) => {
+  const handleBrandCheckboxChange = (brandName: string, checked: boolean | "indeterminate") => {
     setSelectedBrands((prev) => {
       const newSet = new Set(prev);
       if (checked) {
@@ -337,21 +313,15 @@ export default function ApplianceCatalogPage() {
     setDeleteAlertOpen(true);
   };
 
-  const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "number" ? (value === "" ? undefined : parseFloat(value)) : value,
+      [name]: type === "number" ? (value === "" ? undefined : parseFloat(value)) : value,
     }));
   };
 
-  const handleSelectChange = (
-    name: "brand_id" | "category_id",
-    value: string
-  ) => {
+  const handleSelectChange = (name: "brand_id" | "category_id", value: string) => {
     setFormData((prev) => ({
       ...prev,
       [name]: value ? parseInt(value, 10) : undefined,
@@ -368,30 +338,20 @@ export default function ApplianceCatalogPage() {
 
     const isEdit = modalMode === "edit";
 
-    const url = isEdit
-      ? `http://127.0.0.1:5000/products/${selectedProduct?.id}`
-      : `http://127.0.0.1:5000/products`;
-
-    const method = isEdit ? "PUT" : "POST";
-
     // 1. Create the payload directly from formData
     const payload = { ...formData };
-    
+
     // 2. Clean out any keys that are undefined (e.g., an empty number input)
-    Object.keys(payload).forEach(key => 
-      (payload as any)[key] === undefined && delete (payload as any)[key]
-    );
+    Object.keys(payload).forEach((key) => (payload as any)[key] === undefined && delete (payload as any)[key]);
 
     // --- ADD THIS LINE FOR DEBUGGING ---
-    console.log("Sending request:", { method, url, payload });
+    console.log("Sending request:", { method: isEdit ? "PUT" : "POST", payload });
     // --- END DEBUGGING LINE ---
 
     try {
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          "Content-Type": "application/json",
-        },
+      // Use centralized fetchWithAuth
+      const response = await fetchWithAuth(isEdit ? `products/${selectedProduct?.id}` : "products", {
+        method: isEdit ? "PUT" : "POST",
         body: JSON.stringify(payload),
       });
 
@@ -417,12 +377,10 @@ export default function ApplianceCatalogPage() {
     if (!selectedProduct) return;
 
     try {
-      const response = await fetch(
-        `http://127.0.0.1:5000/products/${selectedProduct.id}`,
-        {
-          method: "DELETE",
-        }
-      );
+      // Use centralized fetchWithAuth
+      const response = await fetchWithAuth(`products/${selectedProduct.id}`, {
+        method: "DELETE",
+      });
 
       if (response.ok) {
         setDeleteAlertOpen(false);
@@ -441,12 +399,10 @@ export default function ApplianceCatalogPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Loading appliance catalog...
-          </p>
+          <div className="border-primary mx-auto h-8 w-8 animate-spin rounded-full border-b-2"></div>
+          <p className="text-muted-foreground mt-2 text-sm">Loading appliance catalog...</p>
         </div>
       </div>
     );
@@ -458,9 +414,7 @@ export default function ApplianceCatalogPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Appliance Catalog</h1>
-          <p className="text-muted-foreground">
-            Manage your appliance inventory and pricing tiers
-          </p>
+          <p className="text-muted-foreground">Manage your appliance inventory and pricing tiers</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -468,14 +422,14 @@ export default function ApplianceCatalogPage() {
             onImportComplete={loadData}
             trigger={
               <Button variant="outline">
-                <Upload className="h-4 w-4 mr-2" />
+                <Upload className="mr-2 h-4 w-4" />
                 Import Data
               </Button>
             }
           />
           {/* --- MODIFIED BUTTON --- */}
           <Button onClick={handleAddClick}>
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="mr-2 h-4 w-4" />
             Add Product
           </Button>
           {/* --- END MODIFIED BUTTON --- */}
@@ -487,10 +441,10 @@ export default function ApplianceCatalogPage() {
       {/* Filters */}
       <div className="space-y-4">
         {/* Filter Bar */}
-        <div className="flex justify-between items-center gap-4 flex-wrap">
-          <div className="flex-1 min-w-64">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-64 flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
               <Input
                 placeholder="Search products, model codes, or series..."
                 value={searchTerm}
@@ -500,14 +454,9 @@ export default function ApplianceCatalogPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {pagination.total} Products
-            </span>
-            <Button
-              variant="outline"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Filter className="h-4 w-4 mr-2" />
+            <span className="text-muted-foreground text-sm">{pagination.total} Products</span>
+            <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
+              <Filter className="mr-2 h-4 w-4" />
               {showFilters ? "Hide" : "Show"} Other Filters
             </Button>
           </div>
@@ -515,11 +464,8 @@ export default function ApplianceCatalogPage() {
 
         {/* Collapsible Filter Dropdowns (for Category and Tier) */}
         {showFilters && (
-          <div className="flex items-center gap-4 flex-wrap p-4 bg-card border rounded-lg">
-            <Select
-              value={selectedCategory}
-              onValueChange={setSelectedCategory}
-            >
+          <div className="bg-card flex flex-wrap items-center gap-4 rounded-lg border p-4">
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
@@ -566,14 +512,9 @@ export default function ApplianceCatalogPage() {
             <Checkbox
               id={`brand-${brandName}`}
               checked={selectedBrands.has(brandName)}
-              onCheckedChange={(checked) =>
-                handleBrandCheckboxChange(brandName, checked)
-              }
+              onCheckedChange={(checked) => handleBrandCheckboxChange(brandName, checked)}
             />
-            <Label
-              htmlFor={`brand-${brandName}`}
-              className="text-sm font-medium leading-none cursor-pointer"
-            >
+            <Label htmlFor={`brand-${brandName}`} className="cursor-pointer text-sm leading-none font-medium">
               {brandName}
             </Label>
           </div>
@@ -601,33 +542,22 @@ export default function ApplianceCatalogPage() {
                 <TableRow
                   key={product.id}
                   onClick={() => handleViewClick(product)}
-                  className="cursor-pointer hover:bg-muted/50"
+                  className="hover:bg-muted/50 cursor-pointer"
                 >
-                  <TableCell className="font-medium">
-                    {product.model_code}
-                  </TableCell>
+                  <TableCell className="font-medium">{product.model_code}</TableCell>
                   <TableCell>
                     <div>
                       <p className="font-medium">{product.name}</p>
-                      {product.pack_name && (
-                        <p className="text-xs text-muted-foreground">
-                          Pack: {product.pack_name}
-                        </p>
-                      )}
+                      {product.pack_name && <p className="text-muted-foreground text-xs">Pack: {product.pack_name}</p>}
                     </div>
                   </TableCell>
                   <TableCell>{product.brand?.name}</TableCell>
                   <TableCell>{product.series || "—"}</TableCell>
                   <TableCell>{getProductTierTag(product)}</TableCell>
-                  <TableCell>
-                    {formatPrice(product.pricing.base_price)}
-                  </TableCell>
+                  <TableCell>{formatPrice(product.pricing.base_price)}</TableCell>
 
                   {/* --- MODIFIED TABLECELL (ACTIONS) --- */}
-                  <TableCell
-                    onClick={(e) => e.stopPropagation()}
-                    className="cursor-default"
-                  >
+                  <TableCell onClick={(e) => e.stopPropagation()} className="cursor-default">
                     <div className="flex items-center gap-1">
                       {/* Eye button removed */}
                       <Button
@@ -663,23 +593,17 @@ export default function ApplianceCatalogPage() {
 
         {/* Pagination */}
         {pagination.pages > 1 && (
-          <div className="flex items-center justify-between mt-4">
-            <p className="text-sm text-muted-foreground">
-              Showing {((pagination.page - 1) * pagination.per_page) + 1} to{" "}
-              {Math.min(
-                pagination.page * pagination.per_page,
-                pagination.total
-              )}{" "}
-              of {pagination.total} results
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-muted-foreground text-sm">
+              Showing {(pagination.page - 1) * pagination.per_page + 1} to{" "}
+              {Math.min(pagination.page * pagination.per_page, pagination.total)} of {pagination.total} results
             </p>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 disabled={pagination.page <= 1}
-                onClick={() =>
-                  setPagination((prev) => ({ ...prev, page: prev.page - 1 }))
-                }
+                onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
               >
                 Previous
               </Button>
@@ -690,9 +614,7 @@ export default function ApplianceCatalogPage() {
                 variant="outline"
                 size="sm"
                 disabled={pagination.page >= pagination.pages}
-                onClick={() =>
-                  setPagination((prev) => ({ ...prev, page: prev.page + 1 }))
-                }
+                onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
               >
                 Next
               </Button>
@@ -705,11 +627,9 @@ export default function ApplianceCatalogPage() {
 
       {/* Add/Edit Product Modal */}
       <Dialog open={formModalOpen} onOpenChange={setFormModalOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>
-              {modalMode === "add" ? "Add New Product" : "Edit Product"}
-            </DialogTitle>
+            <DialogTitle>{modalMode === "add" ? "Add New Product" : "Edit Product"}</DialogTitle>
             <DialogDescription>
               {modalMode === "add"
                 ? "Fill in the details for the new product."
@@ -717,7 +637,7 @@ export default function ApplianceCatalogPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="model_code">Model Code *</Label>
                 <Input
@@ -730,21 +650,13 @@ export default function ApplianceCatalogPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="name">Name *</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleFormChange}
-                  required
-                />
+                <Input id="name" name="name" value={formData.name} onChange={handleFormChange} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="brand_id">Brand *</Label>
                 <Select
                   value={formData.brand_id?.toString()}
-                  onValueChange={(value) =>
-                    handleSelectChange("brand_id", value)
-                  }
+                  onValueChange={(value) => handleSelectChange("brand_id", value)}
                   required
                 >
                   <SelectTrigger id="brand_id">
@@ -763,9 +675,7 @@ export default function ApplianceCatalogPage() {
                 <Label htmlFor="category_id">Category *</Label>
                 <Select
                   value={formData.category_id?.toString()}
-                  onValueChange={(value) =>
-                    handleSelectChange("category_id", value)
-                  }
+                  onValueChange={(value) => handleSelectChange("category_id", value)}
                   required
                 >
                   <SelectTrigger id="category_id">
@@ -773,10 +683,7 @@ export default function ApplianceCatalogPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
-                      <SelectItem
-                        key={category.id}
-                        value={category.id.toString()}
-                      >
+                      <SelectItem key={category.id} value={category.id.toString()}>
                         {category.name}
                       </SelectItem>
                     ))}
@@ -785,21 +692,11 @@ export default function ApplianceCatalogPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="series">Series</Label>
-                <Input
-                  id="series"
-                  name="series"
-                  value={formData.series}
-                  onChange={handleFormChange}
-                />
+                <Input id="series" name="series" value={formData.series} onChange={handleFormChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="pack_name">Pack Name</Label>
-                <Input
-                  id="pack_name"
-                  name="pack_name"
-                  value={formData.pack_name}
-                  onChange={handleFormChange}
-                />
+                <Input id="pack_name" name="pack_name" value={formData.pack_name} onChange={handleFormChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="base_price">Base Price (£)</Label>
@@ -847,9 +744,7 @@ export default function ApplianceCatalogPage() {
               </div>
             </div>
 
-            {formError && (
-              <p className="text-sm text-red-600">{formError}</p>
-            )}
+            {formError && <p className="text-sm text-red-600">{formError}</p>}
 
             <DialogFooter>
               <DialogClose asChild>
@@ -857,9 +752,7 @@ export default function ApplianceCatalogPage() {
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit">
-                {modalMode === "add" ? "Create Product" : "Save Changes"}
-              </Button>
+              <Button type="submit">{modalMode === "add" ? "Create Product" : "Save Changes"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -869,26 +762,43 @@ export default function ApplianceCatalogPage() {
       <Dialog open={viewModalOpen} onOpenChange={setViewModalOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>
-              {selectedProduct?.name}
-            </DialogTitle>
+            <DialogTitle>{selectedProduct?.name}</DialogTitle>
             <DialogDescription>
               {selectedProduct?.model_code} | {selectedProduct?.brand?.name}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm">
-            <p><strong>Category:</strong> {selectedProduct?.category?.name}</p>
-            <p><strong>Series:</strong> {selectedProduct?.series || "N/A"}</p>
-            <p><strong>Pack Name:</strong> {selectedProduct?.pack_name || "N/A"}</p>
+            <p>
+              <strong>Category:</strong> {selectedProduct?.category?.name}
+            </p>
+            <p>
+              <strong>Series:</strong> {selectedProduct?.series || "N/A"}
+            </p>
+            <p>
+              <strong>Pack Name:</strong> {selectedProduct?.pack_name || "N/A"}
+            </p>
             <Separator />
             <h4 className="font-semibold">Pricing</h4>
-            <p><strong>Base Price:</strong> {formatPrice(selectedProduct?.pricing.base_price)}</p>
-            <p><strong>Low Tier:</strong> {formatPrice(selectedProduct?.pricing.low_tier_price)}</p>
-            <p><strong>Mid Tier:</strong> {formatPrice(selectedProduct?.pricing.mid_tier_price)}</p>
-            <p><strong>High Tier:</strong> {formatPrice(selectedProduct?.pricing.high_tier_price)}</p>
+            <p>
+              <strong>Base Price:</strong> {formatPrice(selectedProduct?.pricing.base_price)}
+            </p>
+            <p>
+              <strong>Low Tier:</strong> {formatPrice(selectedProduct?.pricing.low_tier_price)}
+            </p>
+            <p>
+              <strong>Mid Tier:</strong> {formatPrice(selectedProduct?.pricing.mid_tier_price)}
+            </p>
+            <p>
+              <strong>High Tier:</strong> {formatPrice(selectedProduct?.pricing.high_tier_price)}
+            </p>
             <Separator />
-            <p><strong>Energy Rating:</strong> {selectedProduct?.energy_rating || "N/A"}</p>
-            <p><strong>Warranty:</strong> {selectedProduct?.warranty_years ? `${selectedProduct.warranty_years} years` : "N/A"}</p>
+            <p>
+              <strong>Energy Rating:</strong> {selectedProduct?.energy_rating || "N/A"}
+            </p>
+            <p>
+              <strong>Warranty:</strong>{" "}
+              {selectedProduct?.warranty_years ? `${selectedProduct.warranty_years} years` : "N/A"}
+            </p>
           </div>
           <DialogFooter>
             <DialogClose asChild>
@@ -898,7 +808,6 @@ export default function ApplianceCatalogPage() {
         </DialogContent>
       </Dialog>
 
-
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
         <AlertDialogContent>
@@ -907,16 +816,16 @@ export default function ApplianceCatalogPage() {
             <AlertDialogDescription>
               This action will deactivate the product:
               <br />
-              <strong>{selectedProduct?.name} ({selectedProduct?.model_code})</strong>
+              <strong>
+                {selectedProduct?.name} ({selectedProduct?.model_code})
+              </strong>
               <br />
               This product will be hidden but not permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>
-              Continue
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete}>Continue</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

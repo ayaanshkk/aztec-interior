@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
 
 type Notification = {
   id: string;
@@ -29,12 +30,8 @@ export function NotificationBell() {
     if (user?.role !== "Production") return;
 
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch('http://127.0.0.1:5000/notifications/production', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      // Use the centralized fetchWithAuth function
+      const response = await fetchWithAuth('notifications/production');
       
       if (response.ok) {
         const data = await response.json();
@@ -62,12 +59,9 @@ export function NotificationBell() {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      const token = localStorage.getItem('auth_token');
-      await fetch(`http://127.0.0.1:5000/notifications/production/${notificationId}/read`, {
+      // Use the centralized fetchWithAuth function
+      await fetchWithAuth(`notifications/production/${notificationId}/read`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
       });
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
     } catch (error) {
@@ -77,12 +71,9 @@ export function NotificationBell() {
 
   const markAllAsRead = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      await fetch('http://127.0.0.1:5000/notifications/production/mark-all-read', {
+      // Use the centralized fetchWithAuth function
+      await fetchWithAuth('notifications/production/mark-all-read', {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
       });
       setNotifications([]);
     } catch (error) {

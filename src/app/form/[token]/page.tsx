@@ -23,7 +23,7 @@ interface FormData {
   completion_date: string;
   deposit_date: string;
   door_style: string;
-  glazing_material: string; 
+  glazing_material: string;
   door_color: string;
   end_panel_color: string;
   plinth_filler_color: string;
@@ -80,75 +80,75 @@ export default function FormPage() {
   const [valid, setValid] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{
-    type: 'success' | 'error' | null;
+    type: "success" | "error" | null;
     message: string;
-  }>({ type: null, message: '' });
+  }>({ type: null, message: "" });
 
   const [formData, setFormData] = useState<FormData>({
-    customer_id: '',
-    customer_name: '',
-    customer_phone: '',
-    customer_address: '',
-    room: '',
-    survey_date: '',
-    appointment_date: '',
-    installation_date: '',
-    completion_date: '',
-    deposit_date: '',
-    door_style: '',
-    glazing_material: '', 
-    door_color: '',
-    end_panel_color: '',
-    plinth_filler_color: '',
-    cabinet_color: '',
-    worktop_color: '',
-    bedside_cabinets_type: '',
-    bedside_cabinets_qty: '',
-    dresser_desk: '',
-    dresser_desk_details: '',
-    internal_mirror: '',
-    internal_mirror_details: '',
-    mirror_type: '',
-    mirror_qty: '',
-    soffit_lights_type: '',
-    soffit_lights_color: '',
-    gable_lights_light_color: '',
-    gable_lights_light_qty: '',
-    gable_lights_profile_color: '',
-    gable_lights_profile_qty: '',
-    other_accessories: '',
+    customer_id: "",
+    customer_name: "",
+    customer_phone: "",
+    customer_address: "",
+    room: "",
+    survey_date: "",
+    appointment_date: "",
+    installation_date: "",
+    completion_date: "",
+    deposit_date: "",
+    door_style: "",
+    glazing_material: "",
+    door_color: "",
+    end_panel_color: "",
+    plinth_filler_color: "",
+    cabinet_color: "",
+    worktop_color: "",
+    bedside_cabinets_type: "",
+    bedside_cabinets_qty: "",
+    dresser_desk: "",
+    dresser_desk_details: "",
+    internal_mirror: "",
+    internal_mirror_details: "",
+    mirror_type: "",
+    mirror_qty: "",
+    soffit_lights_type: "",
+    soffit_lights_color: "",
+    gable_lights_light_color: "",
+    gable_lights_light_qty: "",
+    gable_lights_profile_color: "",
+    gable_lights_profile_qty: "",
+    other_accessories: "",
     floor_protection: [],
     worktop_features: [],
-    worktop_other_details: '',
-    worktop_size: '',
-    under_wall_unit_lights_color: '',
-    under_wall_unit_lights_profile: '',
-    under_worktop_lights_color: '',
-    kitchen_accessories: '',
-    appliances_customer_owned: '',
-    sink_tap_customer_owned: '',
-    sink_details: '',
-    tap_details: '',
-    other_appliances: '',
-    appliances: [ 
-      { details: '', order_date: '' }, // Oven - Index 0
-      { details: '', order_date: '' }, // Microwave - Index 1
-      { details: '', order_date: '' }, // Washing Machine - Index 2
-      { details: '', order_date: '' }, // HOB - Index 3
-      { details: '', order_date: '' }, // Extractor - Index 4
-      { details: '', order_date: '' }, // INTG Dishwasher - Index 5
+    worktop_other_details: "",
+    worktop_size: "",
+    under_wall_unit_lights_color: "",
+    under_wall_unit_lights_profile: "",
+    under_worktop_lights_color: "",
+    kitchen_accessories: "",
+    appliances_customer_owned: "",
+    sink_tap_customer_owned: "",
+    sink_details: "",
+    tap_details: "",
+    other_appliances: "",
+    appliances: [
+      { details: "", order_date: "" }, // Oven - Index 0
+      { details: "", order_date: "" }, // Microwave - Index 1
+      { details: "", order_date: "" }, // Washing Machine - Index 2
+      { details: "", order_date: "" }, // HOB - Index 3
+      { details: "", order_date: "" }, // Extractor - Index 4
+      { details: "", order_date: "" }, // INTG Dishwasher - Index 5
     ],
-    terms_date: '',
-    gas_electric_info: '',
-    appliance_promotion_info: '',
-    signature_date: '',
+    terms_date: "",
+    gas_electric_info: "",
+    appliance_promotion_info: "",
+    signature_date: "",
     // --- NEW FIELDS INITIALIZED ---
-    integ_fridge_qty: '',
-    integ_fridge_details: '',
-    integ_fridge_order_date: '',
-    integ_freezer_qty: '',
-    integ_freezer_details: '',
-    integ_freezer_order_date: '',
+    integ_fridge_qty: "",
+    integ_fridge_details: "",
+    integ_fridge_order_date: "",
+    integ_freezer_qty: "",
+    integ_freezer_details: "",
+    integ_freezer_order_date: "",
     // ----------------------------
   });
 
@@ -172,7 +172,7 @@ export default function FormPage() {
       }));
     }
   }, []);
-  
+
   const [signatureMode, setSignatureMode] = useState("upload");
   const [isDrawing, setIsDrawing] = useState(false);
   const [signatureData, setSignatureData] = useState("");
@@ -189,7 +189,7 @@ export default function FormPage() {
     const y = e.clientY - rect.top;
     setLastPoint({ x, y });
   };
-  
+
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -209,7 +209,7 @@ export default function FormPage() {
     }
     setLastPoint({ x, y });
   };
-  
+
   const stopDrawing = () => {
     setIsDrawing(false);
     setLastPoint(null);
@@ -217,7 +217,7 @@ export default function FormPage() {
       setSignatureData(canvasRef.current.toDataURL());
     }
   };
-  
+
   const clearSignature = () => {
     if (!canvasRef.current) return;
     const ctx = canvasRef.current.getContext("2d");
@@ -227,31 +227,31 @@ export default function FormPage() {
   };
 
   // Type for fields that are not arrays or the appliances object
-  type SingleField = keyof Omit<FormData, 'floor_protection' | 'worktop_features' | 'appliances'>;
+  type SingleField = keyof Omit<FormData, "floor_protection" | "worktop_features" | "appliances">;
 
   const handleInputChange = (field: SingleField, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
-  const handleCheckboxChange = (field: 'floor_protection' | 'worktop_features', value: string, checked: boolean) => {
-    setFormData(prev => {
+  const handleCheckboxChange = (field: "floor_protection" | "worktop_features", value: string, checked: boolean) => {
+    setFormData((prev) => {
       const currentValues = prev[field];
       if (checked) {
         return { ...prev, [field]: [...currentValues, value] };
       } else {
-        return { ...prev, [field]: currentValues.filter(v => v !== value) };
+        return { ...prev, [field]: currentValues.filter((v) => v !== value) };
       }
     });
   };
 
   const handleApplianceChange = (index: number, field: keyof Appliance, value: string) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const appliances = [...prev.appliances];
       if (!appliances[index]) {
-        appliances[index] = { details: '', order_date: '' };
+        appliances[index] = { details: "", order_date: "" };
       }
       appliances[index] = { ...appliances[index], [field]: value };
       return { ...prev, appliances };
@@ -271,102 +271,110 @@ export default function FormPage() {
 
   const validateForm = () => {
     const errors: string[] = [];
-    const isClientOwned = formData.appliances_customer_owned === 'no';
-    
+    const isClientOwned = formData.appliances_customer_owned === "no";
+
     // Customer Information
-    if (!formData.customer_name?.trim()) errors.push('Customer Name');
-    if (!formData.customer_phone?.trim()) errors.push('Tel/Mobile Number');
-    if (!formData.customer_address?.trim()) errors.push('Address');
-    
+    if (!formData.customer_name?.trim()) errors.push("Customer Name");
+    if (!formData.customer_phone?.trim()) errors.push("Tel/Mobile Number");
+    if (!formData.customer_address?.trim()) errors.push("Address");
+
     // Design Specifications
-    if (formType === "kitchen" && !formData.door_style?.trim()) errors.push('Door Style');
-    
+    if (formType === "kitchen" && !formData.door_style?.trim()) errors.push("Door Style");
+
     // Conditional Glazing Material
-    if (formType === "kitchen" && formData.door_style === 'glazed' && !formData.glazing_material?.trim()) {
-        errors.push('Glazing Material');
+    if (formType === "kitchen" && formData.door_style === "glazed" && !formData.glazing_material?.trim()) {
+      errors.push("Glazing Material");
     }
-    
-    if (!formData.door_color?.trim()) errors.push('Door Color');
-    if (!formData.end_panel_color?.trim()) errors.push('End Panel Color');
-    if (!formData.plinth_filler_color?.trim()) errors.push('Plinth/Filler Color');
-    if (!formData.cabinet_color?.trim()) errors.push('Cabinet Color');
-    if (!formData.worktop_color?.trim()) errors.push('Worktop Color');
+
+    if (!formData.door_color?.trim()) errors.push("Door Color");
+    if (!formData.end_panel_color?.trim()) errors.push("End Panel Color");
+    if (!formData.plinth_filler_color?.trim()) errors.push("Plinth/Filler Color");
+    if (!formData.cabinet_color?.trim()) errors.push("Cabinet Color");
+    if (!formData.worktop_color?.trim()) errors.push("Worktop Color");
 
     if (formType === "bedroom") {
-      if (!formData.room?.trim()) errors.push('Room');
-      if (!formData.bedside_cabinets_type?.trim()) errors.push('Bedside Cabinets Type');
-      if (!formData.bedside_cabinets_qty?.trim()) errors.push('Bedside Cabinets Quantity');
-      if (!formData.dresser_desk?.trim()) errors.push('Dresser/Desk');
-      if (!formData.internal_mirror?.trim()) errors.push('Internal Mirror');
-      if (!formData.mirror_type?.trim()) errors.push('Mirror Type');
-      if (!formData.mirror_qty?.trim()) errors.push('Mirror Quantity');
-      if (!formData.soffit_lights_type?.trim()) errors.push('Soffit Lights Type');
-      if (!formData.soffit_lights_color?.trim()) errors.push('Soffit Lights Color');
-      if (!formData.gable_lights_light_color?.trim()) errors.push('Gable Lights - Light Color');
-      if (!formData.gable_lights_light_qty?.trim()) errors.push('Gable Lights - Light Quantity');
-      if (!formData.gable_lights_profile_color?.trim()) errors.push('Gable Lights - Profile Color');
-      if (!formData.gable_lights_profile_qty?.trim()) errors.push('Gable Lights - Profile Quantity');
-      if (!formData.other_accessories?.trim()) errors.push('Other/Misc/Accessories');
-      if (formData.floor_protection.length === 0) errors.push('Floor Protection');
+      if (!formData.room?.trim()) errors.push("Room");
+      if (!formData.bedside_cabinets_type?.trim()) errors.push("Bedside Cabinets Type");
+      if (!formData.bedside_cabinets_qty?.trim()) errors.push("Bedside Cabinets Quantity");
+      if (!formData.dresser_desk?.trim()) errors.push("Dresser/Desk");
+      if (!formData.internal_mirror?.trim()) errors.push("Internal Mirror");
+      if (!formData.mirror_type?.trim()) errors.push("Mirror Type");
+      if (!formData.mirror_qty?.trim()) errors.push("Mirror Quantity");
+      if (!formData.soffit_lights_type?.trim()) errors.push("Soffit Lights Type");
+      if (!formData.soffit_lights_color?.trim()) errors.push("Soffit Lights Color");
+      if (!formData.gable_lights_light_color?.trim()) errors.push("Gable Lights - Light Color");
+      if (!formData.gable_lights_light_qty?.trim()) errors.push("Gable Lights - Light Quantity");
+      if (!formData.gable_lights_profile_color?.trim()) errors.push("Gable Lights - Profile Color");
+      if (!formData.gable_lights_profile_qty?.trim()) errors.push("Gable Lights - Profile Quantity");
+      if (!formData.other_accessories?.trim()) errors.push("Other/Misc/Accessories");
+      if (formData.floor_protection.length === 0) errors.push("Floor Protection");
     }
 
     if (formType === "kitchen") {
-      if (formData.worktop_features.length === 0) errors.push('Worktop Further Info');
-      if (!formData.worktop_size?.trim()) errors.push('Worktop Size');
-      if (!formData.under_wall_unit_lights_color?.trim()) errors.push('Under Wall Unit Lights Color');
-      if (!formData.under_wall_unit_lights_profile?.trim()) errors.push('Under Wall Unit Lights Profile');
-      if (!formData.under_worktop_lights_color?.trim()) errors.push('Under Worktop Lights Color');
-      if (!formData.kitchen_accessories?.trim()) errors.push('Accessories');
-      
+      if (formData.worktop_features.length === 0) errors.push("Worktop Further Info");
+      if (!formData.worktop_size?.trim()) errors.push("Worktop Size");
+      if (!formData.under_wall_unit_lights_color?.trim()) errors.push("Under Wall Unit Lights Color");
+      if (!formData.under_wall_unit_lights_profile?.trim()) errors.push("Under Wall Unit Lights Profile");
+      if (!formData.under_worktop_lights_color?.trim()) errors.push("Under Worktop Lights Color");
+      if (!formData.kitchen_accessories?.trim()) errors.push("Accessories");
+
       // Appliances and Sink/Tap ownership status must be selected
-      if (!formData.appliances_customer_owned?.trim()) errors.push('Appliances Customer Owned Selection');
-      if (!formData.sink_tap_customer_owned?.trim()) errors.push('Sink & Tap Customer Owned Selection');
-      
+      if (!formData.appliances_customer_owned?.trim()) errors.push("Appliances Customer Owned Selection");
+      if (!formData.sink_tap_customer_owned?.trim()) errors.push("Sink & Tap Customer Owned Selection");
+
       // --- START VALIDATION MODIFICATION ---
 
       if (formData.appliances_customer_owned) {
         // Validation check for standard appliances (Details is always checked, Order Date only if not customer owned)
-        const hasStandardAppliances = formData.appliances.some(app => 
-            app.details?.trim() || (isClientOwned && app.order_date?.trim())
+        const hasStandardAppliances = formData.appliances.some(
+          (app) => app.details?.trim() || (isClientOwned && app.order_date?.trim()),
         );
 
         // Validation check for Integrated units
-        const hasFridge = formData.integ_fridge_qty?.trim() || formData.integ_fridge_details?.trim() || (isClientOwned && formData.integ_fridge_order_date?.trim());
-        const hasFreezer = formData.integ_freezer_qty?.trim() || formData.integ_freezer_details?.trim() || (isClientOwned && formData.integ_freezer_order_date?.trim());
+        const hasFridge =
+          formData.integ_fridge_qty?.trim() ||
+          formData.integ_fridge_details?.trim() ||
+          (isClientOwned && formData.integ_fridge_order_date?.trim());
+        const hasFreezer =
+          formData.integ_freezer_qty?.trim() ||
+          formData.integ_freezer_details?.trim() ||
+          (isClientOwned && formData.integ_freezer_order_date?.trim());
         const hasOther = formData.other_appliances?.trim();
-        
+
         if (!hasStandardAppliances && !hasFridge && !hasFreezer && !hasOther) {
-             errors.push('At least one Appliance detail (Details/Qty/Order Date) must be filled.');
+          errors.push("At least one Appliance detail (Details/Qty/Order Date) must be filled.");
         }
 
         // Additional validation for QTY fields:
-        if (formData.integ_fridge_qty && isNaN(parseInt(formData.integ_fridge_qty))) errors.push('Integrated Fridge Quantity must be a number.');
-        if (formData.integ_freezer_qty && isNaN(parseInt(formData.integ_freezer_qty))) errors.push('Integrated Freezer Quantity must be a number.');
+        if (formData.integ_fridge_qty && isNaN(parseInt(formData.integ_fridge_qty)))
+          errors.push("Integrated Fridge Quantity must be a number.");
+        if (formData.integ_freezer_qty && isNaN(parseInt(formData.integ_freezer_qty)))
+          errors.push("Integrated Freezer Quantity must be a number.");
       }
-      
+
       // Require Sink & Tap details if EITHER 'Yes' or 'No' is selected (i.e., if it's not empty)
       if (formData.sink_tap_customer_owned) {
-        if (!formData.sink_details?.trim()) errors.push('Sink Details');
-        if (!formData.tap_details?.trim()) errors.push('Tap Details');
+        if (!formData.sink_details?.trim()) errors.push("Sink Details");
+        if (!formData.tap_details?.trim()) errors.push("Tap Details");
       }
       // --- END VALIDATION MODIFICATION ---
     }
 
     // Terms
-    if (!formData.terms_date?.trim()) errors.push('Date Terms and Conditions Given');
-    if (!formData.gas_electric_info?.trim()) errors.push('Gas and Electric Installation Information');
+    if (!formData.terms_date?.trim()) errors.push("Date Terms and Conditions Given");
+    if (!formData.gas_electric_info?.trim()) errors.push("Gas and Electric Installation Information");
     if (formType === "kitchen" && !formData.appliance_promotion_info?.trim()) {
-      errors.push('Appliance Promotion Information');
+      errors.push("Appliance Promotion Information");
     }
 
     // Signature
-    if (!signatureData) errors.push('Customer Signature');
-    if (!formData.signature_date?.trim()) errors.push('Signature Date');
+    if (!signatureData) errors.push("Customer Signature");
+    if (!formData.signature_date?.trim()) errors.push("Signature Date");
 
     if (errors.length > 0) {
       setSubmitStatus({
-        type: 'error',
-        message: `Please fill in the following required fields: ${errors.join(', ')}`
+        type: "error",
+        message: `Please fill in the following required fields: ${errors.join(", ")}`,
       });
       return false;
     }
@@ -382,35 +390,43 @@ export default function FormPage() {
     const confirmMsg = "Are you sure you want to submit this checklist?";
     if (!window.confirm(confirmMsg)) return;
 
-    const token = searchParams.get("token") || '';
-    const customerIdFromUrl = searchParams.get("customerId") || '';
-    const isClientOwned = formData.appliances_customer_owned === 'no';
-    
+    const token = searchParams.get("token") || "";
+    const customerIdFromUrl = searchParams.get("customerId") || "";
+    const isClientOwned = formData.appliances_customer_owned === "no";
+
     // Prepare final appliance list for submission, consolidating integrated units
     const finalAppliances = [...formData.appliances];
-    
+
     // Add Integrated Fridge details if any field is filled
-    if (formData.integ_fridge_qty?.trim() || formData.integ_fridge_details?.trim() || formData.integ_fridge_order_date?.trim()) {
-        finalAppliances.push({
-            details: `INTG Fridge (QTY: ${formData.integ_fridge_qty || '1'}): ${formData.integ_fridge_details || 'No model specified'}`,
-            order_date: isClientOwned ? formData.integ_fridge_order_date || '' : ''
-        });
+    if (
+      formData.integ_fridge_qty?.trim() ||
+      formData.integ_fridge_details?.trim() ||
+      formData.integ_fridge_order_date?.trim()
+    ) {
+      finalAppliances.push({
+        details: `INTG Fridge (QTY: ${formData.integ_fridge_qty || "1"}): ${formData.integ_fridge_details || "No model specified"}`,
+        order_date: isClientOwned ? formData.integ_fridge_order_date || "" : "",
+      });
     }
 
     // Add Integrated Freezer details if any field is filled
-    if (formData.integ_freezer_qty?.trim() || formData.integ_freezer_details?.trim() || formData.integ_freezer_order_date?.trim()) {
-        finalAppliances.push({
-            details: `INTG Freezer (QTY: ${formData.integ_freezer_qty || '1'}): ${formData.integ_freezer_details || 'No model specified'}`,
-            order_date: isClientOwned ? formData.integ_freezer_order_date || '' : ''
-        });
+    if (
+      formData.integ_freezer_qty?.trim() ||
+      formData.integ_freezer_details?.trim() ||
+      formData.integ_freezer_order_date?.trim()
+    ) {
+      finalAppliances.push({
+        details: `INTG Freezer (QTY: ${formData.integ_freezer_qty || "1"}): ${formData.integ_freezer_details || "No model specified"}`,
+        order_date: isClientOwned ? formData.integ_freezer_order_date || "" : "",
+      });
     }
 
     const finalFormData = {
       ...formData,
-      appliances: finalAppliances, 
+      appliances: finalAppliances,
       signature_data: signatureData,
       form_type: formType,
-      customer_id: customerIdFromUrl || formData.customer_id || '',
+      customer_id: customerIdFromUrl || formData.customer_id || "",
       // Remove the separate fridge/freezer fields as they are now consolidated
       integ_fridge_qty: undefined,
       integ_fridge_details: undefined,
@@ -421,26 +437,26 @@ export default function FormPage() {
     };
 
     setIsSubmitting(true);
-    setSubmitStatus({ type: null, message: '' });
+    setSubmitStatus({ type: null, message: "" });
 
     try {
-      const response = await fetch('http://localhost:5000/submit-customer-form', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("https://aztec-interiors.onrender.com/submit-customer-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token: token || undefined,
-          formData: finalFormData
+          formData: finalFormData,
         }),
       });
 
       const result = await response.json();
 
       if (response.ok && result.success) {
-        setSubmitStatus({ 
-          type: 'success', 
-          message: result.message || 'Form submitted successfully! Redirecting...' 
+        setSubmitStatus({
+          type: "success",
+          message: result.message || "Form submitted successfully! Redirecting...",
         });
-        
+
         // Redirect after 2 seconds
         setTimeout(() => {
           if (result.customer_id) {
@@ -448,116 +464,114 @@ export default function FormPage() {
             window.location.href = `/dashboard/customers/${result.customer_id}`;
           } else {
             // Fallback: redirect to customers list
-            window.location.href = '/dashboard/customers';
+            window.location.href = "/dashboard/customers";
           }
         }, 2000);
       } else {
-        setSubmitStatus({ 
-          type: 'error', 
-          message: result.error || 'Failed to submit form' 
+        setSubmitStatus({
+          type: "error",
+          message: result.error || "Failed to submit form",
         });
       }
     } catch (error) {
-      console.error('Submit error:', error);
-      setSubmitStatus({ 
-        type: 'error', 
-        message: 'Network error. Please try again.' 
+      console.error("Submit error:", error);
+      setSubmitStatus({
+        type: "error",
+        message: "Network error. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
     }
-  }; 	
+  };
 
   if (!valid) return <p className="p-6 text-center">Invalid or expired link.</p>;
 
   // Check if order date should be displayed (only if NOT customer owned)
-  const showOrderDate = formData.appliances_customer_owned === 'no';
-  
+  const showOrderDate = formData.appliances_customer_owned === "no";
+
   // Define column layout for appliance items
   // When Order Date is hidden (2 columns needed: Details and Quantity/Details), use grid-cols-5
   // When Order Date is visible (3 columns needed: Details, Order Date), use grid-cols-3
   // Setting fixed widths for better visual balance: Details=2/3, Date=1/3
-  const standardApplianceGridTemplate = showOrderDate ? 'grid-cols-[2fr_1fr]' : 'grid-cols-1';
+  const standardApplianceGridTemplate = showOrderDate ? "grid-cols-[2fr_1fr]" : "grid-cols-1";
   // Setting fixed widths for integrated units: Details/QTY = 2/3, Date=1/3
-  const integUnitGridTemplate = showOrderDate ? 'grid-cols-[1.5fr_0.5fr_1fr]' : 'grid-cols-[1.5fr_0.5fr]';
-
+  const integUnitGridTemplate = showOrderDate ? "grid-cols-[1.5fr_0.5fr_1fr]" : "grid-cols-[1.5fr_0.5fr]";
 
   // --- Appliance List for rendering (Oven, Hob, etc.) ---
-  const standardAppliances = [
-    'Oven', 'Microwave', 'Washing Machine', 'HOB', 
-    'Extractor', 'INTG Dishwasher',
-  ];
+  const standardAppliances = ["Oven", "Microwave", "Washing Machine", "HOB", "Extractor", "INTG Dishwasher"];
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-6 py-4">
+      <div className="border-b bg-white shadow-sm">
+        <div className="mx-auto max-w-4xl px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Installation Checklist</h1>
-              <p className="text-gray-600 mt-1">Complete installation verification form</p>
+              <p className="mt-1 text-gray-600">Complete installation verification form</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto p-6">
-        <form className="bg-white rounded-lg shadow-sm border p-6">
-          <h2 className="text-xl font-semibold mb-2 text-center">
+      <div className="mx-auto max-w-4xl p-6">
+        <form className="rounded-lg border bg-white p-6 shadow-sm">
+          <h2 className="mb-2 text-center text-xl font-semibold">
             {formType === "kitchen" ? "Kitchen Installation Checklist" : "Bedroom Installation Checklist"}
           </h2>
-          <p className="text-sm text-gray-600 text-center mb-6">All fields are mandatory</p>
+          <p className="mb-6 text-center text-sm text-gray-600">All fields are mandatory</p>
 
           {submitStatus.type && (
-            <div className={`mb-6 p-4 rounded-lg ${
-              submitStatus.type === 'success' 
-                ? 'bg-green-50 text-green-700 border border-green-200' 
-                : 'bg-red-50 text-red-700 border border-red-200'
-            }`}>
+            <div
+              className={`mb-6 rounded-lg p-4 ${
+                submitStatus.type === "success"
+                  ? "border border-green-200 bg-green-50 text-green-700"
+                  : "border border-red-200 bg-red-50 text-red-700"
+              }`}
+            >
               {submitStatus.message}
             </div>
           )}
 
           {/* Customer Information */}
           <div className="mb-8">
-            <h3 className="text-lg font-medium mb-4 text-gray-800 border-b pb-2">Customer Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <h3 className="mb-4 border-b pb-2 text-lg font-medium text-gray-800">Customer Information</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
-                <Input 
-                  placeholder="Enter customer name" 
-                  className="w-full" 
+                <label className="mb-1 block text-sm font-medium text-gray-700">Customer Name</label>
+                <Input
+                  placeholder="Enter customer name"
+                  className="w-full"
                   value={formData.customer_name}
-                  onChange={(e) => handleInputChange('customer_name', e.target.value)}
+                  onChange={(e) => handleInputChange("customer_name", e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tel/Mobile Number</label>
-                <Input 
-                  placeholder="Enter phone number" 
-                  type="tel" 
-                  className="w-full" 
+                <label className="mb-1 block text-sm font-medium text-gray-700">Tel/Mobile Number</label>
+                <Input
+                  placeholder="Enter phone number"
+                  type="tel"
+                  className="w-full"
                   value={formData.customer_phone}
-                  onChange={(e) => handleInputChange('customer_phone', e.target.value)}
+                  onChange={(e) => handleInputChange("customer_phone", e.target.value)}
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-                <Input 
-                  placeholder="Enter full address" 
-                  className="w-full" 
+                <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
+                <Input
+                  placeholder="Enter full address"
+                  className="w-full"
                   value={formData.customer_address}
-                  onChange={(e) => handleInputChange('customer_address', e.target.value)}
+                  onChange={(e) => handleInputChange("customer_address", e.target.value)}
                 />
               </div>
               {formType === "bedroom" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Room</label>
-                  <Input 
-                    placeholder="Enter room details" 
-                    className="w-full" 
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Room</label>
+                  <Input
+                    placeholder="Enter room details"
+                    className="w-full"
                     value={formData.room}
-                    onChange={(e) => handleInputChange('room', e.target.value)}
+                    onChange={(e) => handleInputChange("room", e.target.value)}
                   />
                 </div>
               )}
@@ -566,17 +580,16 @@ export default function FormPage() {
 
           {/* Design Specifications */}
           <div className="mb-8">
-            <h3 className="text-lg font-medium mb-4 text-gray-800 border-b pb-2">Design Specifications</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
+            <h3 className="mb-4 border-b pb-2 text-lg font-medium text-gray-800">Design Specifications</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {/* Door Style - Only visible for Kitchen */}
               {formType === "kitchen" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Door Style</label>
-                  <select 
-                    className="w-full p-2 border border-gray-300 rounded-md"
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Door Style</label>
+                  <select
+                    className="w-full rounded-md border border-gray-300 p-2"
                     value={formData.door_style}
-                    onChange={(e) => handleInputChange('door_style', e.target.value)}
+                    onChange={(e) => handleInputChange("door_style", e.target.value)}
                   >
                     <option value="">Select door style</option>
                     <option value="vinyl">Vinyl</option>
@@ -588,13 +601,13 @@ export default function FormPage() {
               )}
 
               {/* Glazing Material - Only visible if Door Style is Glazed (and Form is Kitchen) */}
-              {formType === "kitchen" && formData.door_style === 'glazed' && (
+              {formType === "kitchen" && formData.door_style === "glazed" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Glazing Material</label>
-                  <select 
-                    className="w-full p-2 border border-gray-300 rounded-md"
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Glazing Material</label>
+                  <select
+                    className="w-full rounded-md border border-gray-300 p-2"
                     value={formData.glazing_material}
-                    onChange={(e) => handleInputChange('glazing_material', e.target.value)}
+                    onChange={(e) => handleInputChange("glazing_material", e.target.value)}
                   >
                     <option value="">Select material</option>
                     <option value="vinyl">Vinyl</option>
@@ -605,50 +618,50 @@ export default function FormPage() {
 
               {/* Door Color */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Door Color</label>
-                <Input 
-                  placeholder="Enter door color" 
+                <label className="mb-1 block text-sm font-medium text-gray-700">Door Color</label>
+                <Input
+                  placeholder="Enter door color"
                   className="w-full"
                   value={formData.door_color}
-                  onChange={(e) => handleInputChange('door_color', e.target.value)}
+                  onChange={(e) => handleInputChange("door_color", e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">End Panel Color</label>
-                <Input 
-                  placeholder="Enter end panel color" 
+                <label className="mb-1 block text-sm font-medium text-gray-700">End Panel Color</label>
+                <Input
+                  placeholder="Enter end panel color"
                   className="w-full"
                   value={formData.end_panel_color}
-                  onChange={(e) => handleInputChange('end_panel_color', e.target.value)}
+                  onChange={(e) => handleInputChange("end_panel_color", e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Plinth/Filler Color</label>
-                <Input 
-                  placeholder="Enter plinth/filler color" 
+                <label className="mb-1 block text-sm font-medium text-gray-700">Plinth/Filler Color</label>
+                <Input
+                  placeholder="Enter plinth/filler color"
                   className="w-full"
                   value={formData.plinth_filler_color}
-                  onChange={(e) => handleInputChange('plinth_filler_color', e.target.value)}
+                  onChange={(e) => handleInputChange("plinth_filler_color", e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cabinet Color</label>
-                <Input 
-                  placeholder="Enter cabinet color" 
+                <label className="mb-1 block text-sm font-medium text-gray-700">Cabinet Color</label>
+                <Input
+                  placeholder="Enter cabinet color"
                   className="w-full"
                   value={formData.cabinet_color}
-                  onChange={(e) => handleInputChange('cabinet_color', e.target.value)}
+                  onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
                   {formType === "bedroom" ? "Worktop Color" : "Worktop Material/Color"}
                 </label>
-                <Input 
-                  placeholder="Enter worktop details" 
+                <Input
+                  placeholder="Enter worktop details"
                   className="w-full"
                   value={formData.worktop_color}
-                  onChange={(e) => handleInputChange('worktop_color', e.target.value)}
+                  onChange={(e) => handleInputChange("worktop_color", e.target.value)}
                 />
               </div>
             </div>
@@ -657,144 +670,144 @@ export default function FormPage() {
           {/* Bedroom Specific */}
           {formType === "bedroom" && (
             <div className="mb-8">
-              <h3 className="text-lg font-medium mb-4 text-gray-800 border-b pb-2">Bedroom Specifications</h3>
+              <h3 className="mb-4 border-b pb-2 text-lg font-medium text-gray-800">Bedroom Specifications</h3>
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Bedside Cabinets</label>
-                    <select 
-                      className="w-full p-2 border border-gray-300 rounded-md"
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Bedside Cabinets</label>
+                    <select
+                      className="w-full rounded-md border border-gray-300 p-2"
                       value={formData.bedside_cabinets_type}
-                      onChange={(e) => handleInputChange('bedside_cabinets_type', e.target.value)}
+                      onChange={(e) => handleInputChange("bedside_cabinets_type", e.target.value)}
                     >
                       <option value="">Select option</option>
                       <option value="floating">Floating</option>
                       <option value="fitted">Fitted</option>
                       <option value="freestand">Freestand</option>
                     </select>
-                    <Input 
-                      placeholder="Quantity" 
-                      className="w-full mt-2" 
+                    <Input
+                      placeholder="Quantity"
+                      className="mt-2 w-full"
                       type="number"
                       value={formData.bedside_cabinets_qty}
-                      onChange={(e) => handleInputChange('bedside_cabinets_qty', e.target.value)}
+                      onChange={(e) => handleInputChange("bedside_cabinets_qty", e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Dresser/Desk</label>
-                    <select 
-                      className="w-full p-2 border border-gray-300 rounded-md"
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Dresser/Desk</label>
+                    <select
+                      className="w-full rounded-md border border-gray-300 p-2"
                       value={formData.dresser_desk}
-                      onChange={(e) => handleInputChange('dresser_desk', e.target.value)}
+                      onChange={(e) => handleInputChange("dresser_desk", e.target.value)}
                     >
                       <option value="">Select option</option>
                       <option value="yes">Yes</option>
                       <option value="no">No</option>
                     </select>
-                    <Input 
-                      placeholder="QTY/Size" 
-                      className="w-full mt-2"
+                    <Input
+                      placeholder="QTY/Size"
+                      className="mt-2 w-full"
                       value={formData.dresser_desk_details}
-                      onChange={(e) => handleInputChange('dresser_desk_details', e.target.value)}
+                      onChange={(e) => handleInputChange("dresser_desk_details", e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Internal Mirror</label>
-                    <select 
-                      className="w-full p-2 border border-gray-300 rounded-md"
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Internal Mirror</label>
+                    <select
+                      className="w-full rounded-md border border-gray-300 p-2"
                       value={formData.internal_mirror}
-                      onChange={(e) => handleInputChange('internal_mirror', e.target.value)}
+                      onChange={(e) => handleInputChange("internal_mirror", e.target.value)}
                     >
                       <option value="">Select option</option>
                       <option value="yes">Yes</option>
                       <option value="no">No</option>
                     </select>
-                    <Input 
-                      placeholder="QTY/Size" 
-                      className="w-full mt-2"
+                    <Input
+                      placeholder="QTY/Size"
+                      className="mt-2 w-full"
                       value={formData.internal_mirror_details}
-                      onChange={(e) => handleInputChange('internal_mirror_details', e.target.value)}
+                      onChange={(e) => handleInputChange("internal_mirror_details", e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Mirror</label>
-                    <select 
-                      className="w-full p-2 border border-gray-300 rounded-md"
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Mirror</label>
+                    <select
+                      className="w-full rounded-md border border-gray-300 p-2"
                       value={formData.mirror_type}
-                      onChange={(e) => handleInputChange('mirror_type', e.target.value)}
+                      onChange={(e) => handleInputChange("mirror_type", e.target.value)}
                     >
                       <option value="">Select option</option>
                       <option value="silver">Silver</option>
                       <option value="bronze">Bronze</option>
                       <option value="grey">Grey</option>
                     </select>
-                    <Input 
-                      placeholder="Quantity" 
-                      className="w-full mt-2" 
+                    <Input
+                      placeholder="Quantity"
+                      className="mt-2 w-full"
                       type="number"
                       value={formData.mirror_qty}
-                      onChange={(e) => handleInputChange('mirror_qty', e.target.value)}
+                      onChange={(e) => handleInputChange("mirror_qty", e.target.value)}
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Soffit Lights</label>
-                    <select 
-                      className="w-full p-2 border border-gray-300 rounded-md"
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Soffit Lights</label>
+                    <select
+                      className="w-full rounded-md border border-gray-300 p-2"
                       value={formData.soffit_lights_type}
-                      onChange={(e) => handleInputChange('soffit_lights_type', e.target.value)}
+                      onChange={(e) => handleInputChange("soffit_lights_type", e.target.value)}
                     >
                       <option value="">Select type</option>
                       <option value="spot">Spot</option>
                       <option value="strip">Strip</option>
                     </select>
-                    <Input 
-                      placeholder="Colour" 
-                      className="w-full mt-2"
+                    <Input
+                      placeholder="Colour"
+                      className="mt-2 w-full"
                       value={formData.soffit_lights_color}
-                      onChange={(e) => handleInputChange('soffit_lights_color', e.target.value)}
+                      onChange={(e) => handleInputChange("soffit_lights_color", e.target.value)}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Gable Lights</label>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Gable Lights</label>
                     <div className="space-y-2">
                       <div className="flex gap-2">
                         {/* select/Input elements also use w-full via their container/flex-1 */}
-                        <select 
-                          className="flex-1 p-2 border border-gray-300 rounded-md"
+                        <select
+                          className="flex-1 rounded-md border border-gray-300 p-2"
                           value={formData.gable_lights_light_color}
-                          onChange={(e) => handleInputChange('gable_lights_light_color', e.target.value)}
+                          onChange={(e) => handleInputChange("gable_lights_light_color", e.target.value)}
                         >
                           <option value="">Light Colour</option>
                           <option value="cool-white">Cool White</option>
                           <option value="warm-white">Warm White</option>
                         </select>
-                        <Input 
-                          placeholder="QTY" 
-                          type="number" 
+                        <Input
+                          placeholder="QTY"
+                          type="number"
                           className="w-20"
                           value={formData.gable_lights_light_qty}
-                          onChange={(e) => handleInputChange('gable_lights_light_qty', e.target.value)}
+                          onChange={(e) => handleInputChange("gable_lights_light_qty", e.target.value)}
                         />
                       </div>
                       <div className="flex gap-2">
-                        <select 
-                          className="flex-1 p-2 border border-gray-300 rounded-md"
+                        <select
+                          className="flex-1 rounded-md border border-gray-300 p-2"
                           value={formData.gable_lights_profile_color}
-                          onChange={(e) => handleInputChange('gable_lights_profile_color', e.target.value)}
+                          onChange={(e) => handleInputChange("gable_lights_profile_color", e.target.value)}
                         >
                           <option value="">Profile Colour</option>
                           <option value="black">Black</option>
                           <option value="white">White</option>
                         </select>
-                        <Input 
-                          placeholder="QTY" 
-                          type="number" 
+                        <Input
+                          placeholder="QTY"
+                          type="number"
                           className="w-20"
                           value={formData.gable_lights_profile_qty}
-                          onChange={(e) => handleInputChange('gable_lights_profile_qty', e.target.value)}
+                          onChange={(e) => handleInputChange("gable_lights_profile_qty", e.target.value)}
                         />
                       </div>
                     </div>
@@ -802,26 +815,26 @@ export default function FormPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Other/Misc/Accessories</label>
-                  <textarea 
-                    className="w-full p-3 border border-gray-300 rounded-md h-20 resize-none"
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Other/Misc/Accessories</label>
+                  <textarea
+                    className="h-20 w-full resize-none rounded-md border border-gray-300 p-3"
                     placeholder="Enter additional items or notes"
                     value={formData.other_accessories}
-                    onChange={(e) => handleInputChange('other_accessories', e.target.value)}
+                    onChange={(e) => handleInputChange("other_accessories", e.target.value)}
                   ></textarea>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Floor Protection</label>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Floor Protection</label>
                   <div className="space-y-2">
-                    {['Carpet Protection', 'Floor Tile Protection', 'No Floor Protection Required'].map((item) => (
+                    {["Carpet Protection", "Floor Tile Protection", "No Floor Protection Required"].map((item) => (
                       <label key={item} className="flex items-center space-x-2">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           className="rounded"
                           value={item}
                           checked={formData.floor_protection.includes(item)}
-                          onChange={(e) => handleCheckboxChange('floor_protection', item, e.target.checked)}
+                          onChange={(e) => handleCheckboxChange("floor_protection", item, e.target.checked)}
                         />
                         <span>{item}</span>
                       </label>
@@ -835,39 +848,47 @@ export default function FormPage() {
           {/* Kitchen Specific */}
           {formType === "kitchen" && (
             <div className="mb-8">
-              <h3 className="text-lg font-medium mb-4 text-gray-800 border-b pb-2">Kitchen Specifications</h3>
+              <h3 className="mb-4 border-b pb-2 text-lg font-medium text-gray-800">Kitchen Specifications</h3>
               <div className="space-y-6">
-                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Worktop Further Info</label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    {['Upstand', 'Splashback', 'Wall Cladding', 'Sink Cut Out', 'Drainer Grooves', 'Hob Cut Out', 'Window Cill', 'LED Grooves'].map((item) => (
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Worktop Further Info</label>
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                    {[
+                      "Upstand",
+                      "Splashback",
+                      "Wall Cladding",
+                      "Sink Cut Out",
+                      "Drainer Grooves",
+                      "Hob Cut Out",
+                      "Window Cill",
+                      "LED Grooves",
+                    ].map((item) => (
                       <label key={item} className="flex items-center space-x-2">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           className="rounded"
                           value={item}
                           checked={formData.worktop_features.includes(item)}
-                          onChange={(e) => handleCheckboxChange('worktop_features', item, e.target.checked)}
+                          onChange={(e) => handleCheckboxChange("worktop_features", item, e.target.checked)}
                         />
                         <span className="text-sm">{item}</span>
                       </label>
                     ))}
                   </div>
-                  <Input 
-                    placeholder="Other details" 
-                    className="w-full mt-2"
+                  <Input
+                    placeholder="Other details"
+                    className="mt-2 w-full"
                     value={formData.worktop_other_details}
-                    onChange={(e) => handleInputChange('worktop_other_details', e.target.value)}
+                    onChange={(e) => handleInputChange("worktop_other_details", e.target.value)}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Worktop Size</label>
-                  <select 
-                    className="w-full p-2 border border-gray-300 rounded-md"
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Worktop Size</label>
+                  <select
+                    className="w-full rounded-md border border-gray-300 p-2"
                     value={formData.worktop_size}
-                    onChange={(e) => handleInputChange('worktop_size', e.target.value)}
+                    onChange={(e) => handleInputChange("worktop_size", e.target.value)}
                   >
                     <option value="">Select thickness</option>
                     <option value="12mm">12mm</option>
@@ -879,23 +900,23 @@ export default function FormPage() {
                   </select>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Under Wall Unit Lights</label>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Under Wall Unit Lights</label>
                     <div className="space-y-2">
-                      <select 
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                      <select
+                        className="w-full rounded-md border border-gray-300 p-2"
                         value={formData.under_wall_unit_lights_color}
-                        onChange={(e) => handleInputChange('under_wall_unit_lights_color', e.target.value)}
+                        onChange={(e) => handleInputChange("under_wall_unit_lights_color", e.target.value)}
                       >
                         <option value="">Main Colour</option>
                         <option value="cool-white">Cool White</option>
                         <option value="warm-white">Warm White</option>
                       </select>
-                      <select 
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                      <select
+                        className="w-full rounded-md border border-gray-300 p-2"
                         value={formData.under_wall_unit_lights_profile}
-                        onChange={(e) => handleInputChange('under_wall_unit_lights_profile', e.target.value)}
+                        onChange={(e) => handleInputChange("under_wall_unit_lights_profile", e.target.value)}
                       >
                         <option value="">Profile Colour</option>
                         <option value="black">Black</option>
@@ -904,11 +925,11 @@ export default function FormPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Under Worktop Lights</label>
-                    <select 
-                      className="w-full p-2 border border-gray-300 rounded-md"
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Under Worktop Lights</label>
+                    <select
+                      className="w-full rounded-md border border-gray-300 p-2"
                       value={formData.under_worktop_lights_color}
-                      onChange={(e) => handleInputChange('under_worktop_lights_color', e.target.value)}
+                      onChange={(e) => handleInputChange("under_worktop_lights_color", e.target.value)}
                     >
                       <option value="">Colour</option>
                       <option value="cool-white">Cool White</option>
@@ -918,22 +939,22 @@ export default function FormPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Accessories</label>
-                  <textarea 
-                    className="w-full p-3 border border-gray-300 rounded-md h-20 resize-none"
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Accessories</label>
+                  <textarea
+                    className="h-20 w-full resize-none rounded-md border border-gray-300 p-3"
                     placeholder="Enter accessory details"
                     value={formData.kitchen_accessories}
-                    onChange={(e) => handleInputChange('kitchen_accessories', e.target.value)}
+                    onChange={(e) => handleInputChange("kitchen_accessories", e.target.value)}
                   ></textarea>
                 </div>
 
                 {/* Appliances Customer Owned Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Appliances Customer Owned</label>
-                  <select 
-                    className="w-full p-2 border border-gray-300 rounded-md" 
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Appliances Customer Owned</label>
+                  <select
+                    className="w-full rounded-md border border-gray-300 p-2"
                     value={formData.appliances_customer_owned}
-                    onChange={(e) => handleInputChange('appliances_customer_owned', e.target.value)}
+                    onChange={(e) => handleInputChange("appliances_customer_owned", e.target.value)}
                   >
                     <option value="">Select</option>
                     <option value="yes">Yes</option>
@@ -944,11 +965,10 @@ export default function FormPage() {
                 {/* Appliances List - SHOW IF customer owned is "yes" OR "no" (i.e., not empty) */}
                 {!!formData.appliances_customer_owned && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2 mt-4">
-                      {formData.appliances_customer_owned === 'yes' 
-                        ? "Customer Owned Appliances Details" 
-                        : "Client Supplied Appliances Details (Require Order Date/Model)"
-                      }
+                    <label className="mt-4 mb-2 block text-sm font-medium text-gray-700">
+                      {formData.appliances_customer_owned === "yes"
+                        ? "Customer Owned Appliances Details"
+                        : "Client Supplied Appliances Details (Require Order Date/Model)"}
                     </label>
                     <div className="space-y-4">
                       {/* Standard Appliances (Oven, Hob, etc.) */}
@@ -956,23 +976,23 @@ export default function FormPage() {
                         // Use dynamic grid template for spacing
                         <div key={appliance} className={`grid ${standardApplianceGridTemplate} gap-3`}>
                           <div>
-                            <label className="block text-xs text-gray-600 mb-1">{appliance} Details</label>
+                            <label className="mb-1 block text-xs text-gray-600">{appliance} Details</label>
                             <Input
                               placeholder={`${appliance} details (e.g., Make/Model)`}
                               className="w-full"
-                              value={formData.appliances[idx]?.details || ''}
-                              onChange={(e) => handleApplianceChange(idx, 'details', e.target.value)}
+                              value={formData.appliances[idx]?.details || ""}
+                              onChange={(e) => handleApplianceChange(idx, "details", e.target.value)}
                             />
                           </div>
                           {/* --- CONDITIONAL ORDER DATE for Standard Appliances --- */}
                           {showOrderDate && (
                             <div>
-                              <label className="block text-xs text-gray-600 mb-1">Order Date</label>
+                              <label className="mb-1 block text-xs text-gray-600">Order Date</label>
                               <input
                                 type="date"
-                                className="w-full p-2 border border-gray-300 rounded-md"
-                                value={formData.appliances[idx]?.order_date || ''}
-                                onChange={(e) => handleApplianceChange(idx, 'order_date', e.target.value)}
+                                className="w-full rounded-md border border-gray-300 p-2"
+                                value={formData.appliances[idx]?.order_date || ""}
+                                onChange={(e) => handleApplianceChange(idx, "order_date", e.target.value)}
                               />
                             </div>
                           )}
@@ -982,72 +1002,69 @@ export default function FormPage() {
 
                       {/* --- Integrated Fridge/Freezer Vertical Layout --- */}
                       <div className="grid grid-cols-1 gap-4 border-t pt-4">
-                        
                         {/* Integrated Fridge ROW */}
                         <div className="space-y-1">
                           <label className="block text-sm font-medium text-gray-700">INTG Fridge</label>
                           <div className={`grid ${integUnitGridTemplate} gap-3`}>
-                            
                             {/* Model/Details (First - 1.5fr) */}
-                            <Input 
-                              placeholder="Model/Details" 
+                            <Input
+                              placeholder="Model/Details"
                               className="col-span-1"
                               value={formData.integ_fridge_details}
-                              onChange={(e) => handleInputChange('integ_fridge_details', e.target.value)}
+                              onChange={(e) => handleInputChange("integ_fridge_details", e.target.value)}
                             />
-                            
+
                             {/* QTY (Second - 0.5fr) */}
-                            <Input 
-                              placeholder="QTY" 
-                              type="number" 
+                            <Input
+                              placeholder="QTY"
+                              type="number"
                               className="col-span-1"
                               value={formData.integ_fridge_qty}
-                              onChange={(e) => handleInputChange('integ_fridge_qty', e.target.value)}
+                              onChange={(e) => handleInputChange("integ_fridge_qty", e.target.value)}
                             />
-                            
+
                             {/* Order Date (Third - Conditional - 1fr) */}
                             {showOrderDate && (
                               <input
                                 type="date"
                                 placeholder="Order Date"
-                                className="col-span-1 p-2 border border-gray-300 rounded-md"
+                                className="col-span-1 rounded-md border border-gray-300 p-2"
                                 value={formData.integ_fridge_order_date}
-                                onChange={(e) => handleInputChange('integ_fridge_order_date', e.target.value)}
+                                onChange={(e) => handleInputChange("integ_fridge_order_date", e.target.value)}
                               />
                             )}
                           </div>
                         </div>
-                        
+
                         {/* Integrated Freezer ROW */}
                         <div className="space-y-1">
                           <label className="block text-sm font-medium text-gray-700">INTG Freezer</label>
                           <div className={`grid ${integUnitGridTemplate} gap-3`}>
-                            
                             {/* Model/Details (First - 1.5fr) */}
-                            <Input 
-                              placeholder="Model/Details" 
+                            <Input
+                              placeholder="Model/Details"
                               className="col-span-1"
                               value={formData.integ_freezer_details}
-                              onChange={(e) => handleInputChange('integ_freezer_details', e.target.value)}
+                              onChange={(e) => handleInputChange("integ_freezer_details", e.target.value)}
                             />
 
                             {/* QTY (Second - 0.5fr) */}
-                            <Input 
-                              placeholder="QTY" 
-                              type="number" 
+                            <Input
+                              placeholder="QTY"
+                              type="number"
                               className="col-span-1"
                               value={formData.integ_freezer_qty}
-                              onChange={(e) => handleInputChange('integ_freezer_qty', e.target.value)}
+                              onChange={(e) => handleInputChange("integ_freezer_qty", e.target.value)}
                             />
-                            
+
                             {/* Order Date (Third - Conditional - 1fr) */}
                             {showOrderDate && (
                               <input
                                 type="date"
                                 placeholder="Order Date"
-                                className="col-span-1 p-2 border border-gray-300 rounded-md"
+                                className="col-span-1 rounded-md border border-gray-300 p-2"
                                 value={formData.integ_freezer_order_date}
-                                onChange={(e) => handleInputChange('integ_freezer_order_date', e.target.value)}
+                                onChange={(e) => handleInputChange("integ_freezer_order_date", e.target.value)}
                               />
                             )}
                           </div>
@@ -1055,14 +1072,13 @@ export default function FormPage() {
                       </div>
                       {/* --- END Integrated Fridge/Freezer Vertical Layout --- */}
 
-
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">Other / Misc Appliances</label>
-                        <Input 
-                          placeholder="Enter any additional appliances" 
+                        <label className="mb-1 block text-xs text-gray-600">Other / Misc Appliances</label>
+                        <Input
+                          placeholder="Enter any additional appliances"
                           className="w-full"
                           value={formData.other_appliances}
-                          onChange={(e) => handleInputChange('other_appliances', e.target.value)}
+                          onChange={(e) => handleInputChange("other_appliances", e.target.value)}
                         />
                       </div>
                     </div>
@@ -1071,11 +1087,11 @@ export default function FormPage() {
 
                 {/* Sink & Tap Customer Owned Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sink & Tap Customer Owned</label>
-                  <select 
-                    className="w-full p-2 border border-gray-300 rounded-md" 
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Sink & Tap Customer Owned</label>
+                  <select
+                    className="w-full rounded-md border border-gray-300 p-2"
                     value={formData.sink_tap_customer_owned}
-                    onChange={(e) => handleInputChange('sink_tap_customer_owned', e.target.value)}
+                    onChange={(e) => handleInputChange("sink_tap_customer_owned", e.target.value)}
                   >
                     <option value="">Select</option>
                     <option value="yes">Yes</option>
@@ -1085,23 +1101,23 @@ export default function FormPage() {
 
                 {/* Sink & Tap Details - SHOW IF customer owned is "yes" OR "no" (i.e., not empty) */}
                 {!!formData.sink_tap_customer_owned && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Sink Details</label>
-                      <Input 
-                        placeholder="Sink details (e.g., Make/Model/Size)" 
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Sink Details</label>
+                      <Input
+                        placeholder="Sink details (e.g., Make/Model/Size)"
                         className="w-full"
                         value={formData.sink_details}
-                        onChange={(e) => handleInputChange('sink_details', e.target.value)}
+                        onChange={(e) => handleInputChange("sink_details", e.target.value)}
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tap Details</label>
-                      <Input 
-                        placeholder="Tap details (e.g., Make/Model)" 
+                      <label className="mb-1 block text-sm font-medium text-gray-700">Tap Details</label>
+                      <Input
+                        placeholder="Tap details (e.g., Make/Model)"
                         className="w-full"
                         value={formData.tap_details}
-                        onChange={(e) => handleInputChange('tap_details', e.target.value)}
+                        onChange={(e) => handleInputChange("tap_details", e.target.value)}
                       />
                     </div>
                   </div>
@@ -1112,23 +1128,25 @@ export default function FormPage() {
 
           {/* Terms and Conditions */}
           <div className="mb-8">
-            <h3 className="text-lg font-medium mb-4 text-gray-800 border-b pb-2">Terms & Information</h3>
+            <h3 className="mb-4 border-b pb-2 text-lg font-medium text-gray-800">Terms & Information</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date Terms and Conditions Given</label>
-                <Input 
-                  type="date" 
-                  className="w-full" 
+                <label className="mb-1 block text-sm font-medium text-gray-700">Date Terms and Conditions Given</label>
+                <Input
+                  type="date"
+                  className="w-full"
                   value={formData.terms_date}
-                  onChange={(e) => handleInputChange('terms_date', e.target.value)}
+                  onChange={(e) => handleInputChange("terms_date", e.target.value)}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Gas and Electric Installation {formType === "kitchen" ? "Information" : "Terms"} Given</label>
-                <select 
-                  className="w-full p-2 border border-gray-300 rounded-md" 
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Gas and Electric Installation {formType === "kitchen" ? "Information" : "Terms"} Given
+                </label>
+                <select
+                  className="w-full rounded-md border border-gray-300 p-2"
                   value={formData.gas_electric_info}
-                  onChange={(e) => handleInputChange('gas_electric_info', e.target.value)}
+                  onChange={(e) => handleInputChange("gas_electric_info", e.target.value)}
                 >
                   <option value="">Select</option>
                   <option value="yes">Yes</option>
@@ -1137,11 +1155,13 @@ export default function FormPage() {
               </div>
               {formType === "kitchen" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Appliance Promotion Information Given</label>
-                  <select 
-                    className="w-full p-2 border border-gray-300 rounded-md" 
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Appliance Promotion Information Given
+                  </label>
+                  <select
+                    className="w-full rounded-md border border-gray-300 p-2"
                     value={formData.appliance_promotion_info}
-                    onChange={(e) => handleInputChange('appliance_promotion_info', e.target.value)}
+                    onChange={(e) => handleInputChange("appliance_promotion_info", e.target.value)}
                   >
                     <option value="">Select</option>
                     <option value="yes">Yes</option>
@@ -1153,21 +1173,19 @@ export default function FormPage() {
           </div>
 
           {/* Confirmation Statement */}
-          <div className="mb-8 p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-700 mb-3 font-medium">
+          <div className="mb-8 rounded-lg bg-gray-50 p-4">
+            <p className="mb-3 text-sm font-medium text-gray-700">
               I confirm that the above specification and all annotated plans and elevations with this pack are correct.
             </p>
-            <p className="text-sm text-gray-600 mb-4">
-              Please sign below to confirm.
-            </p>
+            <p className="mb-4 text-sm text-gray-600">Please sign below to confirm.</p>
           </div>
 
           {/* Signature Section */}
           <div className="mb-8">
-            <h3 className="text-lg font-medium mb-4 text-gray-800 border-b pb-2">Customer Signature</h3>
-            
+            <h3 className="mb-4 border-b pb-2 text-lg font-medium text-gray-800">Customer Signature</h3>
+
             <div className="mb-4">
-              <div className="flex gap-4 mb-3">
+              <div className="mb-3 flex gap-4">
                 <Button
                   type="button"
                   variant={signatureMode === "upload" ? "default" : "outline"}
@@ -1191,7 +1209,7 @@ export default function FormPage() {
               </div>
 
               {signatureMode === "upload" ? (
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <div className="rounded-lg border-2 border-dashed border-gray-300 p-6 text-center">
                   <input
                     type="file"
                     accept="image/*"
@@ -1200,36 +1218,31 @@ export default function FormPage() {
                     onChange={handleSignatureUpload}
                   />
                   <label htmlFor="signature-upload" className="cursor-pointer">
-                    <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                    <Upload className="mx-auto mb-2 h-8 w-8 text-gray-400" />
                     <p className="text-sm text-gray-600">Click to upload signature image</p>
-                    <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 10MB</p>
+                    <p className="mt-1 text-xs text-gray-400">PNG, JPG up to 10MB</p>
                   </label>
                   {signatureData && (
                     <div className="mt-4">
-                      <img src={signatureData} alt="Signature" className="max-h-32 mx-auto border rounded" />
+                      <img src={signatureData} alt="Signature" className="mx-auto max-h-32 rounded border" />
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="border border-gray-300 rounded-lg">
+                <div className="rounded-lg border border-gray-300">
                   <canvas
                     ref={canvasRef}
                     width={400}
                     height={150}
-                    className="w-full cursor-crosshair bg-white rounded-lg"
+                    className="w-full cursor-crosshair rounded-lg bg-white"
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
                     onMouseLeave={stopDrawing}
-                    style={{ touchAction: 'none' }}
+                    style={{ touchAction: "none" }}
                   />
-                  <div className="p-2 border-t bg-gray-50 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={clearSignature}
-                    >
+                  <div className="flex justify-end border-t bg-gray-50 p-2">
+                    <Button type="button" variant="outline" size="sm" onClick={clearSignature}>
                       Clear
                     </Button>
                   </div>
@@ -1238,25 +1251,20 @@ export default function FormPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-              <Input 
-                type="date" 
-                className="w-full" 
+              <label className="mb-1 block text-sm font-medium text-gray-700">Date</label>
+              <Input
+                type="date"
+                className="w-full"
                 value={formData.signature_date}
-                onChange={(e) => handleInputChange('signature_date', e.target.value)}
+                onChange={(e) => handleInputChange("signature_date", e.target.value)}
               />
             </div>
           </div>
 
           {/* Submit Button */}
-          <div className="text-center pt-6 border-t">
-            <Button 
-              className="px-8 py-2 text-lg"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              type="button"
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit Form'}
+          <div className="border-t pt-6 text-center">
+            <Button className="px-8 py-2 text-lg" onClick={handleSubmit} disabled={isSubmitting} type="button">
+              {isSubmitting ? "Submitting..." : "Submit Form"}
             </Button>
           </div>
         </form>

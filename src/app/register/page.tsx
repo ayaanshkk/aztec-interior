@@ -20,7 +20,7 @@ export default function RegisterV1() {
             <GoogleButton className="w-full" variant="outline" />
             <p className="text-muted-foreground text-center text-xs">
               Already have an account?{" "}
-              <Link href="login" className="text-primary">
+              <Link href="/login" className="text-primary">
                 Login
               </Link>
             </p>

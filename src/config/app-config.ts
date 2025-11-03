@@ -8,7 +8,8 @@ export const APP_CONFIG = {
   copyright: `© ${currentYear}, Aztec Interiors.`,
   meta: {
     title: "Aztec Interiors",
-    description:
-      "Aztec Interiors",
+    description: "Aztec Interiors",
   },
+  // ✅ Add your base path here
+  basePath: "/streemlyne",
 };

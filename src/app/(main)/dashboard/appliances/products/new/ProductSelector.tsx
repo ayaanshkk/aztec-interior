@@ -14,16 +14,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
 
 interface Product {
   id: number;
@@ -48,7 +43,7 @@ interface Product {
 interface ProductSelection {
   product: Product;
   quantity: number;
-  tier: 'low' | 'mid' | 'high';
+  tier: "low" | "mid" | "high";
   selected_color?: string;
   custom_price?: number;
   notes?: string;
@@ -56,21 +51,17 @@ interface ProductSelection {
 
 interface ProductSelectorProps {
   onProductSelect: (selection: ProductSelection) => void;
-  selectedTier?: 'low' | 'mid' | 'high';
+  selectedTier?: "low" | "mid" | "high";
   trigger?: React.ReactNode;
 }
 
-export default function ProductSelector({ 
-  onProductSelect, 
-  selectedTier = 'mid',
-  trigger 
-}: ProductSelectorProps) {
+export default function ProductSelector({ onProductSelect, selectedTier = "mid", trigger }: ProductSelectorProps) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [tier, setTier] = useState<'low' | 'mid' | 'high'>(selectedTier);
+  const [tier, setTier] = useState<"low" | "mid" | "high">(selectedTier);
   const [selectedColor, setSelectedColor] = useState("");
   const [customPrice, setCustomPrice] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
@@ -91,7 +82,8 @@ export default function ProductSelector({
   const searchProducts = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://127.0.0.1:5000/products/search?q=${encodeURIComponent(searchTerm)}&limit=20`);
+      // Use centralized fetchWithAuth
+      const response = await fetchWithAuth(`products/search?q=${encodeURIComponent(searchTerm)}&limit=20`);
       if (response.ok) {
         const products = await response.json();
         setSearchResults(products);
@@ -113,10 +105,14 @@ export default function ProductSelector({
   const getProductPrice = (product: Product, pricesTier: string) => {
     const pricing = product.pricing;
     switch (pricesTier) {
-      case 'low': return pricing.low_tier_price || pricing.base_price;
-      case 'mid': return pricing.mid_tier_price || pricing.base_price;
-      case 'high': return pricing.high_tier_price || pricing.base_price;
-      default: return pricing.base_price;
+      case "low":
+        return pricing.low_tier_price || pricing.base_price;
+      case "mid":
+        return pricing.mid_tier_price || pricing.base_price;
+      case "high":
+        return pricing.high_tier_price || pricing.base_price;
+      default:
+        return pricing.base_price;
     }
   };
 
@@ -129,11 +125,11 @@ export default function ProductSelector({
       tier,
       selected_color: selectedColor || undefined,
       custom_price: customPrice || undefined,
-      notes: notes || undefined
+      notes: notes || undefined,
     };
 
     onProductSelect(selection);
-    
+
     // Reset form
     setSelectedProduct(null);
     setQuantity(1);
@@ -151,25 +147,23 @@ export default function ProductSelector({
   };
 
   const currentPrice = selectedProduct ? getProductPrice(selectedProduct, tier) : null;
-  const totalPrice = customPrice ? customPrice * quantity : (currentPrice ? currentPrice * quantity : 0);
+  const totalPrice = customPrice ? customPrice * quantity : currentPrice ? currentPrice * quantity : 0;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
           <Button variant="outline">
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="mr-2 h-4 w-4" />
             Add Product
           </Button>
         )}
       </DialogTrigger>
-      
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Product to Quote</DialogTitle>
-          <DialogDescription>
-            Search and select a product from your appliance catalog
-          </DialogDescription>
+          <DialogDescription>Search and select a product from your appliance catalog</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -177,7 +171,7 @@ export default function ProductSelector({
           <div className="space-y-2">
             <Label>Search Products</Label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
               <Input
                 placeholder="Search by model code, name, or series..."
                 value={searchTerm}
@@ -189,33 +183,33 @@ export default function ProductSelector({
 
           {/* Search Results */}
           {loading && (
-            <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
-              <p className="text-sm text-muted-foreground mt-2">Searching...</p>
+            <div className="py-4 text-center">
+              <div className="border-primary mx-auto h-6 w-6 animate-spin rounded-full border-b-2"></div>
+              <p className="text-muted-foreground mt-2 text-sm">Searching...</p>
             </div>
           )}
 
           {searchResults.length > 0 && !selectedProduct && (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="max-h-64 space-y-2 overflow-y-auto">
               <Label>Search Results</Label>
               {searchResults.map((product) => (
-                <Card 
-                  key={product.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow"
+                <Card
+                  key={product.id}
+                  className="cursor-pointer transition-shadow hover:shadow-md"
                   onClick={() => selectProduct(product)}
                 >
                   <CardContent className="p-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <Package className="h-4 w-4 text-muted-foreground" />
+                          <Package className="text-muted-foreground h-4 w-4" />
                           <span className="font-medium">{product.model_code}</span>
                           <Badge variant={product.in_stock ? "outline" : "destructive"} className="text-xs">
                             {product.in_stock ? "In Stock" : "Out of Stock"}
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground mt-1">{product.name}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-muted-foreground mt-1 text-sm">{product.name}</p>
+                        <p className="text-muted-foreground text-xs">
                           {product.brand?.name} • {product.category?.name}
                           {product.series && ` • ${product.series}`}
                         </p>
@@ -223,9 +217,7 @@ export default function ProductSelector({
                       <div className="text-right">
                         <p className="font-medium">{formatPrice(product.pricing.base_price)}</p>
                         {product.energy_rating && (
-                          <p className="text-xs text-muted-foreground">
-                            Energy: {product.energy_rating}
-                          </p>
+                          <p className="text-muted-foreground text-xs">Energy: {product.energy_rating}</p>
                         )}
                       </div>
                     </div>
@@ -239,7 +231,7 @@ export default function ProductSelector({
           {selectedProduct && (
             <div className="space-y-4">
               <Separator />
-              
+
               <div className="space-y-3">
                 <Label>Selected Product</Label>
                 <Card>
@@ -252,12 +244,12 @@ export default function ProductSelector({
                         </Badge>
                       </div>
                       <p className="text-sm">{selectedProduct.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-muted-foreground text-xs">
                         {selectedProduct.brand?.name} • {selectedProduct.category?.name}
                         {selectedProduct.series && ` • ${selectedProduct.series}`}
                       </p>
                       {selectedProduct.lead_time_weeks && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-muted-foreground text-xs">
                           Lead time: {selectedProduct.lead_time_weeks} weeks
                         </p>
                       )}
@@ -267,7 +259,7 @@ export default function ProductSelector({
               </div>
 
               {/* Configuration */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="quantity">Quantity</Label>
                   <Input
@@ -281,17 +273,13 @@ export default function ProductSelector({
 
                 <div className="space-y-2">
                   <Label htmlFor="tier">Price Tier</Label>
-                  <Select value={tier} onValueChange={(value: 'low' | 'mid' | 'high') => setTier(value)}>
+                  <Select value={tier} onValueChange={(value: "low" | "mid" | "high") => setTier(value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">
-                        Low - {formatPrice(selectedProduct.pricing.low_tier_price)}
-                      </SelectItem>
-                      <SelectItem value="mid">
-                        Mid - {formatPrice(selectedProduct.pricing.mid_tier_price)}
-                      </SelectItem>
+                      <SelectItem value="low">Low - {formatPrice(selectedProduct.pricing.low_tier_price)}</SelectItem>
+                      <SelectItem value="mid">Mid - {formatPrice(selectedProduct.pricing.mid_tier_price)}</SelectItem>
                       <SelectItem value="high">
                         High - {formatPrice(selectedProduct.pricing.high_tier_price)}
                       </SelectItem>
@@ -346,7 +334,7 @@ export default function ProductSelector({
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Unit Price ({tier} tier):</span>
-                      <span>{formatPrice((customPrice ?? currentPrice) ?? undefined)}</span>
+                      <span>{formatPrice(customPrice ?? currentPrice ?? undefined)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Quantity:</span>
@@ -368,12 +356,8 @@ export default function ProductSelector({
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleAddProduct} 
-            disabled={!selectedProduct}
-            className="min-w-24"
-          >
-            <ShoppingCart className="h-4 w-4 mr-2" />
+          <Button onClick={handleAddProduct} disabled={!selectedProduct} className="min-w-24">
+            <ShoppingCart className="mr-2 h-4 w-4" />
             Add to Quote
           </Button>
         </DialogFooter>
