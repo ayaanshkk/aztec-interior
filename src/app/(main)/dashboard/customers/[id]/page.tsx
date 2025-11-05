@@ -557,9 +557,24 @@ export default function CustomerDetailsPage() {
   };
 
   const handleViewDrawing = (doc: DrawingDocument) => {
-    const viewUrl = `https://aztec-interiors.onrender.com${doc.url}`;
-    console.log(`Attempting to view file: ${doc.filename}. URL: ${viewUrl}`);
-    window.open(viewUrl, "_blank");
+      const BACKEND_URL = "https://aztec-interiors.onrender.com"; 
+
+      let viewUrl = doc.url;
+      
+      // 2. Safely construct the full URL
+      if (viewUrl && !viewUrl.startsWith('http')) {
+          // This prepends the backend URL, ensuring we handle paths that may or may not start with a '/'.
+          viewUrl = `${BACKEND_URL}${viewUrl.startsWith('/') ? viewUrl : '/' + viewUrl}`;
+      } else if (!viewUrl) {
+          // Handle case where doc.url is empty or null
+          alert("Error: Drawing URL is missing or invalid.");
+          return;
+      }
+      
+      console.log(`Attempting to view file: ${doc.filename}. Final URL: ${viewUrl}`);
+      
+      // Open the generated URL in a new tab
+      window.open(viewUrl, "_blank");
   };
 
   const handleDeleteDrawing = async (doc: DrawingDocument) => {
@@ -2161,7 +2176,7 @@ export default function CustomerDetailsPage() {
                     <span>Edit</span>
                   </Button>
                 )}
-                <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/customers/${id}`)}>
+                <Button variant="ghost" size="icon" onClick={() => setShowProjectDialog(false)}>
                   <X className="h-5 w-5" />
                 </Button>
               </div>
@@ -2210,7 +2225,7 @@ export default function CustomerDetailsPage() {
                 )}
               </section>
 
-              {/* <section>
+              <section>
                 <h3 className="mb-4 text-lg font-semibold text-gray-900">Forms ({projectForms.length})</h3>
                 {projectForms.length > 0 ? (
                   <div className="space-y-3">
@@ -2244,9 +2259,9 @@ export default function CustomerDetailsPage() {
                     <p className="text-gray-500">No forms submitted for this project yet</p>
                   </div>
                 )}
-              </section> */}
+              </section>
 
-              {/* <section>
+              <section>
                 <h3 className="mb-4 text-lg font-semibold text-gray-900">Financial Documents ({projectDocs.length})</h3>
                 {projectDocs.length > 0 ? (
                   <div className="space-y-3">
@@ -2276,7 +2291,7 @@ export default function CustomerDetailsPage() {
                     <p className="text-gray-500">No financial documents for this project yet</p>
                   </div>
                 )}
-              </section> */}
+              </section>
             </div>
           )}
         </DialogContent>
