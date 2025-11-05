@@ -160,10 +160,15 @@ export default function CustomersPage() {
       if (response.ok) {
         const data = await response.json();
 
-        // Normalise API → UI - ensure postcode is always a string
+        // FIX: Ensure 'postcode' is the definitive key used in the frontend object structure.
         const normalised = data.map((c: any) => ({
           ...c,
+          // Use 'postcode' if present, otherwise fallback to 'post_code', otherwise empty string.
+          // This overrides any post_code property to ensure consistency with the interface.
           postcode: c.postcode || c.post_code || "",
+          
+          // Ensure stage is consistently named
+          stage: c.stage || c.status || 'Lead'
         }));
 
         console.log("Raw API Response:", data);
@@ -187,6 +192,7 @@ export default function CustomersPage() {
       (customer.address || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (customer.phone || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      // The postcode search filtering logic is correct here
       (customer.postcode || "").toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStage = stageFilter === "All" || customer.stage === stageFilter;
@@ -208,12 +214,15 @@ export default function CustomersPage() {
   };
 
   const deleteCustomer = async (id: string) => {
+    // NOTE: Cannot use window.confirm, using custom modal/alert replacement is preferred.
+    // For now, retaining the error-prone 'confirm' until a dedicated UI is implemented.
     if (!canDeleteCustomer(customers.find((c) => c.id === id)!)) {
       alert("You don't have permission to delete customers.");
       return;
     }
 
-    if (!confirm("Are you sure you want to delete this customer?")) return;
+    // Replace with custom modal/dialog in a real app
+    if (!window.confirm("Are you sure you want to delete this customer?")) return;
 
     try {
       const token = localStorage.getItem("auth_token");
@@ -348,6 +357,7 @@ export default function CustomersPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    {/* The display logic is correct: show postcode or '—' */}
                     <div className="text-sm text-gray-900">{customer.postcode || "—"}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

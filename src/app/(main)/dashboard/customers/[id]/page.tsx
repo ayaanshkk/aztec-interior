@@ -301,6 +301,10 @@ export default function CustomerDetailsPage() {
   const [drawingToDelete, setDrawingToDelete] = useState<DrawingDocument | null>(null);
   const [isDeletingDrawing, setIsDeletingDrawing] = useState(false);
 
+  const [showDeleteProjectDialog, setShowDeleteProjectDialog] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
+
   useEffect(() => {
     if (!id) return;
     loadCustomerData();
@@ -1509,6 +1513,48 @@ export default function CustomerDetailsPage() {
     );
   };
 
+  const handleDeleteProject = (project: Project) => {
+    if (!canManageProjects()) {
+      alert("You do not have permission to delete projects.");
+      return;
+    }
+    setProjectToDelete(project);
+    setShowDeleteProjectDialog(true);
+  };
+
+  const handleConfirmDeleteProject = async () => {
+    if (!projectToDelete || isDeletingProject) return;
+
+    setIsDeletingProject(true);
+    const token = localStorage.getItem("auth_token");
+    const headers: HeadersInit = {
+      "Authorization": `Bearer ${token}`,
+    };
+
+    try {
+      const response = await fetch(`https://aztec-interiors.onrender.com/projects/${projectToDelete.id}`, {
+        method: "DELETE",
+        headers: headers,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Server error" }));
+        throw new Error(errorData.error || `Failed to delete project (status: ${response.status})`);
+      }
+
+      // Update UI state and reload customer data
+      setShowDeleteProjectDialog(false);
+      setProjectToDelete(null);
+      alert(`Project "${projectToDelete.project_name}" deleted successfully!`);
+      loadCustomerData();
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      alert(`Error: ${(error as Error).message}`);
+    } finally {
+      setIsDeletingProject(false);
+    }
+  };
+
   const handleDeleteForm = async () => {
     if (!formToDelete || !canDelete()) return;
     setIsDeleting(true);
@@ -1859,15 +1905,29 @@ export default function CustomerDetailsPage() {
                       <div className="ml-4 flex flex-shrink-0 flex-col space-y-2">
                         {/* Project Edit Button now uses the permissive canManageProjects() */}
                         {canManageProjects() && (
-                          <Button
-                            onClick={() => handleEditProject(project.id)}
-                            variant="default"
-                            size="sm"
-                            className="flex items-center space-x-2"
-                          >
-                            <Edit className="h-4 w-4" />
-                            <span>Edit Project</span>
-                          </Button>
+                          <>
+                            <Button
+                              onClick={() => handleEditProject(project.id)}
+                              variant="default"
+                              size="sm"
+                              className="flex items-center space-x-2"
+                            >
+                              <Edit className="h-4 w-4" />
+                              <span>Edit Project</span>
+                            </Button>
+                            <Button
+                              onClick={(e) => { // Corrected syntax here
+                                e.stopPropagation();
+                                handleDeleteProject(project);
+                              }}
+                              variant="destructive"
+                              size="sm"
+                              className="flex items-center space-x-2 bg-red-600 hover:bg-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span>Delete</span>
+                            </Button>
+                          </>
                         )}
                         <Button
                           onClick={() => handleViewProjectDetails(project)}
@@ -2101,7 +2161,7 @@ export default function CustomerDetailsPage() {
                     <span>Edit</span>
                   </Button>
                 )}
-                <Button variant="ghost" size="icon" onClick={() => setShowProjectDialog(false)}>
+                <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/customers/${id}`)}>
                   <X className="h-5 w-5" />
                 </Button>
               </div>
@@ -2150,7 +2210,7 @@ export default function CustomerDetailsPage() {
                 )}
               </section>
 
-              <section>
+              {/* <section>
                 <h3 className="mb-4 text-lg font-semibold text-gray-900">Forms ({projectForms.length})</h3>
                 {projectForms.length > 0 ? (
                   <div className="space-y-3">
@@ -2184,9 +2244,9 @@ export default function CustomerDetailsPage() {
                     <p className="text-gray-500">No forms submitted for this project yet</p>
                   </div>
                 )}
-              </section>
+              </section> */}
 
-              <section>
+              {/* <section>
                 <h3 className="mb-4 text-lg font-semibold text-gray-900">Financial Documents ({projectDocs.length})</h3>
                 {projectDocs.length > 0 ? (
                   <div className="space-y-3">
@@ -2216,7 +2276,7 @@ export default function CustomerDetailsPage() {
                     <p className="text-gray-500">No financial documents for this project yet</p>
                   </div>
                 )}
-              </section>
+              </section> */}
             </div>
           )}
         </DialogContent>
@@ -2328,6 +2388,36 @@ export default function CustomerDetailsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE PROJECT DIALOG */}
+      <Dialog open={showDeleteProjectDialog} onOpenChange={setShowDeleteProjectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Project</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete project <strong>{projectToDelete?.project_name}</strong>? This action
+              cannot be undone and will not automatically delete associated forms or documents (if they exist outside of
+              this project's context).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteProjectDialog(false)}
+              disabled={isDeletingProject}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDeleteProject}
+              disabled={isDeletingProject}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isDeletingProject ? "Deleting..." : "Delete Project"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
