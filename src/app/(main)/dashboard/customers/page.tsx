@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useState, useEffect } from "react";
 import { Search, Plus, Edit, Trash2, ChevronDown, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext"; // ✅ Make sure this path is correct
 
+// ---------------- Types ----------------
 type JobStage =
   | "Lead"
   | "Quote"
@@ -52,6 +54,7 @@ interface Customer {
   project_types?: ProjectType[];
 }
 
+// ---------------- Utility functions ----------------
 const getStageColor = (stage: JobStage): string => {
   switch (stage) {
     case "Lead":
@@ -97,87 +100,64 @@ const getProjectTypeColor = (type: ProjectType): string => {
   }
 };
 
+// ---------------- Component ----------------
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState<JobStage | "All">("All");
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
 
+  // Fetch customers initially
   useEffect(() => {
     fetchCustomers();
   }, []);
 
+  // Filter customers based on user role
   useEffect(() => {
-    // Filter customers when user data loads or changes
     if (user?.role === "Sales") {
-      console.log("Current user:", user);
-      console.log("All customers:", allCustomers);
-
       const filteredData = allCustomers.filter((customer: Customer) => {
         const matchesCreatedBy = customer.created_by === String(user.id);
         const matchesSalesperson = customer.salesperson === user.name;
-
-        console.log(`Customer ${customer.name}:`, {
-          created_by: customer.created_by,
-          salesperson: customer.salesperson,
-          matchesCreatedBy,
-          matchesSalesperson,
-        });
-
         return matchesCreatedBy || matchesSalesperson;
       });
 
-      console.log("Filtered customers for Sales:", filteredData);
-
-      // TEMPORARY: If no customers match, show all customers
-      // Remove this after fixing the data
       if (filteredData.length === 0 && allCustomers.length > 0) {
-        console.warn("No customers match Sales filter. Showing all customers temporarily.");
+        console.warn("No customers match Sales filter. Showing all temporarily.");
         setCustomers(allCustomers);
       } else {
         setCustomers(filteredData);
       }
     } else {
-      console.log("Non-sales user, showing all customers");
       setCustomers(allCustomers);
     }
   }, [user, allCustomers]);
 
+  // ---------------- Fetch Customers ----------------
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("auth_token");
       const response = await fetch("https://aztec-interiors.onrender.com/customers", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (!response.ok) throw new Error("Failed to fetch customers");
 
-        // FIX: Ensure 'postcode' is the definitive key used in the frontend object structure.
-        const normalised = data.map((c: any) => ({
-          ...c,
-          // Use 'postcode' if present, otherwise fallback to 'post_code', otherwise empty string.
-          // This overrides any post_code property to ensure consistency with the interface.
-          postcode: c.postcode || c.post_code || "",
-          
-          // Ensure stage is consistently named
-          stage: c.stage || c.status || 'Lead'
-        }));
+      const data = await response.json();
 
-        console.log("Raw API Response:", data);
-        console.log("Normalised customers:", normalised);
-        setAllCustomers(normalised);
-      } else {
-        console.error("Failed to fetch customers:", response.status);
-        setAllCustomers([]);
-      }
+      const normalised = data.map((c: any) => ({
+        ...c,
+        postcode: c.postcode || c.post_code || "",
+        salesperson: c.salesperson || "",
+        project_types: Array.isArray(c.project_types) ? c.project_types : [],
+        stage: c.stage || c.status || "Lead",
+      }));
+
+      setAllCustomers(normalised);
     } catch (err) {
       console.error("Error fetching customers:", err);
       setAllCustomers([]);
@@ -186,20 +166,22 @@ export default function CustomersPage() {
     }
   };
 
+  // ---------------- Filtering ----------------
   const filteredCustomers = customers.filter((customer) => {
+    const term = searchTerm.toLowerCase();
     const matchesSearch =
-      (customer.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (customer.address || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (customer.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (customer.phone || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      // The postcode search filtering logic is correct here
-      (customer.postcode || "").toLowerCase().includes(searchTerm.toLowerCase());
+      (customer.name || "").toLowerCase().includes(term) ||
+      (customer.address || "").toLowerCase().includes(term) ||
+      (customer.email || "").toLowerCase().includes(term) ||
+      (customer.phone || "").toLowerCase().includes(term) ||
+      (customer.postcode || "").toLowerCase().includes(term);
 
     const matchesStage = stageFilter === "All" || customer.stage === stageFilter;
 
     return matchesSearch && matchesStage;
   });
 
+  // ---------------- Permissions ----------------
   const canEditCustomer = (customer: Customer): boolean => {
     if (user?.role === "Manager" || user?.role === "HR") return true;
     if (user?.role === "Sales") {
@@ -208,60 +190,44 @@ export default function CustomersPage() {
     return false;
   };
 
-  const canDeleteCustomer = (customer: Customer): boolean => {
-    // Only Manager and HR can delete customers
-    return user?.role === "Manager" || user?.role === "HR";
-  };
+  const canDeleteCustomer = (customer: Customer): boolean =>
+    user?.role === "Manager" || user?.role === "HR";
 
+  // ---------------- Delete Customer ----------------
   const deleteCustomer = async (id: string) => {
-    // NOTE: Cannot use window.confirm, using custom modal/alert replacement is preferred.
-    // For now, retaining the error-prone 'confirm' until a dedicated UI is implemented.
-    if (!canDeleteCustomer(customers.find((c) => c.id === id)!)) {
+    const target = customers.find((c) => c.id === id);
+    if (!target || !canDeleteCustomer(target)) {
       alert("You don't have permission to delete customers.");
       return;
     }
-
-    // Replace with custom modal/dialog in a real app
     if (!window.confirm("Are you sure you want to delete this customer?")) return;
 
     try {
       const token = localStorage.getItem("auth_token");
-
       const res = await fetch(`https://aztec-interiors.onrender.com/customers/${id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error("Failed to delete customer");
-      setCustomers(customers.filter((c) => c.id !== id));
-      setAllCustomers(allCustomers.filter((c) => c.id !== id));
+
+      setCustomers((prev) => prev.filter((c) => c.id !== id));
+      setAllCustomers((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
       console.error("Delete error:", err);
       alert("Error deleting customer");
     }
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "—";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
+  // ---------------- UI ----------------
   const uniqueStages = Array.from(new Set(customers.map((c) => c.stage)));
 
   return (
     <div className="w-full p-6">
-      <h1 className="mb-6 text-3xl font-bold">{user?.role === "Sales" ? "My Customers" : "Customers"}</h1>
+      <h1 className="mb-6 text-3xl font-bold">
+        {user?.role === "Sales" ? "My Customers" : "Customers"}
+      </h1>
 
+      {/* Search and Filter Bar */}
       <div className="mb-6 flex justify-between">
         <div className="flex gap-3">
           <div className="relative w-64">
@@ -273,6 +239,8 @@ export default function CustomersPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+
+          {/* ✅ Dropdown menu with single valid trigger child */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
@@ -282,7 +250,9 @@ export default function CustomersPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setStageFilter("All")}>All Stages</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStageFilter("All")}>
+                All Stages
+              </DropdownMenuItem>
               {uniqueStages.map((stage) => (
                 <DropdownMenuItem key={stage} onClick={() => setStageFilter(stage)}>
                   {stage}
@@ -291,6 +261,7 @@ export default function CustomersPage() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
         {user?.role !== "Staff" && user?.role !== "Production" && (
           <Button onClick={() => setShowCreateModal(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -299,27 +270,20 @@ export default function CustomersPage() {
         )}
       </div>
 
+      {/* Customer Table */}
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                  Phone
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                  Email
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                  Address
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                  Postcode
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                  Stage
-                </th>
+                {["Name", "Phone", "Email", "Address", "Postcode", "Stage"].map((h) => (
+                  <th
+                    key={h}
+                    className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
+                  >
+                    {h}
+                  </th>
+                ))}
                 {(user?.role === "Manager" || user?.role === "HR") && (
                   <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                     Salesperson
@@ -335,6 +299,7 @@ export default function CustomersPage() {
                 )}
               </tr>
             </thead>
+
             <tbody className="divide-y divide-gray-200 bg-white">
               {filteredCustomers.map((customer) => (
                 <tr
@@ -342,41 +307,44 @@ export default function CustomersPage() {
                   onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
                   className="cursor-pointer hover:bg-gray-50"
                 >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{customer.name}</div>
+                  <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                    {customer.name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{customer.phone}</div>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {customer.phone}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">{customer.email || "—"}</div>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {customer.email || "—"}
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="max-w-xs">
-                      <div className="text-sm text-gray-900">{customer.address}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {/* The display logic is correct: show postcode or '—' */}
-                    <div className="text-sm text-gray-900">{customer.postcode || "—"}</div>
+                  <td className="px-6 py-4 text-sm text-gray-900">{customer.address}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {customer.postcode || "—"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStageColor(customer.stage)}`}
+                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStageColor(
+                        customer.stage
+                      )}`}
                     >
                       {customer.stage}
                     </span>
                   </td>
+
                   {(user?.role === "Manager" || user?.role === "HR") && (
-                    <td className="px-6 py-4 text-sm whitespace-nowrap text-gray-900">{customer.salesperson || "—"}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {customer.salesperson || "—"}
+                    </td>
                   )}
+
                   <td className="px-6 py-4 whitespace-nowrap">
                     {customer.project_types && customer.project_types.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {customer.project_types.map((type, index) => (
                           <span
                             key={index}
-                            className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getProjectTypeColor(type)}`}
+                            className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getProjectTypeColor(
+                              type
+                            )}`}
                           >
                             {type}
                           </span>
@@ -386,9 +354,10 @@ export default function CustomersPage() {
                       <span className="text-sm text-gray-500">—</span>
                     )}
                   </td>
+
                   {user?.role !== "Staff" && (
-                    <td className="px-6 py-4 text-right text-sm font-medium whitespace-nowrap">
-                      <div className="flex gap-2">
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      <div className="flex gap-2 justify-end">
                         {canEditCustomer(customer) && (
                           <Button
                             variant="ghost"
@@ -397,7 +366,6 @@ export default function CustomersPage() {
                               e.stopPropagation();
                               router.push(`/dashboard/customers/${customer.id}/edit`);
                             }}
-                            title="Edit customer"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -410,7 +378,6 @@ export default function CustomersPage() {
                               e.stopPropagation();
                               deleteCustomer(customer.id);
                             }}
-                            title="Delete customer"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -425,6 +392,7 @@ export default function CustomersPage() {
         </div>
       </div>
 
+      {/* Loading and Empty States */}
       {isLoading ? (
         <div className="py-12 text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent text-gray-600"></div>
@@ -433,15 +401,20 @@ export default function CustomersPage() {
       ) : filteredCustomers.length === 0 ? (
         <div className="py-12 text-center text-gray-500">
           <p className="text-lg">No customers found.</p>
-          {user?.role === "Sales" && <p className="mt-2 text-sm">Create your first customer to get started!</p>}
+          {user?.role === "Sales" && (
+            <p className="mt-2 text-sm">Create your first customer to get started!</p>
+          )}
         </div>
       ) : null}
 
-      <CreateCustomerModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onCustomerCreated={fetchCustomers}
-      />
+      {/* ✅ Safe modal call (renders one root element only) */}
+      {showCreateModal && (
+        <CreateCustomerModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onCustomerCreated={fetchCustomers}
+        />
+      )}
     </div>
   );
 }

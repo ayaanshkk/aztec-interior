@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar, PenTool, Upload } from "lucide-react";
-import { useSearchParams } from "next/dist/client/components/navigation";
+import { useSearchParams, useRouter } from "next/navigation"; // 🛠️ useRouter is imported here
 
 interface Appliance {
   details: string;
@@ -74,6 +74,7 @@ interface FormData {
 
 export default function FormPage() {
   const searchParams = useSearchParams();
+  const router = useRouter(); // 🛠️ useRouter initialized
   const typeParam = searchParams.get("type");
 
   const [formType, setFormType] = useState<"bedroom" | "kitchen">("bedroom");
@@ -384,11 +385,15 @@ export default function FormPage() {
 
   const handleSubmit = async () => {
     if (!validateForm()) {
-      return;
+        return;
     }
 
     const confirmMsg = "Are you sure you want to submit this checklist?";
     if (!window.confirm(confirmMsg)) return;
+
+    // --- CAPTURE REDIRECT URL ---
+    const redirectUrl = searchParams.get("redirect"); // Get optional redirect path
+    // ----------------------------
 
     const token = searchParams.get("token") || "";
     const customerIdFromUrl = searchParams.get("customerId") || "";
@@ -459,12 +464,18 @@ export default function FormPage() {
 
         // Redirect after 2 seconds
         setTimeout(() => {
-          if (result.customer_id) {
-            // Redirect to customer details page
-            window.location.href = `/dashboard/customers/${result.customer_id}`;
+          const targetCustomerId = result.customer_id || customerIdFromUrl;
+
+          // 🛠️ USE router.push() for Next.js client-side navigation
+          if (redirectUrl) {
+            // Option 1: Redirect using the passed 'redirect' URL parameter (if provided when linking to the form)
+            router.push(redirectUrl);
+          } else if (targetCustomerId) {
+            // Option 2: Fallback to the specific customer details page using the ID from the API or URL
+            router.push(`/dashboard/customers/${targetCustomerId}`);
           } else {
-            // Fallback: redirect to customers list
-            window.location.href = "/dashboard/customers";
+            // Option 3: Final fallback to the customers list
+            router.push("/dashboard/customers");
           }
         }, 2000);
       } else {
