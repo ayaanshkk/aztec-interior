@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CheckSquare, FileText, Receipt, DollarSign, Link, User, Copy, Check } from "lucide-react";
+import { CheckSquare, FileText, Receipt, DollarSign, User } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
 
@@ -20,8 +19,7 @@ import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
 interface FormItem {
   label: string;
   icon: React.ElementType;
-  type?: "kitchen" | "bedroom" | "remedial" | "general" | "receipt" | "deposit" | "final" | "proforma";
-  requiresLink?: boolean;
+  type?: "kitchen" | "bedroom" | "remedial" | "general" | "receipt" | "deposit" | "final" | "proforma" | "invoice" | "quotation" | "terms";
   route?: string;
 }
 
@@ -43,12 +41,6 @@ const FormsAndChecklistsPage = () => {
   // Customers state
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
-
-  // Link generation states
-  const [showLinkDialog, setShowLinkDialog] = useState(false);
-  const [generatedLink, setGeneratedLink] = useState("");
-  const [formType, setFormType] = useState("");
-  const [linkCopied, setLinkCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
 
   // Fetch customers when component mounts
@@ -92,11 +84,45 @@ const FormsAndChecklistsPage = () => {
     const customer = customers.find((c) => c.id === selectedCustomer);
     if (!customer) return;
 
-    // KITCHEN/BEDROOM FORMS: Always require link generation for the client
-    if (selectedForm?.requiresLink && selectedForm?.type) {
-      await generateFormLink(selectedForm.type as "kitchen" | "bedroom", customer);
+    // For Kitchen and Bedroom checklists, generate a link first
+    if (selectedForm?.type === "kitchen" || selectedForm?.type === "bedroom") {
+      setGenerating(true);
+      try {
+        const response = await fetchWithAuth(`customers/${customer.id}/generate-form-link`, {
+          method: "POST",
+          body: JSON.stringify({ formType: selectedForm.type }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            const params = new URLSearchParams({
+              type: selectedForm.type,
+              customerId: customer.id,
+              customerName: customer.name,
+              customerAddress: customer.address,
+              customerPhone: customer.phone,
+              customerEmail: customer.email || "",
+            });
+
+            // Navigate directly to the form page
+            router.push(`/form/${data.token}?${params.toString()}`);
+            setIsDialogOpen(false);
+          } else {
+            setConfirmationMessage(`⚠ Failed to generate form: ${data.error || "Unknown error"}`);
+          }
+        } else {
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+          setConfirmationMessage(`⚠ Server error: ${errorData.error || response.status}`);
+        }
+      } catch (error) {
+        console.error(`Error generating form:`, error);
+        setConfirmationMessage("⚠ Network error: Please check your connection and try again.");
+      } finally {
+        setGenerating(false);
+      }
     }
-    // STAFF NAVIGATION ITEMS: Navigates directly to the specified route
+    // For all other forms, navigate directly to the route
     else if (selectedForm?.route) {
       const queryParams = new URLSearchParams({
         customerId: selectedCustomer,
@@ -111,66 +137,6 @@ const FormsAndChecklistsPage = () => {
       router.push(`${selectedForm.route}?${queryParams.toString()}`);
       setIsDialogOpen(false);
     }
-    // For other documents
-    else {
-      setConfirmationMessage(`✅ ${selectedForm?.label} generated/linked for ${customer.name}.`);
-    }
-  };
-
-  const generateFormLink = async (type: "kitchen" | "bedroom", customer: Customer) => {
-    if (generating) return;
-
-    setGenerating(true);
-    setConfirmationMessage("");
-
-    try {
-      // Use centralized fetchWithAuth
-      const response = await fetchWithAuth(`customers/${customer.id}/generate-form-link`, {
-        method: "POST",
-        body: JSON.stringify({ formType: type }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          const params = new URLSearchParams({
-            type: type,
-            customerId: customer.id,
-            customerName: customer.name,
-            customerAddress: customer.address,
-            customerPhone: customer.phone,
-            customerEmail: customer.email || "",
-          });
-
-          // This link is for the CLIENT and is tokenized/external
-          const fullLink = `${window.location.origin}/form/${data.token}?${params.toString()}`;
-          setGeneratedLink(fullLink);
-          setFormType(type);
-          setIsDialogOpen(false);
-          setShowLinkDialog(true);
-        } else {
-          const errorMsg = data.error || "Unknown error occurred";
-          console.error("Link generation failed:", errorMsg);
-          setConfirmationMessage(`⚠ Failed to generate link: ${errorMsg}`);
-        }
-      } else {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        const errorMsg = errorData.error || `Server error: ${response.status}`;
-        console.error("Server responded with error:", errorMsg);
-        setConfirmationMessage(`⚠ Server error: ${errorMsg}`);
-      }
-    } catch (error) {
-      console.error(`Network error generating ${type} form link:`, error);
-      setConfirmationMessage("⚠ Network error: Please check your connection and try again.");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedLink);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
   };
 
   // Grouped sections
@@ -191,16 +157,14 @@ const FormsAndChecklistsPage = () => {
           type: "general" as const,
         },
         {
-          label: "Kitchen Checklist Form (Client Link)",
-          icon: Link,
+          label: "Kitchen Checklist Form",
+          icon: CheckSquare,
           type: "kitchen" as const,
-          requiresLink: true,
         },
         {
-          label: "Bedroom Checklist Form (Client Link)",
-          icon: Link,
+          label: "Bedroom Checklist Form",
+          icon: CheckSquare,
           type: "bedroom" as const,
-          requiresLink: true,
         },
       ] as FormItem[],
     },
@@ -335,30 +299,9 @@ const FormsAndChecklistsPage = () => {
               disabled={generating || loadingCustomers || !selectedCustomer}
               className="bg-slate-800 text-white hover:bg-slate-700"
             >
-              {generating ? "Generating..." : "Continue"}
+              {generating ? "Loading..." : "Continue"}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Link Display Dialog */}
-      <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{formType === "kitchen" ? "Kitchen" : "Bedroom"} Checklist Form Link Generated</DialogTitle>
-            <DialogDescription>
-              Share this link with {customers.find((c) => c.id === selectedCustomer)?.name || "the customer"} to fill
-              out the {formType === "kitchen" ? "kitchen" : "bedroom"} checklist form. The form data will be linked to
-              their existing customer record.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center space-x-2">
-            <Input value={generatedLink} readOnly className="flex-1" />
-            <Button onClick={copyToClipboard} variant="outline">
-              {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {linkCopied ? "Copied!" : "Copy"}
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
     </div>

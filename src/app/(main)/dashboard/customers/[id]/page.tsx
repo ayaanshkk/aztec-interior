@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft,
   Edit,
@@ -47,7 +48,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-// --- INTERFACES ---
+// ... (keeping all your existing interfaces the same)
 interface Project {
   id: string;
   project_name: string;
@@ -88,6 +89,7 @@ interface FormSubmission {
   submitted_at: string;
   form_data: any;
   project_id?: string;
+  created_by?: number;
 }
 
 interface FinancialDocument {
@@ -112,6 +114,16 @@ interface DrawingDocument {
   project_id?: string;
 }
 
+interface FormDocument {
+  id: string;
+  filename: string;
+  url: string;
+  type: "excel" | "pdf" | "other";
+  created_at: string;
+  customer_id: string;
+}
+
+// ... (keeping all your existing constants the same - FIELD_LABELS, FINANCIAL_FIELDS, etc.)
 const FIELD_LABELS: Record<string, string> = {
   customer_name: "Customer Name",
   customer_phone: "Phone Number",
@@ -194,6 +206,12 @@ const DRAWING_DOCUMENT_ICONS: Record<string, React.ReactNode> = {
   other: <FileText className="h-4 w-4 text-gray-600" />,
 };
 
+const FORM_DOCUMENT_ICONS: Record<string, React.ReactNode> = {
+  excel: <FileText className="h-4 w-4 text-green-600" />,
+  pdf: <FileText className="h-4 w-4 text-red-600" />,
+  other: <FileText className="h-4 w-4 text-gray-600" />,
+};
+
 const PROJECT_TYPES: Project["project_type"][] = ["Kitchen", "Bedroom", "Wardrobe", "Remedial", "Other"];
 
 const PROJECT_STAGES = [
@@ -211,6 +229,7 @@ const PROJECT_STAGES = [
   "Other",
 ];
 
+// ... (keeping all your helper functions the same)
 const formatDate = (dateString: string) => {
   if (!dateString) return "—";
   try {
@@ -272,6 +291,19 @@ export default function CustomerDetailsPage() {
   const { user } = useAuth();
   const id = params?.id as string;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const formFileInputRef = useRef<HTMLInputElement>(null);
+  
+  // NEW: Bulk delete states
+  const [selectedDrawings, setSelectedDrawings] = useState<Set<string>>(new Set());
+  const [selectedFormDocs, setSelectedFormDocs] = useState<Set<string>>(new Set());
+  const [showBulkDeleteDrawingsDialog, setShowBulkDeleteDrawingsDialog] = useState(false);
+  const [showBulkDeleteFormDocsDialog, setShowBulkDeleteFormDocsDialog] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  
+  const [formDocuments, setFormDocuments] = useState<FormDocument[]>([]);
+  const [showDeleteFormDocDialog, setShowDeleteFormDocDialog] = useState(false);
+  const [formDocToDelete, setFormDocToDelete] = useState<FormDocument | null>(null);
+  const [isDeletingFormDoc, setIsDeletingFormDoc] = useState(false);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [financialDocs, setFinancialDocs] = useState<FinancialDocument[]>([]);
   const [drawingDocuments, setDrawingDocuments] = useState<DrawingDocument[]>([]);
@@ -288,7 +320,6 @@ export default function CustomerDetailsPage() {
   const [formToDelete, setFormToDelete] = useState<FormSubmission | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [hasAccess, setHasAccess] = useState(true);
-
   const [showProjectDialog, setShowProjectDialog] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectForms, setProjectForms] = useState<FormSubmission[]>([]);
@@ -296,14 +327,15 @@ export default function CustomerDetailsPage() {
   const [showEditProjectDialog, setShowEditProjectDialog] = useState(false);
   const [editProjectData, setEditProjectData] = useState<Partial<Project>>({});
   const [isSavingProject, setIsSavingProject] = useState(false);
-
   const [showDeleteDrawingDialog, setShowDeleteDrawingDialog] = useState(false);
   const [drawingToDelete, setDrawingToDelete] = useState<DrawingDocument | null>(null);
   const [isDeletingDrawing, setIsDeletingDrawing] = useState(false);
-
   const [showDeleteProjectDialog, setShowDeleteProjectDialog] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
+  const [isEditingForm, setIsEditingForm] = useState(false);
+  const [editFormData, setEditFormData] = useState<any>(null);
+  const [isSavingForm, setIsSavingForm] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -368,6 +400,7 @@ export default function CustomerDetailsPage() {
     // Load documents (don't need to wait for these)
     loadFinancialDocuments(headers);
     loadDrawingDocuments(headers);
+    loadFormDocuments(headers);
 
     // Wait for both critical fetches, then stop loading
     Promise.all([customerPromise, jobsPromise])
@@ -466,17 +499,262 @@ export default function CustomerDetailsPage() {
       });
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    console.log("📄 File input changed");
+  const loadFormDocuments = (headers: HeadersInit) => {
+  const url = `https://aztec-interiors.onrender.com/files/forms?customer_id=${id}`;
 
+  fetch(url, { headers })
+    .then((res) => {
+      if (!res.ok) {
+        if (res.status === 404 || res.status === 204) {
+          setFormDocuments([]);
+          return null;
+        }
+        console.error(`Failed to fetch form documents, status: ${res.status}`);
+        throw new Error(`Failed to fetch form documents (status: ${res.status})`);
+      }
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        return res.json();
+      } else {
+        return null;
+      }
+    })
+    .then((data) => {
+      if (data === null) return;
+
+      if (Array.isArray(data)) {
+        setFormDocuments(data);
+      } else {
+        console.warn("Unexpected data format from form documents endpoint:", data);
+        setFormDocuments([]);
+      }
+    })
+    .catch((err) => {
+      console.error("Error loading form documents:", err);
+      setFormDocuments([]);
+    });
+};
+
+const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+
+  const token = localStorage.getItem("auth_token");
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  for (const file of Array.from(files)) {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("customer_id", id);
+
+      const response = await fetch("https://aztec-interiors.onrender.com/files/forms", {
+        method: "POST",
+        headers: headers,
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.form_document && data.form_document.id) {
+          const newDoc: FormDocument = {
+            id: data.form_document.id,
+            filename: data.form_document.filename || file.name,
+            url: data.form_document.url || data.form_document.file_url,
+            type: data.form_document.type || "other",
+            created_at: data.form_document.created_at || new Date().toISOString(),
+            customer_id: id,
+          };
+
+          setFormDocuments((prev) => {
+            const updated = [...prev, newDoc];
+            return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          });
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: `Server returned status ${response.status}` }));
+        console.error(`Failed to upload ${file.name}: ${errorData.error || "Server error"}`);
+      }
+    } catch (error) {
+      console.error(`Network error:`, error);
+    }
+  }
+
+  if (event.target) event.target.value = "";
+};
+
+const handleUploadFormDocument = () => {
+  if (formFileInputRef.current) {
+    formFileInputRef.current.click();
+  }
+};
+
+const handleViewFormDocument = (doc: FormDocument) => {
+  const BACKEND_URL = "https://aztec-interiors.onrender.com";
+  let viewUrl = doc.url;
+
+  if (viewUrl && viewUrl.startsWith('http')) {
+    window.open(viewUrl, "_blank");
+    return;
+  }
+
+  if (viewUrl && !viewUrl.startsWith('http')) {
+    viewUrl = `${BACKEND_URL}${viewUrl.startsWith('/') ? viewUrl : '/' + viewUrl}`;
+  } else if (!viewUrl) {
+    alert("Error: Form document URL is missing or invalid.");
+    return;
+  }
+
+  window.open(viewUrl, "_blank");
+};
+
+const handleDeleteFormDocument = async (doc: FormDocument) => {
+  if (isDeletingFormDoc) return;
+  setFormDocToDelete(doc);
+  setShowDeleteFormDocDialog(true);
+};
+
+const handleConfirmDeleteFormDocument = async () => {
+  if (!formDocToDelete) return;
+  setIsDeletingFormDoc(true);
+  
+  const token = localStorage.getItem("auth_token");
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  try {
+    const res = await fetch(
+      `https://aztec-interiors.onrender.com/files/forms/${formDocToDelete.id}`,
+      { method: "DELETE", headers }
+    );
+
+    if (res.ok) {
+      setFormDocuments((prev) => prev.filter((d) => d.id !== formDocToDelete.id));
+      setShowDeleteFormDocDialog(false);
+      setFormDocToDelete(null);
+    } else {
+      const err = await res.json().catch(() => ({ error: "Server error" }));
+      alert(`Failed to delete: ${err.error}`);
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Network error");
+  } finally {
+    setIsDeletingFormDoc(false);
+  }
+};
+
+  // NEW: Bulk delete handlers for drawings
+  const handleToggleDrawingSelection = (drawingId: string) => {
+    setSelectedDrawings(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(drawingId)) {
+        newSet.delete(drawingId);
+      } else {
+        newSet.add(drawingId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllDrawings = () => {
+    if (selectedDrawings.size === drawingDocuments.length) {
+      setSelectedDrawings(new Set());
+    } else {
+      setSelectedDrawings(new Set(drawingDocuments.map(d => d.id)));
+    }
+  };
+
+  const handleBulkDeleteDrawings = () => {
+    if (selectedDrawings.size === 0) return;
+    setShowBulkDeleteDrawingsDialog(true);
+  };
+
+  const handleConfirmBulkDeleteDrawings = async () => {
+    setIsBulkDeleting(true);
+    const token = localStorage.getItem("auth_token");
+    const headers: HeadersInit = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const deletePromises = Array.from(selectedDrawings).map(drawingId =>
+      fetch(`https://aztec-interiors.onrender.com/files/drawings/${drawingId}`, {
+        method: "DELETE",
+        headers
+      })
+    );
+
+    try {
+      await Promise.all(deletePromises);
+      setDrawingDocuments(prev => prev.filter(d => !selectedDrawings.has(d.id)));
+      setSelectedDrawings(new Set());
+      setShowBulkDeleteDrawingsDialog(false);
+    } catch (error) {
+      console.error("Error bulk deleting drawings:", error);
+      alert("Some files failed to delete. Please try again.");
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  // NEW: Bulk delete handlers for form documents
+  const handleToggleFormDocSelection = (docId: string) => {
+    setSelectedFormDocs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(docId)) {
+        newSet.delete(docId);
+      } else {
+        newSet.add(docId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllFormDocs = () => {
+    if (selectedFormDocs.size === formDocuments.length) {
+      setSelectedFormDocs(new Set());
+    } else {
+      setSelectedFormDocs(new Set(formDocuments.map(d => d.id)));
+    }
+  };
+
+  const handleBulkDeleteFormDocs = () => {
+    if (selectedFormDocs.size === 0) return;
+    setShowBulkDeleteFormDocsDialog(true);
+  };
+
+  const handleConfirmBulkDeleteFormDocs = async () => {
+    setIsBulkDeleting(true);
+    const token = localStorage.getItem("auth_token");
+    const headers: HeadersInit = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const deletePromises = Array.from(selectedFormDocs).map(docId =>
+      fetch(`https://aztec-interiors.onrender.com/files/forms/${docId}`, {
+        method: "DELETE",
+        headers
+      })
+    );
+
+    try {
+      await Promise.all(deletePromises);
+      setFormDocuments(prev => prev.filter(d => !selectedFormDocs.has(d.id)));
+      setSelectedFormDocs(new Set());
+      setShowBulkDeleteFormDocsDialog(false);
+    } catch (error) {
+      console.error("Error bulk deleting form documents:", error);
+      alert("Some files failed to delete. Please try again.");
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
 
     if (!files || files.length === 0) {
-      console.log("📄 No files selected");
       return;
     }
-
-    console.log(`📄 Selected ${files.length} file(s) for upload`);
 
     const token = localStorage.getItem("auth_token");
     const headers: HeadersInit = {};
@@ -486,8 +764,6 @@ export default function CustomerDetailsPage() {
     }
 
     for (const file of Array.from(files)) {
-      console.log(`📤 Uploading: ${file.name} (${file.type})`);
-
       try {
         const formData = new FormData();
         formData.append("file", file);
@@ -499,11 +775,8 @@ export default function CustomerDetailsPage() {
           body: formData,
         });
 
-        console.log(`📥 Response status: ${response.status}`);
-
         if (response.ok) {
           const data = await response.json();
-          console.log("✅ Upload successful:", data);
 
           if (data.drawing && data.drawing.id) {
             const newDoc: DrawingDocument = {
@@ -515,66 +788,52 @@ export default function CustomerDetailsPage() {
               project_id: data.drawing.project_id,
             };
 
-            console.log("📄 Adding document to state:", newDoc);
-
             setDrawingDocuments((prev) => {
               const updated = [...prev, newDoc];
               return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
             });
-
-            alert(`✅ Successfully uploaded: ${file.name}`);
           } else {
-            console.error("🚨 Invalid response structure:", data);
-            alert(`Upload succeeded for ${file.name}, but couldn't update the list. Please refresh the page.`);
+            console.error("Invalid response structure:", data);
           }
         } else {
           const errorData = await response.json().catch(() => ({
             error: `Server returned status ${response.status}`,
           }));
-          console.error(`❌ Upload failed:`, errorData);
-          alert(`Failed to upload ${file.name}: ${errorData.error || "Server error"}`);
+          console.error(`Upload failed:`, errorData);
         }
       } catch (error) {
-        console.error(`💥 Network error:`, error);
-        alert(`Network error uploading ${file.name}. Please check the console.`);
+        console.error(`Network error:`, error);
       }
     }
 
     if (event.target) {
       event.target.value = "";
     }
-
-    console.log("📄 Upload process complete");
   };
 
   const handleUploadDrawing = () => {
-    console.log("🚀 handleUploadDrawing: Triggering file input click...");
     if (fileInputRef.current) {
       fileInputRef.current.click();
-    } else {
-      console.error("🚨 handleUploadDrawing: fileInputRef is null or undefined!");
     }
   };
 
   const handleViewDrawing = (doc: DrawingDocument) => {
-      const BACKEND_URL = "https://aztec-interiors.onrender.com"; 
+    const BACKEND_URL = "https://aztec-interiors.onrender.com";
+    let viewUrl = doc.url;
 
-      let viewUrl = doc.url;
-      
-      // 2. Safely construct the full URL
-      if (viewUrl && !viewUrl.startsWith('http')) {
-          // This prepends the backend URL, ensuring we handle paths that may or may not start with a '/'.
-          viewUrl = `${BACKEND_URL}${viewUrl.startsWith('/') ? viewUrl : '/' + viewUrl}`;
-      } else if (!viewUrl) {
-          // Handle case where doc.url is empty or null
-          alert("Error: Drawing URL is missing or invalid.");
-          return;
-      }
-      
-      console.log(`Attempting to view file: ${doc.filename}. Final URL: ${viewUrl}`);
-      
-      // Open the generated URL in a new tab
+    if (viewUrl && viewUrl.startsWith('http')) {
       window.open(viewUrl, "_blank");
+      return;
+    }
+
+    if (viewUrl && !viewUrl.startsWith('http')) {
+      viewUrl = `${BACKEND_URL}${viewUrl.startsWith('/') ? viewUrl : '/' + viewUrl}`;
+    } else if (!viewUrl) {
+      alert("Error: Drawing URL is missing or invalid.");
+      return;
+    }
+
+    window.open(viewUrl, "_blank");
   };
 
   const handleDeleteDrawing = async (doc: DrawingDocument) => {
@@ -754,10 +1013,93 @@ export default function CustomerDetailsPage() {
 
   // --- NEW PERMISSIVE FUNCTION (For Project Creation/Editing) ---
   const canManageProjects = (): boolean => {
-    // Returns true if the user object exists and has a role, giving all authenticated users access.
-    return !!user?.role;
+    if (!user) return false;
+    
+    // Allow Manager, HR, Production, and Sales to manage projects
+    const allowedRoles = ['Manager', 'HR', 'Production', 'Sales'];
+    return allowedRoles.includes(user.role);
   };
+
   // -------------------------------------------------------------
+
+  // Add permission check function
+  const canEditForm = (submission: FormSubmission): boolean => {
+    if (!user) return false;
+    
+    const allowedRoles = ['Manager', 'HR', 'Production', 'Sales'];
+    const isCreator = submission.created_by === user.id;
+    
+    return allowedRoles.includes(user.role) || isCreator;
+  };
+
+  // Add function to handle edit button click
+  const handleEditForm = (submission: FormSubmission) => {
+    if (!canEditForm(submission)) {
+      alert("You don't have permission to edit this form.");
+      return;
+    }
+    
+    try {
+      const formData = typeof submission.form_data === "string" 
+        ? JSON.parse(submission.form_data) 
+        : submission.form_data;
+      
+      setSelectedForm(submission);
+      setEditFormData(formData);
+      setIsEditingForm(true);
+      setShowFormDialog(true);
+      setFormType(getFormType(submission));
+    } catch (error) {
+      console.error("Error parsing form data:", error);
+      alert("Error loading form data for editing");
+    }
+  };
+
+  // Add function to save edited form
+  const handleSaveEditedForm = async () => {
+    if (!selectedForm || !editFormData || isSavingForm) return;
+
+    setIsSavingForm(true);
+    const token = localStorage.getItem("auth_token");
+
+    try {
+      const response = await fetch(
+        `https://aztec-interiors.onrender.com/form-submissions/${selectedForm.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ formData: editFormData }),
+        }
+      );
+
+      if (response.ok) {
+        alert("Form updated successfully!");
+        setShowFormDialog(false);
+        setIsEditingForm(false);
+        setEditFormData(null);
+        loadCustomerData(); // Reload data to show updated form
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        alert(`Failed to update form: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error updating form:", error);
+      alert("Network error: Could not update form");
+    } finally {
+      setIsSavingForm(false);
+    }
+  };
+
+  // Add function to handle field changes
+  const handleFormFieldChange = (fieldName: string, value: any) => {
+    setEditFormData((prev: any) => ({
+      ...prev,
+      [fieldName]: value,
+    }));
+  };
 
   const canEdit = (): boolean => {
     if (!customer) return false;
@@ -767,7 +1109,10 @@ export default function CustomerDetailsPage() {
   };
 
   const canDelete = (): boolean => {
-    return user?.role === "Manager" || user?.role === "HR";
+    if (!user) return false;
+    
+    const allowedRoles = ['Manager', 'HR', 'Sales'];
+    return allowedRoles.includes(user.role);
   };
 
   const canCreateFinancialDocs = (): boolean => {
@@ -1460,14 +1805,29 @@ export default function CustomerDetailsPage() {
             size="sm"
             onClick={() => {
               setSelectedForm(submission);
+              setIsEditingForm(false);
               setShowFormDialog(true);
               setFormType(getFormType(submission));
             }}
             className="flex items-center space-x-1"
           >
             <Eye className="h-4 w-4" />
-            <span>Open</span>
+            <span>View</span>
           </Button>
+          
+          {/* ADD EDIT BUTTON */}
+          {canEditForm(submission) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEditForm(submission)}
+              className="flex items-center space-x-1"
+            >
+              <Edit className="h-4 w-4" />
+              <span>Edit</span>
+            </Button>
+          )}
+          
           {canDelete() && (
             <Button
               variant="ghost"
@@ -1527,6 +1887,47 @@ export default function CustomerDetailsPage() {
       </div>
     );
   };
+
+  const renderFormDocument = (doc: FormDocument) => {
+  const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
+  const docType = doc.type || 
+    (fileExtension === "pdf" ? "pdf" : 
+     ["xlsx", "xls", "csv"].includes(fileExtension) ? "excel" : "other");
+
+  return (
+    <div key={doc.id} className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
+      <div className="flex items-start justify-between">
+        <div className="flex flex-1 items-start space-x-4">
+          <div className="rounded-xl bg-gradient-to-br from-green-50 to-blue-50 p-3">
+            {FORM_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
+            <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
+          </div>
+        </div>
+        <div className="ml-6 flex items-center space-x-2">
+          <Button onClick={() => handleViewFormDocument(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
+            <Eye className="h-4 w-4" />
+            <span>View</span>
+          </Button>
+          {canEdit() && (
+            <Button
+              onClick={() => handleDeleteFormDocument(doc)}
+              disabled={isDeletingFormDoc}
+              variant="outline"
+              size="sm"
+              className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Delete</span>
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
   const handleDeleteProject = (project: Project) => {
     if (!canManageProjects()) {
@@ -1648,6 +2049,15 @@ export default function CustomerDetailsPage() {
         ref={fileInputRef}
         onChange={handleFileChange}
         accept=".pdf,image/png,image/jpeg,image/jpg,image/gif"
+        multiple
+        style={{ display: "none" }}
+      />
+
+      <input
+        type="file"
+        ref={formFileInputRef}
+        onChange={handleFormFileChange}
+        accept=".pdf,.xlsx,.xls,.csv"
         multiple
         style={{ display: "none" }}
       />
@@ -1971,65 +2381,104 @@ export default function CustomerDetailsPage() {
         <div className="mb-8 border-t border-gray-200 pt-8">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">Drawings & Layouts</h2>
-            {canEdit() && (
-              <Button
-                onClick={handleUploadDrawing}
-                className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
-              >
-                <Upload className="h-4 w-4" />
-                <span>Upload File</span>
-              </Button>
-            )}
+            <div className="flex items-center space-x-2">
+              {canEdit() && selectedDrawings.size > 0 && (
+                <>
+                  <Button
+                    onClick={handleBulkDeleteDrawings}
+                    variant="destructive"
+                    className="flex items-center space-x-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Delete Selected ({selectedDrawings.size})</span>
+                  </Button>
+                  <Button
+                    onClick={() => setSelectedDrawings(new Set())}
+                    variant="outline"
+                  >
+                    Clear Selection
+                  </Button>
+                </>
+              )}
+              {canEdit() && drawingDocuments.length > 0 && (
+                <Checkbox
+                  checked={selectedDrawings.size === drawingDocuments.length && drawingDocuments.length > 0}
+                  onCheckedChange={handleSelectAllDrawings}
+                />
+              )}
+              {canEdit() && (
+                <Button
+                  onClick={handleUploadDrawing}
+                  className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span>Upload File</span>
+                </Button>
+              )}
+            </div>
           </div>
 
           {drawingDocuments.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {drawingDocuments
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                .map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex flex-1 items-start space-x-4">
-                        <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
-                          {DRAWING_DOCUMENT_ICONS[doc.type] || <FileText className="h-5 w-5 text-gray-600" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
-                          <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
-                          {doc.project_id && <p className="mt-1 text-xs text-blue-500">Project ID: {doc.project_id}</p>}
-                        </div>
-                      </div>
+                .map((doc) => {
+                  const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
+                  const docType =
+                    doc.type ||
+                    (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
 
-                      <div className="ml-6 flex items-center space-x-2">
-                        <Button
-                          onClick={() => handleViewDrawing(doc)}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span>View</span>
-                        </Button>
-
+                  return (
+                    <div
+                      key={doc.id}
+                      className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between">
                         {canEdit() && (
+                          <Checkbox
+                            checked={selectedDrawings.has(doc.id)}
+                            onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
+                            className="mr-4 mt-1"
+                          />
+                        )}
+                        <div className="flex flex-1 items-start space-x-4">
+                          <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
+                            {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
+                            <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
+                            {doc.project_id && <p className="mt-1 text-xs text-blue-500">Project ID: {doc.project_id}</p>}
+                          </div>
+                        </div>
+
+                        <div className="ml-6 flex items-center space-x-2">
                           <Button
-                            onClick={() => handleDeleteDrawing(doc)}
-                            disabled={isDeletingDrawing}
+                            onClick={() => handleViewDrawing(doc)}
                             variant="outline"
                             size="sm"
-                            className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
+                            className="flex items-center space-x-2"
                           >
-                            <Trash2 className="h-4 w-4" />
-                            <span>Delete</span>
+                            <Eye className="h-4 w-4" />
+                            <span>View</span>
                           </Button>
-                        )}
+
+                          {canEdit() && (
+                            <Button
+                              onClick={() => handleDeleteDrawing(doc)}
+                              disabled={isDeletingDrawing}
+                              variant="outline"
+                              size="sm"
+                              className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           ) : (
             <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-8 text-center">
@@ -2042,21 +2491,210 @@ export default function CustomerDetailsPage() {
 
         {/* FORM SUBMISSIONS SECTION */}
         <div className="mb-8 border-t border-gray-200 pt-8">
-          <h2 className="mb-6 text-xl font-semibold text-gray-900">Form Submissions</h2>
-          {customer.form_submissions && customer.form_submissions.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {customer.form_submissions.map((submission) => (
-                <div key={submission.id}>{renderFormSubmission(submission)}</div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-lg bg-gray-50 p-8 text-center text-gray-500">
-              <CheckSquare className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-              <h3 className="mb-2 text-lg font-medium text-gray-900">No Form Submissions</h3>
-              <p className="text-sm">Generate a form link or create a checklist to collect customer information.</p>
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">Form Submissions</h2>
+            {canEdit() && (
+              <Button
+                onClick={handleUploadFormDocument}
+                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700"
+              >
+                <Upload className="h-4 w-4" />
+                <span>Upload Document</span>
+              </Button>
+            )}
+          </div>
+
+          {/* Uploaded Form Documents */}
+          {formDocuments.length > 0 && (
+            <div className="mb-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Uploaded Documents ({formDocuments.length})
+                </h3>
+                <div className="flex items-center space-x-2">
+                  {canEdit() && selectedFormDocs.size > 0 && (
+                    <>
+                      <Button
+                        onClick={handleBulkDeleteFormDocs}
+                        variant="destructive"
+                        className="flex items-center space-x-2"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>Delete Selected ({selectedFormDocs.size})</span>
+                      </Button>
+                      <Button
+                        onClick={() => setSelectedFormDocs(new Set())}
+                        variant="outline"
+                      >
+                        Clear Selection
+                      </Button>
+                    </>
+                  )}
+                  {canEdit() && formDocuments.length > 0 && (
+                    <Checkbox
+                      checked={selectedFormDocs.size === formDocuments.length && formDocuments.length > 0}
+                      onCheckedChange={handleSelectAllFormDocs}
+                    />
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                {formDocuments
+                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                  .map((doc) => {
+                    const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
+                    const docType = doc.type || 
+                      (fileExtension === "pdf" ? "pdf" : 
+                       ["xlsx", "xls", "csv"].includes(fileExtension) ? "excel" : "other");
+
+                    return (
+                      <div key={doc.id} className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
+                        <div className="flex items-start justify-between">
+                          {canEdit() && (
+                            <Checkbox
+                              checked={selectedFormDocs.has(doc.id)}
+                              onCheckedChange={() => handleToggleFormDocSelection(doc.id)}
+                              className="mr-4 mt-1"
+                            />
+                          )}
+                          <div className="flex flex-1 items-start space-x-4">
+                            <div className="rounded-xl bg-gradient-to-br from-green-50 to-blue-50 p-3">
+                              {FORM_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
+                              <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
+                            </div>
+                          </div>
+                          <div className="ml-6 flex items-center space-x-2">
+                            <Button onClick={() => handleViewFormDocument(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
+                              <Eye className="h-4 w-4" />
+                              <span>View</span>
+                            </Button>
+                            {canEdit() && (
+                              <Button
+                                onClick={() => handleDeleteFormDocument(doc)}
+                                disabled={isDeletingFormDoc}
+                                variant="outline"
+                                size="sm"
+                                className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           )}
+
+          {/* Form Submissions */}
+          {customer.form_submissions && customer.form_submissions.length > 0 ? (
+            <div>
+              <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                Form Submissions ({customer.form_submissions.length})
+              </h3>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                {customer.form_submissions.map((submission) => (
+                  <div key={submission.id}>{renderFormSubmission(submission)}</div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            !formDocuments.length && (
+              <div className="rounded-lg bg-gray-50 p-8 text-center text-gray-500">
+                <CheckSquare className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+                <h3 className="mb-2 text-lg font-medium text-gray-900">No Form Submissions</h3>
+                <p className="text-sm">
+                  Generate a form link, create a checklist, or upload documents to collect customer information.
+                </p>
+              </div>
+            )
+          )}
         </div>
+
+        {/* DELETE FORM DOCUMENT DIALOG */}
+        <Dialog open={showDeleteFormDocDialog} onOpenChange={setShowDeleteFormDocDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Form Document</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete <strong>{formDocToDelete?.filename}</strong>? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDeleteFormDocDialog(false)} disabled={isDeletingFormDoc}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmDeleteFormDocument}
+                disabled={isDeletingFormDoc}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                {isDeletingFormDoc ? "Deleting..." : "Delete"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* BULK DELETE DRAWINGS DIALOG */}
+        <Dialog open={showBulkDeleteDrawingsDialog} onOpenChange={setShowBulkDeleteDrawingsDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Multiple Drawings</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete {selectedDrawings.size} selected drawing(s)? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowBulkDeleteDrawingsDialog(false)}
+                disabled={isBulkDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmBulkDeleteDrawings}
+                disabled={isBulkDeleting}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                {isBulkDeleting ? "Deleting..." : `Delete ${selectedDrawings.size} Files`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* BULK DELETE FORM DOCUMENTS DIALOG */}
+        <Dialog open={showBulkDeleteFormDocsDialog} onOpenChange={setShowBulkDeleteFormDocsDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Multiple Documents</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete {selectedFormDocs.size} selected document(s)? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowBulkDeleteFormDocsDialog(false)}
+                disabled={isBulkDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmBulkDeleteFormDocs}
+                disabled={isBulkDeleting}
+                className="bg-red-600 text-white hover:bg-red-700"
+              >
+                {isBulkDeleting ? "Deleting..." : `Delete ${selectedFormDocs.size} Files`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* JOBS SECTION */}
         <div className="mb-8 border-t border-gray-200 pt-8">
@@ -2508,36 +3146,58 @@ export default function CustomerDetailsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* FORM DIALOG - Truncated for brevity, remains the same as original */}
-      <Dialog open={showFormDialog} onOpenChange={setShowFormDialog}>
+      {/* FORM DIALOG - WITH EDIT FUNCTIONALITY */}
+      <Dialog open={showFormDialog} onOpenChange={(open) => {
+        setShowFormDialog(open);
+        if (!open) {
+          setIsEditingForm(false);
+          setEditFormData(null);
+        }
+      }}>
         <DialogContent className="h-[85vh] w-[85vw] max-w-none overflow-hidden rounded-lg p-0">
           <div className="flex items-start justify-between border-b bg-white px-6 py-4">
             <div>
               <DialogTitle className="text-lg font-semibold">
-                {selectedForm ? getFormTitle(selectedForm) : "Form Submission"}
+                {isEditingForm ? "Edit " : ""}{selectedForm ? getFormTitle(selectedForm) : "Form Submission"}
               </DialogTitle>
               <DialogDescription className="text-sm text-gray-500">
                 Submitted: {selectedForm ? formatDate(selectedForm.submitted_at) : "—"}
               </DialogDescription>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowFormDialog(false)}
-              className="absolute top-4 right-4"
-            >
-              <X className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center space-x-2">
+              {isEditingForm && (
+                <Button
+                  onClick={handleSaveEditedForm}
+                  disabled={isSavingForm}
+                  className="flex items-center space-x-2"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>{isSavingForm ? "Saving..." : "Save Changes"}</span>
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setShowFormDialog(false);
+                  setIsEditingForm(false);
+                  setEditFormData(null);
+                }}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
           <div className="h-[calc(85vh-72px)] overflow-auto bg-gray-50 p-6">
             {selectedForm ? (
               (() => {
                 let rawData: Record<string, any> = {};
                 try {
-                  rawData =
-                    typeof selectedForm.form_data === "string"
-                      ? JSON.parse(selectedForm.form_data)
-                      : selectedForm.form_data || {};
+                  rawData = isEditingForm && editFormData 
+                    ? editFormData 
+                    : (typeof selectedForm.form_data === "string"
+                        ? JSON.parse(selectedForm.form_data)
+                        : selectedForm.form_data || {});
                 } catch {
                   rawData = selectedForm.form_data || {};
                 }
@@ -2621,6 +3281,34 @@ export default function CustomerDetailsPage() {
                 ];
                 const auxiliaryFields = ["sink_tap_customer_owned", "appliances_customer_owned"];
 
+                // NEW: EditableRow component for edit mode
+                const EditableRow: React.FC<{ label: string; value: any; name: string }> = ({ label, value, name }) => {
+                  if (!isEditingForm) {
+                    return <Row label={label} value={value} name={name} />;
+                  }
+
+                  // Don't allow editing signature fields
+                  if (name === "signature_data" || name === "signature_date") {
+                    return <Row label={label} value={value} name={name} />;
+                  }
+
+                  // Render editable input
+                  return (
+                    <div className="grid grid-cols-1 items-start gap-4 border-b py-3 last:border-b-0 md:grid-cols-3">
+                      <div className="md:col-span-1">
+                        <div className="text-sm font-medium text-gray-700">{label}</div>
+                      </div>
+                      <div className="md:col-span-2">
+                        <Input
+                          value={value || ""}
+                          onChange={(e) => handleFormFieldChange(name, e.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  );
+                };
+
                 const renderSection = (title: string, fields: string[], typeCondition?: string) => {
                   if (typeCondition && inferredType !== typeCondition) return null;
 
@@ -2640,23 +3328,90 @@ export default function CustomerDetailsPage() {
                               String(rawData.appliances_customer_owned).trim().toLowerCase() === "yes";
 
                             if ((k === "sink_details" || k === "tap_details") && sinkTapOwned) {
-                              return <Row key={k} label={humanizeLabel(k)} value="Customer Owned" name={k} />;
+                              return <EditableRow key={k} label={humanizeLabel(k)} value="Customer Owned" name={k} />;
                             }
                             if ((k === "other_appliances" || k === "appliances") && appliancesOwned) {
-                              return <Row key={k} label={humanizeLabel(k)} value="Customer Owned" name={k} />;
+                              return <EditableRow key={k} label={humanizeLabel(k)} value="Customer Owned" name={k} />;
                             }
+
                             if (k === "appliances" && Array.isArray(rawData[k])) {
-                              const appliancesList = rawData[k]
-                                .filter((app: any) => app.details || app.order_date)
-                                .map((app: any) => {
-                                  const details = app.details || "N/A";
-                                  const orderDate = app.order_date
-                                    ? ` (Order Date: ${formatDate(app.order_date)})`
-                                    : "";
-                                  return `${details}${orderDate}`;
-                                })
-                                .join("; ");
-                              return <Row key={k} label={humanizeLabel(k)} value={appliancesList || "—"} name={k} />;
+                              const appliances = rawData[k].filter((app: any) => app.make || app.model || app.quantity || app.details || app.order_date);
+                              
+                              if (appliances.length === 0) {
+                                return <EditableRow key={k} label={humanizeLabel(k)} value="—" name={k} />;
+                              }
+
+                              // Define standard appliance types for labeling
+                              const standardAppliances = ["Oven", "Microwave", "Washing Machine", "HOB", "Extractor", "INTG Dishwasher"];
+
+                              return (
+                                <div key={k} className="grid grid-cols-1 items-start gap-4 border-b py-3 last:border-b-0 md:grid-cols-3">
+                                  <div className="md:col-span-1">
+                                    <div className="text-sm font-medium text-gray-700">{humanizeLabel(k)}</div>
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <div className="space-y-3">
+                                      {appliances.map((app: any, index: number) => {
+                                        // Check if this is new format (make/model/quantity) or old format (details)
+                                        const hasNewFormat = app.make || app.model || app.quantity;
+                                        const hasOldFormat = app.details;
+                                        
+                                        // Get appliance label
+                                        const applianceLabel = index < standardAppliances.length 
+                                          ? standardAppliances[index] 
+                                          : `Appliance ${index + 1}`;
+
+                                        return (
+                                          <div key={index} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                            <div className="mb-2 text-sm font-semibold text-gray-800">{applianceLabel}</div>
+                                            
+                                            {hasNewFormat ? (
+                                              <div className="space-y-2">
+                                                {app.make && (
+                                                  <div className="flex items-start">
+                                                    <span className="w-24 text-xs font-medium text-gray-600">Make:</span>
+                                                    <span className="flex-1 text-sm text-gray-900">{app.make}</span>
+                                                  </div>
+                                                )}
+                                                {app.model && (
+                                                  <div className="flex items-start">
+                                                    <span className="w-24 text-xs font-medium text-gray-600">Model:</span>
+                                                    <span className="flex-1 text-sm text-gray-900">{app.model}</span>
+                                                  </div>
+                                                )}
+                                                {app.quantity && (
+                                                  <div className="flex items-start">
+                                                    <span className="w-24 text-xs font-medium text-gray-600">Quantity:</span>
+                                                    <span className="flex-1 text-sm text-gray-900">{app.quantity}</span>
+                                                  </div>
+                                                )}
+                                                {app.order_date && (
+                                                  <div className="flex items-start">
+                                                    <span className="w-24 text-xs font-medium text-gray-600">Order Date:</span>
+                                                    <span className="flex-1 text-sm text-gray-900">{formatDate(app.order_date)}</span>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            ) : hasOldFormat ? (
+                                              <div className="space-y-2">
+                                                <div className="text-sm text-gray-900">{app.details}</div>
+                                                {app.order_date && (
+                                                  <div className="flex items-start">
+                                                    <span className="w-24 text-xs font-medium text-gray-600">Order Date:</span>
+                                                    <span className="flex-1 text-sm text-gray-900">{formatDate(app.order_date)}</span>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            ) : (
+                                              <div className="text-sm text-gray-500">No details provided</div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
                             }
                           }
 
@@ -2678,7 +3433,7 @@ export default function CustomerDetailsPage() {
                             );
                           }
 
-                          return <Row key={k} label={humanizeLabel(k)} value={rawData[k]} name={k} />;
+                          return <EditableRow key={k} label={humanizeLabel(k)} value={rawData[k]} name={k} />;
                         })}
                       </div>
                     </section>
@@ -2701,7 +3456,7 @@ export default function CustomerDetailsPage() {
                           {keys
                             .filter((k) => !displayed.has(k) && !auxiliaryFields.includes(k))
                             .map((k) => (
-                              <Row key={k} label={humanizeLabel(k)} value={rawData[k]} name={k} />
+                              <EditableRow key={k} label={humanizeLabel(k)} value={rawData[k]} name={k} />
                             ))}
                         </div>
                       </section>

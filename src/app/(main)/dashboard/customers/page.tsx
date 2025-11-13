@@ -148,14 +148,24 @@ export default function CustomersPage() {
       if (!response.ok) throw new Error("Failed to fetch customers");
 
       const data = await response.json();
+      
+      // ✅ Add console log to debug
+      console.log("Raw customer data from API:", data[0]); // Check first customer
 
-      const normalised = data.map((c: any) => ({
-        ...c,
-        postcode: c.postcode || c.post_code || "",
-        salesperson: c.salesperson || "",
-        project_types: Array.isArray(c.project_types) ? c.project_types : [],
-        stage: c.stage || c.status || "Lead",
-      }));
+      const normalised = data.map((c: any) => {
+        const customer = {
+          ...c,
+          postcode: c.postcode || c.post_code || "",
+          salesperson: c.salesperson || "",
+          project_types: Array.isArray(c.project_types) ? c.project_types : [],
+          stage: c.stage || c.status || "Lead",
+        };
+        
+        // ✅ Debug normalized data
+        console.log("Normalized customer:", customer);
+        
+        return customer;
+      });
 
       setAllCustomers(normalised);
     } catch (err) {

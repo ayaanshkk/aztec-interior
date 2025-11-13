@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -270,6 +270,7 @@ export default function EnhancedPipelinePage() {
   const [filterType, setFilterType] = useState("all");
   const [filterDateRange, setFilterDateRange] = useState("all");
   const { user, token, loading: authLoading } = useAuth();
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [editDialog, setEditDialog] = useState<{
     open: boolean;
     itemId: string | null;
@@ -281,18 +282,14 @@ export default function EnhancedPipelinePage() {
     itemId: null,
   });
   const prevFeaturesRef = useRef<any[]>([]);
-
   const columns = useMemo(() => makeColumns(), []);
-
   // Get user role and permissions
   const userRole = (user?.role || "Staff") as UserRole;
   const permissions = ROLE_PERMISSIONS[userRole as keyof typeof ROLE_PERMISSIONS] || ROLE_PERMISSIONS.Staff;
-
   // Helper function to create a standardized user ID for comparison
   const getStandardUserId = (value: string | null | undefined): string => {
     return (value || "").toLowerCase().trim();
   };
-
   // Helper function to check if user can access an item
   const canUserAccessItem = (item: PipelineItem): boolean => {
     const standardUserEmail = getStandardUserId(user?.email);
@@ -584,7 +581,7 @@ export default function EnhancedPipelinePage() {
     fetchData();
   }, [authLoading, token, user]);
 
-  // --- FIX: Updated handleDataChange to support Project updates ---
+ // --- FIX: Updated handleDataChange to fix the multi-stage drag-and-refresh issue ---
   const handleDataChange = async (next: any[]) => {
     if (!permissions.canDragDrop) {
       alert("You don't have permission to move items in the pipeline.");
@@ -597,152 +594,157 @@ export default function EnhancedPipelinePage() {
       return p && p.column !== n.column;
     });
 
-    // --- ADD LOGGING HERE ---
+    // ✅ UPDATE UI IMMEDIATELY (smooth visual feedback)
+    setFeatures(next);
+    prevFeaturesRef.current = next;
+
     if (moved.length > 0) {
+      // ✅ CANCEL any pending API calls (user is still dragging)
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        console.log("❌ Cancelled pending API call - user still dragging");
+      }
+
       console.log(
-        "handleDataChange triggered. Moved items:",
+        "Drag detected. Will save after user stops...",
         moved.map((item) => ({
           id: item.itemId,
-          targetColumn: item.column,
           targetStage: columnIdToStage(item.column),
         })),
       );
-    }
 
-    if (moved.length > 0) {
+      // Check permissions
       const unauthorizedMoves = moved.filter((item) => {
-        // Find the original pipeline item to get complete data
         const originalItem = pipelineItems.find((pi) => pi.id === item.itemId);
         if (!originalItem) return true;
-
         return !canUserEditItem(originalItem);
       });
 
       if (unauthorizedMoves.length > 0) {
-        alert("You don't have permission to move some of these items.");
+        alert("You don't have permission to move some of these items. Reverting changes.");
+        setFeatures(prev);
+        prevFeaturesRef.current = prev;
         return;
       }
 
-      // Continue with the rest of the function...
-      setFeatures(next);
-      prevFeaturesRef.current = next;
+      // ✅ DEBOUNCE: Wait 400ms after user STOPS dragging before saving
+      debounceTimerRef.current = setTimeout(async () => {
+        console.log("✅ User stopped dragging. Making API call now...");
+        
+        try {
+          const updatePromises = moved.map(async (item) => {
+            const newStage = columnIdToStage(item.column);
 
-      try {
-        const updatePromises = moved.map(async (item) => {
-          const newStage = columnIdToStage(item.column);
+            const isProject = item.itemId.startsWith("project-");
+            const isCustomer = item.itemId.startsWith("customer-");
+            const isJob = item.itemId.startsWith("job-");
 
-          const isProject = item.itemId.startsWith("project-");
-          const isCustomer = item.itemId.startsWith("customer-");
-          const isJob = item.itemId.startsWith("job-");
+            let entityId;
+            let endpoint;
+            let method;
 
-          let entityId;
-          let endpoint;
-          let method;
+            if (isJob) {
+              entityId = item.itemId.replace("job-", "");
+              endpoint = `jobs/${entityId}/stage`;
+              method = "PATCH";
+            } else if (isProject) {
+              entityId = item.itemId.replace("project-", "");
+              endpoint = `projects/${entityId}`;
+              method = "PUT";
+            } else if (isCustomer) {
+              entityId = item.itemId.replace("customer-", "");
+              endpoint = `customers/${entityId}/stage`;
+              method = "PATCH";
+            } else {
+              throw new Error(`Unknown pipeline item type: ${item.itemId}`);
+            }
 
-          if (isJob) {
-            entityId = item.itemId.replace("job-", "");
-            endpoint = `jobs/${entityId}/stage`; // Updated - relative path
-            method = "PATCH";
-          } else if (isProject) {
-            entityId = item.itemId.replace("project-", "");
-            endpoint = `projects/${entityId}`; // Updated - relative path
-            method = "PUT";
-          } else if (isCustomer) {
-            entityId = item.itemId.replace("customer-", "");
-            endpoint = `customers/${entityId}/stage`; // Updated - relative path
-            method = "PATCH";
-          } else {
-            throw new Error(`Unknown pipeline item type: ${item.itemId}`);
-          }
+            const originalItem = pipelineItems.find((pi) => pi.id === item.itemId);
+            let bodyData: any;
 
-          // Retrieve original item data to send full body for PUT requests (Projects)
-          const originalItem = pipelineItems.find((pi) => pi.id === item.itemId);
-          let bodyData: any;
+            if (isProject) {
+              bodyData = {
+                ...originalItem?.job,
+                project_name: originalItem?.job?.job_name,
+                project_type: originalItem?.job?.job_type,
+                stage: newStage,
+                updated_by: user?.email || "current_user",
+              };
+            } else {
+              bodyData = {
+                stage: newStage,
+                reason: "Moved via Kanban board",
+                updated_by: user?.email || "current_user",
+              };
+            }
 
-          if (isProject) {
-            // For a Project PUT, we must send the whole object (or at least the fields the backend expects).
-            // We use the last known good state from pipelineItems and only change the stage.
-            bodyData = {
-              ...originalItem?.job, // Copy existing Project data fields
-              project_name: originalItem?.job?.job_name,
-              project_type: originalItem?.job?.job_type,
-              stage: newStage, // Update the stage
-              updated_by: user?.email || "current_user",
+            const response = await fetchWithAuth(endpoint, {
+              method: method,
+              body: JSON.stringify(bodyData),
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || `Failed to update ${item.itemType} ${entityId}`);
+            }
+
+            const result = await response.json();
+
+            const auditEntry: AuditLog = {
+              audit_id: `audit-${Date.now()}-${item.itemId}`,
+              entity_type: isCustomer ? "Customer" : isProject ? "Project" : "Job",
+              entity_id: item.itemId,
+              action: "update",
+              changed_by: user?.email || "current_user",
+              changed_at: new Date().toISOString(),
+              change_summary: `Stage changed to ${newStage} via Kanban drag & drop`,
             };
-          } else {
-            // For PATCH (Job/Customer), only send the stage and audit details.
-            bodyData = {
-              stage: newStage,
-              reason: "Moved via Kanban board",
-              updated_by: user?.email || "current_user",
-            };
-          }
+            setAuditLogs((prev) => [auditEntry, ...prev.slice(0, 4)]);
 
-          const response = await fetchWithAuth(endpoint, {
-            // Updated
-            method: method,
-            body: JSON.stringify(bodyData),
+            if (
+              newStage === "Accepted" &&
+              isJob &&
+              (userRole === "Manager" || userRole === "HR" || userRole === "Sales")
+            ) {
+              try {
+                await fetchWithAuth(`invoices`, {
+                  method: "POST",
+                  body: JSON.stringify({
+                    jobId: entityId,
+                    templateId: "default_invoice",
+                  }),
+                });
+              } catch (e) {
+                console.warn("Failed to create invoice automatically:", e);
+              }
+            }
+            
+            return result;
           });
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Failed to update ${item.itemType} ${entityId}`);
-          }
+          await Promise.all(updatePromises);
 
-          const result = await response.json();
+          console.log("✅ API call successful!");
+          
+          // Sync with server
+          await refetchPipelineData();
 
-          const auditEntry: AuditLog = {
-            audit_id: `audit-${Date.now()}-${item.itemId}`,
-            entity_type: isCustomer ? "Customer" : isProject ? "Project" : "Job", // Use correct entity type for audit
-            entity_id: item.itemId,
-            action: "update",
-            changed_by: user?.email || "current_user",
-            changed_at: new Date().toISOString(),
-            change_summary: `Stage changed to ${newStage} via Kanban drag & drop`,
-          };
-          setAuditLogs((prev) => [auditEntry, ...prev.slice(0, 4)]);
-
-          // Automation only runs for actual Job model items
-          if (
-            newStage === "Accepted" &&
-            isJob &&
-            (userRole === "Manager" || userRole === "HR" || userRole === "Sales")
-          ) {
-            try {
-              await fetchWithAuth(`invoices`, {
-                // Updated
-                method: "POST",
-                body: JSON.stringify({
-                  jobId: entityId,
-                  templateId: "default_invoice",
-                }),
-              });
-            } catch (e) {
-              console.warn("Failed to create invoice automatically:", e);
-            }
-          }
-          return result;
-        });
-
-        await Promise.all(updatePromises);
-      } catch (error) {
-        console.error("Failed to update stages:", error);
-        setFeatures(prev);
-        prevFeaturesRef.current = prev;
-        alert(
-          `Failed to update stage: ${error instanceof Error ? error.message : "Unknown error"}. Changes have been reverted.`,
-        );
-      }
-    } else {
-      setFeatures(next);
-      prevFeaturesRef.current = next;
+        } catch (error) {
+          console.error("❌ Failed to update stages:", error);
+          setFeatures(prev);
+          prevFeaturesRef.current = prev;
+          alert(
+            `Failed to update stage: ${error instanceof Error ? error.message : "Unknown error"}. Changes have been reverted.`,
+          );
+        }
+      }, 400); // ✅ Wait 400ms after last drag event
     }
   };
 
   // --- FIX: Updated refetchPipelineData (simplified for single endpoint reliability) ---
   const refetchPipelineData = async () => {
     try {
-      const pipelineResponse = await fetchWithAuth("pipeline"); // Updated
+      const pipelineResponse = await fetchWithAuth("pipeline");
       if (pipelineResponse.ok) {
         const pipelineData = await pipelineResponse.json();
 

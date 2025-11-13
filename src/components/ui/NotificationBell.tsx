@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
 
@@ -25,6 +25,16 @@ type Notification = {
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const { user } = useAuth();
+  const previousCountRef = useRef<number>(0); // Track previous notification count
+  const audioRef = useRef<HTMLAudioElement | null>(null); // Reference to audio element
+
+  // Initialize audio element
+  useEffect(() => {
+    // Create audio element for notification sound
+    // Using a simple notification beep sound from a CDN
+    audioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
+    audioRef.current.volume = 0.5; // Set volume to 50%
+  }, []);
 
   const fetchNotifications = async () => {
     if (user?.role !== "Production") return;
@@ -35,6 +45,21 @@ export function NotificationBell() {
       
       if (response.ok) {
         const data = await response.json();
+        
+        // Check if there are NEW notifications (count increased)
+        if (data.length > previousCountRef.current && previousCountRef.current > 0) {
+          // Play notification sound
+          if (audioRef.current) {
+            audioRef.current.play().catch(error => {
+              console.log('Audio play failed:', error);
+              // Browser might block autoplay, this is expected
+            });
+          }
+        }
+        
+        // Update the previous count
+        previousCountRef.current = data.length;
+        
         setNotifications(data);
       }
     } catch (error) {
@@ -53,7 +78,8 @@ export function NotificationBell() {
         return () => clearInterval(interval);
     } else {
         // Optional: Clear notifications if role changes away from Production
-        setNotifications([]); 
+        setNotifications([]);
+        previousCountRef.current = 0; // Reset count
     }
   }, [user]);
 
@@ -64,6 +90,8 @@ export function NotificationBell() {
         method: 'PATCH',
       });
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      // Update the count when a notification is marked as read
+      previousCountRef.current = Math.max(0, previousCountRef.current - 1);
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
     }
@@ -76,6 +104,7 @@ export function NotificationBell() {
         method: 'PATCH',
       });
       setNotifications([]);
+      previousCountRef.current = 0; // Reset count
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
     }
@@ -91,7 +120,7 @@ export function NotificationBell() {
           {notifications.length > 0 && (
             <Badge 
               variant="destructive" 
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs animate-pulse"
             >
               {notifications.length}
             </Badge>
