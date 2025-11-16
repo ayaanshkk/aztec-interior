@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, Plus, Edit, Trash2, ChevronDown, Filter } from "lucide-react";
+import { Search, Plus, Edit, Trash2, ChevronDown, Filter, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
-import { useAuth } from "@/contexts/AuthContext"; // ✅ Make sure this path is correct
+import { useAuth } from "@/contexts/AuthContext";
 
 // ---------------- Types ----------------
 type JobStage =
@@ -52,6 +52,11 @@ interface Customer {
   created_by: string;
   salesperson?: string;
   project_types?: ProjectType[];
+  form_count?: number;
+  drawing_count?: number;
+  form_document_count?: number;
+  has_drawings?: boolean;
+  has_forms?: boolean;
 }
 
 // ---------------- Utility functions ----------------
@@ -136,38 +141,42 @@ export default function CustomersPage() {
     }
   }, [user, allCustomers]);
 
-  // ---------------- Fetch Customers ----------------
+  // ---------------- Fetch Customers (OPTIMIZED) ----------------
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem("auth_token");
+      const headers: HeadersInit = { Authorization: `Bearer ${token}` };
+      
       const response = await fetch("https://aztec-interiors.onrender.com/customers", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
       });
 
       if (!response.ok) throw new Error("Failed to fetch customers");
 
       const data = await response.json();
       
-      // ✅ Add console log to debug
-      console.log("Raw customer data from API:", data[0]); // Check first customer
-
-      const normalised = data.map((c: any) => {
-        const customer = {
+      // Map the data directly - backend now includes document counts
+      const customersWithDocs = data.map((c: any) => {
+        const customer: Customer = {
           ...c,
           postcode: c.postcode || c.post_code || "",
           salesperson: c.salesperson || "",
           project_types: Array.isArray(c.project_types) ? c.project_types : [],
           stage: c.stage || c.status || "Lead",
+          // Backend now provides these
+          has_drawings: c.has_drawings || c.drawing_count > 0,
+          has_forms: c.has_forms || (c.form_count > 0 || c.form_document_count > 0),
+          form_count: c.form_count || 0,
+          drawing_count: c.drawing_count || 0,
+          form_document_count: c.form_document_count || 0,
         };
-        
-        // ✅ Debug normalized data
-        console.log("Normalized customer:", customer);
         
         return customer;
       });
 
-      setAllCustomers(normalised);
+      console.log("Customers loaded:", customersWithDocs.length);
+      setAllCustomers(customersWithDocs);
     } catch (err) {
       console.error("Error fetching customers:", err);
       setAllCustomers([]);
@@ -250,7 +259,6 @@ export default function CustomersPage() {
             />
           </div>
 
-          {/* ✅ Dropdown menu with single valid trigger child */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
@@ -311,92 +319,108 @@ export default function CustomersPage() {
             </thead>
 
             <tbody className="divide-y divide-gray-200 bg-white">
-              {filteredCustomers.map((customer) => (
-                <tr
-                  key={customer.id}
-                  onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
-                  className="cursor-pointer hover:bg-gray-50"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
-                    {customer.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {customer.phone}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {customer.email || "—"}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{customer.address}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {customer.postcode || "—"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStageColor(
-                        customer.stage
-                      )}`}
-                    >
-                      {customer.stage}
-                    </span>
-                  </td>
+              {filteredCustomers.map((customer) => {
+                // Check if customer has any documents or form submissions
+                const hasFormSubmissions = customer.has_forms || (customer.form_count && customer.form_count > 0);
+                const hasDrawings = customer.has_drawings || (customer.drawing_count && customer.drawing_count > 0);
+                
+                // Customer needs attention if they have NO forms AND NO drawings
+                const needsAttention = !hasFormSubmissions && !hasDrawings;
 
-                  {(user?.role === "Manager" || user?.role === "HR") && (
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {customer.salesperson || "—"}
-                    </td>
-                  )}
-
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {customer.project_types && customer.project_types.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {customer.project_types.map((type, index) => (
-                          <span
-                            key={index}
-                            className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getProjectTypeColor(
-                              type
-                            )}`}
-                          >
-                            {type}
-                          </span>
-                        ))}
+                return (
+                  <tr
+                    key={customer.id}
+                    onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                    className={`cursor-pointer hover:bg-gray-50 ${needsAttention ? 'bg-red-50' : ''}`}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                      <div className="flex items-center space-x-2">
+                        {needsAttention && (
+                          <div title="No drawings or checklists uploaded" className="flex items-center">
+                            <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                          </div>
+                        )}
+                        <span>{customer.name}</span>
                       </div>
-                    ) : (
-                      <span className="text-sm text-gray-500">—</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {customer.phone}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {customer.email || "—"}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{customer.address}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {customer.postcode || "—"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStageColor(
+                          customer.stage
+                        )}`}
+                      >
+                        {customer.stage}
+                      </span>
+                    </td>
+
+                    {(user?.role === "Manager" || user?.role === "HR") && (
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {customer.salesperson || "—"}
+                      </td>
                     )}
-                  </td>
 
-                  {user?.role !== "Staff" && (
-                    <td className="px-6 py-4 text-right whitespace-nowrap">
-                      <div className="flex gap-2 justify-end">
-                        {canEditCustomer(customer) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/dashboard/customers/${customer.id}/edit`);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {canDeleteCustomer(customer) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteCustomer(customer.id);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {customer.project_types && customer.project_types.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {customer.project_types.map((type, index) => (
+                            <span
+                              key={index}
+                              className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getProjectTypeColor(
+                                type
+                              )}`}
+                            >
+                              {type}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-500">—</span>
+                      )}
                     </td>
-                  )}
-                </tr>
-              ))}
+
+                    {user?.role !== "Staff" && (
+                      <td className="px-6 py-4 text-right whitespace-nowrap">
+                        <div className="flex gap-2 justify-end">
+                          {canEditCustomer(customer) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/dashboard/customers/${customer.id}/edit`);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canDeleteCustomer(customer) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteCustomer(customer.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -417,7 +441,6 @@ export default function CustomersPage() {
         </div>
       ) : null}
 
-      {/* ✅ Safe modal call (renders one root element only) */}
       {showCreateModal && (
         <CreateCustomerModal
           isOpen={showCreateModal}

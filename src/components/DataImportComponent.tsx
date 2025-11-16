@@ -100,11 +100,48 @@ export default function DataImportComponent({ onImportComplete, trigger }: DataI
         body: formData,
       });
 
+      // --- IMPROVED ERROR HANDLING ---
+      // Check the content type of the response
+      const contentType = response.headers.get("content-type");
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Upload failed");
+        // Try to parse error based on content type
+        if (contentType?.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Upload failed");
+        } else {
+          // Server returned HTML (500 error page)
+          const htmlText = await response.text();
+          console.error("Server error response (HTML):", htmlText);
+
+          // Try to extract meaningful error from HTML
+          const tempDiv = document.createElement("div");
+          tempDiv.innerHTML = htmlText;
+          const errorText = tempDiv.textContent || "";
+
+          // Look for common error patterns
+          let errorMessage = "Server error occurred";
+          if (errorText.includes("AttributeError")) {
+            errorMessage = "Server configuration error. Please contact support.";
+          } else if (errorText.includes("ImportError") || errorText.includes("ModuleNotFoundError")) {
+            errorMessage = "Server dependency error. Please contact support.";
+          } else if (errorText.includes("FileNotFoundError")) {
+            errorMessage = "Upload directory not found. Please contact support.";
+          } else if (errorText.includes("PermissionError")) {
+            errorMessage = "File permission error. Please contact support.";
+          } else if (errorText.length > 0) {
+            // Extract first meaningful line
+            const lines = errorText.split("\n").filter((l) => l.trim().length > 0);
+            if (lines.length > 0) {
+              errorMessage = lines[0].substring(0, 200);
+            }
+          }
+
+          throw new Error(errorMessage);
+        }
       }
 
+      // Success - parse JSON response
       const result = await response.json();
 
       // Start polling for status
@@ -127,8 +164,16 @@ export default function DataImportComponent({ onImportComplete, trigger }: DataI
         },
       });
 
+      // --- IMPROVED ERROR HANDLING ---
+      const contentType = response.headers.get("content-type");
+
       if (!response.ok) {
-        throw new Error("Failed to get import status");
+        if (contentType?.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to get import status");
+        } else {
+          throw new Error("Failed to get import status (server error)");
+        }
       }
 
       const status: ImportStatus = await response.json();

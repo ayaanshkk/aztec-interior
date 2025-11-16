@@ -1792,7 +1792,25 @@ const handleConfirmDeleteFormDocument = async () => {
     );
   };
 
+  const handleViewChecklist = (submission: FormSubmission) => {
+    const formType = getFormType(submission);
+    // For checklists (bedroom/kitchen), open in new tab
+    if (formType === "bedroom" || formType === "kitchen") {
+      const viewUrl = `/streemlyne/checklist-view?id=${submission.id}`;
+      window.open(viewUrl, "_blank");
+    } else {
+      // For other forms, open in dialog
+      setSelectedForm(submission);
+      setIsEditingForm(false);
+      setShowFormDialog(true);
+      setFormType(formType);
+    }
+  };
+
   const renderFormSubmission = (submission: FormSubmission) => {
+    const formType = getFormType(submission);
+    const isChecklist = formType === "bedroom" || formType === "kitchen";
+    
     return (
       <div className="flex items-center justify-between rounded-lg border bg-gray-50 p-4 transition hover:bg-gray-100">
         <div className="flex flex-col">
@@ -1803,19 +1821,13 @@ const handleConfirmDeleteFormDocument = async () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              setSelectedForm(submission);
-              setIsEditingForm(false);
-              setShowFormDialog(true);
-              setFormType(getFormType(submission));
-            }}
+            onClick={() => handleViewChecklist(submission)}
             className="flex items-center space-x-1"
           >
             <Eye className="h-4 w-4" />
-            <span>View</span>
+            <span>View{isChecklist ? " Checklist" : ""}</span>  {/* ← CHANGED: Dynamic text */}
           </Button>
           
-          {/* ADD EDIT BUTTON */}
           {canEditForm(submission) && (
             <Button
               variant="outline"

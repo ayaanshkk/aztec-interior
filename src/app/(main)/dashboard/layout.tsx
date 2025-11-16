@@ -2,9 +2,7 @@ import { ReactNode } from "react";
 import { cookies } from "next/headers";
 
 import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
-import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { cn } from "@/lib/utils";
 import { getPreference } from "@/server/server-actions";
 import {
@@ -16,15 +14,14 @@ import {
   type ContentLayout,
 } from "@/types/preferences/layout";
 
-import { AccountSwitcher } from "./_components/sidebar/account-switcher";
-import { LayoutControls } from "./_components/sidebar/layout-controls";
-// import { SearchDialog } from "./_components/sidebar/search-dialog";
-import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
+import { AccountSwitcher } from "@/app/(main)/dashboard/_components/sidebar/account-switcher";
+import { LayoutControls } from "@/app/(main)/dashboard/_components/sidebar/layout-controls";
+import { ThemeSwitcher } from "@/app/(main)/dashboard/_components/sidebar/theme-switcher";
 
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/contexts/ProtectedRoute";
 
-export default async function Layout({ children }: Readonly<{ children: ReactNode }>) {
+export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value === "true";
 
@@ -56,8 +53,6 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
               <div className="flex w-full items-center justify-between px-4 lg:px-6">
                 <div className="flex items-center gap-1 lg:gap-2">
                   <SidebarTrigger className="-ml-1" />
-                  {/* <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
-                  <SearchDialog /> */}
                 </div>
                 <div className="flex items-center gap-2">
                   <LayoutControls {...layoutPreferences} />
