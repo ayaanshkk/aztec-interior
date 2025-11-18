@@ -1,218 +1,214 @@
-"use client";
+// 1. CENTRALIZED BASE CONFIGURATION
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://aztec-interiors.onrender.com";
+// const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { fetchPublic, fetchWithAuth } from "@/lib/api";
+// Auth uses Next.js API routes
+const AUTH_API_ROOT = `${BASE_PATH}/api`;
 
-interface User {
-  name: any;
-  id: number;
-  email: string;
-  first_name: string;
-  last_name: string;
-  full_name: string;
-  phone?: string;
-  role: string;
-  department?: string;
-  is_active: boolean;
-  is_verified: boolean;
-  created_at: string;
-  last_login?: string;
+// Data uses external backend
+const DATA_API_ROOT = BACKEND_URL;
+
+// 🔍 DEBUG: Log the configuration
+if (typeof window !== 'undefined') {
+  console.log('🌐 API Configuration:', {
+    BASE_PATH,
+    AUTH_API_ROOT,
+    DATA_API_ROOT,
+  });
 }
 
-interface RegisterData {
-  email: string;
-  password: string;
-  first_name: string;
-  last_name: string;
-  phone?: string;
-  department?: string;
-  role: string;
-}
-
-interface AuthContextType {
-  user: User | null;
-  token: string | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
-  register: (userData: RegisterData) => Promise<{ success: boolean; error?: string }>;
-  updateUser: (userData: Partial<User>) => void;
-  checkAuth: () => Promise<boolean>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+// ✅ Helper function to redirect to login with basePath support
+function redirectToLogin() {
+  if (typeof window !== 'undefined') {
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+    window.location.href = `${basePath}/login`;
   }
-  return context;
-};
+}
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+// ✅ Helper to add timeout to fetch calls
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 5000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+}
 
-  const clearAuth = useCallback(() => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_user");
-  }, []);
+/**
+ * Helper function for PUBLIC API calls (no authentication required)
+ * Used for login/register - calls Next.js API routes
+ */
+export async function fetchPublic(path: string, options: RequestInit = {}) {
+  const url = `${AUTH_API_ROOT}${path.startsWith("/") ? "" : "/"}${path}`;
 
-  // ✅ Initialize auth state from localStorage
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const storedToken = localStorage.getItem("auth_token");
-        const storedUser = localStorage.getItem("auth_user");
+  console.log('📡 fetchPublic calling:', url);
 
-        console.log("Initializing auth...", { hasToken: !!storedToken, hasUser: !!storedUser });
+  const headers = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
 
-        if (storedToken && storedUser) {
-          setToken(storedToken);
-          setUser(JSON.parse(storedUser));
-          console.log("Auth state restored from localStorage");
-        }
-      } catch (error) {
-        console.error("Error initializing auth:", error);
-        clearAuth();
-      } finally {
-        console.log("Auth initialization complete");
-        setLoading(false);
-      }
-    };
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
 
-    initAuth();
-  }, [clearAuth]);
+  return response;
+}
 
-  // ✅ LOGIN - No redirects, just sets user/token
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+/**
+ * Helper function to make authenticated API calls
+ * Used for data endpoints - calls external Render backend
+ */
+export async function fetchWithAuth(path: string, options: RequestInit = {}) {
+  const token = localStorage.getItem("auth_token");
+
+  const url = `${DATA_API_ROOT}${path.startsWith("/") ? "" : "/"}${path}`;
+
+  console.log('📡 fetchWithAuth calling:', url);
+
+  if (!token) {
+    console.error("No auth token found");
+    redirectToLogin();
+    throw new Error("Not authenticated");
+  }
+
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+    ...options.headers,
+  };
+
+  try {
+    // ✅ Add 5-second timeout
+    const response = await fetchWithTimeout(url, {
+      ...options,
+      headers,
+    }, 5000);
+
+    // ✅ DON'T logout on 401 - mock auth setup
+    if (response.status === 401) {
+      console.warn("⚠️ Got 401 from backend - continuing with mock auth");
+      // Don't clear localStorage or redirect - let user stay logged in
+    }
+
+    return response;
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.error("⏱️ Request timeout - backend not responding");
+      throw new Error("Request timeout");
+    }
+    throw error;
+  }
+}
+
+// ✅ Helper to handle API responses gracefully
+async function handleApiResponse(response: Response) {
+  // For 401s, return empty data instead of throwing
+  if (response.status === 401) {
+    console.warn("⚠️ 401 response - returning empty data for mock auth");
+    return { data: [], error: "Backend authentication in progress" };
+  }
+
+  if (response.ok) {
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return response.json();
+    } else {
+      return { success: true };
+    }
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "API error");
+  } else {
+    const errorText = await response.text();
+    console.error("Non-JSON response:", errorText);
+    throw new Error(`API failed with status ${response.status}`);
+  }
+}
+
+// Example usage functions
+export const api = {
+  // AUTH ENDPOINTS (use fetchPublic - calls Next.js API routes)
+  async login(email: string, password: string) {
+    const response = await fetchPublic("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    return handleApiResponse(response);
+  },
+
+  async register(userData: {
+    email: string;
+    password: string;
+    first_name: string;
+    last_name: string;
+    role?: string;
+  }) {
+    const response = await fetchPublic("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(userData),
+    });
+    return handleApiResponse(response);
+  },
+
+  // DATA ENDPOINTS (use fetchWithAuth - calls Render backend)
+  async getCustomers() {
     try {
-      console.log("🔄 Attempting login...");
-
-      const response = await fetchPublic("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      });
-
-      let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        console.error("Failed to parse JSON response:", e);
-        return { success: false, error: "Server returned an invalid response (not JSON)." };
-      }
-
-      console.log("📡 Login response:", { status: response.status, data });
-
-      if (response.ok) {
-        console.log("✅ Login successful, setting auth state...");
-        setToken(data.token);
-        setUser(data.user);
-
-        localStorage.setItem("auth_token", data.token);
-        localStorage.setItem("auth_user", JSON.stringify(data.user));
-
-        console.log("💾 Auth state saved to localStorage");
-
-        // ⚠️ No redirect — stays on current page
-        return { success: true };
-      } else {
-        console.log("❌ Login failed:", data.error);
-        return { success: false, error: data.error || "Login failed" };
-      }
+      const response = await fetchWithAuth("/customers");
+      return await handleApiResponse(response);
     } catch (error) {
-      console.error("🚨 Login network/fetch error:", error);
-      return { success: false, error: "Cannot connect to server. Please ensure the backend is running." };
+      console.warn("⚠️ getCustomers failed, returning empty data");
+      return { customers: [] };
     }
-  };
+  },
 
-  // ✅ REGISTER - No redirects
-  const register = async (userData: RegisterData): Promise<{ success: boolean; error?: string }> => {
+  async getJobs() {
     try {
-      console.log("🔄 Attempting registration...");
-
-      const response = await fetchPublic("/auth/register", {
-        method: "POST",
-        body: JSON.stringify(userData),
-      });
-
-      let data;
-      try {
-        data = await response.json();
-      } catch (e) {
-        console.error("Failed to parse JSON response:", e);
-        return { success: false, error: "Server returned an invalid response (not JSON)." };
-      }
-
-      console.log("📡 Registration response:", { status: response.status, data });
-
-      if (response.ok) {
-        console.log("✅ Registration successful");
-        return { success: true };
-      } else {
-        console.log("❌ Registration failed:", data.error);
-        return { success: false, error: data.error || "Registration failed" };
-      }
+      const response = await fetchWithAuth("/jobs");
+      return await handleApiResponse(response);
     } catch (error) {
-      console.error("🚨 Registration network error:", error);
-      return { success: false, error: "Cannot connect to server. Please try again." };
+      console.warn("⚠️ getJobs failed, returning empty data");
+      return { jobs: [] };
     }
-  };
+  },
 
-  // ✅ LOGOUT - Only redirect when explicitly logging out
-  const logout = async () => {
-    console.log("Logging out...");
-    clearAuth();
-    router.replace("/login");
-  };
-
-  // ✅ AUTH CHECK - No redirects on failure
-  const checkAuth = async (): Promise<boolean> => {
-    if (!token) return false;
-
+  async getPipeline() {
     try {
-      const response = await fetchWithAuth("/auth/me");
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-        localStorage.setItem("auth_user", JSON.stringify(data.user));
-        return true;
-      } else {
-        clearAuth();
-        return false;
-      }
+      const response = await fetchWithAuth("/pipeline");
+      return await handleApiResponse(response);
     } catch (error) {
-      console.error("Auth check network error:", error);
-      clearAuth();
-      return false;
+      console.warn("⚠️ getPipeline failed, returning empty data");
+      return { pipeline: [] };
     }
-  };
+  },
 
-  const updateUser = (userData: Partial<User>) => {
-    if (user) {
-      const updatedUser = { ...user, ...userData };
-      setUser(updatedUser);
-      localStorage.setItem("auth_user", JSON.stringify(updatedUser));
-    }
-  };
+  async updateCustomerStage(customerId: string, stage: string, reason: string, updatedBy: string) {
+    const response = await fetchWithAuth(`/customers/${customerId}/stage`, {
+      method: "PATCH",
+      body: JSON.stringify({ stage, reason, updated_by: updatedBy }),
+    });
+    return handleApiResponse(response);
+  },
 
-  const value = {
-    user,
-    token,
-    loading,
-    login,
-    logout,
-    register,
-    updateUser,
-    checkAuth,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  async updateJobStage(jobId: string, stage: string, reason: string, updatedBy: string) {
+    const response = await fetchWithAuth(`/jobs/${jobId}/stage`, {
+      method: "PATCH",
+      body: JSON.stringify({ stage, reason, updated_by: updatedBy }),
+    });
+    return handleApiResponse(response);
+  },
 };
