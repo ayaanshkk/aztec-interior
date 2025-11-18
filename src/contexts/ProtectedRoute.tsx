@@ -22,10 +22,12 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
       // Wait for AuthContext to finish loading
       if (!user || !token) {
         console.log("No auth, redirecting to login");
-        router.replace("/login");
+        // ✅ FIXED: Correct path to match middleware
+        router.replace("/auth/login");
         return;
       }
 
+      // Role-based access control (middleware doesn't handle this)
       if (requiredRole && user.role !== requiredRole) {
         console.log("Insufficient role, redirecting to unauthorized");
         router.replace("/unauthorized");
