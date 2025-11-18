@@ -3,8 +3,8 @@ const nextConfig = {
   // ====================================================
   // SUBDIRECTORY DEPLOYMENT
   // ====================================================
-  basePath: '/streemlyne',
-  assetPrefix: '/streemlyne/',
+  // basePath: '/streemlyne',
+  // assetPrefix: '/streemlyne/',
   trailingSlash: true,
   
   // ====================================================

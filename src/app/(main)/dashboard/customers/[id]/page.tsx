@@ -1013,11 +1013,11 @@ const handleConfirmDeleteFormDocument = async () => {
 
   // --- NEW PERMISSIVE FUNCTION (For Project Creation/Editing) ---
   const canManageProjects = (): boolean => {
-    if (!user) return false;
+    if (!user || !user.role) return false;
     
     // Allow Manager, HR, Production, and Sales to manage projects
     const allowedRoles = ['Manager', 'HR', 'Production', 'Sales'];
-    return allowedRoles.includes(user.role);
+    return allowedRoles.some(role => role.toLowerCase() === user.role.toLowerCase());
   };
 
   // -------------------------------------------------------------
