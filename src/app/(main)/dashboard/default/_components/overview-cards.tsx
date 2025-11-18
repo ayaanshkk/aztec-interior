@@ -26,7 +26,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { formatCurrency, cn } from "@/lib/utils";
 
 import {
-  leadsChartData, // Using dummy data for the small bar chart
+  leadsChartData,
   leadsChartConfig,
   proposalsChartData,
   proposalsChartConfig,
@@ -34,14 +34,11 @@ import {
   revenueChartConfig,
   leadsBySourceChartData,
   leadsBySourceChartConfig,
-  // salesPipelineChartData, // We will now fetch this
   salesPipelineChartConfig,
-  // actionItems, // We will now fetch this
 } from "./crm.config";
 
 // --- Define Types for Fetched Data ---
 
-// Simplified type for pipeline items
 interface PipelineItem {
   id: string;
   type: "customer" | "job";
@@ -56,16 +53,14 @@ interface PipelineItem {
   };
 }
 
-// Type for Assignment (Action Item)
 interface AssignmentItem {
   id: string;
   title: string;
   priority: "High" | "Medium" | "Low" | string;
-  date: string; // ISO date string
+  date: string;
   status: "Scheduled" | "Complete" | string;
 }
 
-// Type for our processed action item
 interface ActionItem {
   id: string;
   title: string;
@@ -74,7 +69,6 @@ interface ActionItem {
   checked: boolean;
 }
 
-// Type for our processed pipeline data
 interface PipelineStage {
   stage: string;
   value: number;
@@ -85,8 +79,15 @@ export function OverviewCards() {
   const [newLeadsCount, setNewLeadsCount] = useState(0);
   const [pipelineData, setPipelineData] = useState<PipelineStage[]>([]);
   const [userActionItems, setUserActionItems] = useState<ActionItem[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   const totalLeads = leadsBySourceChartData.reduce((acc, curr) => acc + curr.leads, 0);
+
+  // Get user role
+  useEffect(() => {
+    const role = localStorage.getItem("user_role");
+    setUserRole(role);
+  }, []);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -99,7 +100,6 @@ export function OverviewCards() {
       const headers = { Authorization: `Bearer ${token}` };
 
       try {
-        // Fetch both pipeline and assignments data in parallel
         const [pipelineRes, assignmentsRes] = await Promise.all([
           fetch("https://aztec-interiors.onrender.com/pipeline", { headers }),
           fetch("https://aztec-interiors.onrender.com/assignments", { headers }),
@@ -114,7 +114,6 @@ export function OverviewCards() {
         // --- 1. Process New Leads (Last 30 Days) ---
         const thirtyDaysAgo = subDays(new Date(), 30);
         const newLeads = pipelineItems.filter((item) => {
-          // We only count new customers, not new jobs for existing customers
           return item.type === "customer" && new Date(item.customer.created_at) >= thirtyDaysAgo;
         });
         setNewLeadsCount(newLeads.length);
@@ -130,14 +129,12 @@ export function OverviewCards() {
         };
 
         pipelineItems.forEach((item) => {
-          // Use job stage if it exists, otherwise fall back to customer stage
           const stage = item.job?.stage || item.customer.stage;
           if (stage in stageCounts) {
             stageCounts[stage]++;
           }
         });
 
-        // Map counts to funnel chart data format
         const newPipelineData = requiredStages.map((stage) => ({
           stage: stage,
           value: stageCounts[stage],
@@ -171,41 +168,40 @@ export function OverviewCards() {
 
   return (
     <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs sm:grid-cols-2 lg:grid-cols-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>New Leads</CardTitle>
-          <CardDescription>Last 30 Days</CardDescription>
-        </CardHeader>
-        <CardContent className="size-full">
-          {/* This chart remains based on dummy data as requested */}
-          <ChartContainer className="size-full min-h-24" config={leadsChartConfig}>
-            <BarChart accessibilityLayer data={leadsChartData} barSize={8}>
-              <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} hide />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar
-                background={{ fill: "var(--color-background)", radius: 4, opacity: 0.07 }}
-                dataKey="newLeads"
-                stackId="a"
-                fill="var(--color-newLeads)"
-                radius={[0, 0, 0, 0]}
-              />
-              <Bar dataKey="disqualified" stackId="a" fill="var(--color-disqualified)" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ChartContainer>
-        </CardContent>
-        <CardFooter className="flex items-center justify-between">
-          {/* Dynamic Count */}
-          <span className="text-xl font-semibold tabular-nums">{newLeadsCount}</span>
-          {/* Percentage removed as it requires more complex historical data */}
-        </CardFooter>
-      </Card>
+      {/* Hide New Leads card for Production users */}
+      {userRole !== "Production" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>New Leads</CardTitle>
+            <CardDescription>Last 30 Days</CardDescription>
+          </CardHeader>
+          <CardContent className="size-full">
+            <ChartContainer className="size-full min-h-24" config={leadsChartConfig}>
+              <BarChart accessibilityLayer data={leadsChartData} barSize={8}>
+                <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} hide />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar
+                  background={{ fill: "var(--color-background)", radius: 4, opacity: 0.07 }}
+                  dataKey="newLeads"
+                  stackId="a"
+                  fill="var(--color-newLeads)"
+                  radius={[0, 0, 0, 0]}
+                />
+                <Bar dataKey="disqualified" stackId="a" fill="var(--color-disqualified)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+          <CardFooter className="flex items-center justify-between">
+            <span className="text-xl font-semibold tabular-nums">{newLeadsCount}</span>
+          </CardFooter>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
           <CardTitle>Sales Pipeline</CardTitle>
         </CardHeader>
         <CardContent className="size-full">
-          {/* Dynamic Funnel Chart */}
           <ChartContainer config={salesPipelineChartConfig} className="size-full">
             <FunnelChart margin={{ left: 0, right: 0, top: 0, bottom: 0 }}>
               <Funnel className="stroke-card stroke-2" dataKey="value" data={pipelineData}>
@@ -225,7 +221,6 @@ export function OverviewCards() {
           <CardTitle>Action Items</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Dynamic Action Items List */}
           <ul className="space-y-2">
             {userActionItems.length > 0 ? (
               userActionItems.map((item) => (
@@ -257,83 +252,85 @@ export function OverviewCards() {
         </CardContent>
       </Card>
 
-      <Card className="lg:col-span-1">
-        <CardHeader>
-          <CardTitle>Leads by Source</CardTitle>
-        </CardHeader>
-        <CardContent className="max-h-40">
-          {/* This chart remains based on dummy data as requested */}
-          <ChartContainer config={leadsBySourceChartConfig} className="size-full">
-            <PieChart
-              className="m-0"
-              margin={{
-                top: 0,
-                right: 0,
-                left: 0,
-                bottom: 0,
-              }}
-            >
-              <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-              <Pie
-                data={leadsBySourceChartData}
-                dataKey="leads"
-                nameKey="source"
-                innerRadius={35}
-                outerRadius={55}
-                paddingAngle={2}
-                cornerRadius={4}
+      {/* Hide Leads by Source card for Production users */}
+      {userRole !== "Production" && (
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Leads by Source</CardTitle>
+          </CardHeader>
+          <CardContent className="max-h-40">
+            <ChartContainer config={leadsBySourceChartConfig} className="size-full">
+              <PieChart
+                className="m-0"
+                margin={{
+                  top: 0,
+                  right: 0,
+                  left: 0,
+                  bottom: 0,
+                }}
               >
-                <Label
-                  content={({ viewBox }) => {
-                    if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                      return (
-                        <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                          <tspan
-                            x={viewBox.cx}
-                            y={viewBox.cy}
-                            className="fill-foreground text-lg font-bold tabular-nums"
-                          >
-                            {totalLeads.toLocaleString()}
-                          </tspan>
-                          <tspan x={viewBox.cx} y={(viewBox.cy ?? 0) + 16} className="fill-muted-foreground text-xs">
-                            Leads
-                          </tspan>
-                        </text>
-                      );
-                    }
-                  }}
+                <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                <Pie
+                  data={leadsBySourceChartData}
+                  dataKey="leads"
+                  nameKey="source"
+                  innerRadius={35}
+                  outerRadius={55}
+                  paddingAngle={2}
+                  cornerRadius={4}
+                >
+                  <Label
+                    content={({ viewBox }) => {
+                      if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                        return (
+                          <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                            <tspan
+                              x={viewBox.cx}
+                              y={viewBox.cy}
+                              className="fill-foreground text-lg font-bold tabular-nums"
+                            >
+                              {totalLeads.toLocaleString()}
+                            </tspan>
+                            <tspan x={viewBox.cx} y={(viewBox.cy ?? 0) + 16} className="fill-muted-foreground text-xs">
+                              Leads
+                            </tspan>
+                          </text>
+                        );
+                      }
+                    }}
+                  />
+                </Pie>
+                <ChartLegend
+                  layout="vertical"
+                  verticalAlign="middle"
+                  align="right"
+                  content={() => (
+                    <ul className="ml-4 flex flex-col gap-1.5">
+                      {leadsBySourceChartData.map((item) => (
+                        <li key={item.source} className="flex w-24 items-center justify-between">
+                          <span className="flex items-center gap-1.5 capitalize">
+                            <span className="size-2 rounded-full" style={{ background: item.fill }} />
+                            <span className="text-xs">{leadsBySourceChartConfig[item.source].label}</span>
+                          </span>
+                          <span className="text-xs tabular-nums">{item.leads}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 />
-              </Pie>
-              <ChartLegend
-                layout="vertical"
-                verticalAlign="middle"
-                align="right"
-                content={() => (
-                  <ul className="ml-4 flex flex-col gap-1.5">
-                    {leadsBySourceChartData.map((item) => (
-                      <li key={item.source} className="flex w-24 items-center justify-between">
-                        <span className="flex items-center gap-1.5 capitalize">
-                          <span className="size-2 rounded-full" style={{ background: item.fill }} />
-                          <span className="text-xs">{leadsBySourceChartConfig[item.source].label}</span>
-                        </span>
-                        <span className="text-xs tabular-nums">{item.leads}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              />
-            </PieChart>
-          </ChartContainer>
-        </CardContent>
-        <CardFooter className="gap-1">
-          <Button size="sm" variant="outline" className="basis-1/2 text-xs">
-            Report
-          </Button>
-          <Button size="sm" variant="outline" className="basis-1/2 text-xs">
-            Export
-          </Button>
-        </CardFooter>
-      </Card>
+              </PieChart>
+            </ChartContainer>
+          </CardContent>
+          <CardFooter className="gap-1">
+            <Button size="sm" variant="outline" className="basis-1/2 text-xs">
+              Report
+            </Button>
+            <Button size="sm" variant="outline" className="basis-1/2 text-xs">
+              Export
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
     </div>
   );
 }

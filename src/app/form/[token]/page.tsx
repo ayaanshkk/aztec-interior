@@ -59,7 +59,9 @@ interface FormData {
   appliances_customer_owned: string;
   sink_tap_customer_owned: string;
   sink_details: string;
+  sink_model: string;
   tap_details: string;
+  tap_model: string;
   other_appliances: string;
   appliances: Appliance[];
   terms_date: string;
@@ -136,9 +138,12 @@ export default function FormPage() {
     appliances_customer_owned: "",
     sink_tap_customer_owned: "",
     sink_details: "",
+    sink_model: "",
     tap_details: "",
+    tap_model: "",
     other_appliances: "",
     appliances: [
+      { make: "", model: "", order_date: "" },
       { make: "", model: "", order_date: "" },
       { make: "", model: "", order_date: "" },
       { make: "", model: "", order_date: "" },
@@ -358,7 +363,9 @@ export default function FormPage() {
 
       if (formData.sink_tap_customer_owned) {
         if (!formData.sink_details?.trim()) errors.push("Sink Details");
+        if (!formData.sink_model?.trim()) errors.push("Sink Model Code");
         if (!formData.tap_details?.trim()) errors.push("Tap Details");
+        if (!formData.tap_model?.trim()) errors.push("Tap Model Code");
       }
     }
 
@@ -494,7 +501,7 @@ export default function FormPage() {
   const showOrderDate = formData.appliances_customer_owned === "no";
   const standardApplianceGridTemplate = showOrderDate ? "grid-cols-[1fr_1fr_1fr]" : "grid-cols-[1fr_1fr]";
   const integUnitGridTemplate = showOrderDate ? "grid-cols-[0.5fr_1fr_1fr_1fr]" : "grid-cols-[0.5fr_1fr_1fr]";
-  const standardAppliances = ["Oven", "Microwave", "Washing Machine", "HOB", "Extractor", "INTG Dishwasher"];
+  const standardAppliances = ["Oven", "Microwave", "Washing Machine", "Dryer", "HOB", "Extractor", "INTG Dishwasher"];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1185,22 +1192,34 @@ export default function FormPage() {
 
                 {!!formData.sink_tap_customer_owned && (
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
+                    <div className="space-y-2">
                       <label className="mb-1 block text-sm font-medium text-gray-700">Sink Details</label>
                       <Input
-                        placeholder="Sink details (e.g., Make/Model/Size)"
+                        placeholder="Sink details (e.g., Make/Size)"
                         className="w-full"
                         value={formData.sink_details}
                         onChange={(e) => handleInputChange("sink_details", e.target.value)}
                       />
+                      <Input
+                        placeholder="Sink model code"
+                        className="w-full"
+                        value={formData.sink_model}
+                        onChange={(e) => handleInputChange("sink_model", e.target.value)}
+                      />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <label className="mb-1 block text-sm font-medium text-gray-700">Tap Details</label>
                       <Input
-                        placeholder="Tap details (e.g., Make/Model)"
+                        placeholder="Tap details (e.g., Make)"
                         className="w-full"
                         value={formData.tap_details}
                         onChange={(e) => handleInputChange("tap_details", e.target.value)}
+                      />
+                      <Input
+                        placeholder="Tap model code"
+                        className="w-full"
+                        value={formData.tap_model}
+                        onChange={(e) => handleInputChange("tap_model", e.target.value)}
                       />
                     </div>
                   </div>

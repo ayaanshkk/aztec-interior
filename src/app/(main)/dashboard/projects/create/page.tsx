@@ -24,7 +24,7 @@ const JOB_STAGES = [
   "Design",
   "Quoted",
   "Accepted",
-  "OnHold",
+  "Rejected",
   "Production",
   "Delivery",
   "Installation",

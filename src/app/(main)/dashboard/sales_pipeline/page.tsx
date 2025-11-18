@@ -38,6 +38,7 @@ import {
   AlertCircle,
   Filter,
   Lock,
+  FolderOpen,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format, addDays, isWithinInterval } from "date-fns";
@@ -54,7 +55,7 @@ const STAGES = [
   "Design",
   "Quote",
   "Accepted",
-  "OnHold",
+  "Rejected",
   "Ordered",
   "Production",
   "Delivery",
@@ -72,7 +73,7 @@ const stageColors: Record<Stage, string> = {
   Design: "#10B981",
   Quote: "#3B82F6",
   Accepted: "#059669",
-  OnHold: "#6D28D9",
+  Rejected: "#6D28D9",
   Ordered: "#9333EA",
   Production: "#D97706",
   Delivery: "#0284C7",
@@ -138,7 +139,7 @@ const ROLE_PERMISSIONS: Record<UserRole, any> = {
 
 const PRODUCTION_STAGES: Stage[] = [
   "Accepted",
-  "OnHold",
+  "Rejected",
   "Ordered",
   "Production",
   "Delivery",
@@ -218,6 +219,7 @@ type PipelineItem = {
   measureDate?: string | null;
   deliveryDate?: string | null;
   salesperson?: string | null;
+   project_count?: number; 
 };
 
 type AuditLog = {
@@ -295,10 +297,10 @@ export default function EnhancedPipelinePage() {
   // MODIFICATION 3: Filter visible stages/columns based on user role
   const visibleStages: Stage[] = useMemo(() => {
     if (userRole === "Production") {
-      // Production: Accepted, OnHold, Ordered, Production, Delivery, Installation, Complete, Remedial
+      // Production: Accepted, Rejected, Ordered, Production, Delivery, Installation, Complete, Remedial
       const allowedProductionStages: Stage[] = [
         "Accepted", 
-        "OnHold", 
+        "Rejected", 
         "Ordered", 
         "Production", 
         "Delivery", 
@@ -310,8 +312,8 @@ export default function EnhancedPipelinePage() {
     }
     // NEW MODIFICATION: Sales role logic
     if (userRole === "Sales") {
-      const salesLimitStage = "OnHold";
-      // Find the index of "OnHold" and take all stages up to and including it.
+      const salesLimitStage = "Rejected";
+      // Find the index of "Rejected" and take all stages up to and including it.
       const salesLimitIndex = STAGES.indexOf(salesLimitStage);
       // slice will return all elements from index 0 up to (and including) salesLimitIndex.
       return STAGES.slice(0, salesLimitIndex + 1); 
@@ -353,8 +355,8 @@ export default function EnhancedPipelinePage() {
         standardItemSalesperson === standardUserEmail || standardItemSalesperson === standardUserName;
       const isCreator = standardItemCreator === standardUserEmail || standardItemCreator === standardUserName;
 
-      // Restrict Sales to stages up to OnHold
-      const salesVisibleStages: Stage[] = ["Lead", "Survey", "Design", "Quote", "Accepted", "OnHold"];
+      // Restrict Sales to stages up to Rejected
+      const salesVisibleStages: Stage[] = ["Lead", "Survey", "Design", "Quote", "Accepted", "Rejected"];
       const isInSalesStage = salesVisibleStages.includes(item.stage);
 
       return (isAssignedSalesperson || isCreator) && isInSalesStage;
@@ -428,6 +430,7 @@ export default function EnhancedPipelinePage() {
         measureDate: item.measureDate,
         deliveryDate: item.deliveryDate,
         salesperson: item.salesperson,
+        project_count: item.project_count || 0,
       };
     });
   };
@@ -523,9 +526,10 @@ export default function EnhancedPipelinePage() {
             pipelineItemsRetrieved = rawPipelineData.map((item: any) => {
               const isProjectItem = item.id.startsWith("project-");
 
-              // CRITICAL FIX: Prioritize the item's job/project stage over the customer's stage
-              const primaryStage =
-                item.type === "customer" ? item.customer.stage : item.job?.stage || item.customer.stage;
+              // ✅ NEW: Use most advanced stage from backend
+              const primaryStage = item.type === "customer" 
+                ? item.stage  // Customer's most advanced stage
+                : item.job?.stage || item.stage || "Lead";
 
               const validStage = STAGES.includes(primaryStage) ? primaryStage : ("Lead" as Stage);
 
@@ -544,6 +548,8 @@ export default function EnhancedPipelinePage() {
                   type: "customer" as const,
                   reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
                   jobType: item.customer.project_types?.join(", "),
+                  // ✅ NEW: Add project count
+                  project_count: item.project_count || 0,
                 };
               } else {
                 const jobStage = item.job?.stage
@@ -552,17 +558,17 @@ export default function EnhancedPipelinePage() {
                     : "Lead"
                   : validStage;
 
-                // CRITICAL FIX: Correctly extract name and reference for Project vs Job
                 const jobReference = isProjectItem
                   ? item.job.job_reference || `PROJ-${item.job.id.slice(-4).toUpperCase()}`
                   : item.job.job_reference || `JOB-${item.job.id.slice(-4).toUpperCase()}`;
 
-                // CRITICAL FIX: Generate unique name for Project items
-                const jobName = isProjectItem ? `${item.customer.name} - ${item.job.job_name}` : item.customer.name;
+                const jobName = isProjectItem 
+                  ? `${item.customer.name} - ${item.job.job_name}` 
+                  : item.customer.name;
 
                 return {
                   ...commonItem,
-                  type: isProjectItem ? ("project" as const) : ("job" as const), // Use 'project' type
+                  type: isProjectItem ? ("project" as const) : ("job" as const),
                   job: item.job,
                   name: jobName,
                   reference: jobReference,
@@ -631,152 +637,311 @@ export default function EnhancedPipelinePage() {
   }, [authLoading, token, user]);
 
   // --- FIX: Updated handleDataChange to fix the multi-stage drag-and-refresh issue (using PATCH consistently) ---
+  // const handleDataChange = async (next: any[]) => {
+  //   console.log("🎯 DRAG DETECTED");
+    
+  //   if (!permissions.canDragDrop) {
+  //     alert("You don't have permission to move items in the pipeline.");
+  //     return;
+  //   }
+
+  //   const prev = prevFeaturesRef.current;
+  //   const moved = next.filter((n) => {
+  //     const p = prev.find((x) => x.id === n.id);
+  //     return p && p.column !== n.column;
+  //   });
+
+  //   if (moved.length === 0) return;
+
+  //   const previousFeaturesSnapshot = prevFeaturesRef.current;
+  //   const previousPipelineSnapshot = pipelineItems;
+
+  //   // Optimistic update
+  //   const stageUpdates = new Map(
+  //     moved.map((item) => [item.itemId, columnIdToStage(item.column)])
+  //   );
+
+  //   const optimisticallyUpdatedFeatures = features.map((feature) => {
+  //     const newStage = stageUpdates.get(feature.itemId);
+  //     if (!newStage) return feature;
+  //     return { ...feature, column: stageToColumnId(newStage), stage: newStage };
+  //   });
+
+  //   setFeatures(optimisticallyUpdatedFeatures);
+  //   prevFeaturesRef.current = optimisticallyUpdatedFeatures;
+
+  //   setPipelineItems((current) =>
+  //     current.map((item) => {
+  //       const newStage = stageUpdates.get(item.id);
+  //       return newStage ? { ...item, stage: newStage } : item;
+  //     })
+  //   );
+
+  //   try {
+  //     const updatePromises = moved.map(async (item) => {
+  //       const newStage = columnIdToStage(item.column);
+        
+  //       const isProject = item.itemId.startsWith("project-");
+  //       const isCustomer = item.itemId.startsWith("customer-");
+  //       const isJob = item.itemId.startsWith("job-");
+
+  //       let entityId: string;
+  //       let endpoint: string;
+
+  //       if (isJob) {
+  //         entityId = item.itemId.replace("job-", "");
+  //         endpoint = `jobs/${entityId}/stage`;
+  //       } else if (isProject) {
+  //         entityId = item.itemId.replace("project-", "");
+  //         endpoint = `projects/${entityId}/stage`;
+  //       } else if (isCustomer) {
+  //         entityId = item.itemId.replace("customer-", "");
+  //         endpoint = `customers/${entityId}/stage`;
+  //       } else {
+  //         throw new Error(`Unknown item type: ${item.itemId}`);
+  //       }
+
+  //       const bodyData = {
+  //         stage: newStage,
+  //         reason: "Moved via Kanban board",
+  //         updated_by: user?.email || "current_user",
+  //       };
+
+  //       console.log(`📤 Updating ${item.itemType} ${entityId} to ${newStage}`);
+
+  //       const response = await fetchWithAuth(endpoint, {
+  //         method: "PATCH",
+  //         body: JSON.stringify(bodyData),
+  //       });
+
+  //       if (!response.ok) {
+  //         const errorText = await response.text();
+  //         throw new Error(`Failed to update ${item.itemType}: ${errorText}`);
+  //       }
+
+  //       const result = await response.json();
+  //       console.log(`✅ Updated successfully:`, result);
+  //       return result;
+  //     });
+
+  //     await Promise.all(updatePromises);
+      
+  //     // ✅ CRITICAL: Force immediate refresh after all updates complete
+  //     console.log("🔄 Forcing immediate data refresh...");
+  //     await refetchPipelineData();
+  //     console.log("✅ Data refreshed successfully");
+
+  //   } catch (error) {
+  //     console.error("❌ DRAG ERROR:", error);
+      
+  //     // Revert optimistic updates
+  //     setFeatures(previousFeaturesSnapshot);
+  //     prevFeaturesRef.current = previousFeaturesSnapshot;
+  //     setPipelineItems(previousPipelineSnapshot);
+      
+  //     alert(`Failed to update: ${error instanceof Error ? error.message : "Unknown error"}`);
+  //   }
+  // };
+
+
   const handleDataChange = async (next: any[]) => {
-    if (!permissions.canDragDrop) {
-      alert("You don't have permission to move items in the pipeline.");
-      return;
-    }
-
-    const prev = prevFeaturesRef.current;
-    const moved = next.filter((n) => {
-      const p = prev.find((x) => x.id === n.id);
-      return p && p.column !== n.column;
-    });
-
-    // 🔍 DEBUG: Log what was moved
-    console.log("🔍 Moved items:", moved);
-    console.log("🔍 Previous features count:", prev.length);
-    console.log("🔍 Next features count:", next.length);
-
-    if (moved.length === 0) {
-      console.log("⚠️ No items detected as moved!");
-      return;
-    }
-
-    const stageUpdates = new Map(
-      moved.map((item) => [item.itemId, columnIdToStage(item.column)]),
-    );
-
-    console.log("🔍 Stage updates map:", Array.from(stageUpdates.entries()));
-
-    const unauthorizedMoves = moved.filter((item) => {
-      const originalItem = pipelineItems.find((pi) => pi.id === item.itemId);
-      if (!originalItem) return true;
-      return !canUserEditItem(originalItem);
-    });
-
-    if (unauthorizedMoves.length > 0) {
-      alert("You don't have permission to move some of these items. Reverting changes.");
-      return;
-    }
-
-    const previousFeaturesSnapshot = prevFeaturesRef.current;
-    const previousPipelineSnapshot = pipelineItems;
-
-    const movedIds = new Set(moved.map((item) => item.id));
-    const nextById = new Map(next.map((item) => [item.id, item]));
-
-    const optimisticallyUpdatedFeatures = features.map((feature) => {
-      if (!movedIds.has(feature.id)) {
-        return feature;
+      console.log("=".repeat(60));
+      console.log("🎯 DRAG DETECTED - Starting handleDataChange");
+      console.log("=".repeat(60));
+      console.log("📊 Current features count:", features.length);
+      console.log("📊 Next features count:", next.length);
+      console.log("📊 Previous features ref count:", prevFeaturesRef.current.length);
+      
+      if (!permissions.canDragDrop) {
+        console.warn("⛔ User doesn't have drag permission");
+        alert("You don't have permission to move items in the pipeline.");
+        return;
       }
 
-      const nextFeature = nextById.get(feature.id);
-      const nextColumn = nextFeature?.column ?? feature.column;
-      const nextStage = stageUpdates.get(feature.itemId) ?? feature.stage;
+      const prev = prevFeaturesRef.current;
+      const moved = next.filter((n) => {
+        const p = prev.find((x) => x.id === n.id);
+        const hasMoved = p && p.column !== n.column;
+        if (hasMoved) {
+          console.log(`🔍 Detected movement:`, {
+            id: n.id,
+            itemId: n.itemId,
+            itemType: n.itemType,
+            oldColumn: p.column,
+            newColumn: n.column,
+            oldStage: p.stage,
+            newStage: columnIdToStage(n.column)
+          });
+        }
+        return hasMoved;
+      });
 
-      return {
-        ...feature,
-        column: nextColumn,
-        stage: nextStage,
-      };
-    });
+      console.log(`🔍 Total moved items detected: ${moved.length}`);
+      
+      if (moved.length === 0) {
+        console.log("⚠️ No items detected as moved - exiting");
+        return;
+      }
 
-    setFeatures(optimisticallyUpdatedFeatures);
-    prevFeaturesRef.current = optimisticallyUpdatedFeatures;
+      // Create stage updates map
+      const stageUpdates = new Map(
+        moved.map((item) => [item.itemId, columnIdToStage(item.column)]),
+      );
 
-    setPipelineItems((current) =>
-      current.map((item) => {
-        const newStage = stageUpdates.get(item.id);
-        if (!newStage) {
-          return item;
+      console.log("🗺️ Stage updates map:", Array.from(stageUpdates.entries()));
+
+      // Check for unauthorized moves
+      const unauthorizedMoves = moved.filter((item) => {
+        const originalItem = pipelineItems.find((pi) => pi.id === item.itemId);
+        if (!originalItem) {
+          console.warn(`⚠️ Original item not found for ${item.itemId}`);
+          return true;
+        }
+        const canEdit = canUserEditItem(originalItem);
+        if (!canEdit) {
+          console.warn(`🚫 User cannot edit item ${item.itemId}`);
+        }
+        return !canEdit;
+      });
+
+      if (unauthorizedMoves.length > 0) {
+        console.error("❌ Unauthorized moves detected:", unauthorizedMoves);
+        alert("You don't have permission to move some of these items. Reverting changes.");
+        return;
+      }
+
+      // Take snapshots for potential rollback
+      const previousFeaturesSnapshot = prevFeaturesRef.current;
+      const previousPipelineSnapshot = pipelineItems;
+      console.log("📸 Snapshots taken for rollback");
+
+      // Optimistically update UI
+      console.log("🎨 Applying optimistic UI updates...");
+      const movedIds = new Set(moved.map((item) => item.id));
+      const nextById = new Map(next.map((item) => [item.id, item]));
+
+      const optimisticallyUpdatedFeatures = features.map((feature) => {
+        if (!movedIds.has(feature.id)) {
+          return feature;
         }
 
+        const nextFeature = nextById.get(feature.id);
+        const nextColumn = nextFeature?.column ?? feature.column;
+        const nextStage = stageUpdates.get(feature.itemId) ?? feature.stage;
+
         return {
-          ...item,
-          stage: newStage,
+          ...feature,
+          column: nextColumn,
+          stage: nextStage,
         };
-      }),
-    );
-
-    console.log("🎯 Drag detected. Making API call...");
-
-  try {
-    const updatePromises = moved.map(async (item) => {
-      const newStage = columnIdToStage(item.column);
-
-      const isProject = item.itemId.startsWith("project-");
-      const isCustomer = item.itemId.startsWith("customer-");
-      const isJob = item.itemId.startsWith("job-");
-
-      let entityId;
-      let endpoint;
-
-      if (isJob) {
-        entityId = item.itemId.replace("job-", "");
-        endpoint = `jobs/${entityId}/stage`;
-      } else if (isProject) {
-        entityId = item.itemId.replace("project-", "");
-        endpoint = `projects/${entityId}/stage`;
-      } else if (isCustomer) {
-        entityId = item.itemId.replace("customer-", "");
-        endpoint = `customers/${entityId}/stage`;
-      } else {
-        throw new Error(`Unknown pipeline item type: ${item.itemId}`);
-      }
-
-      const bodyData = {
-        stage: newStage,
-        reason: "Moved via Kanban board",
-        updated_by: user?.email || "current_user",
-      };
-
-      // 🔍 DEBUG: Log the API call
-      console.log(`📤 API Call:`, {
-        endpoint,
-        method: "PATCH",
-        itemId: item.itemId,
-        itemType: item.itemType,
-        entityId,
-        bodyData,
       });
 
-      const response = await fetchWithAuth(endpoint, {
-        method: "PATCH",
-        body: JSON.stringify(bodyData),
+      setFeatures(optimisticallyUpdatedFeatures);
+      prevFeaturesRef.current = optimisticallyUpdatedFeatures;
+
+      setPipelineItems((current) =>
+        current.map((item) => {
+          const newStage = stageUpdates.get(item.id);
+          if (!newStage) {
+            return item;
+          }
+          return {
+            ...item,
+            stage: newStage,
+          };
+        }),
+      );
+
+      console.log("✅ Optimistic UI updates applied");
+      console.log("📤 Starting API calls...");
+
+    try {
+      const updatePromises = moved.map(async (item, index) => {
+        const newStage = columnIdToStage(item.column);
+        
+        console.log(`\n📤 API Call ${index + 1}/${moved.length}:`, {
+          itemId: item.itemId,
+          itemType: item.itemType,
+          newStage: newStage
+        });
+
+        const isProject = item.itemId.startsWith("project-");
+        const isCustomer = item.itemId.startsWith("customer-");
+        const isJob = item.itemId.startsWith("job-");
+
+        let entityId;
+        let endpoint;
+
+        if (isJob) {
+          entityId = item.itemId.replace("job-", "");
+          endpoint = `jobs/${entityId}/stage`;
+        } else if (isProject) {
+          entityId = item.itemId.replace("project-", "");
+          endpoint = `projects/${entityId}/stage`;
+        } else if (isCustomer) {
+          entityId = item.itemId.replace("customer-", "");
+          endpoint = `customers/${entityId}/stage`;
+        } else {
+          throw new Error(`Unknown pipeline item type: ${item.itemId}`);
+        }
+
+        const bodyData = {
+          stage: newStage,
+          reason: "Moved via Kanban board",
+          updated_by: user?.email || "current_user",
+        };
+
+        console.log(`📤 Request details:`, {
+          endpoint,
+          method: "PATCH",
+          entityId,
+          body: bodyData
+        });
+
+        const response = await fetchWithAuth(endpoint, {
+          method: "PATCH",
+          body: JSON.stringify(bodyData),
+        });
+
+        console.log(`📥 Response status for ${item.itemId}:`, response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ API Error Response:`, {
+            status: response.status,
+            statusText: response.statusText,
+            errorText: errorText
+          });
+          throw new Error(`Failed to update ${item.itemType} ${entityId}: ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log(`✅ API Success for ${item.itemId}:`, result);
+        return result;
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error(`❌ API Error:`, errorData);
-        throw new Error(errorData.error || `Failed to update ${item.itemType} ${entityId}`);
-      }
+      console.log(`⏳ Waiting for ${updatePromises.length} API calls to complete...`);
+      const results = await Promise.all(updatePromises);
+      console.log("✅ All API calls completed successfully:", results);
+      
+      console.log("🔄 Refreshing pipeline data...");
+      await refetchPipelineData();
+      console.log("✅ Pipeline data refreshed successfully");
+      console.log("=".repeat(60));
 
-      const result = await response.json();
-      console.log(`✅ API Success:`, result);
-      return result;
-    });
-
-    await Promise.all(updatePromises);
-    console.log("✅ All updates successful! Refreshing...");
-    
-    await refetchPipelineData();
-
-  } catch (error) {
-    console.error("❌ Failed to update stages:", error);
+    } catch (error) {
+      console.error("=".repeat(60));
+      console.error("❌ DRAG-AND-DROP ERROR");
+      console.error("=".repeat(60));
+      console.error("Error details:", error);
+      console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+      
+      console.log("🔙 Reverting optimistic updates...");
       setFeatures(previousFeaturesSnapshot);
       prevFeaturesRef.current = previousFeaturesSnapshot;
       setPipelineItems(previousPipelineSnapshot);
+      console.log("✅ Reverted to previous state");
+      
       alert(
         `Failed to update stage: ${error instanceof Error ? error.message : "Unknown error"}. Changes have been reverted.`,
       );
@@ -1098,26 +1263,24 @@ export default function EnhancedPipelinePage() {
   // Action handlers
   // MODIFICATION 5: REVISED handleOpenItem logic for clear customer/job routing
   const handleOpenItem = (itemId: string, itemType: "customer" | "job" | "project") => {
-    // Clean the ID just in case it has prefixes
-    const entityId = itemId.replace("customer-", "").replace("job-", "").replace("project-", "");
+    // Find the actual item to get the correct customer ID
+    const item = pipelineItems.find((i) => i.id === itemId);
+    
+    if (!item) {
+      console.error("Item not found:", itemId);
+      return;
+    }
 
     if (itemType === "customer") {
-      // Customer cards (pure leads) navigate directly using the cleaned ID
-      window.location.href = `/dashboard/customers/${entityId}`; 
+      // For customer cards, use the customer ID directly (no prefix stripping needed)
+      router.push(`/dashboard/customers/${item.customer.id}`);
     } else if (itemType === "project") {
-      // Project cards navigate to the parent customer's detail page by looking up the customer ID
-      const item = pipelineItems.find((i) => i.id === itemId);
-      const customerId = item?.customer.id;
-      
-      if (customerId) {
-        window.location.href = `/dashboard/customers/${customerId}`;
-      } else {
-        // Fallback to Project's own detail page (assuming it's under /jobs for now)
-        window.location.href = `/dashboard/jobs/${entityId}`; 
-      }
+      // For project cards, navigate to the customer's detail page
+      router.push(`/dashboard/customers/${item.customer.id}`);
     } else {
-      // itemType === "job" (Real Job)
-      window.location.href = `/dashboard/jobs/${entityId}`; 
+      // For job cards, navigate to job details
+      const jobId = itemId.replace("job-", "");
+      router.push(`/dashboard/jobs/${jobId}`);
     }
   };
   // END MODIFICATION 5
@@ -1366,269 +1529,273 @@ export default function EnhancedPipelinePage() {
         </TabsList>
 
         {/* Kanban View */}
-        <TabsContent value="kanban" className="mt-6">
-          <div className="h-[calc(100vh-300px)] min-h-[850px]">
-            <div
-              className="h-full overflow-x-auto overflow-y-hidden rounded-lg bg-gray-50/30"
-              style={{
-                maxWidth: "100%",
-                width: "calc(100vw - 390px)",
-              }}
-            >
-              <div className="flex h-full items-start gap-4 p-3" style={{ width: "max-content", minWidth: "100%" }}>
-                {/* Use visibleColumns for KanbanProvider */}
-                <KanbanProvider
-                  columns={visibleColumns} 
-                  data={filteredFeatures}
-                  onDataChange={permissions.canDragDrop ? handleDataChange : undefined}
-                >
-                  {(column) => (
-                    <div key={column.id} className="flex-shrink-0">
-                      <KanbanBoard
-                        id={column.id}
-                        className="flex h-full w-[196px] flex-shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm md:w-[224px]"
-                      >
-                        {/* Potential Fix for React.Children.only: 
-                          If KanbanBoard requires a single child, wrapping KanbanHeader and KanbanCards in a fragment or single div is necessary. 
-                          However, the most likely fix in a custom component like this is ensuring *all* mapped elements are wrapped in a single parent.
-                          Since both Header and Cards are direct children of KanbanBoard, an error may be originating in the underlying Dnd logic.
-                          I'll wrap the two children in an explicit fragment/div as a potential fix for this pattern if KanbanBoard expects a single child wrapper. 
-                        */}
-                        <div className="flex h-full flex-col"> {/* Added wrapper div */}
-                            <KanbanHeader className="flex-shrink-0 rounded-t-lg border-b bg-gray-50/80 p-2.5">
-                              <div className="flex items-center gap-1.5">
-                                <div className="h-1.5 w-1.5 flex-shrink-0 rounded-full" />
-                                <span className="text-xs font-medium">{column.name}</span>
-                                <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
-                                  {counts[column.id] ?? 0}
-                                </Badge>
-                              </div>
-                            </KanbanHeader>
+          <TabsContent value="kanban" className="mt-6">
+            <div className="h-[calc(100vh-300px)] min-h-[850px]">
+              <div
+                className="h-full overflow-x-auto overflow-y-hidden rounded-lg bg-gray-50/30"
+                style={{
+                  maxWidth: "100%",
+                  width: "calc(100vw - 390px)",
+                }}
+              >
+                <div className="flex h-full items-start gap-4 p-3" style={{ width: "max-content", minWidth: "100%" }}>
+                  {/* Use visibleColumns for KanbanProvider */}
+                  <KanbanProvider
+                    columns={visibleColumns} 
+                    data={filteredFeatures}
+                    onDataChange={permissions.canDragDrop ? handleDataChange : undefined}
+                  >
+                    {(column) => (
+                      <div key={column.id} className="flex-shrink-0">
+                        <KanbanBoard
+                          id={column.id}
+                          className="flex h-full w-[196px] flex-shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm md:w-[224px]"
+                        >
+                          <div className="flex h-full flex-col">
+                              <KanbanHeader className="flex-shrink-0 rounded-t-lg border-b bg-gray-50/80 p-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="h-1.5 w-1.5 flex-shrink-0 rounded-full" />
+                                  <span className="text-xs font-medium">{column.name}</span>
+                                  <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                                    {counts[column.id] ?? 0}
+                                  </Badge>
+                                </div>
+                              </KanbanHeader>
 
-                            <KanbanCards id={column.id} className="max-h-[850px] flex-1 space-y-2 overflow-y-auto p-2">
-                              {(feature: any) => {
-                                const isEditable = canUserEditItem({
-                                  id: feature.itemId,
-                                  type: feature.itemType,
-                                  customer: feature.customer,
-                                  job: feature.job,
-                                  reference: feature.reference,
-                                  name: feature.customer.name,
-                                  stage: feature.stage,
-                                  jobType: feature.jobType,
-                                  salesperson: feature.salesperson,
-                                } as PipelineItem);
+                              <KanbanCards id={column.id} className="max-h-[850px] flex-1 space-y-2 overflow-y-auto p-2">
+                                {(feature: any) => {
+                                  const isEditable = canUserEditItem({
+                                    id: feature.itemId,
+                                    type: feature.itemType,
+                                    customer: feature.customer,
+                                    job: feature.job,
+                                    reference: feature.reference,
+                                    name: feature.customer.name,
+                                    stage: feature.stage,
+                                    jobType: feature.jobType,
+                                    salesperson: feature.salesperson,
+                                  } as PipelineItem);
 
-                                return (
-                                  <KanbanCard
-                                    column={column.id}
-                                    id={feature.id}
-                                    key={feature.id}
-                                    name={feature.name}
-                                    className={`rounded-md border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md ${permissions.canDragDrop && isEditable ? "cursor-grab" : "cursor-not-allowed opacity-90"} p-2 ${feature.itemType === "job" ? "pb-0" : ""}`}
-                                  >
-                                    <div className="space-y-3">
-                                      {/* Lock icon for non-editable items */}
-                                      {!isEditable && (
-                                        <div className="absolute top-1 right-1">
-                                          <Lock className="h-3 w-3 text-gray-400" />
-                                        </div>
-                                      )}
+                                  return (
+                                    <KanbanCard
+                                      column={column.id}
+                                      id={feature.id}
+                                      key={feature.id}
+                                      name={feature.name}
+                                      className={`rounded-md border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md ${permissions.canDragDrop && isEditable ? "cursor-grab" : "cursor-not-allowed opacity-90"} p-2 ${feature.itemType === "job" ? "pb-0" : ""}`}
+                                    >
+                                      <div className="space-y-3">
+                                        {/* Lock icon for non-editable items */}
+                                        {!isEditable && (
+                                          <div className="absolute top-1 right-1">
+                                            <Lock className="h-3 w-3 text-gray-400" />
+                                          </div>
+                                        )}
 
-                                      {/* Header */}
-                                      <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0 flex-1 pr-2">
-                                          <p className="text-sm font-semibold break-words text-black">
-                                            {feature.customer.name}
-                                          </p>
+                                        {/* Header */}
+                                        <div className="flex items-start justify-between gap-2">
+                                          <div className="min-w-0 flex-1 pr-2">
+                                            <p className="text-sm font-semibold break-words text-black">
+                                              {feature.customer.name}
+                                            </p>
 
-                                          {/* Show reference below customer name for both types */}
-                                          <div className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
-                                            <span className="truncate">{feature.reference}</span>
+                                            {/* Show reference below customer name for both types */}
+                                            <div className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
+                                              <span className="truncate">{feature.reference}</span>
+                                            </div>
+
+                                            {/* ✅ NEW: Project Count Badge - only for customers with multiple projects */}
+                                            {feature.itemType === "customer" && feature.project_count > 1 && (
+                                              <div className="mt-1 flex items-center gap-1">
+                                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 flex items-center gap-1">
+                                                  <FolderOpen className="h-2.5 w-2.5" />
+                                                  <span>{feature.project_count} projects</span>
+                                                </Badge>
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          <div className="flex flex-shrink-0 flex-col gap-1">
+                                            {/* Render each job/project type as its own badge */}
+                                            {feature.jobType &&
+                                              feature.jobType.split(",").map((t: string, i: number) => (
+                                                <Badge key={i} variant="outline" className="text-xs whitespace-nowrap">
+                                                  {t.trim()}
+                                                </Badge>
+                                              ))}
                                           </div>
                                         </div>
 
-                                        <div className="flex flex-shrink-0 flex-col gap-1">
-                                          {/* Render each job/project type as its own badge */}
-                                          {feature.jobType &&
-                                            feature.jobType.split(",").map((t: string, i: number) => (
-                                              <Badge key={i} variant="outline" className="text-xs whitespace-nowrap">
-                                                {t.trim()}
-                                              </Badge>
-                                            ))}
-                                        </div>
-                                      </div>
+                                        {/* Contact Info - only show if available */}
+                                        {(feature.customer.phone || feature.customer.email || feature.customer.address) && (
+                                          <div className="text-muted-foreground space-y-1 text-xs">
+                                            {feature.customer.phone && (
+                                              <div className="flex items-center gap-2">
+                                                <Phone className="h-3 w-3 flex-shrink-0" />
+                                                <span className="truncate">{feature.customer.phone}</span>
+                                              </div>
+                                            )}
+                                            {feature.customer.email && (
+                                              <div className="flex items-center gap-2">
+                                                <Mail className="h-3 w-3 flex-shrink-0" />
+                                                <span className="truncate">{feature.customer.email}</span>
+                                              </div>
+                                            )}
+                                            {feature.customer.address && (
+                                              <div className="flex items-center gap-2">
+                                                <MapPin className="h-3 w-3 flex-shrink-0" />
+                                                <span className="truncate">{feature.customer.address}</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
 
-                                      {/* Contact Info - only show if available */}
-                                      {(feature.customer.phone || feature.customer.email || feature.customer.address) && (
-                                        <div className="text-muted-foreground space-y-1 text-xs">
-                                          {feature.customer.phone && (
+                                        {/* Job Details - conditional rendering based on available data and permissions */}
+                                        <div className="space-y-2 text-xs">
+                                          {feature.salesperson && (
                                             <div className="flex items-center gap-2">
-                                              <Phone className="h-3 w-3 flex-shrink-0" />
-                                              <span className="truncate">{feature.customer.phone}</span>
+                                              <Users className="text-muted-foreground h-3 w-3 flex-shrink-0" />
+                                              <span className="truncate">{feature.salesperson}</span>
                                             </div>
                                           )}
-                                          {feature.customer.email && (
+                                          {feature.measureDate && (
                                             <div className="flex items-center gap-2">
-                                              <Mail className="h-3 w-3 flex-shrink-0" />
-                                              <span className="truncate">{feature.customer.email}</span>
+                                              <Calendar className="text-muted-foreground h-3 w-3 flex-shrink-0" />
+                                              <span className="truncate">Measure: {formatDate(feature.measureDate)}</span>
                                             </div>
                                           )}
-                                          {feature.customer.address && (
+
+                                          {/* Financial information - only show if user has permission */}
+                                          {permissions.canViewFinancials && (
+                                            <>
+                                              {feature.quotePrice && (
+                                                <div className="flex items-center gap-2">
+                                                  <DollarSign className="text-muted-foreground h-3 w-3 flex-shrink-0" />
+                                                  <span className="truncate">Quote: £{feature.quotePrice.toFixed(2)}</span>
+                                                </div>
+                                              )}
+                                              {feature.agreedPrice && (
+                                                <div className="flex items-center gap-2">
+                                                  <Check className="h-3 w-3 flex-shrink-0 text-green-500" />
+                                                  <span className="truncate">Agreed: £{feature.agreedPrice.toFixed(2)}</span>
+                                                </div>
+                                              )}
+                                              {feature.soldAmount && (
+                                                <div className="flex items-center gap-2">
+                                                  <Check className="h-3 w-3 flex-shrink-0 text-green-500" />
+                                                  <span className="truncate">Sold: £{feature.soldAmount.toFixed(2)}</span>
+                                                </div>
+                                              )}
+                                              {feature.deposit1 && (
+                                                <div className="flex items-center gap-2">
+                                                  <div
+                                                    className={`h-2 w-2 flex-shrink-0 rounded-full ${feature.deposit1Paid ? "bg-green-500" : "bg-red-500"}`}
+                                                  />
+                                                  <span className="truncate">Deposit 1: £{feature.deposit1.toFixed(2)}</span>
+                                                </div>
+                                              )}
+                                              {feature.deposit2 && (
+                                                <div className="flex items-center gap-2">
+                                                  <div
+                                                    className={`h-2 w-2 flex-shrink-0 rounded-full ${feature.deposit2Paid ? "bg-green-500" : "bg-red-500"}`}
+                                                  />
+                                                  <span className="truncate">Deposit 2: £{feature.deposit2.toFixed(2)}</span>
+                                                </div>
+                                              )}
+                                            </>
+                                          )}
+
+                                          {feature.deliveryDate && (
                                             <div className="flex items-center gap-2">
-                                              <MapPin className="h-3 w-3 flex-shrink-0" />
-                                              <span className="truncate">{feature.customer.address}</span>
+                                              <Calendar className="text-muted-foreground h-3 w-3 flex-shrink-0" />
+                                              <span className="truncate">Delivery: {formatDate(feature.deliveryDate)}</span>
                                             </div>
                                           )}
                                         </div>
-                                      )}
 
-                                      {/* Job Details - conditional rendering based on available data and permissions */}
-                                      <div className="space-y-2 text-xs">
-                                        {feature.salesperson && (
-                                          <div className="flex items-center gap-2">
-                                            <Users className="text-muted-foreground h-3 w-3 flex-shrink-0" />
-                                            <span className="truncate">{feature.salesperson}</span>
-                                          </div>
-                                        )}
-                                        {feature.measureDate && (
-                                          <div className="flex items-center gap-2">
-                                            <Calendar className="text-muted-foreground h-3 w-3 flex-shrink-0" />
-                                            <span className="truncate">Measure: {formatDate(feature.measureDate)}</span>
-                                          </div>
-                                        )}
-
-                                        {/* Financial information - only show if user has permission */}
-                                        {permissions.canViewFinancials && (
-                                          <>
-                                            {feature.quotePrice && (
-                                              <div className="flex items-center gap-2">
-                                                <DollarSign className="text-muted-foreground h-3 w-3 flex-shrink-0" />
-                                                <span className="truncate">Quote: £{feature.quotePrice.toFixed(2)}</span>
-                                              </div>
-                                            )}
-                                            {feature.agreedPrice && (
-                                              <div className="flex items-center gap-2">
-                                                <Check className="h-3 w-3 flex-shrink-0 text-green-500" />
-                                                <span className="truncate">Agreed: £{feature.agreedPrice.toFixed(2)}</span>
-                                              </div>
-                                            )}
-                                            {feature.soldAmount && (
-                                              <div className="flex items-center gap-2">
-                                                <Check className="h-3 w-3 flex-shrink-0 text-green-500" />
-                                                <span className="truncate">Sold: £{feature.soldAmount.toFixed(2)}</span>
-                                              </div>
-                                            )}
-                                            {feature.deposit1 && (
-                                              <div className="flex items-center gap-2">
-                                                <div
-                                                  className={`h-2 w-2 flex-shrink-0 rounded-full ${feature.deposit1Paid ? "bg-green-500" : "bg-red-500"}`}
-                                                />
-                                                <span className="truncate">Deposit 1: £{feature.deposit1.toFixed(2)}</span>
-                                              </div>
-                                            )}
-                                            {feature.deposit2 && (
-                                              <div className="flex items-center gap-2">
-                                                <div
-                                                  className={`h-2 w-2 flex-shrink-0 rounded-full ${feature.deposit2Paid ? "bg-green-500" : "bg-red-500"}`}
-                                                />
-                                                <span className="truncate">Deposit 2: £{feature.deposit2.toFixed(2)}</span>
-                                              </div>
-                                            )}
-                                          </>
-                                        )}
-
-                                        {feature.deliveryDate && (
-                                          <div className="flex items-center gap-2">
-                                            <Calendar className="text-muted-foreground h-3 w-3 flex-shrink-0" />
-                                            <span className="truncate">Delivery: {formatDate(feature.deliveryDate)}</span>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Action Buttons (fixed to the bottom with padding) */}
-                                      <div className="flex gap-1 pt-2 pb-1">
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-6 flex-1 px-1 text-xs hover:bg-gray-100"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleOpenItem(feature.itemId, feature.itemType);
-                                          }}
-                                          title={`Open ${feature.itemType === "customer" ? "Customer" : feature.itemType === "project" ? "Project" : "Job"}`}
-                                        >
-                                          <Eye className="h-3 w-3" />
-                                        </Button>
-
-                                        {/* Only show quote action if appropriate stage and user has permission */}
-                                        {permissions.canSendQuotes &&
-                                          isEditable &&
-                                          (feature.stage === "Quote" ||
-                                            feature.stage === "Design") && ( // Removed 'Quoted' stage
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-6 flex-1 px-1 text-xs hover:bg-gray-100"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleSendQuote(feature.itemId);
-                                              }}
-                                              title="Send Quote"
-                                            >
-                                              <Mail className="h-3 w-3" />
-                                            </Button>
-                                          )}
-
-                                        {/* Only show schedule if user has permission */}
-                                        {permissions.canSchedule &&
-                                          (feature.stage === "Survey" ||
-                                            feature.stage === "Installation" ||
-                                            feature.stage === "Delivery") && (
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-6 flex-1 px-1 text-xs hover:bg-gray-100"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleSchedule(feature.itemId);
-                                              }}
-                                              title="Schedule"
-                                            >
-                                              <Calendar className="h-3 w-3" />
-                                            </Button>
-                                          )}
-
-                                        {/* Show documents for jobs/projects */}
-                                        {(feature.itemType === "job" || feature.itemType === "project") && (
+                                        {/* Action Buttons (fixed to the bottom with padding) */}
+                                        <div className="flex gap-1 pt-2 pb-1">
                                           <Button
                                             size="sm"
                                             variant="ghost"
                                             className="h-6 flex-1 px-1 text-xs hover:bg-gray-100"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              handleViewDocuments(feature.itemId);
+                                              handleOpenItem(feature.itemId, feature.itemType);
                                             }}
-                                            title="View Documents"
+                                            title={`Open ${feature.itemType === "customer" ? "Customer" : feature.itemType === "project" ? "Project" : "Job"}`}
                                           >
-                                            <File className="h-3 w-3" />
+                                            <Eye className="h-3 w-3" />
                                           </Button>
-                                        )}
+
+                                          {/* Only show quote action if appropriate stage and user has permission */}
+                                          {permissions.canSendQuotes &&
+                                            isEditable &&
+                                            (feature.stage === "Quote" ||
+                                              feature.stage === "Design") && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-6 flex-1 px-1 text-xs hover:bg-gray-100"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleSendQuote(feature.itemId);
+                                                }}
+                                                title="Send Quote"
+                                              >
+                                                <Mail className="h-3 w-3" />
+                                              </Button>
+                                            )}
+
+                                          {/* Only show schedule if user has permission */}
+                                          {permissions.canSchedule &&
+                                            (feature.stage === "Survey" ||
+                                              feature.stage === "Installation" ||
+                                              feature.stage === "Delivery") && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-6 flex-1 px-1 text-xs hover:bg-gray-100"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleSchedule(feature.itemId);
+                                                }}
+                                                title="Schedule"
+                                              >
+                                                <Calendar className="h-3 w-3" />
+                                              </Button>
+                                            )}
+
+                                          {/* Show documents for jobs/projects */}
+                                          {(feature.itemType === "job" || feature.itemType === "project") && (
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-6 flex-1 px-1 text-xs hover:bg-gray-100"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleViewDocuments(feature.itemId);
+                                              }}
+                                              title="View Documents"
+                                            >
+                                              <File className="h-3 w-3" />
+                                            </Button>
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
-                                  </KanbanCard>
-                                );
-                              }}
-                            </KanbanCards>
-                        </div>
-                      </KanbanBoard>
-                    </div>
-                  )}
-                </KanbanProvider>
-              </div>
-              </div>
-          </div>
-        </TabsContent>
+                                    </KanbanCard>
+                                  );
+                                }}
+                              </KanbanCards>
+                          </div>
+                        </KanbanBoard>
+                      </div>
+                    )}
+                  </KanbanProvider>
+                </div>
+                </div>
+            </div>
+          </TabsContent>
 
         {/* List View - updated to handle both customers and jobs */}
         <TabsContent value="list" className="mt-6">

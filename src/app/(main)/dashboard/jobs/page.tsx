@@ -1,357 +1,408 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, X, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
+import { Plus, Search, Filter, Eye, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { fetchWithAuth } from "@/lib/api";
 
+const JOB_STAGES = ["Lead", "Quote", "Survey", "Measure", "Design", "Quoted", "Accepted", "Production", "Delivery", "Installation", "Complete", "Cancelled"];
 const JOB_TYPES = ["Kitchen", "Bedroom", "Wardrobe", "Remedial", "Other"];
 
-interface FormData {
-  job_type: string;
+interface Job {
+  id: string;
+  job_reference: string;
   job_name: string;
-  customer_id: string;
-  team_member: string;
+  customer_name: string;
+  job_type: string;
+  stage: string;
+  priority: string;
   start_date: string;
   end_date: string;
-  tags: string;
-  notes: string;
+  agreed_price: number;
+  created_at: string;
 }
 
-export default function CreateJobPage() {
+export default function JobsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [loading, setLoading] = useState(false);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
-  const [attachedForms, setAttachedForms] = useState<any[]>([]);
-  const [availableForms, setAvailableForms] = useState<any[]>([]);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStage, setFilterStage] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("all");
+  
+  // Delete confirmation dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
 
-  const [formData, setFormData] = useState<FormData>({
-    job_type: "",
-    job_name: "",
-    customer_id: searchParams?.get("customerId") || "",
-    team_member: "",
-    start_date: "",
-    end_date: "",
-    tags: "",
-    notes: "",
-  });
-
-  // Fetch customers, team members, and unlinked forms
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Use centralized fetchWithAuth
-        const customersRes = await fetchWithAuth("customers");
-        if (customersRes.ok) setCustomers(await customersRes.json());
+    loadJobs();
+  }, []);
 
-        // Mock team members
-        setTeamMembers([
-          { id: 1, name: "John Smith" },
-          { id: 2, name: "Sarah Johnson" },
-          { id: 3, name: "Mike Wilson" },
-        ]);
+  useEffect(() => {
+    applyFilters();
+  }, [jobs, searchTerm, filterStage, filterType]);
 
-        if (formData.customer_id) {
-          // Use centralized fetchWithAuth
-          const formsRes = await fetchWithAuth(`forms/unlinked?customer_id=${formData.customer_id}`);
-          if (formsRes.ok) setAvailableForms(await formsRes.json());
-        }
-      } catch (error) {
-        console.error("Error loading data:", error);
-      }
-    };
-    loadData();
-  }, [formData.customer_id]);
-
-  const handleInputChange = (field: keyof FormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
-  };
-
-  const attachForm = (formId: string) => {
-    const form = availableForms.find((f) => f.id === parseInt(formId));
-    if (form && !attachedForms.find((f) => f.id === form.id)) {
-      setAttachedForms((prev) => [...prev, form]);
-      setAvailableForms((prev) => prev.filter((f) => f.id !== form.id));
-    }
-  };
-
-  const detachForm = (formId: number) => {
-    const form = attachedForms.find((f) => f.id === formId);
-    if (form) {
-      setAvailableForms((prev) => [...prev, form]);
-      setAttachedForms((prev) => prev.filter((f) => f.id !== formId));
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.job_type) newErrors.job_type = "Job type is required";
-    if (!formData.customer_id) newErrors.customer_id = "Customer is required";
-    if (!formData.start_date) newErrors.start_date = "Start date is required";
-    if (!formData.end_date) newErrors.end_date = "End date is required";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-
-    setLoading(true);
+  const loadJobs = async () => {
     try {
-      const submitData = {
-        customer_id: parseInt(formData.customer_id),
-        type: formData.job_type,
-        job_name: formData.job_name,
-        team_member: formData.team_member ? parseInt(formData.team_member) : null,
-        start_date: formData.start_date,
-        end_date: formData.end_date,
-        tags: formData.tags,
-        notes: formData.notes,
-        attached_forms: attachedForms.map((f) => f.id),
-      };
-
-      // Use centralized fetchWithAuth
-      const response = await fetchWithAuth("jobs", {
-        method: "POST",
-        body: JSON.stringify(submitData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create job");
+      setLoading(true);
+      const response = await fetchWithAuth("jobs");
+      if (response.ok) {
+        const data = await response.json();
+        setJobs(data);
       }
-
-      const newJob = await response.json();
-      router.push(`/dashboard/jobs/${newJob.id}?success=created`);
     } catch (error) {
-      setErrors({
-        submit: error instanceof Error ? error.message : "Error creating job",
-      });
+      console.error("Error loading jobs:", error);
     } finally {
       setLoading(false);
     }
   };
 
+  const applyFilters = () => {
+    let filtered = [...jobs];
+
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (job) =>
+          job.job_reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          job.job_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          job.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (filterStage && filterStage !== "all") {
+      filtered = filtered.filter((job) => job.stage === filterStage);
+    }
+
+    if (filterType && filterType !== "all") {
+      filtered = filtered.filter((job) => job.job_type === filterType);
+    }
+
+    setFilteredJobs(filtered);
+  };
+
+  // ✅ Delete job handler
+  const handleDeleteJob = async () => {
+    if (!jobToDelete) return;
+
+    try {
+      const response = await fetchWithAuth(`jobs/${jobToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete job");
+      }
+
+      // Remove from state
+      setJobs((prev) => prev.filter((j) => j.id !== jobToDelete.id));
+      setDeleteDialogOpen(false);
+      setJobToDelete(null);
+      alert("Job deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting job:", error);
+      alert("Failed to delete job. Please try again.");
+    }
+  };
+
+  const getStageColor = (stage: string) => {
+    const colors: Record<string, string> = {
+      Lead: "bg-gray-100 text-gray-800",
+      Quote: "bg-blue-100 text-blue-800",
+      Survey: "bg-yellow-100 text-yellow-800",
+      Measure: "bg-purple-100 text-purple-800",
+      Design: "bg-pink-100 text-pink-800",
+      Quoted: "bg-indigo-100 text-indigo-800",
+      Accepted: "bg-green-100 text-green-800",
+      Production: "bg-orange-100 text-orange-800",
+      Delivery: "bg-cyan-100 text-cyan-800",
+      Installation: "bg-teal-100 text-teal-800",
+      Complete: "bg-green-200 text-green-900",
+      Cancelled: "bg-red-100 text-red-800",
+    };
+    return colors[stage] || "bg-gray-100 text-gray-800";
+  };
+
+  const getPriorityColor = (priority: string) => {
+    const colors: Record<string, string> = {
+      High: "text-red-600 font-semibold",
+      Medium: "text-yellow-600",
+      Low: "text-gray-600",
+    };
+    return colors[priority] || "text-gray-600";
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading jobs...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="flex items-center space-x-3 border-b bg-white px-8 py-6">
-        <button onClick={() => router.back()} className="flex items-center text-gray-500 hover:text-gray-700">
-          <ArrowLeft className="mr-1 h-5 w-5" />
-        </button>
-        <h1 className="text-3xl font-semibold text-gray-900">Create Job</h1>
+      <header className="border-b bg-white px-8 py-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold text-gray-900">Jobs</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Manage and track all your jobs in one place
+            </p>
+          </div>
+          <Button onClick={() => router.push("/dashboard/jobs/create")} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create New Job
+          </Button>
+        </div>
       </header>
 
-      {/* Main Form */}
-      <main className="mx-auto max-w-3xl px-8 py-10">
-        <form onSubmit={handleSubmit} className="space-y-10">
-          {/* --- Basic Information --- */}
-          <section>
-            <h2 className="mb-4 text-xl font-semibold text-gray-800">Basic Information</h2>
-
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div>
-                <Label>Job Type *</Label>
-                <Select value={formData.job_type} onValueChange={(v) => handleInputChange("job_type", v)}>
-                  <SelectTrigger className={errors.job_type ? "border-red-500" : ""}>
-                    <SelectValue placeholder="Select job type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {JOB_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.job_type && <p className="mt-1 text-sm text-red-500">{errors.job_type}</p>}
-              </div>
-
-              <div>
-                <Label>Job Name</Label>
-                <Input
-                  placeholder="e.g., Kitchen Installation"
-                  value={formData.job_name}
-                  onChange={(e) => handleInputChange("job_name", e.target.value)}
-                />
-              </div>
+      <div className="border-b bg-white px-8 py-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex-1 min-w-[300px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="Search by job reference, name, or customer..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
             </div>
-          </section>
-
-          {/* --- Customer & Team --- */}
-          <section>
-            <h2 className="mb-4 text-xl font-semibold text-gray-800">Customer & Team</h2>
-
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div>
-                <Label>Customer *</Label>
-                <Select value={formData.customer_id} onValueChange={(v) => handleInputChange("customer_id", v)}>
-                  <SelectTrigger className={errors.customer_id ? "border-red-500" : ""}>
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.customer_id && <p className="mt-1 text-sm text-red-500">{errors.customer_id}</p>}
-              </div>
-
-              <div>
-                <Label>Team Member</Label>
-                <Select value={formData.team_member} onValueChange={(v) => handleInputChange("team_member", v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select team member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teamMembers.map((m) => (
-                      <SelectItem key={m.id} value={m.id.toString()}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </section>
-
-          {/* --- Schedule --- */}
-          <section>
-            <h2 className="mb-4 text-xl font-semibold text-gray-800">Schedule</h2>
-
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div>
-                <Label>Start Date *</Label>
-                <Input
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) => handleInputChange("start_date", e.target.value)}
-                  className={errors.start_date ? "border-red-500" : ""}
-                />
-                {errors.start_date && <p className="mt-1 text-sm text-red-500">{errors.start_date}</p>}
-              </div>
-
-              <div>
-                <Label>End Date *</Label>
-                <Input
-                  type="date"
-                  value={formData.end_date}
-                  onChange={(e) => handleInputChange("end_date", e.target.value)}
-                  className={errors.end_date ? "border-red-500" : ""}
-                />
-                {errors.end_date && <p className="mt-1 text-sm text-red-500">{errors.end_date}</p>}
-              </div>
-            </div>
-          </section>
-
-          {/* --- Notes --- */}
-          <section>
-            <h2 className="mb-4 text-xl font-semibold text-gray-800">Notes</h2>
-            <div className="space-y-4">
-              <div>
-                <Label>Tags</Label>
-                <Input
-                  placeholder="e.g., urgent, VIP"
-                  value={formData.tags}
-                  onChange={(e) => handleInputChange("tags", e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label>Additional Notes</Label>
-                <Textarea
-                  rows={4}
-                  placeholder="Add any extra details..."
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange("notes", e.target.value)}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* --- Attach Forms --- */}
-          {availableForms.length > 0 && (
-            <section>
-              <h2 className="mb-4 text-xl font-semibold text-gray-800">Attach Existing Forms</h2>
-
-              <div className="space-y-3">
-                {availableForms.map((form) => (
-                  <div key={form.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">Form #{form.id}</p>
-                      <p className="text-sm text-gray-500">
-                        Submitted: {new Date(form.submitted_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Button type="button" variant="outline" size="sm" onClick={() => attachForm(form.id.toString())}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Attach
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* --- Attached Forms --- */}
-          {attachedForms.length > 0 && (
-            <section>
-              <h2 className="mb-4 text-xl font-semibold text-gray-800">Attached Forms</h2>
-
-              <div className="space-y-3">
-                {attachedForms.map((form) => (
-                  <div
-                    key={form.id}
-                    className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3"
-                  >
-                    <div>
-                      <p className="font-medium">Form #{form.id}</p>
-                      <p className="text-sm text-gray-600">
-                        Submitted: {new Date(form.submitted_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => detachForm(form.id)}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* --- Error Message --- */}
-          {errors.submit && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{errors.submit}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* --- Buttons --- */}
-          <div className="flex justify-end space-x-4 pt-6">
-            <Button type="button" variant="outline" onClick={() => router.back()}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create Job"}
-            </Button>
           </div>
-        </form>
+
+          <div className="w-[200px]">
+            <Select value={filterStage} onValueChange={setFilterStage}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Stages" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stages</SelectItem>
+                {JOB_STAGES.map((stage) => (
+                  <SelectItem key={stage} value={stage}>
+                    {stage}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-[200px]">
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {JOB_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {(searchTerm || filterStage !== "all" || filterType !== "all") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearchTerm("");
+                setFilterStage("all");
+                setFilterType("all");
+              }}
+            >
+              Clear Filters
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="border-b bg-white px-8 py-4">
+        <div className="flex gap-8">
+          <div>
+            <p className="text-sm text-gray-600">Total Jobs</p>
+            <p className="text-2xl font-semibold">{jobs.length}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Filtered Results</p>
+            <p className="text-2xl font-semibold">{filteredJobs.length}</p>
+          </div>
+        </div>
+      </div>
+
+      <main className="px-8 py-6">
+        {filteredJobs.length === 0 ? (
+          <div className="rounded-lg border bg-white p-12 text-center">
+            <Filter className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-4 text-lg font-semibold text-gray-900">No jobs found</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              {jobs.length === 0
+                ? "Get started by creating your first job."
+                : "Try adjusting your search or filter criteria."}
+            </p>
+            {jobs.length === 0 && (
+              <Button onClick={() => router.push("/dashboard/jobs/create")} className="mt-4">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Your First Job
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                      Job Reference
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                      Job Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                      Customer
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                      Stage
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                      Priority
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                      Created
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {filteredJobs.map((job) => (
+                    <tr
+                      key={job.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="font-medium text-gray-900">{job.job_reference || "N/A"}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-gray-900">{job.job_name || "-"}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-gray-900">{job.customer_name || "Unknown"}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-700">{job.job_type}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStageColor(
+                            job.stage
+                          )}`}
+                        >
+                          {job.stage}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`text-sm ${getPriorityColor(job.priority)}`}>
+                          {job.priority}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {new Date(job.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => router.push(`/dashboard/jobs/${job.id}`)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setJobToDelete(job);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* ✅ Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {jobToDelete && (
+                <>
+                  <p className="mb-2">
+                    Are you sure you want to delete this job?
+                  </p>
+                  <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
+                    <p><strong>Job Reference:</strong> {jobToDelete.job_reference}</p>
+                    <p><strong>Customer:</strong> {jobToDelete.customer_name}</p>
+                    <p><strong>Type:</strong> {jobToDelete.job_type}</p>
+                  </div>
+                  <p className="mt-3 text-red-600 font-medium">
+                    This action cannot be undone.
+                  </p>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setDeleteDialogOpen(false);
+              setJobToDelete(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteJob}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

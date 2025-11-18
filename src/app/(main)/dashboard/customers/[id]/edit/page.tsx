@@ -34,9 +34,9 @@ interface Address {
 // Define stage permissions by role
 const ROLE_STAGE_PERMISSIONS: Record<string, string[]> = {
   Sales: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted"],
-  Production: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "OnHold", "Production", "Delivery", "Installation"],
-  Manager: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "OnHold", "Production", "Delivery", "Installation", "Complete", "Remedial", "Cancelled"],
-  HR: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "OnHold", "Production", "Delivery", "Installation", "Complete", "Remedial", "Cancelled"],
+  Production: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "Rejected", "Production", "Delivery", "Installation"],
+  Manager: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "Rejected", "Production", "Delivery", "Installation", "Complete", "Remedial", "Cancelled"],
+  HR: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "Rejected", "Production", "Delivery", "Installation", "Complete", "Remedial", "Cancelled"],
 };
 
 export default function CustomerEditPage() {

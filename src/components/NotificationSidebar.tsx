@@ -1,12 +1,12 @@
 "use client";
 
-import { Bell, X, Trash2, CheckCheck, Info } from "lucide-react";
+import { Bell, X, Trash2, CheckCheck, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEffect, useState, useRef } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { fetchWithAuth } from "@/lib/api";
+import { useRouter } from "next/navigation"; // ✅ Changed from react-router-dom
+import { useNotifications } from "@/contexts/NotificationContext";
 import {
   Sheet,
   SheetContent,
@@ -21,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import Link from "next/link"; // ✅ Added for navigation
 
 type Notification = {
   id: string;
@@ -130,11 +131,20 @@ function getNotificationPriority(notification: Notification): 'high' | 'medium' 
 }
 
 export function NotificationSidebar() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const { user } = useAuth();
-  const previousCountRef = useRef<number>(0);
+  const router = useRouter(); // ✅ Changed from useNavigate
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const previousUnreadCountRef = useRef<number>(0);
+  
+  // Use shared notification context
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    clearAllNotifications,
+  } = useNotifications();
 
   // Initialize audio element for notification sound
   useEffect(() => {
@@ -142,118 +152,37 @@ export function NotificationSidebar() {
     audioRef.current.volume = 0.5; // Set volume to 50%
   }, []);
 
-  /**
-   * Fetch notifications from the backend
-   * Polls every 30 seconds for new notifications
-   */
-  const fetchNotifications = async () => {
-    // Allow all authenticated users to see notifications
-    if (!user) return;
-
-    try {
-      const response = await fetchWithAuth('notifications/production');
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Check if there are NEW unread notifications
-        const unreadCount = data.filter((n: Notification) => !n.read).length;
-        const prevUnreadCount = notifications.filter(n => !n.read).length;
-        
-        // Play sound only when new unread notifications appear
-        if (unreadCount > prevUnreadCount && prevUnreadCount >= 0) {
-          if (audioRef.current && unreadCount > 0) {
-            audioRef.current.play().catch(error => {
-              console.log('Audio play failed:', error);
-              // Browser might block autoplay - this is expected and safe to ignore
-            });
-          }
-        }
-        
-        setNotifications(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch notifications:', error);
-    }
-  };
-
-  // Poll for notifications every 30 seconds
+  // Play sound when new unread notifications appear
   useEffect(() => {
-    if (user) {
-      fetchNotifications();
-      const interval = setInterval(fetchNotifications, 30000); // 30 seconds
-      return () => clearInterval(interval);
+    if (unreadCount > previousUnreadCountRef.current && previousUnreadCountRef.current > 0) {
+      if (audioRef.current) {
+        audioRef.current.play().catch(error => {
+          console.log('Audio play failed:', error);
+        });
+      }
     }
-  }, [user]);
+    previousUnreadCountRef.current = unreadCount;
+  }, [unreadCount]);
 
   /**
-   * Mark a single notification as read
+   * Handle clear all with confirmation
    */
-  const markAsRead = async (notificationId: string) => {
-    try {
-      await fetchWithAuth(`notifications/production/${notificationId}/read`, {
-        method: 'PATCH',
-      });
-      // Update local state to mark as read
-      setNotifications(prev => 
-        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-      );
-    } catch (error) {
-      console.error('Failed to mark notification as read:', error);
-    }
-  };
-
-  /**
-   * Mark all notifications as read
-   */
-  const markAllAsRead = async () => {
-    try {
-      await fetchWithAuth('notifications/production/mark-all-read', {
-        method: 'PATCH',
-      });
-      // Update local state to mark all as read
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    } catch (error) {
-      console.error('Failed to mark all notifications as read:', error);
-    }
-  };
-
-  /**
-   * Delete all notifications permanently (with confirmation)
-   */
-  const clearAllNotifications = async () => {
+  const handleClearAll = async () => {
     if (!window.confirm('Are you sure you want to clear all notifications? This action cannot be undone.')) {
       return;
     }
-
-    try {
-      await fetchWithAuth('notifications/production/clear-all', {
-        method: 'DELETE',
-      });
-      setNotifications([]);
-    } catch (error) {
-      console.error('Failed to clear all notifications:', error);
-    }
+    await clearAllNotifications();
   };
 
   /**
-   * Delete a single notification permanently
+   * Navigate to full notifications page
    */
-  const deleteNotification = async (notificationId: string) => {
-    try {
-      await fetchWithAuth(`notifications/production/${notificationId}`, {
-        method: 'DELETE',
-      });
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    } catch (error) {
-      console.error('Failed to delete notification:', error);
-    }
+  const handleViewAll = () => {
+    setIsOpen(false);
+    router.push('/dashboard/notifications'); // ✅ Changed from navigate
   };
 
-  // Don't render if user is not logged in
-  if (!user) return null;
-
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const displayedNotifications = notifications.slice(0, 10); // Show only first 10 in sidebar
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -265,7 +194,7 @@ export function NotificationSidebar() {
               variant="destructive" 
               className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs animate-pulse"
             >
-              {unreadCount}
+              {unreadCount > 9 ? '9+' : unreadCount}
             </Badge>
           )}
         </Button>
@@ -285,49 +214,60 @@ export function NotificationSidebar() {
                 </SheetDescription>
               </div>
               
-              {/* Action buttons */}
-              <div className="flex items-center space-x-2">
-                {unreadCount > 0 && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={markAllAsRead}
-                          className="flex items-center space-x-1"
-                        >
-                          <CheckCheck className="h-4 w-4" />
-                          <span className="hidden sm:inline">Mark all read</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        Mark all notifications as read
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {notifications.length > 0 && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          onClick={clearAllNotifications}
-                          className="flex items-center space-x-1"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="hidden sm:inline">Clear all</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        Permanently delete all notifications
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </div>
+              {/* View All Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleViewAll}
+                className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <span className="text-sm font-medium">View All</span>
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center space-x-2 mt-3">
+              {unreadCount > 0 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={markAllAsRead}
+                        className="flex items-center space-x-1 flex-1"
+                      >
+                        <CheckCheck className="h-4 w-4" />
+                        <span className="hidden sm:inline">Mark all read</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Mark all notifications as read
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {notifications.length > 0 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={handleClearAll}
+                        className="flex items-center space-x-1 flex-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Clear all</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Permanently delete all notifications
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
           </SheetHeader>
 
@@ -345,7 +285,7 @@ export function NotificationSidebar() {
             ) : (
               // Notification items
               <div className="divide-y">
-                {notifications.map((notification) => {
+                {displayedNotifications.map((notification) => {
                   const priority = getNotificationPriority(notification);
                   const icon = getNotificationIcon(notification.message);
                   
@@ -425,22 +365,22 @@ export function NotificationSidebar() {
                       {(notification.job_id || notification.customer_id) && (
                         <div className="mt-2 ml-7 flex items-center space-x-2 text-xs">
                           {notification.customer_id && (
-                            <a
-                              href={`/streemlyne/dashboard/customers/${notification.customer_id}`}
+                            <Link
+                              href={`/dashboard/customers/${notification.customer_id}`}
                               className="text-blue-600 hover:underline font-medium"
                               onClick={() => setIsOpen(false)}
                             >
                               View Customer →
-                            </a>
+                            </Link>
                           )}
                           {notification.job_id && (
-                            <a
+                            <Link
                               href={`/dashboard/jobs/${notification.job_id}`}
                               className="text-blue-600 hover:underline font-medium"
                               onClick={() => setIsOpen(false)}
                             >
                               View Job →
-                            </a>
+                            </Link>
                           )}
                         </div>
                       )}
@@ -450,6 +390,20 @@ export function NotificationSidebar() {
               </div>
             )}
           </ScrollArea>
+
+          {/* Footer - Show "View All" if more than 10 notifications */}
+          {notifications.length > 10 && (
+            <div className="border-t px-6 py-3 bg-gray-50">
+              <Button
+                variant="link"
+                size="sm"
+                onClick={handleViewAll}
+                className="w-full text-blue-600 hover:text-blue-700 font-medium"
+              >
+                View all {notifications.length} notifications →
+              </Button>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>

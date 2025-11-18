@@ -15,16 +15,24 @@ import {
   FileText,
   CheckSquare,
   Clock,
-  DollarSign,
-  Users,
-  MessageSquare,
-  Upload,
   Plus,
-  AlertCircle,
   CheckCircle,
+  Trash2,
+  Eye,
+  Download,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
+import { fetchWithAuth } from "@/lib/api";
 
 const formatDate = (dateString: string) => {
   if (!dateString) return "—";
@@ -69,6 +77,16 @@ const getPriorityColor = (priority: string) => {
   return colors[priority] || "bg-gray-100 text-gray-800";
 };
 
+const getApprovalStatusBadge = (status: string) => {
+  const variants: Record<string, { className: string; text: string }> = {
+    pending: { className: "bg-yellow-100 text-yellow-800", text: "Pending" },
+    approved: { className: "bg-green-100 text-green-800", text: "Approved" },
+    rejected: { className: "bg-red-100 text-red-800", text: "Rejected" },
+  };
+  const variant = variants[status] || variants.pending;
+  return <Badge className={variant.className}>{variant.text}</Badge>;
+};
+
 export default function JobDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -78,11 +96,13 @@ export default function JobDetailsPage() {
 
   const [job, setJob] = useState<any | null>(null);
   const [customer, setCustomer] = useState<any | null>(null);
-  const [quote, setQuote] = useState<any | null>(null);
   const [documents, setDocuments] = useState<any[]>([]);
-  const [checklists, setChecklists] = useState<any[]>([]);
+  const [formSubmissions, setFormSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("details");
+  
+  // Delete confirmation
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!jobId) return;
@@ -93,7 +113,7 @@ export default function JobDetailsPage() {
     try {
       setLoading(true);
 
-      // Load job details using centralized fetchWithAuth
+      // Load job details
       const jobRes = await fetchWithAuth(`jobs/${jobId}`);
       if (!jobRes.ok) throw new Error("Failed to fetch job");
       const jobData = await jobRes.json();
@@ -105,29 +125,47 @@ export default function JobDetailsPage() {
         if (customerRes.ok) {
           const customerData = await customerRes.json();
           setCustomer(customerData);
+          
+          // ✅ FIXED: Load customer's drawings from correct endpoint
+          try {
+            const docsRes = await fetchWithAuth(`files/drawings?customer_id=${jobData.customer_id}`);
+            if (docsRes.ok) {
+              const docsData = await docsRes.json();
+              console.log("✅ Loaded documents:", docsData);
+              
+              // Map the response to match our interface
+              const mappedDocs = docsData.map((doc: any) => ({
+                id: doc.id,
+                filename: doc.file_name || doc.filename,
+                url: doc.file_url || doc.url,
+                type: doc.category || doc.type || 'other',
+                created_at: doc.created_at,
+                uploaded_by: doc.uploaded_by
+              }));
+              
+              setDocuments(mappedDocs);
+            } else {
+              console.log("No drawings found or endpoint returned non-OK status");
+              setDocuments([]);
+            }
+          } catch (error) {
+            console.error("Error loading documents:", error);
+            setDocuments([]);
+          }
+
+          // ✅ FIXED: Get form submissions from customer object
+          try {
+            // Form submissions are nested in the customer object
+            const formSubmissions = customerData.form_submissions || [];
+            console.log("✅ Loaded form submissions:", formSubmissions);
+            setFormSubmissions(formSubmissions);
+          } catch (error) {
+            console.error("Error loading form submissions:", error);
+            setFormSubmissions([]);
+          }
         }
       }
 
-      // Load linked quote
-      if (jobData.quote_id) {
-        const quoteRes = await fetchWithAuth(`quotations/${jobData.quote_id}`);
-        if (quoteRes.ok) {
-          const quoteData = await quoteRes.json();
-          setQuote(quoteData);
-        }
-      }
-
-      // Load documents (mock data for now)
-      setDocuments([
-        { id: 1, name: "Floor Plan.pdf", type: "PDF", size: "2.1 MB", uploaded_at: "2024-01-15" },
-        { id: 2, name: "Kitchen Design.png", type: "Image", size: "1.8 MB", uploaded_at: "2024-01-16" },
-      ]);
-
-      // Load checklists (mock data for now)
-      setChecklists([
-        { id: 1, name: "Pre-Installation Checklist", status: "Complete", items_completed: 8, total_items: 8 },
-        { id: 2, name: "Quality Control Checklist", status: "In Progress", items_completed: 3, total_items: 12 },
-      ]);
     } catch (error) {
       console.error("Error loading job data:", error);
     } finally {
@@ -139,28 +177,50 @@ export default function JobDetailsPage() {
     router.push(`/dashboard/jobs/${jobId}/edit`);
   };
 
-  const handleAddRooms = () => {
-    router.push(`/dashboard/jobs/${jobId}/rooms`);
-  };
-
-  const handleCreateCountingSheet = () => {
-    router.push(`/dashboard/counting-sheets/create?jobId=${jobId}`);
-  };
-
   const handleCreateSchedule = () => {
     router.push(`/dashboard/schedules/create?jobId=${jobId}`);
   };
 
-  const handleCreateInvoice = () => {
-    router.push(`/dashboard/invoices/create?jobId=${jobId}`);
+  // Delete job handler
+  const handleDeleteJob = async () => {
+    try {
+      const response = await fetchWithAuth(`jobs/${jobId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete job");
+      }
+
+      router.push("/dashboard/jobs?deleted=true");
+    } catch (error) {
+      console.error("Error deleting job:", error);
+      alert("Failed to delete job. Please try again.");
+    }
   };
 
   if (loading) {
-    return <div className="p-8">Loading...</div>;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading job details...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!job) {
-    return <div className="p-8">Job not found.</div>;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg text-gray-600">Job not found</p>
+          <Button onClick={() => router.push("/dashboard/jobs")} className="mt-4">
+            Back to Jobs
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -201,11 +261,20 @@ export default function JobDetailsPage() {
                     </Badge>
                   )}
                 </div>
-                <p className="mt-1 text-lg text-gray-600">{job.job_name || job.type}</p>
+                <p className="mt-1 text-lg text-gray-600">{job.job_name || job.job_type}</p>
               </div>
             </div>
 
             <div className="flex items-center space-x-3">
+              <Button 
+                variant="outline" 
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Job
+              </Button>
+              
               <Button variant="outline" onClick={handleEdit}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit Job
@@ -214,7 +283,7 @@ export default function JobDetailsPage() {
           </div>
 
           {/* Quick Info Cards */}
-          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
@@ -242,23 +311,11 @@ export default function JobDetailsPage() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
-                  <DollarSign className="h-5 w-5 text-gray-500" />
-                  <div>
-                    <p className="text-sm font-medium">Agreed Price</p>
-                    <p className="text-sm text-gray-600">{formatCurrency(job.agreed_price)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
                   <MapPin className="h-5 w-5 text-gray-500" />
                   <div>
                     <p className="text-sm font-medium">Location</p>
                     <p className="truncate text-sm text-gray-600">
-                      {job.installation_address ? job.installation_address.split(",")[0] : "—"}
+                      {job.installation_address ? job.installation_address.split(",")[0] : customer?.address?.split(",")[0] || "—"}
                     </p>
                   </div>
                 </div>
@@ -268,47 +325,27 @@ export default function JobDetailsPage() {
         </div>
       </div>
 
-      {/* Next Steps CTA Panel */}
-      {showSuccess && (
-        <div className="border-b border-blue-200 bg-blue-50">
-          <div className="mx-auto max-w-7xl px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium text-blue-900">Next Steps</h3>
-                <p className="text-sm text-blue-700">Complete your job setup with these quick actions</p>
-              </div>
-              <div className="flex space-x-2">
-                <Button size="sm" variant="outline" onClick={handleAddRooms}>
-                  Add Rooms
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleCreateCountingSheet}>
-                  Create Counting Sheet
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleCreateSchedule}>
-                  Create Schedule
-                </Button>
-                <Button size="sm" onClick={handleCreateInvoice}>
-                  Create Invoice
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="checklists">Checklists</TabsTrigger>
+            <TabsTrigger value="documents">
+              Documents
+              {documents.length > 0 && (
+                <Badge variant="secondary" className="ml-2">{documents.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="checklists">
+              Checklists
+              {formSubmissions.length > 0 && (
+                <Badge variant="secondary" className="ml-2">{formSubmissions.length}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
-            <TabsTrigger value="financials">Financials</TabsTrigger>
-            <TabsTrigger value="team">Team</TabsTrigger>
-            <TabsTrigger value="notes">Notes</TabsTrigger>
           </TabsList>
 
+          {/* DETAILS TAB */}
           <TabsContent value="details" className="space-y-6">
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {/* Job Information */}
@@ -324,7 +361,7 @@ export default function JobDetailsPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-500">Type</p>
-                      <p className="text-base">{job.type}</p>
+                      <p className="text-base">{job.job_type}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-500">Stage</p>
@@ -342,7 +379,7 @@ export default function JobDetailsPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-500">Salesperson</p>
-                      <p className="text-base">{job.salesperson_name || "—"}</p>
+                      <p className="text-base">{job.salesperson_name || customer?.salesperson || "—"}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -362,15 +399,15 @@ export default function JobDetailsPage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-500">Email</p>
-                        <p className="text-base">{customer.email}</p>
+                        <p className="text-base">{customer.email || "—"}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-500">Phone</p>
-                        <p className="text-base">{customer.phone}</p>
+                        <p className="text-base">{customer.phone || "—"}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-500">Address</p>
-                        <p className="text-base">{customer.address}</p>
+                        <p className="text-base">{customer.address || "—"}</p>
                       </div>
                       <div className="pt-2">
                         <Button
@@ -417,42 +454,77 @@ export default function JobDetailsPage() {
                   <CardTitle>Installation Address</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-base">{job.installation_address || "—"}</p>
+                  <p className="text-base">{job.installation_address || customer?.address || "—"}</p>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
+          {/* DOCUMENTS TAB - Real-time from Customer's Drawings */}
           <TabsContent value="documents" className="space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Documents</CardTitle>
-                  <Button>
-                    <Upload className="mr-2 h-4 w-4" />
-                    Upload Document
-                  </Button>
+                  <div>
+                    <CardTitle>Documents & Drawings</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Documents uploaded by the customer in their profile
+                    </p>
+                  </div>
+                  {customer && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                    >
+                      View in Customer Profile
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
                 {documents.length > 0 ? (
                   <div className="space-y-3">
                     {documents.map((doc) => (
-                      <div key={doc.id} className="flex items-center justify-between rounded border p-3">
+                      <div key={doc.id} className="flex items-center justify-between rounded border p-4 hover:bg-gray-50">
                         <div className="flex items-center space-x-3">
-                          <FileText className="h-5 w-5 text-gray-500" />
+                          <FileText className="h-5 w-5 text-blue-500" />
                           <div>
-                            <p className="font-medium">{doc.name}</p>
+                            <p className="font-medium">{doc.filename}</p>
                             <p className="text-sm text-gray-500">
-                              {doc.size} • {formatDate(doc.uploaded_at)}
+                              {doc.type} • {formatDate(doc.created_at)}
+                              {doc.uploaded_by && ` • Uploaded by ${doc.uploaded_by}`}
                             </p>
                           </div>
                         </div>
                         <div className="flex space-x-2">
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const viewUrl = doc.url.startsWith('http') 
+                                ? doc.url 
+                                : `https://aztec-interiors.onrender.com${doc.url}`;
+                              window.open(viewUrl, '_blank');
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
                             View
                           </Button>
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const downloadUrl = doc.url.startsWith('http') 
+                                ? doc.url 
+                                : `https://aztec-interiors.onrender.com${doc.url}`;
+                              const link = document.createElement('a');
+                              link.href = downloadUrl;
+                              link.download = doc.filename;
+                              link.click();
+                            }}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
                             Download
                           </Button>
                         </div>
@@ -460,215 +532,226 @@ export default function JobDetailsPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-gray-500">
+                  <div className="py-12 text-center text-gray-500">
                     <FileText className="mx-auto mb-4 h-12 w-12 opacity-50" />
-                    <p>No documents uploaded yet</p>
+                    <p className="font-medium">No documents uploaded yet</p>
+                    <p className="text-sm mt-1">Customer hasn't uploaded any drawings or documents</p>
+                    {customer && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-4"
+                        onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                      >
+                        Go to Customer Profile to Upload
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* CHECKLISTS TAB - Real-time from Customer's Form Submissions */}
           <TabsContent value="checklists" className="space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Checklists</CardTitle>
-                  <Button onClick={handleCreateCountingSheet}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Checklist
-                  </Button>
+                  <div>
+                    <CardTitle>Form Submissions</CardTitle>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Checklists and forms submitted by the customer
+                    </p>
+                  </div>
+                  {customer && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                    >
+                      View in Customer Profile
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
-                {checklists.length > 0 ? (
+                {formSubmissions.length > 0 ? (
                   <div className="space-y-3">
-                    {checklists.map((checklist) => (
-                      <div key={checklist.id} className="flex items-center justify-between rounded border p-3">
-                        <div className="flex items-center space-x-3">
-                          <CheckSquare className="h-5 w-5 text-gray-500" />
-                          <div>
-                            <p className="font-medium">{checklist.name}</p>
-                            <p className="text-sm text-gray-500">
-                              {checklist.items_completed}/{checklist.total_items} items completed
-                            </p>
+                    {formSubmissions.map((form) => {
+                      // Parse form data
+                      let formData: any = {};
+                      try {
+                        formData = typeof form.form_data === 'string' 
+                          ? JSON.parse(form.form_data) 
+                          : form.form_data || {};
+                      } catch {
+                        formData = {};
+                      }
+                      
+                      const formKeys = Object.keys(formData);
+                      const completedFields = formKeys.filter(key => 
+                        formData[key] && formData[key] !== ''
+                      ).length;
+                      
+                      // Determine form type
+                      const formType = formData.form_type || formData.checklistType || 'form';
+                      const isChecklist = formType.toLowerCase().includes('kitchen') || 
+                                        formType.toLowerCase().includes('bedroom');
+                      
+                      return (
+                        <div key={form.id} className="rounded border p-4 hover:bg-gray-50">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
+                              <CheckSquare className="h-5 w-5 text-green-500" />
+                              <div>
+                                <p className="font-medium">
+                                  {isChecklist 
+                                    ? `${formType.charAt(0).toUpperCase() + formType.slice(1)} Checklist`
+                                    : 'Form Submission'} #{form.id}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  Submitted: {formatDate(form.submitted_at)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-3">
+                              {form.approval_status && getApprovalStatusBadge(form.approval_status)}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  // Open checklist in new tab or navigate to customer profile
+                                  if (isChecklist) {
+                                    window.open(`/streemlyne/checklist-view?id=${form.id}`, '_blank');
+                                  } else {
+                                    router.push(`/dashboard/customers/${customer.id}?formId=${form.id}`);
+                                  }
+                                }}
+                              >
+                                View Details
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Progress Bar */}
+                          {formKeys.length > 0 && (
+                            <div className="mb-2">
+                              <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
+                                <span>Completion</span>
+                                <span>{completedFields}/{formKeys.length} fields</span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-green-500 h-2 rounded-full transition-all"
+                                  style={{ width: `${(completedFields / formKeys.length) * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Show preview of key fields */}
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                            {formKeys.slice(0, 4).map((key) => (
+                              <div key={key} className="text-gray-600">
+                                <span className="font-medium capitalize">
+                                  {key.replace(/_/g, ' ')}:
+                                </span>{' '}
+                                <span className="text-gray-900">
+                                  {formData[key] ? String(formData[key]).substring(0, 30) : '—'}
+                                  {formData[key] && String(formData[key]).length > 30 ? '...' : ''}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                        <div className="flex items-center space-x-3">
-                          <Badge
-                            className={
-                              checklist.status === "Complete"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-yellow-100 text-yellow-800"
-                            }
-                          >
-                            {checklist.status}
-                          </Badge>
-                          <Button variant="outline" size="sm">
-                            View
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="py-8 text-center text-gray-500">
+                  <div className="py-12 text-center text-gray-500">
                     <CheckSquare className="mx-auto mb-4 h-12 w-12 opacity-50" />
-                    <p>No checklists created yet</p>
+                    <p className="font-medium">No form submissions yet</p>
+                    <p className="text-sm mt-1">Customer hasn't submitted any checklists or forms</p>
+                    {customer && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-4"
+                        onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                      >
+                        Go to Customer Profile
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
           </TabsContent>
 
+          {/* SCHEDULE TAB */}
           <TabsContent value="schedule" className="space-y-6">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Schedule</CardTitle>
                   <Button onClick={handleCreateSchedule}>
-                    <Calendar className="mr-2 h-4 w-4" />
+                    <Plus className="mr-2 h-4 w-4" />
                     Create Schedule
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="py-8 text-center text-gray-500">
-                  <Calendar className="mx-auto mb-4 h-12 w-12 opacity-50" />
-                  <p>No schedule created yet</p>
-                  <p className="mt-2 text-sm">Create a schedule to track project milestones and deadlines</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="financials" className="space-y-6">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Pricing Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Pricing</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium text-gray-500">Quote Price</span>
-                      <span className="text-base">{formatCurrency(job.quote_price)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium text-gray-500">Agreed Price</span>
-                      <span className="text-base font-medium">{formatCurrency(job.agreed_price)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium text-gray-500">Deposit Amount</span>
-                      <span className="text-base">{formatCurrency(job.deposit_amount)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium text-gray-500">Deposit Due</span>
-                      <span className="text-base">{formatDate(job.deposit_due_date)}</span>
-                    </div>
-                  </div>
-
-                  {quote && (
-                    <div className="border-t pt-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Linked Quote</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => router.push(`/dashboard/quotes/${quote.id}`)}
-                        >
-                          View Quote #{quote.id}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Invoices & Payments */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Invoices & Payments</CardTitle>
-                    <Button size="sm" onClick={handleCreateInvoice}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Invoice
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="py-8 text-center text-gray-500">
-                    <DollarSign className="mx-auto mb-4 h-12 w-12 opacity-50" />
-                    <p>No invoices created yet</p>
-                    <p className="mt-2 text-sm">Create invoices to track payments and billing</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="team" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Team Assignment</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Assigned Team</p>
-                    <p className="text-base">{job.assigned_team_name || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Primary Fitter</p>
-                    <p className="text-base">{job.primary_fitter_name || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Salesperson</p>
-                    <p className="text-base">{job.salesperson_name || "—"}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="notes" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Notes & Comments</CardTitle>
-                  <Button size="sm">
+                <div className="py-12 text-center text-gray-500">
+                  <Clock className="mx-auto mb-4 h-12 w-12 opacity-50" />
+                  <p className="font-medium">No schedule created yet</p>
+                  <p className="text-sm mt-1">Create a schedule to track project milestones and deadlines</p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={handleCreateSchedule}
+                  >
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Note
+                    Create Schedule
                   </Button>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {job.notes ? (
-                  <div className="space-y-4">
-                    <div className="rounded border bg-gray-50 p-4">
-                      <div className="flex items-start space-x-3">
-                        <MessageSquare className="mt-0.5 h-5 w-5 text-gray-500" />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">Initial Notes</p>
-                          <p className="mt-1 text-sm text-gray-600">{job.notes}</p>
-                          <p className="mt-2 text-xs text-gray-500">Added: {formatDate(job.created_at)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="py-8 text-center text-gray-500">
-                    <MessageSquare className="mx-auto mb-4 h-12 w-12 opacity-50" />
-                    <p>No notes added yet</p>
-                    <p className="mt-2 text-sm">Add notes to track important information and updates</p>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <p className="mb-2">
+                Are you sure you want to delete this job?
+              </p>
+              <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
+                <p><strong>Job Reference:</strong> {job.job_reference}</p>
+                <p><strong>Customer:</strong> {customer?.name}</p>
+                <p><strong>Type:</strong> {job.job_type}</p>
+              </div>
+              <p className="mt-3 text-red-600 font-medium">
+                This action cannot be undone. All associated data will be permanently deleted.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteJob}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Job
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -16,12 +16,14 @@ import {
   Gauge,
   GraduationCap,
   CheckCircle,
+  Package,
   Home,
   Briefcase,
   FileText,
   Settings,
   type LucideIcon,
   Bot,
+  Bell,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -32,6 +34,7 @@ export interface NavSubItem {
   newTab?: boolean;
   isNew?: boolean;
   roles?: string[]; // Add roles field
+  badge?: number | string; // Add badge support for notification count
 }
 
 export interface NavMainItem {
@@ -43,6 +46,7 @@ export interface NavMainItem {
   newTab?: boolean;
   isNew?: boolean;
   roles?: string[]; // Add roles field
+  badge?: number | string; // Add badge support for notification count
 }
 
 export interface NavGroup {
@@ -61,49 +65,55 @@ const allSidebarItems: NavGroup[] = [
         title: "Dashboard",
         url: "/dashboard/default",
         icon: Home,
-        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
-      },
-      {
-        title: "Customers",
-        url: "/dashboard/customers",
-        icon: Users,
-        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
-      },
-      {
-        title: "Jobs",
-        url: "/dashboard/jobs",
-        icon: Briefcase,
-        roles: ["manager", "hr", "production"], // ✅ Changed HR to hr
+        roles: ["manager", "hr", "sales", "production"],
       },
       {
         title: "Sales Pipeline",
         url: "/dashboard/sales_pipeline",
         icon: Briefcase,
-        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
+        roles: ["manager", "hr", "sales", "production"],
+      },
+      {
+        title: "Customers",
+        url: "/dashboard/customers",
+        icon: Users,
+        roles: ["manager", "hr", "sales", "production"],
+      },
+      {
+        title: "Jobs",
+        url: "/dashboard/jobs",
+        icon: Briefcase,
+        roles: ["manager", "hr", "production"],
+      },
+      {
+        title: "Materials",
+        url: "/dashboard/materials",
+        icon: Package,
+        roles: ["manager", "hr", "production"],
       },
       {
         title: "Schedule",
         url: "/dashboard/schedule",
         icon: Calendar,
-        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
+        roles: ["manager", "hr", "sales", "production"],
       },
       {
         title: "Forms/Checklists",
         url: "/dashboard/forms",
         icon: FileText,
-        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
+        roles: ["manager", "hr", "sales", "production"],
       },
       {
         title: "Appliances",
         url: "/dashboard/appliances",
         icon: Forklift,
-        roles: ["manager", "hr", "production"], // ✅ Changed HR to hr
+        roles: ["manager", "hr", "production"],
       },
       {
         title: "Chatbot",
         url: "/dashboard/chatbot",
         icon: Bot,
-        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
+        roles: ["manager", "hr", "sales", "production"],
       },
       {
         title: "Approvals",
@@ -112,27 +122,45 @@ const allSidebarItems: NavGroup[] = [
         roles: ["manager"],
       },
       {
+        title: "Notifications",
+        url: "/dashboard/notifications",
+        icon: Bell,
+        roles: ["manager", "hr", "sales", "production"],
+        // Badge will be set dynamically - don't hardcode it here
+      },
+      {
         title: "Settings",
         url: "/dashboard/settings",
         icon: Settings,
-        roles: ["manager", "hr", "sales", "production"], // ✅ Changed HR to hr
+        roles: ["manager", "hr", "sales", "production"],
       },
     ],
   },
 ];
 
-// Filter sidebar items based on user role
-export const getSidebarItems = (userRole: string): NavGroup[] => {
+// Filter sidebar items based on user role and optionally set notification badge
+export const getSidebarItems = (userRole: string, notificationCount?: number): NavGroup[] => {
   const normalizedRole = userRole?.toLowerCase();
   return allSidebarItems
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => {
-        // If no roles defined, show to everyone
-        if (!item.roles || item.roles.length === 0) return true;
-        // Check if user's role is in the allowed roles
-        return item.roles.includes(userRole);
-      }),
+      items: group.items
+        .filter((item) => {
+          // If no roles defined, show to everyone
+          if (!item.roles || item.roles.length === 0) return true;
+          // Check if user's role is in the allowed roles
+          return item.roles.includes(userRole);
+        })
+        .map((item) => {
+          // Update notification badge count dynamically
+          if (item.title === "Notifications" && notificationCount !== undefined && notificationCount > 0) {
+            return {
+              ...item,
+              badge: notificationCount > 9 ? '9+' : notificationCount,
+            };
+          }
+          return item;
+        }),
     }))
     .filter((group) => group.items.length > 0); // Remove empty groups
 };
