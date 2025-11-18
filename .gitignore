@@ -1,3 +1,5 @@
 .vercel
 .next/
 .node_modules/
+.next/type
+.next/types
