@@ -526,12 +526,20 @@ export default function EnhancedPipelinePage() {
             pipelineItemsRetrieved = rawPipelineData.map((item: any) => {
               const isProjectItem = item.id.startsWith("project-");
 
-              // ✅ NEW: Use most advanced stage from backend
-              const primaryStage = item.type === "customer" 
-                ? item.stage  // Customer's most advanced stage
-                : item.job?.stage || item.stage || "Lead";
-
-              const validStage = STAGES.includes(primaryStage) ? primaryStage : ("Lead" as Stage);
+              // ✅ BEST FIX: Just use the stage from backend - trust it completely
+              const backendStage = item.stage;  // Backend always provides correct stage
+              
+              // Validate it's in our STAGES array
+              const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
+              
+              if (!STAGES.includes(backendStage)) {
+                console.error('⚠️ Backend returned invalid stage:', {
+                  itemId: item.id,
+                  customerName: item.customer?.name,
+                  invalidStage: backendStage,
+                  availableStages: STAGES
+                });
+              }
 
               const commonItem = {
                 id: item.id,
@@ -552,11 +560,8 @@ export default function EnhancedPipelinePage() {
                   project_count: item.project_count || 0,
                 };
               } else {
-                const jobStage = item.job?.stage
-                  ? STAGES.includes(item.job.stage)
-                    ? item.job.stage
-                    : "Lead"
-                  : validStage;
+                // ✅ For jobs/projects, use the stage from backend (already in validStage)
+                const jobStage = validStage;
 
                 const jobReference = isProjectItem
                   ? item.job.job_reference || `PROJ-${item.job.id.slice(-4).toUpperCase()}`
@@ -948,7 +953,7 @@ export default function EnhancedPipelinePage() {
     }
   };
 
-    // --- FIX: Updated refetchPipelineData (simplified for single endpoint reliability) ---
+// --- FIX: Updated refetchPipelineData (simplified for single endpoint reliability) ---
     const refetchPipelineData = async () => {
       try {
         const pipelineResponse = await fetchWithAuth("pipeline");
@@ -958,9 +963,18 @@ export default function EnhancedPipelinePage() {
           const items = pipelineData.map((item: any) => {
             const isProjectItem = item.id.startsWith("project-");
 
-            const primaryStage = item.type === "customer" ? item.customer.stage : item.job?.stage || item.customer.stage;
+            // ✅ BEST FIX: Trust backend stage completely
+            const backendStage = item.stage;
+            const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
 
-            const validStage = STAGES.includes(primaryStage) ? primaryStage : ("Lead" as Stage);
+            if (!STAGES.includes(backendStage)) {
+              console.error('⚠️ Backend returned invalid stage during refetch:', {
+                itemId: item.id,
+                customerName: item.customer?.name,
+                invalidStage: backendStage,
+                availableStages: STAGES
+              });
+            }
 
             const commonItem = {
               id: item.id,
@@ -977,9 +991,11 @@ export default function EnhancedPipelinePage() {
                 type: "customer" as const,
                 reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
                 jobType: item.customer.project_types?.join(", "),
+                project_count: item.project_count || 0,
               };
             } else {
-              const jobStage = item.job?.stage ? (STAGES.includes(item.job.stage) ? item.job.stage : "Lead") : validStage;
+              // ✅ Use the validated stage from backend
+              const jobStage = validStage;
 
               // CRITICAL FIX: Correctly extract name and reference for Project vs Job
               const jobReference = isProjectItem
