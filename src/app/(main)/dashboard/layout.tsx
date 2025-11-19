@@ -18,7 +18,7 @@ import { AccountSwitcher } from "@/app/(main)/dashboard/_components/sidebar/acco
 import { LayoutControls } from "@/app/(main)/dashboard/_components/sidebar/layout-controls";
 import { ThemeSwitcher } from "@/app/(main)/dashboard/_components/sidebar/theme-switcher";
 
-import { AuthProvider } from "@/contexts/AuthContext";
+// import { AuthProvider } from "@/contexts/AuthContext";
 // import ProtectedRoute from "@/contexts/ProtectedRoute"; // ❌ TEMPORARILY DISABLED
 
 export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
@@ -38,7 +38,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   };
 
   return (
-    <AuthProvider>
+    // <AuthProvider>
       {/* ❌ ProtectedRoute temporarily disabled to debug loop */}
       {/* <ProtectedRoute> */}
         <SidebarProvider defaultOpen={defaultOpen}>
@@ -66,6 +66,6 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           </SidebarInset>
         </SidebarProvider>
       {/* </ProtectedRoute> */}
-    </AuthProvider>
+    {/* </AuthProvider> */}
   );
 }
