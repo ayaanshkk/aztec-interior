@@ -1,7 +1,6 @@
 // 1. CENTRALIZED BASE CONFIGURATION
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://aztec-interiors.onrender.com";
-// const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
 // Auth uses Next.js API routes
 const AUTH_API_ROOT = `${BASE_PATH}/api`;
