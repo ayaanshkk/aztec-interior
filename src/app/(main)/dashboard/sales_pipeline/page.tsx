@@ -955,90 +955,171 @@ export default function EnhancedPipelinePage() {
   };
 
 // --- FIX: Updated refetchPipelineData (simplified for single endpoint reliability) ---
-    const refetchPipelineData = async () => {
-      try {
-        const pipelineResponse = await fetchWithAuth("pipeline");
-        if (pipelineResponse.ok) {
-          const pipelineData = await pipelineResponse.json();
+    // const refetchPipelineData = async () => {
+    //   try {
+    //     const pipelineResponse = await fetchWithAuth("pipeline");
+    //     if (pipelineResponse.ok) {
+    //       const pipelineData = await pipelineResponse.json();
 
-          const items = pipelineData.map((item: any) => {
-            const isProjectItem = item.id.startsWith("project-");
+    //       const items = pipelineData.map((item: any) => {
+    //         const isProjectItem = item.id.startsWith("project-");
 
-            // ✅ BEST FIX: Trust backend stage completely
-            const backendStage = item.stage;
-            const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
+    //         // ✅ BEST FIX: Trust backend stage completely
+    //         const backendStage = item.stage;
+    //         const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
 
-            if (!STAGES.includes(backendStage)) {
-              console.error('⚠️ Backend returned invalid stage during refetch:', {
-                itemId: item.id,
-                customerName: item.customer?.name,
-                invalidStage: backendStage,
-                availableStages: STAGES
-              });
-            }
+    //         if (!STAGES.includes(backendStage)) {
+    //           console.error('⚠️ Backend returned invalid stage during refetch:', {
+    //             itemId: item.id,
+    //             customerName: item.customer?.name,
+    //             invalidStage: backendStage,
+    //             availableStages: STAGES
+    //           });
+    //         }
 
-            const commonItem = {
-              id: item.id,
-              customer: item.customer,
-              name: item.customer.name,
-              salesperson: item.job?.salesperson_name || item.customer.salesperson,
-              measureDate: item.job?.measure_date || item.customer.date_of_measure,
-              stage: validStage,
+    //         const commonItem = {
+    //           id: item.id,
+    //           customer: item.customer,
+    //           name: item.customer.name,
+    //           salesperson: item.job?.salesperson_name || item.customer.salesperson,
+    //           measureDate: item.job?.measure_date || item.customer.date_of_measure,
+    //           stage: validStage,
+    //         };
+
+    //         if (item.type === "customer") {
+    //           return {
+    //             ...commonItem,
+    //             type: "customer" as const,
+    //             reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
+    //             jobType: item.customer.project_types?.join(", "),
+    //             project_count: item.project_count || 0,
+    //           };
+    //         } else {
+    //           // ✅ Use the validated stage from backend
+    //           const jobStage = validStage;
+
+    //           // CRITICAL FIX: Correctly extract name and reference for Project vs Job
+    //           const jobReference = isProjectItem
+    //             ? item.job.job_reference || `PROJ-${item.job.id.slice(-4).toUpperCase()}`
+    //             : item.job.job_reference || `JOB-${item.job.id.slice(-4).toUpperCase()}`;
+
+    //           // CRITICAL FIX: Generate unique name for Project items
+    //           const jobName = isProjectItem ? `${item.customer.name} - ${item.job.job_name}` : item.customer.name;
+
+    //           return {
+    //             ...commonItem,
+    //             type: isProjectItem ? ("project" as const) : ("job" as const),
+    //             job: item.job,
+    //             name: jobName,
+    //             reference: jobReference,
+    //             stage: jobStage as Stage,
+    //             jobType: item.job.job_type,
+    //             // Note: Quote/Agreed/Deposit fields will be null/false if it's a Project from the backend fix
+    //             quotePrice: item.job.quote_price,
+    //             agreedPrice: item.job.agreed_price,
+    //             soldAmount: item.job.sold_amount,
+    //             deposit1: item.job.deposit1,
+    //             deposit2: item.job.deposit2,
+    //             deposit1Paid: item.job.deposit1_paid || false,
+    //             deposit2Paid: item.job.deposit2_paid || false,
+    //             deliveryDate: item.job.delivery_date,
+    //             measureDate: item.job.measure_date,
+    //           };
+    //         }
+    //       });
+
+    //       const filteredItems = items.filter((item: PipelineItem) => canUserAccessItem(item));
+    //       setPipelineItems(filteredItems);
+
+    //       const updatedFeatures = mapPipelineToFeatures(filteredItems);
+    //       setFeatures(updatedFeatures);
+    //       prevFeaturesRef.current = updatedFeatures;
+    //     }
+    //   } catch (pipelineError) {
+    //     console.log("Pipeline refetch failed, using original state fallback");
+    //   }
+    // };
+
+  const refetchPipelineData = async () => {
+    try {
+      const pipelineResponse = await fetchWithAuth("pipeline");
+      if (pipelineResponse.ok) {
+        const pipelineData = await pipelineResponse.json();
+
+        const items = pipelineData.map((item: any) => {
+          const isProjectItem = item.id.startsWith("project-");
+
+          // ✅ FIX: Use the stage from the TOP LEVEL of the backend response
+          const backendStage = item.stage; // This is correct!
+          const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
+
+          if (!STAGES.includes(backendStage)) {
+            console.error('⚠️ Backend returned invalid stage during refetch:', {
+              itemId: item.id,
+              customerName: item.customer?.name,
+              invalidStage: backendStage,
+              availableStages: STAGES
+            });
+          }
+
+          const commonItem = {
+            id: item.id,
+            customer: item.customer,
+            name: item.customer.name,
+            salesperson: item.job?.salesperson_name || item.customer.salesperson,
+            measureDate: item.job?.measure_date || item.customer.date_of_measure,
+            stage: validStage, // ✅ Use the validated backend stage
+          };
+
+          if (item.type === "customer") {
+            return {
+              ...commonItem,
+              type: "customer" as const,
+              reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
+              jobType: item.customer.project_types?.join(", "),
+              project_count: item.project_count || 0,
             };
+          } else {
+            const jobReference = isProjectItem
+              ? item.job.job_reference || `PROJ-${item.job.id.slice(-4).toUpperCase()}`
+              : item.job.job_reference || `JOB-${item.job.id.slice(-4).toUpperCase()}`;
 
-            if (item.type === "customer") {
-              return {
-                ...commonItem,
-                type: "customer" as const,
-                reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
-                jobType: item.customer.project_types?.join(", "),
-                project_count: item.project_count || 0,
-              };
-            } else {
-              // ✅ Use the validated stage from backend
-              const jobStage = validStage;
+            const jobName = isProjectItem 
+              ? `${item.customer.name} - ${item.job.job_name}` 
+              : item.customer.name;
 
-              // CRITICAL FIX: Correctly extract name and reference for Project vs Job
-              const jobReference = isProjectItem
-                ? item.job.job_reference || `PROJ-${item.job.id.slice(-4).toUpperCase()}`
-                : item.job.job_reference || `JOB-${item.job.id.slice(-4).toUpperCase()}`;
+            return {
+              ...commonItem,
+              type: isProjectItem ? ("project" as const) : ("job" as const),
+              job: item.job,
+              name: jobName,
+              reference: jobReference,
+              stage: validStage, // ✅ Use the same validated backend stage
+              jobType: item.job.job_type,
+              quotePrice: item.job.quote_price,
+              agreedPrice: item.job.agreed_price,
+              soldAmount: item.job.sold_amount,
+              deposit1: item.job.deposit1,
+              deposit2: item.job.deposit2,
+              deposit1Paid: item.job.deposit1_paid || false,
+              deposit2Paid: item.job.deposit2_paid || false,
+              deliveryDate: item.job.delivery_date,
+              measureDate: item.job.measure_date,
+            };
+          }
+        });
 
-              // CRITICAL FIX: Generate unique name for Project items
-              const jobName = isProjectItem ? `${item.customer.name} - ${item.job.job_name}` : item.customer.name;
+        const filteredItems = items.filter((item: PipelineItem) => canUserAccessItem(item));
+        setPipelineItems(filteredItems);
 
-              return {
-                ...commonItem,
-                type: isProjectItem ? ("project" as const) : ("job" as const),
-                job: item.job,
-                name: jobName,
-                reference: jobReference,
-                stage: jobStage as Stage,
-                jobType: item.job.job_type,
-                // Note: Quote/Agreed/Deposit fields will be null/false if it's a Project from the backend fix
-                quotePrice: item.job.quote_price,
-                agreedPrice: item.job.agreed_price,
-                soldAmount: item.job.sold_amount,
-                deposit1: item.job.deposit1,
-                deposit2: item.job.deposit2,
-                deposit1Paid: item.job.deposit1_paid || false,
-                deposit2Paid: item.job.deposit2_paid || false,
-                deliveryDate: item.job.delivery_date,
-                measureDate: item.job.measure_date,
-              };
-            }
-          });
-
-          const filteredItems = items.filter((item: PipelineItem) => canUserAccessItem(item));
-          setPipelineItems(filteredItems);
-
-          const updatedFeatures = mapPipelineToFeatures(filteredItems);
-          setFeatures(updatedFeatures);
-          prevFeaturesRef.current = updatedFeatures;
-        }
-      } catch (pipelineError) {
-        console.log("Pipeline refetch failed, using original state fallback");
+        const updatedFeatures = mapPipelineToFeatures(filteredItems);
+        setFeatures(updatedFeatures);
+        prevFeaturesRef.current = updatedFeatures;
       }
-    };
+    } catch (pipelineError) {
+      console.log("Pipeline refetch failed, using original state fallback");
+    }
+  };
 
   const filteredFeatures = useMemo(() => {
     if (loading) return [];
