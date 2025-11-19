@@ -175,7 +175,7 @@ export function ProductionMaterialsManagement() {
       
       if (mappedCustomers.length > 0) {
         console.log('✅ Customers with Accepted projects loaded:', 
-          mappedCustomers.map(c => `${c.name} (${c.projects_at_stage} project(s) in Accepted)`)
+          mappedCustomers.map((c: Customer) => `${c.name} (${c.projects_at_stage} project(s) in Accepted)`)
         );
       } else {
         console.log('⚠️ No customers found with projects in Accepted stage');
