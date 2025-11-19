@@ -1170,6 +1170,64 @@ export default function EnhancedPipelinePage() {
     [pipelineItems],
   );
 
+// Quick stage change handler (no confirmation dialog, direct move)
+  const handleQuickStageChange = async (
+    itemId: string,
+    newStage: Stage,
+    itemType: "customer" | "job" | "project"
+  ) => {
+    // Check permissions
+    const item = pipelineItems.find((i) => i.id === itemId);
+    if (!item || !canUserEditItem(item)) {
+      alert("You don't have permission to change the stage of this item.");
+      return;
+    }
+
+    try {
+      const isProject = itemId.startsWith("project-");
+      const isCustomer = itemId.startsWith("customer-");
+      const isJob = itemId.startsWith("job-");
+
+      let entityId;
+      let endpoint;
+
+      if (isJob) {
+        entityId = itemId.replace("job-", "");
+        endpoint = `jobs/${entityId}/stage`;
+      } else if (isProject) {
+        entityId = itemId.replace("project-", "");
+        endpoint = `projects/${entityId}/stage`;
+      } else if (isCustomer) {
+        entityId = itemId.replace("customer-", "");
+        endpoint = `customers/${entityId}/stage`;
+      } else {
+        throw new Error(`Unknown pipeline item type: ${itemId}`);
+      }
+
+      const bodyData = {
+        stage: newStage,
+        reason: "Moved via quick reject button",
+        updated_by: user?.email || "current_user",
+      };
+
+      const response = await fetchWithAuth(endpoint, {
+        method: "PATCH",
+        body: JSON.stringify(bodyData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to update stage`);
+      }
+
+      await refetchPipelineData();
+
+    } catch (e) {
+      console.error("Failed to quick change stage:", e);
+      alert("Failed to move to Rejected. Please try again.");
+    }
+  };
+  
   // Handle stage change with audit logging
   const handleStageChange = async (
     itemId: string,
