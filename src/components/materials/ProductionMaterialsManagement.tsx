@@ -62,8 +62,17 @@ interface MaterialOrder {
 interface Customer {
   id: string;
   name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
   stage: string;
-  project_count?: number;
+  projects_at_stage?: number;
+  project_details?: Array<{
+    id: string;
+    name: string;
+    type: string;
+  }>;
+  total_projects?: number;
 }
 
 interface NewMaterialForm {
@@ -138,45 +147,39 @@ export function ProductionMaterialsManagement() {
   const fetchCustomers = async () => {
     setCustomersLoading(true);
     try {
-      console.log('🔄 Fetching customers...');
+      console.log('🔄 Fetching customers in Accepted stage...');
       
-      // Force a fresh fetch with cache-busting timestamp
+      // ✅ NEW: Use the new endpoint that filters by project stage
       const timestamp = new Date().getTime();
-      const response = await fetchWithAuth(`customers?_t=${timestamp}`);
+      const response = await fetchWithAuth(`customers/by-stage/Accepted?_t=${timestamp}`);
       
       if (!response.ok) throw new Error('Failed to fetch customers');
       const data = await response.json();
 
-      console.log('📊 Total customers:', data.length);
+      console.log('📊 Total customers with Accepted projects:', data.length);
       
-      // Log ALL stages for debugging
-      const stageDebug = data.reduce((acc: any, c: any) => {
-        acc[c.stage] = (acc[c.stage] || 0) + 1;
-        return acc;
-      }, {});
-      console.log('📊 Stage distribution:', stageDebug);
-      
-      // Filter for Accepted stage - EXACT match
-      const acceptedCustomers = data.filter((c: any) => {
-        const isAccepted = c.stage === 'Accepted';
-        
-        if (isAccepted) {
-          console.log('✅ Found Accepted customer:', c.name);
-        }
-        
-        return isAccepted;
-      });
-      
-      console.log(`✅ Accepted customers found: ${acceptedCustomers.length}`);
-      
-      const mappedCustomers = acceptedCustomers.map((c: any) => ({ 
+      // ✅ NEW: Map the response to show project details
+      const mappedCustomers = data.map((c: any) => ({ 
         id: c.id, 
         name: c.name,
+        email: c.email,
+        phone: c.phone,
+        address: c.address,
         stage: c.stage,
-        project_count: c.project_count || 0
+        projects_at_stage: c.projects_at_stage || 0,
+        project_details: c.project_details || [],
+        total_projects: c.total_projects || 0
       }));
       
       setCustomers(mappedCustomers);
+      
+      if (mappedCustomers.length > 0) {
+        console.log('✅ Customers with Accepted projects loaded:', 
+          mappedCustomers.map(c => `${c.name} (${c.projects_at_stage} project(s) in Accepted)`)
+        );
+      } else {
+        console.log('⚠️ No customers found with projects in Accepted stage');
+      }
       
     } catch (error) {
       console.error('❌ Error fetching customers:', error);
@@ -417,7 +420,11 @@ export function ProductionMaterialsManagement() {
             <DialogHeader>
               <DialogTitle>Order New Materials</DialogTitle>
               <DialogDescription>
-                Create a new material order for a customer project (Accepted customers only)
+                Create a new material order for a customer project in "Accepted" stage
+                <br />
+                <span className="text-xs text-gray-500 mt-1 block">
+                  Only showing customers who have at least one project in the "Accepted" stage
+                </span>
               </DialogDescription>
             </DialogHeader>
             
@@ -445,7 +452,10 @@ export function ProductionMaterialsManagement() {
                         {customers.length === 0 ? (
                           <div className="p-4 text-center space-y-2">
                             <p className="text-sm text-gray-500">
-                              No customers in "Accepted" stage
+                              No customers with projects in "Accepted" stage
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1">
+                              Projects must reach "Accepted" stage before materials can be ordered
                             </p>
                             <Button
                               variant="link"
@@ -461,12 +471,19 @@ export function ProductionMaterialsManagement() {
                         ) : (
                           customers.map((customer) => (
                             <SelectItem key={customer.id} value={customer.id}>
-                              {customer.name}
-                              {customer.project_count && customer.project_count > 0 && (
-                                <span className="text-xs text-gray-500 ml-2">
-                                  ({customer.project_count} project{customer.project_count !== 1 ? 's' : ''})
-                                </span>
-                              )}
+                              <div className="flex flex-col">
+                                <span className="font-medium">{customer.name}</span>
+                                {customer.projects_at_stage && customer.projects_at_stage > 0 && (
+                                  <span className="text-xs text-green-600">
+                                    {customer.projects_at_stage} project{customer.projects_at_stage !== 1 ? 's' : ''} in Accepted
+                                  </span>
+                                )}
+                                {customer.total_projects && customer.total_projects > (customer.projects_at_stage || 0) && (
+                                  <span className="text-xs text-gray-400">
+                                    ({customer.total_projects - (customer.projects_at_stage || 0)} in other stages)
+                                  </span>
+                                )}
+                              </div>
                             </SelectItem>
                           ))
                         )}
@@ -589,12 +606,16 @@ export function ProductionMaterialsManagement() {
         <Alert className="border-yellow-200 bg-yellow-50">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>No customers in "Accepted" stage found.</strong>
+            <strong>No customers with projects in "Accepted" stage found.</strong>
             <br />
-            Make sure customers are moved to the "Accepted" stage in the pipeline before creating material orders.
+            Projects must reach the "Accepted" stage in the pipeline before materials can be ordered for them.
+            <br />
+            <span className="text-xs text-gray-500 mt-1 block">
+              (Only projects have stages - jobs are created automatically when projects reach Accepted/Production)
+            </span>
           </AlertDescription>
         </Alert>
-      )}
+      )
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
