@@ -1,5 +1,4 @@
-// import { redirect } from 'next/navigation';
-
-// export default function Home() {
-//   redirect('/dashboard/default');
-// }
+export default function Home() {
+  // Redirect handled by next.config.mjs
+  return null;
+}
