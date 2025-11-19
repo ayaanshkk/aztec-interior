@@ -109,15 +109,15 @@ export function ProductionMaterialsManagement() {
     fetchCustomers();
   }, []); // Empty dependency array = run once on mount
 
-  // ✅ FIXED: Auto-refresh customers every 10 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing customers...');
-      fetchCustomers();
-    }, 10000);
+  // // ✅ FIXED: Auto-refresh customers every 10 seconds
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     console.log('🔄 Auto-refreshing customers...');
+  //     fetchCustomers();
+  //   }, 10000);
 
-    return () => clearInterval(interval);
-  }, []);
+  //   return () => clearInterval(interval);
+  // }, []);
 
   const fetchMaterials = async () => {
     try {

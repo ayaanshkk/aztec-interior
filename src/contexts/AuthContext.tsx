@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem("auth_user");
   }, []);
 
-  // ✅ Initialize auth state from localStorage
+  // ✅ Initialize auth state from localStorage - ONLY RUN ONCE
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -80,7 +80,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (error) {
         console.error("Error initializing auth:", error);
-        clearAuth();
+        // Don't call clearAuth here to avoid dependency issues
+        setUser(null);
+        setToken(null);
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_user");
       } finally {
         console.log("Auth initialization complete");
         setLoading(false);
@@ -88,7 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     initAuth();
-  }, [clearAuth]);
+  }, []); // ✅ Empty array - only run once on mount
 
   // ✅ LOGIN - No redirects, just sets user/token
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
@@ -120,7 +124,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         console.log("💾 Auth state saved to localStorage");
 
-        // ⚠️ No redirect — stays on current page
         return { success: true };
       } else {
         console.log("❌ Login failed:", data.error);
