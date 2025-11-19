@@ -39,6 +39,7 @@ import {
   Filter,
   Lock,
   FolderOpen,
+  X,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format, addDays, isWithinInterval } from "date-fns";
@@ -1227,7 +1228,7 @@ export default function EnhancedPipelinePage() {
       alert("Failed to move to Rejected. Please try again.");
     }
   };
-  
+
   // Handle stage change with audit logging
   const handleStageChange = async (
     itemId: string,
