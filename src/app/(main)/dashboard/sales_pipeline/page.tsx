@@ -516,95 +516,118 @@ export default function EnhancedPipelinePage() {
         setLoading(true);
         setError(null);
 
-        console.log("🚀 Fetching pipeline data...");
+        let pipelineItemsRetrieved: any[] = [];
 
-        // 1. Fetch from pipeline endpoint ONLY
-        // We removed the fallback to prevent stale "Lead" data from loading if this fails.
-        const pipelineResponse = await fetchWithAuth("pipeline");
-        
-        if (!pipelineResponse.ok) {
-          throw new Error(`Failed to fetch pipeline: ${pipelineResponse.status} ${pipelineResponse.statusText}`);
+        // 1. Try fetching from the combined pipeline endpoint
+        try {
+          const pipelineResponse = await fetchWithAuth("pipeline");
+          if (pipelineResponse.ok) {
+            const rawPipelineData = await pipelineResponse.json();
+
+            pipelineItemsRetrieved = rawPipelineData.map((item: any) => {
+              const isProjectItem = item.id.startsWith("project-");
+
+              // ✅ FIX: Trust the backend stage completely - it's at the top level
+              const backendStage = item.stage;
+              const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
+              
+              if (!STAGES.includes(backendStage)) {
+                console.error('⚠️ Backend returned invalid stage:', {
+                  itemId: item.id,
+                  customerName: item.customer?.name,
+                  invalidStage: backendStage,
+                  availableStages: STAGES
+                });
+              }
+
+              const commonItem = {
+                id: item.id,
+                customer: item.customer,
+                name: item.customer.name,
+                salesperson: item.job?.salesperson_name || item.customer.salesperson,
+                measureDate: item.job?.measure_date || item.customer.date_of_measure,
+                stage: validStage, // ✅ Use the backend stage
+              };
+
+              if (item.type === "customer") {
+                return {
+                  ...commonItem,
+                  type: "customer" as const,
+                  reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
+                  jobType: item.customer.project_types?.join(", "),
+                  project_count: item.project_count || 0,
+                };
+              } else {
+                const jobReference = isProjectItem
+                  ? item.job.job_reference || `PROJ-${item.job.id.slice(-4).toUpperCase()}`
+                  : item.job.job_reference || `JOB-${item.job.id.slice(-4).toUpperCase()}`;
+
+                const jobName = isProjectItem 
+                  ? `${item.customer.name} - ${item.job.job_name}` 
+                  : item.customer.name;
+
+                return {
+                  ...commonItem,
+                  type: isProjectItem ? ("project" as const) : ("job" as const),
+                  job: item.job,
+                  name: jobName,
+                  reference: jobReference,
+                  stage: validStage, // ✅ Use the backend stage
+                  jobType: item.job?.job_type,
+                  quotePrice: item.job?.quote_price,
+                  agreedPrice: item.job?.agreed_price,
+                  soldAmount: item.job?.sold_amount,
+                  deposit1: item.job?.deposit1,
+                  deposit2: item.job?.deposit2,
+                  deposit1Paid: item.job?.deposit1_paid || false,
+                  deposit2Paid: item.job?.deposit2_paid || false,
+                  deliveryDate: item.job?.delivery_date,
+                  measureDate: item.job?.measure_date,
+                  salesperson: item.job?.salesperson_name || item.customer.salesperson,
+                };
+              }
+            });
+
+            // Filter and set data immediately
+            const filteredItems = pipelineItemsRetrieved.filter((item: PipelineItem) => canUserAccessItem(item));
+            setPipelineItems(filteredItems);
+            setFeatures(mapPipelineToFeatures(filteredItems));
+            prevFeaturesRef.current = mapPipelineToFeatures(filteredItems);
+
+            return;
+          }
+        } catch (pipelineError) {
+          console.warn("Pipeline endpoint not available or failed, falling back to individual endpoints...");
         }
 
-        const rawPipelineData = await pipelineResponse.json();
-        console.log(`✅ Pipeline data loaded: ${rawPipelineData.length} items`);
+        // 2. Fallback (Existing old logic, kept for robustness)
+        const customersResponse = await fetchWithAuth("customers");
+        if (!customersResponse.ok) {
+          throw new Error(`Failed to fetch customers: ${customersResponse.statusText}`);
+        }
+        const customersData = await customersResponse.json();
 
-        const pipelineItemsRetrieved = rawPipelineData.map((item: any) => {
-            const isProjectItem = item.id.startsWith("project-");
+        let jobsData: Job[] = [];
+        try {
+          const jobsResponse = await fetchWithAuth("jobs");
+          if (jobsResponse.ok) {
+            jobsData = await jobsResponse.json();
+          }
+        } catch (jobsError) {
+          console.log("Jobs endpoint not available, showing customers only");
+        }
 
-            // ✅ BEST FIX: Trust backend stage completely
-            // Your console log showed the stage is at the root: { name: "...", stage: "Accepted" }
-            const backendStage = item.stage ? item.stage.trim() : "Lead";
-            
-            // Validate it's in our STAGES array
-            const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
-            
-            if (backendStage !== "Lead" && validStage === "Lead") {
-              console.error('⚠️ Stage mismatch detected:', {
-                itemId: item.id,
-                received: backendStage,
-                fallback: validStage
-              });
-            }
+        const items = createPipelineItemsFromSeparateData(customersData, jobsData);
 
-            const commonItem = {
-              id: item.id,
-              customer: item.customer,
-              name: item.customer.name,
-              salesperson: item.job?.salesperson_name || item.customer.salesperson,
-              measureDate: item.job?.measure_date || item.customer.date_of_measure,
-              stage: validStage, // ✅ Use the validated backend stage
-            };
-
-            if (item.type === "customer") {
-              return {
-                ...commonItem,
-                type: "customer" as const,
-                reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
-                jobType: item.customer.project_types?.join(", "),
-                project_count: item.project_count || 0,
-              };
-            } else {
-              // Jobs/Projects
-              const jobReference = isProjectItem
-                ? item.job.job_reference || `PROJ-${item.job.id.slice(-4).toUpperCase()}`
-                : item.job.job_reference || `JOB-${item.job.id.slice(-4).toUpperCase()}`;
-
-              const jobName = isProjectItem 
-                ? `${item.customer.name} - ${item.job.job_name}` 
-                : item.customer.name;
-
-              return {
-                ...commonItem,
-                type: isProjectItem ? ("project" as const) : ("job" as const),
-                job: item.job,
-                name: jobName,
-                reference: jobReference,
-                stage: validStage, // ✅ Use the validated backend stage
-                jobType: item.job?.job_type,
-                quotePrice: item.job?.quote_price,
-                agreedPrice: item.job?.agreed_price,
-                soldAmount: item.job?.sold_amount,
-                deposit1: item.job?.deposit1,
-                deposit2: item.job?.deposit2,
-                deposit1Paid: item.job?.deposit1_paid || false,
-                deposit2Paid: item.job?.deposit2_paid || false,
-                deliveryDate: item.job?.delivery_date,
-                measureDate: item.job?.measure_date,
-                salesperson: item.job?.salesperson_name || item.customer.salesperson,
-              };
-            }
-        });
-
-        // Filter and set data
-        const filteredItems = pipelineItemsRetrieved.filter((item: PipelineItem) => canUserAccessItem(item));
+        const filteredItems = items.filter(canUserAccessItem);
         setPipelineItems(filteredItems);
-        setFeatures(mapPipelineToFeatures(filteredItems));
-        prevFeaturesRef.current = mapPipelineToFeatures(filteredItems);
 
+        const kanbanFeatures = mapPipelineToFeatures(filteredItems);
+        setFeatures(kanbanFeatures);
+        prevFeaturesRef.current = kanbanFeatures;
       } catch (err) {
-        console.error("❌ Error fetching pipeline data:", err);
-        setError(err instanceof Error ? err.message : "Failed to load pipeline data. Please refresh.");
+        console.error("Final Error fetching pipeline data:", err);
+        setError(err instanceof Error ? err.message : "Failed to load data");
       } finally {
         setLoading(false);
       }
