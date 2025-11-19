@@ -66,13 +66,17 @@ interface Customer {
   phone?: string;
   address?: string;
   stage: string;
+  customer_stage?: string;
   projects_at_stage?: number;
   project_details?: Array<{
     id: string;
     name: string;
     type: string;
+    stage: string;
   }>;
   total_projects?: number;
+  has_separate_projects?: boolean;
+  is_customer_level?: boolean;
 }
 
 interface NewMaterialForm {
@@ -420,10 +424,10 @@ export function ProductionMaterialsManagement() {
             <DialogHeader>
               <DialogTitle>Order New Materials</DialogTitle>
               <DialogDescription>
-                Create a new material order for a customer project in "Accepted" stage
+                Create a new material order for a customer in "Accepted" stage
                 <br />
                 <span className="text-xs text-gray-500 mt-1 block">
-                  Only showing customers who have at least one project in the "Accepted" stage
+                  Showing customers in "Accepted" stage (with or without separate projects)
                 </span>
               </DialogDescription>
             </DialogHeader>
@@ -452,10 +456,10 @@ export function ProductionMaterialsManagement() {
                         {customers.length === 0 ? (
                           <div className="p-4 text-center space-y-2">
                             <p className="text-sm text-gray-500">
-                              No customers with projects in "Accepted" stage
+                              No customers in "Accepted" stage
                             </p>
                             <p className="text-xs text-gray-400 mt-1">
-                              Projects must reach "Accepted" stage before materials can be ordered
+                              Customers must reach "Accepted" stage before materials can be ordered
                             </p>
                             <Button
                               variant="link"
@@ -473,14 +477,22 @@ export function ProductionMaterialsManagement() {
                             <SelectItem key={customer.id} value={customer.id}>
                               <div className="flex flex-col">
                                 <span className="font-medium">{customer.name}</span>
-                                {customer.projects_at_stage && customer.projects_at_stage > 0 && (
+                                {customer.is_customer_level ? (
+                                  <span className="text-xs text-blue-600">
+                                    ✓ Customer in Accepted stage
+                                  </span>
+                                ) : customer.projects_at_stage && customer.projects_at_stage > 0 ? (
                                   <span className="text-xs text-green-600">
                                     {customer.projects_at_stage} project{customer.projects_at_stage !== 1 ? 's' : ''} in Accepted
+                                    {customer.total_projects && customer.total_projects > customer.projects_at_stage && (
+                                      <span className="text-gray-400">
+                                        {' '}+ {customer.total_projects - customer.projects_at_stage} in other stages
+                                      </span>
+                                    )}
                                   </span>
-                                )}
-                                {customer.total_projects && customer.total_projects > (customer.projects_at_stage || 0) && (
-                                  <span className="text-xs text-gray-400">
-                                    ({customer.total_projects - (customer.projects_at_stage || 0)} in other stages)
+                                ) : (
+                                  <span className="text-xs text-gray-500">
+                                    In Accepted stage
                                   </span>
                                 )}
                               </div>
@@ -491,7 +503,10 @@ export function ProductionMaterialsManagement() {
                     </Select>
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-gray-500">
-                        Only showing customers who have reached "Accepted" stage
+                        {customers.filter(c => c.is_customer_level).length > 0 && 
+                        customers.filter(c => c.has_separate_projects).length > 0
+                          ? `${customers.filter(c => c.is_customer_level).length} customer-level, ${customers.filter(c => c.has_separate_projects).length} project-level`
+                          : 'Customers in "Accepted" stage'}
                       </p>
                       {customers.length > 0 && (
                         <p className="text-xs text-green-600 font-medium">
