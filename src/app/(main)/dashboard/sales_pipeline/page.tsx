@@ -55,13 +55,13 @@ const STAGES = [
   "Design",
   "Quote",
   "Accepted",
-  "Rejected",
   "Ordered",
   "Production",
   "Delivery",
   "Installation",
   "Complete",
   "Remedial",
+  "Rejected"
 ] as const;
 
 type Stage = (typeof STAGES)[number];
@@ -1731,6 +1731,25 @@ export default function EnhancedPipelinePage() {
 
                                         {/* Action Buttons (fixed to the bottom with padding) */}
                                         <div className="flex gap-1 pt-2 pb-1">
+                                          {/* ✅ NEW: Quick Reject Button - only show if not already rejected */}
+                                          {isEditable && feature.stage !== "Rejected" && (
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              className="h-6 flex-1 px-1 text-xs hover:bg-red-50 text-red-600"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (confirm(`Move ${feature.customer.name} to Rejected stage?`)) {
+                                                  handleQuickStageChange(feature.itemId, "Rejected", feature.itemType);
+                                                }
+                                              }}
+                                              title="Move to Rejected"
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                          )}
+                                          
+                                          {/* Eye button - always visible */}
                                           <Button
                                             size="sm"
                                             variant="ghost"
@@ -1744,8 +1763,8 @@ export default function EnhancedPipelinePage() {
                                             <Eye className="h-3 w-3" />
                                           </Button>
 
-                                          {/* Only show quote action if appropriate stage and user has permission */}
-                                          {permissions.canSendQuotes &&
+                                          {/* REMOVED: Mail/Quote button */}
+                                          {/* {permissions.canSendQuotes &&
                                             isEditable &&
                                             (feature.stage === "Quote" ||
                                               feature.stage === "Design") && (
@@ -1761,10 +1780,10 @@ export default function EnhancedPipelinePage() {
                                               >
                                                 <Mail className="h-3 w-3" />
                                               </Button>
-                                            )}
+                                            )} */}
 
-                                          {/* Only show schedule if user has permission */}
-                                          {permissions.canSchedule &&
+                                          {/* COMMENTED OUT: Schedule button */}
+                                          {/* {permissions.canSchedule &&
                                             (feature.stage === "Survey" ||
                                               feature.stage === "Installation" ||
                                               feature.stage === "Delivery") && (
@@ -1780,9 +1799,9 @@ export default function EnhancedPipelinePage() {
                                               >
                                                 <Calendar className="h-3 w-3" />
                                               </Button>
-                                            )}
+                                            )} */}
 
-                                          {/* Show documents for jobs/projects */}
+                                          {/* Documents button - keep for jobs/projects */}
                                           {(feature.itemType === "job" || feature.itemType === "project") && (
                                             <Button
                                               size="sm"
