@@ -78,7 +78,7 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
 
   if (!token) {
     console.error("No auth token found");
-    redirectToLogin();
+    // redirectToLogin();
     throw new Error("Not authenticated");
   }
 

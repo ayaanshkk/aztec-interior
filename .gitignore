@@ -3,3 +3,4 @@
 .node_modules/
 .next/type
 .next/types
+node_modules
