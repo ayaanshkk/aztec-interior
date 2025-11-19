@@ -615,7 +615,7 @@ export function ProductionMaterialsManagement() {
             </span>
           </AlertDescription>
         </Alert>
-      )
+      )}
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
