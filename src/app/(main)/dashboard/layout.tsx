@@ -19,7 +19,7 @@ import { LayoutControls } from "@/app/(main)/dashboard/_components/sidebar/layou
 import { ThemeSwitcher } from "@/app/(main)/dashboard/_components/sidebar/theme-switcher";
 
 import { AuthProvider } from "@/contexts/AuthContext";
-import ProtectedRoute from "@/contexts/ProtectedRoute";
+// import ProtectedRoute from "@/contexts/ProtectedRoute"; // ❌ TEMPORARILY DISABLED
 
 export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
@@ -39,7 +39,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
 
   return (
     <AuthProvider>
-      <ProtectedRoute>
+      {/* ❌ ProtectedRoute temporarily disabled to debug loop */}
+      {/* <ProtectedRoute> */}
         <SidebarProvider defaultOpen={defaultOpen}>
           <AppSidebar variant={sidebarVariant} collapsible={sidebarCollapsible} />
           <SidebarInset
@@ -64,7 +65,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
             <div className="h-full p-4 md:p-6">{children}</div>
           </SidebarInset>
         </SidebarProvider>
-      </ProtectedRoute>
+      {/* </ProtectedRoute> */}
     </AuthProvider>
   );
 }
