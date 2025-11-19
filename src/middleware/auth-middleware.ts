@@ -1,19 +1,16 @@
-// ⚠️ This middleware has been temporarily disabled to avoid unnecessary edge function executions.
-// To re-enable, rename this file to `middleware.ts`.
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
-import { authMiddleware } from "./middleware/auth-middleware";
+export function authMiddleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  const isLoggedIn = req.cookies.get("auth-token");
+  
+  if (!isLoggedIn && pathname.startsWith("/dashboard")) {
+    return NextResponse.redirect(new URL("/auth/login", req.url));
+  }
 
-export function middleware(req: NextRequest) {
-  // authMiddleware
-  const response = authMiddleware(req);
-  if (response) {
-    return response;
+  if (isLoggedIn && pathname === "/auth/login") {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
   return NextResponse.next();
 }
-
-export const config = {
-  matcher: ["/dashboard/:path*", "/auth/login"],
-};
