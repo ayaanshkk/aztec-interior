@@ -782,9 +782,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-// 🛑 FIX START: Changed import path from an erroneous path to the correct package name.
 import { useRouter } from "next/navigation"; 
-// 🛑 FIX END
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 import { CustomerProjectTimeline } from "@/components/materials/CustomerProjectTimeline";
 import { useAuth } from "@/contexts/AuthContext";
@@ -930,11 +928,12 @@ export default function CustomersPage() {
     fetchCustomers();
   }, []);
 
-  // Filter customers based on user role
+  // ✅ FIX 1: Sync allCustomers to the working 'customers' list.
+  // This ensures the sorting logic below runs on the complete, fresh dataset.
   useEffect(() => {
-    // No role filtering applied here, based on previous user request ("all the customers shown for all the roles")
+    // If no filter is applied by role (based on your previous request), just set the full list.
     setCustomers(allCustomers);
-  }, [user, allCustomers]);
+  }, [allCustomers]);
 
   // Reset page when filters/search change
   useEffect(() => {
@@ -972,7 +971,8 @@ export default function CustomersPage() {
           stage: c.stage || c.status || "Lead",
           project_count: Number(c.project_count) || 0,
           form_submissions: c.form_submissions || [],
-          updated_at: c.updated_at || c.created_at,
+          // Ensure we have an updated_at field for sorting
+          updated_at: c.updated_at || c.created_at, 
         };
 
         return customer;
@@ -1034,7 +1034,7 @@ export default function CustomersPage() {
     }
   };
 
-  // ✅ NEW: Sorting Logic - Accepted Stage first, then by date (applies to all existing)
+  // ✅ Sorting Logic - Accepted Stage first (including existing), then by most recent update
   const sortedCustomers = useMemo(() => {
     return [...customers].sort((a, b) => {
       // Priority 1: Accepted stage customers come first (sort order: Accepted -> Others)
@@ -1045,6 +1045,7 @@ export default function CustomersPage() {
       if (!aIsAccepted && bIsAccepted) return 1;
       
       // Priority 2: Within the same priority group, sort by most recent update
+      // This ensures the *most recently* accepted customer (or updated in general) is highest.
       const aDate = new Date(a.updated_at || a.created_at).getTime();
       const bDate = new Date(b.updated_at || b.created_at).getTime();
       
@@ -1067,7 +1068,7 @@ export default function CustomersPage() {
 
       return matchesSearch && matchesStage;
     });
-  }, [sortedCustomers, searchTerm, stageFilter]);
+  }, [sortedCustomers, searchTerm, stageFilter]); // Depend on sortedCustomers
 
   // ---------------- Pagination Calculations ----------------
   const totalPages = Math.ceil(filteredCustomers.length / CUSTOMERS_PER_PAGE);
@@ -1094,7 +1095,7 @@ export default function CustomersPage() {
     return user?.role === "Manager" || user?.role === "HR" || user?.role === "Production";
   };
 
-  // ✅ UPDATED: Check if customer is in Accepted stage (for icon display)
+  // ✅ Clock icon logic: Check if customer is in Accepted stage
   const isCustomerInAcceptedStage = (customer: Customer): boolean => {
     return customer.stage === "Accepted";
   };
@@ -1116,6 +1117,7 @@ export default function CustomersPage() {
       });
       if (!res.ok) throw new Error("Failed to delete customer");
 
+      // Update both state arrays to ensure sorting is correct upon next refresh
       setCustomers((prev) => prev.filter((c) => c.id !== id));
       setAllCustomers((prev) => prev.filter((c) => c.id !== id));
       
@@ -1320,6 +1322,7 @@ export default function CustomersPage() {
                                 <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
                               </div>
                             )}
+                            {/* This is the visual indicator you had before, not the clock icon itself */}
                             {customer.stage === 'Accepted' && (
                               <div className="flex items-center" title="Customer in Accepted stage">
                                 <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse" />
@@ -1454,7 +1457,7 @@ export default function CustomersPage() {
                         {user?.role !== "Staff" && (
                           <td className="px-6 py-4 text-right whitespace-nowrap">
                             <div className="flex gap-2 justify-end">
-                              {/* ✅ IMPLEMENTATION: Clock icon visible only if in Accepted stage */}
+                              {/* ✅ Clock icon visible only if in Accepted stage and user can view timeline */}
                               {canViewTimeline() && isCustomerInAcceptedStage(customer) && (
                                 <Button
                                   variant="ghost"
