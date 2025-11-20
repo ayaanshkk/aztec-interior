@@ -174,6 +174,15 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
   const { login } = useAuth();
   const router = useRouter();
 
+  const form = useForm<z.infer<typeof FormSchema>>({
+    resolver: zodResolver(FormSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      remember: false,
+    },
+  });
+
   const onSubmit = async (data: z.infer<typeof FormSchema>) => {
     setLoading(true);
 
