@@ -782,7 +782,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useRouter } from "@/node_modules/next/navigation";
+// 🛑 FIX START: Changed import path from an erroneous path to the correct package name.
+import { useRouter } from "next/navigation"; 
+// 🛑 FIX END
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 import { CustomerProjectTimeline } from "@/components/materials/CustomerProjectTimeline";
 import { useAuth } from "@/contexts/AuthContext";
