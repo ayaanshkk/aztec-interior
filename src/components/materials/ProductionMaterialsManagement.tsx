@@ -66,6 +66,7 @@ interface Customer {
   address?: string;
   stage: string;
   customer_stage?: string;
+  project_count?: number; // ✅ ADD THIS LINE
   projects_at_stage?: number;
   project_details?: Array<{
     id: string;
