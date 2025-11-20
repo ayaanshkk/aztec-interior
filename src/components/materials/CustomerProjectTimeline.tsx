@@ -26,7 +26,7 @@ interface ProjectTimeline {
   customer_id: string;
   customer_name: string;
   timeline: Timeline;
-  materials_breakdown: Material[];
+  materials_breakdown?: Material[]; // ✅ Make optional
 }
 
 export function CustomerProjectTimeline({ customerId }: { customerId: string }) {
@@ -41,6 +41,9 @@ export function CustomerProjectTimeline({ customerId }: { customerId: string }) 
   const fetchTimeline = async () => {
     try {
       const token = localStorage.getItem('auth_token');
+      
+      console.log(`🔍 Fetching timeline for customer ${customerId}...`);
+      
       const response = await fetch(
         `https://aztec-interiors.onrender.com/materials/timeline/${customerId}`,
         {
@@ -50,11 +53,19 @@ export function CustomerProjectTimeline({ customerId }: { customerId: string }) 
         }
       );
 
-      if (!response.ok) throw new Error('Failed to fetch timeline');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Timeline fetch failed:', response.status, errorText);
+        throw new Error(`Failed to fetch timeline: ${response.status}`);
+      }
 
       const data = await response.json();
+      console.log('✅ Timeline data received:', data);
+      
       setTimeline(data);
+      setError(null);
     } catch (err) {
+      console.error('❌ Timeline error:', err);
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
@@ -91,12 +102,16 @@ export function CustomerProjectTimeline({ customerId }: { customerId: string }) 
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Not set';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch {
+      return 'Invalid date';
+    }
   };
 
   if (loading) {
@@ -105,6 +120,7 @@ export function CustomerProjectTimeline({ customerId }: { customerId: string }) 
         <CardContent className="p-6">
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <p className="ml-3 text-gray-600">Loading timeline...</p>
           </div>
         </CardContent>
       </Card>
@@ -115,18 +131,34 @@ export function CustomerProjectTimeline({ customerId }: { customerId: string }) 
     return (
       <Alert variant="destructive">
         <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>{error}</AlertDescription>
+        <AlertDescription>
+          {error}
+          <button 
+            onClick={fetchTimeline} 
+            className="ml-3 underline text-sm"
+          >
+            Retry
+          </button>
+        </AlertDescription>
       </Alert>
     );
   }
 
-  if (!timeline) return null;
+  if (!timeline) {
+    return (
+      <Alert>
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription>No timeline data available for this customer.</AlertDescription>
+      </Alert>
+    );
+  }
 
-  const { timeline: timelineData, materials_breakdown } = timeline;
+  // ✅ CRITICAL FIX: Safely access materials_breakdown
+  const { timeline: timelineData, materials_breakdown = [] } = timeline;
 
   return (
     <div className="space-y-4">
-      {/* Quick Status Card - What manager sees first when customer calls */}
+      {/* Quick Status Card */}
       <Card className="border-l-4 border-l-blue-500">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -200,8 +232,8 @@ export function CustomerProjectTimeline({ customerId }: { customerId: string }) 
             </Alert>
           )}
 
-          {/* Materials Breakdown */}
-          {materials_breakdown.length > 0 && (
+          {/* Materials Breakdown - ✅ SAFE ACCESS */}
+          {materials_breakdown && materials_breakdown.length > 0 && (
             <div className="mt-6">
               <h4 className="text-sm font-semibold mb-3 text-gray-700">Materials Breakdown</h4>
               <div className="space-y-2">
@@ -229,7 +261,7 @@ export function CustomerProjectTimeline({ customerId }: { customerId: string }) 
         </CardContent>
       </Card>
 
-      {/* Quick Response Guide for Manager */}
+      {/* Quick Response Guide */}
       <Card className="bg-blue-50">
         <CardHeader>
           <CardTitle className="text-sm font-semibold text-blue-900">
