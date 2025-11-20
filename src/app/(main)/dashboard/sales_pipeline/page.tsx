@@ -524,6 +524,18 @@ export default function EnhancedPipelinePage() {
           if (pipelineResponse.ok) {
             const rawPipelineData = await pipelineResponse.json();
 
+            // 🔍 DEBUG: Raw backend data
+            console.log("🔍 RAW BACKEND DATA:", {
+              totalItems: rawPipelineData.length,
+              firstItem: rawPipelineData[0],
+              stages: rawPipelineData.map((item: any) => ({
+                id: item.id,
+                name: item.customer?.name,
+                stage: item.stage,
+                column: `col-${item.stage?.toLowerCase().replace(/\s+/g, "-")}`
+              })).slice(0, 10)
+            });
+
             pipelineItemsRetrieved = rawPipelineData.map((item: any) => {
               const isProjectItem = item.id.startsWith("project-");
 
@@ -588,11 +600,49 @@ export default function EnhancedPipelinePage() {
               }
             });
 
+            // 🔍 DEBUG: Mapped pipeline items (AFTER map completes)
+            console.log("🗂️ MAPPED PIPELINE ITEMS:", {
+              totalMapped: pipelineItemsRetrieved.length,
+              sampleItems: pipelineItemsRetrieved.slice(0, 5).map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                stage: item.stage,
+                type: item.type
+              }))
+            });
+
             // Filter and set data immediately
             const filteredItems = pipelineItemsRetrieved.filter((item: PipelineItem) => canUserAccessItem(item));
+            
+            // 🔍 DEBUG: Filtered items
+            console.log("🔒 FILTERED ITEMS:", {
+              beforeFilter: pipelineItemsRetrieved.length,
+              afterFilter: filteredItems.length,
+              userRole: userRole,
+              sampleFiltered: filteredItems.slice(0, 5).map(item => ({
+                id: item.id,
+                name: item.name,
+                stage: item.stage
+              }))
+            });
+
             setPipelineItems(filteredItems);
-            setFeatures(mapPipelineToFeatures(filteredItems));
-            prevFeaturesRef.current = mapPipelineToFeatures(filteredItems);
+            const mappedFeatures = mapPipelineToFeatures(filteredItems);
+            
+            // 🔍 DEBUG: Mapped features for Kanban
+            console.log("🎨 MAPPED FEATURES FOR KANBAN:", {
+              totalFeatures: mappedFeatures.length,
+              sampleFeatures: mappedFeatures.slice(0, 5).map(f => ({
+                id: f.id,
+                itemId: f.itemId,
+                name: f.name,
+                column: f.column,
+                stage: f.stage
+              }))
+            });
+            
+            setFeatures(mappedFeatures);
+            prevFeaturesRef.current = mappedFeatures;
 
             return;
           }
