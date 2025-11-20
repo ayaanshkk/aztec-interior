@@ -930,22 +930,8 @@ export default function CustomersPage() {
 
   // Filter customers based on user role
   useEffect(() => {
-    if (user?.role === "Sales") {
-      const filteredData = allCustomers.filter((customer: Customer) => {
-        const matchesCreatedBy = customer.created_by === String(user.id);
-        const matchesSalesperson = customer.salesperson === user.name;
-        return matchesCreatedBy || matchesSalesperson;
-      });
-
-      if (filteredData.length === 0 && allCustomers.length > 0) {
-        console.warn("No customers match Sales filter. Showing all temporarily.");
-        setCustomers(allCustomers);
-      } else {
-        setCustomers(filteredData);
-      }
-    } else {
-      setCustomers(allCustomers);
-    }
+    // No role filtering applied here, based on previous user request ("all the customers shown for all the roles")
+    setCustomers(allCustomers);
   }, [user, allCustomers]);
 
   // Reset page when filters/search change
@@ -1046,21 +1032,21 @@ export default function CustomersPage() {
     }
   };
 
-  // ✅ NEW: Sort customers - Accepted stage first, then by most recent update
+  // ✅ NEW: Sorting Logic - Accepted Stage first, then by date
   const sortedCustomers = useMemo(() => {
     return [...customers].sort((a, b) => {
-      // Priority 1: Accepted stage customers come first
+      // Priority 1: Accepted stage customers come first (sort order: Accepted -> Others)
       const aIsAccepted = a.stage === "Accepted";
       const bIsAccepted = b.stage === "Accepted";
       
       if (aIsAccepted && !bIsAccepted) return -1;
       if (!aIsAccepted && bIsAccepted) return 1;
       
-      // Priority 2: Within same priority group, sort by most recent update
+      // Priority 2: Within the same priority group (e.g., both Accepted or both not-Accepted), sort by updated_at date (most recent first)
       const aDate = new Date(a.updated_at || a.created_at).getTime();
       const bDate = new Date(b.updated_at || b.created_at).getTime();
       
-      return bDate - aDate; // Most recent first
+      return bDate - aDate; // Descending order (Most recent first)
     });
   }, [customers]);
 
@@ -1106,17 +1092,9 @@ export default function CustomersPage() {
     return user?.role === "Manager" || user?.role === "HR" || user?.role === "Production";
   };
 
-  // ✅ NEW: Check if customer is in Accepted stage (or has projects in Accepted)
+  // ✅ NEW: Check if customer is in Accepted stage (for icon display)
   const isCustomerInAcceptedStage = (customer: Customer): boolean => {
-    // Check if customer-level stage is Accepted
-    if (customer.stage === "Accepted") {
-      return true;
-    }
-    
-    // Check if customer has projects in Accepted stage
-    // This will be determined by the backend when fetching projects
-    // For now, we'll rely on the customer.stage field
-    return false;
+    return customer.stage === "Accepted";
   };
 
   // ---------------- Delete Customer ----------------
@@ -1474,8 +1452,8 @@ export default function CustomersPage() {
                         {user?.role !== "Staff" && (
                           <td className="px-6 py-4 text-right whitespace-nowrap">
                             <div className="flex gap-2 justify-end">
-                              {/* ✅ NEW: Clock icon only for Accepted stage customers */}
-                              {canViewTimeline() && showTimelineIcon && (
+                              {/* ✅ MODIFIED: Clock icon visible only if in Accepted stage */}
+                              {canViewTimeline() && isCustomerInAcceptedStage(customer) && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
