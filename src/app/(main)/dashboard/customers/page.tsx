@@ -782,7 +782,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/node_modules/next/navigation";
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 import { CustomerProjectTimeline } from "@/components/materials/CustomerProjectTimeline";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1032,7 +1032,7 @@ export default function CustomersPage() {
     }
   };
 
-  // ✅ NEW: Sorting Logic - Accepted Stage first, then by date
+  // ✅ NEW: Sorting Logic - Accepted Stage first, then by date (applies to all existing)
   const sortedCustomers = useMemo(() => {
     return [...customers].sort((a, b) => {
       // Priority 1: Accepted stage customers come first (sort order: Accepted -> Others)
@@ -1042,7 +1042,7 @@ export default function CustomersPage() {
       if (aIsAccepted && !bIsAccepted) return -1;
       if (!aIsAccepted && bIsAccepted) return 1;
       
-      // Priority 2: Within the same priority group (e.g., both Accepted or both not-Accepted), sort by updated_at date (most recent first)
+      // Priority 2: Within the same priority group, sort by most recent update
       const aDate = new Date(a.updated_at || a.created_at).getTime();
       const bDate = new Date(b.updated_at || b.created_at).getTime();
       
@@ -1092,7 +1092,7 @@ export default function CustomersPage() {
     return user?.role === "Manager" || user?.role === "HR" || user?.role === "Production";
   };
 
-  // ✅ NEW: Check if customer is in Accepted stage (for icon display)
+  // ✅ UPDATED: Check if customer is in Accepted stage (for icon display)
   const isCustomerInAcceptedStage = (customer: Customer): boolean => {
     return customer.stage === "Accepted";
   };
@@ -1452,7 +1452,7 @@ export default function CustomersPage() {
                         {user?.role !== "Staff" && (
                           <td className="px-6 py-4 text-right whitespace-nowrap">
                             <div className="flex gap-2 justify-end">
-                              {/* ✅ MODIFIED: Clock icon visible only if in Accepted stage */}
+                              {/* ✅ IMPLEMENTATION: Clock icon visible only if in Accepted stage */}
                               {canViewTimeline() && isCustomerInAcceptedStage(customer) && (
                                 <Button
                                   variant="ghost"
