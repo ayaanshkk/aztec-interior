@@ -900,8 +900,6 @@ const getProjectTypeColor = (type: ProjectType): string => {
 
 // ---------------- Component ----------------
 export default function CustomersPage() {
-  // Removed 'customers' state, consolidating to 'allCustomers' as the source of truth
-  // The 'customers' list is now generated via useMemo (sortedCustomers)
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]); 
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState<JobStage | "All">("All");
@@ -965,7 +963,6 @@ export default function CustomersPage() {
           stage: c.stage || c.status || "Lead",
           project_count: Number(c.project_count) || 0,
           form_submissions: c.form_submissions || [],
-          // Ensure we have an updated_at field for sorting
           updated_at: c.updated_at || c.created_at, 
         };
 
@@ -976,6 +973,14 @@ export default function CustomersPage() {
 
       const endTime = performance.now();
       console.log(`⏱️ Page loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+
+      // ✅ DEBUG: Log Accepted stage customers
+      const acceptedCustomers = customersWithData.filter((c: Customer) => 
+        (c.stage || "").trim().toLowerCase() === "accepted"
+      );
+      console.log(`🟣 Found ${acceptedCustomers.length} customers in Accepted stage:`, 
+        acceptedCustomers.map((c: Customer) => c.name)
+      );
 
     } catch (err) {
       console.error("Error fetching customers:", err);
@@ -1028,26 +1033,47 @@ export default function CustomersPage() {
     }
   };
 
-  // ✅ FIX A: Sorting Logic - Now depends directly on 'allCustomers'
+  // ✅ STEP 1: Apply role-based filtering FIRST
+  const roleFilteredCustomers = useMemo(() => {
+    if (user?.role === "Sales") {
+      const filtered = allCustomers.filter((customer: Customer) => {
+        const matchesCreatedBy = customer.created_by === String(user.id);
+        const matchesSalesperson = customer.salesperson === user.name;
+        return matchesCreatedBy || matchesSalesperson;
+      });
+      console.log(`👤 Sales filter: ${filtered.length} customers visible to ${user.name}`);
+      return filtered;
+    }
+    return allCustomers;
+  }, [allCustomers, user]);
+
+  // ✅ STEP 2: Sort with Accepted stage first
   const sortedCustomers = useMemo(() => {
-    return [...allCustomers].sort((a, b) => {
-      // Priority 1: Accepted stage customers come first (sort order: Accepted -> Others)
-      // Use the robust check here too, in case data is inconsistent
+    const sorted = [...roleFilteredCustomers].sort((a, b) => {
+      // Priority 1: Accepted stage customers come first
       const aIsAccepted = (a.stage || "").trim().toLowerCase() === "accepted";
       const bIsAccepted = (b.stage || "").trim().toLowerCase() === "accepted";
       
       if (aIsAccepted && !bIsAccepted) return -1;
       if (!aIsAccepted && bIsAccepted) return 1;
       
-      // Priority 2: Within the same priority group, sort by most recent update
+      // Priority 2: Within same group, sort by most recent update
       const aDate = new Date(a.updated_at || a.created_at).getTime();
       const bDate = new Date(b.updated_at || b.created_at).getTime();
       
-      return bDate - aDate; // Descending order (Most recent first)
+      return bDate - aDate;
     });
-  }, [allCustomers]); // Depends on the raw list
 
-  // ---------------- Filtering ----------------
+    // ✅ DEBUG: Log sorting results
+    const acceptedCount = sorted.filter(c => 
+      (c.stage || "").trim().toLowerCase() === "accepted"
+    ).length;
+    console.log(`🔄 Sorted: ${acceptedCount} Accepted customers at top of ${sorted.length} total`);
+    
+    return sorted;
+  }, [roleFilteredCustomers]);
+
+  // ✅ STEP 3: Apply search and stage filters
   const filteredCustomers = useMemo(() => {
     return sortedCustomers.filter((customer) => {
       const term = searchTerm.toLowerCase();
@@ -1058,7 +1084,6 @@ export default function CustomersPage() {
         (customer.phone || "").toLowerCase().includes(term) ||
         (customer.postcode || "").toLowerCase().includes(term);
 
-      // Use robust comparison for filtering as well
       const customerStageLower = (customer.stage || "").trim().toLowerCase();
       const stageFilterLower = (stageFilter === "All" ? "All" : stageFilter).toLowerCase();
       
@@ -1093,7 +1118,7 @@ export default function CustomersPage() {
     return user?.role === "Manager" || user?.role === "HR" || user?.role === "Production";
   };
 
-  // ✅ FIX B: Robust check for Accepted stage (Handles casing/whitespace issues)
+  // ✅ Robust check for Accepted stage
   const isCustomerInAcceptedStage = (customer: Customer): boolean => {
     return (customer.stage || "").trim().toLowerCase() === "accepted";
   };
@@ -1115,10 +1140,8 @@ export default function CustomersPage() {
       });
       if (!res.ok) throw new Error("Failed to delete customer");
 
-      // Only update allCustomers, which automatically triggers sorting and filtering via useMemo
       setAllCustomers((prev) => prev.filter((c) => c.id !== id));
       
-      // Re-evaluate current page after deletion
       if (paginatedCustomers.length === 1 && currentPage > 1) {
         setCurrentPage(prev => prev - 1);
       }
@@ -1136,7 +1159,6 @@ export default function CustomersPage() {
   };
 
   // ---------------- UI ----------------
-  // Generate unique stages from the sorted list
   const uniqueStages = Array.from(new Set(sortedCustomers.map((c) => c.stage)));
 
   // Pagination Component
@@ -1172,7 +1194,6 @@ export default function CustomersPage() {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           
-          {/* Page numbers */}
           <div className="flex items-center px-3 text-sm text-gray-700">
             Page {currentPage} of {totalPages}
           </div>
@@ -1303,10 +1324,8 @@ export default function CustomersPage() {
 
                   return (
                     <React.Fragment key={customer.id}>
-                      {/* Main Customer Row */}
                       <tr
                         onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
-                        // Use isAccepted for the row highlight
                         className={`cursor-pointer hover:bg-gray-50 transition-colors ${
                           !customer.has_documents ? 'bg-red-50' : ''
                         } ${isAccepted ? 'bg-purple-50' : ''}`}
@@ -1321,7 +1340,6 @@ export default function CustomersPage() {
                                 <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
                               </div>
                             )}
-                            {/* Visual indicator (pulse) for accepted stage */}
                             {isAccepted && (
                               <div className="flex items-center" title="Customer in Accepted stage">
                                 <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse" />
@@ -1341,7 +1359,6 @@ export default function CustomersPage() {
                           {customer.postcode || "—"}
                         </td>
 
-                        {/* Stage */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStageColor(
@@ -1352,7 +1369,6 @@ export default function CustomersPage() {
                           </span>
                         </td>
 
-                        {/* Projects - With Expandable Breakdown */}
                         <td className="px-6 py-4 whitespace-nowrap">
                           {customer.project_count > 0 ? (
                             <Popover>
@@ -1456,7 +1472,6 @@ export default function CustomersPage() {
                         {user?.role !== "Staff" && (
                           <td className="px-6 py-4 text-right whitespace-nowrap">
                             <div className="flex gap-2 justify-end">
-                              {/* ✅ IMPLEMENTATION: Clock icon visible only if in Accepted stage (using robust check) */}
                               {canViewTimeline() && isAccepted && (
                                 <Button
                                   variant="ghost"
@@ -1508,11 +1523,9 @@ export default function CustomersPage() {
           </table>
         </div>
 
-        {/* Pagination Controls */}
         {!isLoading && filteredCustomers.length > 0 && <PaginationControls />}
       </div>
 
-      {/* Create Customer Modal */}
       {showCreateModal && (
         <CreateCustomerModal
           isOpen={showCreateModal}
@@ -1521,7 +1534,6 @@ export default function CustomersPage() {
         />
       )}
 
-      {/* Timeline Modal */}
       <Dialog open={showTimelineModal} onOpenChange={setShowTimelineModal}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
