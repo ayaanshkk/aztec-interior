@@ -480,7 +480,7 @@ export default function EnhancedPipelinePage() {
                 salesperson: item.job?.salesperson_name || item.customer.salesperson,
               };
             }
-        }).filter(Boolean) as PipelineItem[]; // Filter out nulls
+        }).filter(Boolean); // Filter out nulls
 
         const afterMalformedFilter = pipelineItemsRetrieved.length;
         
@@ -1234,13 +1234,12 @@ export default function EnhancedPipelinePage() {
             <div className="h-[calc(100vh-300px)] min-h-[850px]">
               <div
                 className="h-full overflow-x-auto overflow-y-hidden rounded-lg bg-gray-50/30"
-                // ✅ FIX 1: Set max-width to allow horizontal scrolling while using full viewport width
+                // ✅ FIX 1: Ensure container width calculation is correct for horizontal scrolling
                 style={{
                   maxWidth: "100%",
                   width: "calc(100vw - 390px)",
                 }}
               >
-                {/* Horizontal scroll container */}
                 <div className="flex h-full items-start gap-4 p-3" style={{ width: "max-content", minWidth: "100%" }}>
                   {/* Use visibleColumns for KanbanProvider */}
                   <KanbanProvider
@@ -1252,8 +1251,8 @@ export default function EnhancedPipelinePage() {
                       <div key={column.id} className="flex-shrink-0">
                         <KanbanBoard
                           id={column.id}
-                          // ✅ FIX 2: Set responsive width that allows more content to show
-                          className="flex h-full w-[270px] flex-shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm md:w-[270px]"
+                          // 🚀 FIX 2: INCREASE COLUMN WIDTH for better readability (270px -> 300px)
+                          className="flex h-full w-[300px] flex-shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm md:w-[300px]"
                         >
                           <div className="flex h-full flex-col">
                               <KanbanHeader className="flex-shrink-0 rounded-t-lg border-b bg-gray-50/80 p-2.5">
@@ -1419,7 +1418,7 @@ export default function EnhancedPipelinePage() {
 
                                         {/* Action Buttons (fixed to the bottom with padding) */}
                                         <div className="flex gap-1 pt-2 pb-1">
-                                          {/* ✅ FIX: Quick Reject Button - now instant on click (no confirm dialog) */}
+                                          {/* ✅ MODIFIED: Quick Reject Button - now instant on click */}
                                           {isEditable && feature.stage !== "Rejected" && (
                                             <Button
                                               size="sm"
@@ -1427,7 +1426,6 @@ export default function EnhancedPipelinePage() {
                                               className="h-6 flex-1 px-1 text-xs hover:bg-red-50 text-red-600"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                // Instant placement into Rejected stage
                                                 handleQuickStageChange(feature.itemId, "Rejected", feature.itemType);
                                               }}
                                               title="Move to Rejected"
