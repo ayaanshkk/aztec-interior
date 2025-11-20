@@ -1796,7 +1796,7 @@ const handleConfirmDeleteFormDocument = async () => {
     const formType = getFormType(submission);
     // For checklists (bedroom/kitchen), open in new tab
     if (formType === "bedroom" || formType === "kitchen") {
-      const viewUrl = `/streemlyne/checklist-view?id=${submission.id}`;
+      const viewUrl = `/checklist-view?id=${submission.id}`;
       window.open(viewUrl, "_blank");
     } else {
       // For other forms, open in dialog
