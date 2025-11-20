@@ -39,7 +39,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { fetchWithAuth } from '@/lib/api';
 
 interface MaterialOrder {
@@ -115,27 +114,20 @@ export function ProductionMaterialsManagement() {
     notes: ''
   });
 
-  // ✅ FIXED: Initial load on mount
+  // ✅ FIXED: Initial load on mount - only fetch materials
   useEffect(() => {
-    console.log('🚀 Component mounted - loading initial data...');
+    console.log('🚀 Component mounted - loading materials...');
     fetchMaterials();
-    fetchCustomers();
   }, []); // Empty dependency array = run once on mount
 
-  // // ✅ FIXED: Auto-refresh customers every 10 seconds
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     console.log('🔄 Auto-refreshing customers...');
-  //     fetchCustomers();
-  //   }, 10000);
-
-  //   return () => clearInterval(interval);
-  // }, []);
-
+  // ✅ OPTIMIZED: Fetch materials with cache busting
   const fetchMaterials = async () => {
+    setLoading(true);
     try {
       console.log('📦 Fetching materials...');
-      const response = await fetchWithAuth('materials');
+      // ✅ Add cache-busting timestamp to prevent stale data
+      const timestamp = new Date().getTime();
+      const response = await fetchWithAuth(`materials?_t=${timestamp}`);
       if (!response.ok) throw new Error('Failed to fetch materials');
       const data = await response.json();
       console.log('✅ Materials loaded:', data.length);
@@ -148,12 +140,13 @@ export function ProductionMaterialsManagement() {
     }
   };
 
+  // ✅ OPTIMIZED: Only fetch customers when the dialog is opened
   const fetchCustomers = async () => {
     setCustomersLoading(true);
     try {
       console.log('🔄 Fetching customers in Accepted stage...');
       
-      // ✅ NEW: Use the new endpoint that filters by project stage
+      // ✅ Use cache-busting timestamp
       const timestamp = new Date().getTime();
       const response = await fetchWithAuth(`customers/by-stage/Accepted?_t=${timestamp}`);
       
@@ -162,7 +155,6 @@ export function ProductionMaterialsManagement() {
 
       console.log('📊 Total customers with Accepted projects:', data.length);
       
-      // ✅ NEW: Map the response to show project details
       const mappedCustomers = data.map((c: any) => ({ 
         id: c.id, 
         name: c.name,
@@ -241,6 +233,7 @@ export function ProductionMaterialsManagement() {
       });
       setIsCreateDialogOpen(false);
       
+      // ✅ Immediately reload materials
       await fetchMaterials();
       alert('Material order created successfully!');
       
@@ -277,6 +270,7 @@ export function ProductionMaterialsManagement() {
 
       console.log('✅ Material status updated successfully');
 
+      // ✅ Immediately reload materials
       await fetchMaterials();
       setIsUpdateDialogOpen(false);
       setSelectedMaterial(null);
@@ -308,6 +302,8 @@ export function ProductionMaterialsManagement() {
 
       setDeleteDialogOpen(false);
       setMaterialToDelete(null);
+      
+      // ✅ Immediately reload materials
       await fetchMaterials();
       
       alert('Material order deleted successfully!');
@@ -394,7 +390,10 @@ export function ProductionMaterialsManagement() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading materials...</p>
+        </div>
       </div>
     );
   }
@@ -413,6 +412,7 @@ export function ProductionMaterialsManagement() {
             <Button 
               className="flex items-center gap-2"
               onClick={() => {
+                // ✅ Only fetch customers when opening the dialog
                 fetchCustomers();
               }}
             >
@@ -425,10 +425,6 @@ export function ProductionMaterialsManagement() {
               <DialogTitle>Order New Materials</DialogTitle>
               <DialogDescription>
                 Create a new material order for a customer in "Accepted" stage
-                <br />
-                <span className="text-xs text-gray-500 mt-1 block">
-                  Showing customers in "Accepted" stage (with or without separate projects)
-                </span>
               </DialogDescription>
             </DialogHeader>
             
@@ -617,20 +613,7 @@ export function ProductionMaterialsManagement() {
         </Dialog>
       </div>
 
-      {customers.length === 0 && !customersLoading && (
-        <Alert className="border-yellow-200 bg-yellow-50">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            <strong>No customers with projects in "Accepted" stage found.</strong>
-            <br />
-            Projects must reach the "Accepted" stage in the pipeline before materials can be ordered for them.
-            <br />
-            <span className="text-xs text-gray-500 mt-1 block">
-              (Only projects have stages - jobs are created automatically when projects reach Accepted/Production)
-            </span>
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* ✅ REMOVED: Yellow alert bar - customers are now lazy-loaded only when needed */}
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -729,7 +712,7 @@ export function ProductionMaterialsManagement() {
           <Card>
             <CardContent className="p-12 text-center">
               <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">No materials found</p>
+              <p className="text-gray-600">No orders found</p>
               <p className="text-sm text-gray-400 mt-1">
                 {searchTerm || filter !== 'all' 
                   ? 'Try adjusting your filters'
