@@ -2519,6 +2519,7 @@ type AuditLog = {
   change_summary: string;
 };
 
+
 const makeColumns = () =>
   STAGES.map((name) => ({
     id: `col-${name.toLowerCase().replace(/\s+/g, "-")}`,
@@ -2566,24 +2567,7 @@ export default function EnhancedPipelinePage() {
 
   // MODIFICATION 3: Filter visible stages/columns based on user role
   const visibleStages: Stage[] = useMemo(() => {
-    if (userRole === "Production") {
-      const allowedProductionStages: Stage[] = [
-        "Accepted", 
-        "Rejected", 
-        "Ordered", 
-        "Production", 
-        "Delivery", 
-        "Installation", 
-        "Complete", 
-        "Remedial" 
-      ];
-      return STAGES.filter(stage => allowedProductionStages.includes(stage));
-    }
-    if (userRole === "Sales") {
-      const salesLimitStage = "Rejected";
-      const salesLimitIndex = STAGES.indexOf(salesLimitStage);
-      return STAGES.slice(0, salesLimitIndex + 1); 
-    }
+    // ✅ MODIFIED: Show all stages for all roles as requested by the user.
     return STAGES as unknown as Stage[];
   }, [userRole]);
 
@@ -2600,44 +2584,30 @@ export default function EnhancedPipelinePage() {
   const getStandardUserId = (value: string | null | undefined): string => {
     return (value || "").toLowerCase().trim();
   };
+  
   // Helper function to check if user can access an item
   const canUserAccessItem = (item: PipelineItem): boolean => {
-    const standardUserEmail = getStandardUserId(user?.email);
-    const standardUserName = getStandardUserId(user?.name);
-
-    if (permissions.canViewAllRecords) {
-      return true;
+    // ✅ MODIFIED TO SHOW ALL CUSTOMERS TO ALL ROLES, AS REQUESTED BY THE USER.
+    
+    // We keep the check for a logged-in user, which should always be true if the component loads.
+    if (!user) {
+      return false;
     }
 
-    if (userRole === "Sales") {
-      const standardItemSalesperson = getStandardUserId(item.salesperson);
-      const standardItemCreator = getStandardUserId(item.customer.created_by);
-
-      const isAssignedSalesperson =
-        standardItemSalesperson === standardUserEmail || standardItemSalesperson === standardUserName;
-      const isCreator = standardItemCreator === standardUserEmail || standardItemCreator === standardUserName;
-
-      const salesVisibleStages: Stage[] = ["Lead", "Survey", "Design", "Quote", "Accepted", "Rejected"];
-      const isInSalesStage = salesVisibleStages.includes(item.stage);
-
-      return (isAssignedSalesperson || isCreator) && isInSalesStage;
-    }
-
-    if (userRole === "Production") {
-      return PRODUCTION_STAGES.includes(item.stage);
-    }
-
-    return false;
+    // Returning true overrides all role-based restrictions (Sales/Production visibility)
+    return true;
   };
 
   // Helper function to check if user can edit an item
   const canUserEditItem = (item: PipelineItem): boolean => {
     if (!permissions.canEdit) return false;
 
+    // Managers and HR can edit everything
     if (userRole === "Manager" || userRole === "HR" || userRole === "Production") {
       return true;
     }
 
+    // Sales staff can only edit their own records (case-insensitive check)
     if (userRole === "Sales") {
       const standardItemSalesperson = getStandardUserId(item.salesperson);
       const standardUserEmail = getStandardUserId(user?.email);
@@ -2721,8 +2691,9 @@ export default function EnhancedPipelinePage() {
         }
 
         const rawPipelineData = await pipelineResponse.json();
-        console.log(`✅ Pipeline data loaded: ${rawPipelineData.length} items`);
+        console.log(`✅ Pipeline data loaded: ${rawPipelineData.length} total items from API`);
 
+        let malformedCount = 0;
         const pipelineItemsRetrieved = rawPipelineData.map((item: any) => {
             const isProjectItem = item.id.startsWith("project-");
 
@@ -2760,7 +2731,8 @@ export default function EnhancedPipelinePage() {
             } else {
               // ✅ CRITICAL FIX: Check if job data actually exists for job/project types
               if (!item.job) {
-                console.error(`⚠️ Item ${item.id} is type ${item.type} but missing job data. Skipping.`);
+                console.error(`⚠️ MALFORMED ITEM REMOVED: Item ${item.id} (${item.customer?.name}) is type ${item.type} but missing job data.`);
+                malformedCount++;
                 return null;
               }
 
@@ -2795,10 +2767,20 @@ export default function EnhancedPipelinePage() {
                 salesperson: item.job?.salesperson_name || item.customer.salesperson,
               };
             }
-        }).filter(Boolean); // ✅ Filter out nulls (missing job data)
+        }).filter(Boolean) as PipelineItem[]; // Ensure type is correct after filter
 
-        // Filter and set data
+        const afterMalformedFilter = pipelineItemsRetrieved.length;
+        
+        if (malformedCount > 0) {
+            console.log(`⚠️ ${malformedCount} malformed items removed.`);
+        }
+        console.log(`🔎 ${afterMalformedFilter} valid items remaining before role filter.`);
+
         const filteredItems = pipelineItemsRetrieved.filter((item: PipelineItem) => canUserAccessItem(item));
+        const finalCount = filteredItems.length;
+
+        console.log(`✅ Final count after role filtering: ${finalCount}`);
+        
         setPipelineItems(filteredItems);
         setFeatures(mapPipelineToFeatures(filteredItems));
         prevFeaturesRef.current = mapPipelineToFeatures(filteredItems);
@@ -3129,6 +3111,7 @@ export default function EnhancedPipelinePage() {
     newStage: Stage,
     itemType: "customer" | "job" | "project"
   ) => {
+    // Check permissions
     const item = pipelineItems.find((i) => i.id === itemId);
     if (!item || !canUserEditItem(item)) {
       alert("You don't have permission to change the stage of this item.");
@@ -3409,7 +3392,7 @@ export default function EnhancedPipelinePage() {
         <div className="flex items-center gap-2">
           {/* Show role badge */}
           <Badge variant="outline" className="text-xs">
-            {userRole} View
+            {userRole} View (All Customers)
           </Badge>
 
           {permissions.canCreate && (
@@ -3422,23 +3405,16 @@ export default function EnhancedPipelinePage() {
         </div>
 
       {/* Role-based information alerts */}
-      {userRole === "Sales" && (
-        <Alert className="border-blue-200 bg-blue-50">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            You are viewing your assigned customers and leads in the stages up to and including **On Hold**.
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* ALERT MODIFIED to reflect new permissions */}
+      <Alert className="border-green-200 bg-green-50">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          **Visibility Override Active:** All pipeline customers are currently visible regardless of your role.
+          {userRole === "Production" && " Pricing information remains hidden."}
+          {userRole === "Sales" && " Editing restrictions still apply to unassigned records."}
+        </AlertDescription>
+      </Alert>
 
-      {userRole === "Production" && (
-        <Alert className="border-orange-200 bg-orange-50">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            You can manage and move jobs through the pipeline. Pricing information is hidden.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Search + Filters */}
       <div className="flex flex-wrap items-center gap-4">
@@ -3982,11 +3958,7 @@ export default function EnhancedPipelinePage() {
                   <Briefcase className="mx-auto mb-4 h-12 w-12 opacity-50" />
                   <h3 className="mb-2 text-lg font-medium">No items found</h3>
                   <p>
-                    {userRole === "Sales"
-                      ? "You have no assigned customers or leads. Try creating one to see it appear, or check your filters."
-                      : userRole === "Production"
-                        ? "No jobs are currently in production stages."
-                        : "Try adjusting your search criteria or filters."}
+                    Try creating a new customer or check your connection.
                   </p>
                   <div className="mt-4 space-x-2">
                     {permissions.canCreate && (
