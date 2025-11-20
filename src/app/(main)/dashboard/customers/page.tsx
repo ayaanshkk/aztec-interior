@@ -900,8 +900,9 @@ const getProjectTypeColor = (type: ProjectType): string => {
 
 // ---------------- Component ----------------
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  // Removed 'customers' state, consolidating to 'allCustomers' as the source of truth
+  // The 'customers' list is now generated via useMemo (sortedCustomers)
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]); 
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState<JobStage | "All">("All");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -927,13 +928,6 @@ export default function CustomersPage() {
   useEffect(() => {
     fetchCustomers();
   }, []);
-
-  // ✅ FIX 1: Sync allCustomers to the working 'customers' list.
-  // This ensures the sorting logic below runs on the complete, fresh dataset.
-  useEffect(() => {
-    // If no filter is applied by role (based on your previous request), just set the full list.
-    setCustomers(allCustomers);
-  }, [allCustomers]);
 
   // Reset page when filters/search change
   useEffect(() => {
@@ -1034,24 +1028,24 @@ export default function CustomersPage() {
     }
   };
 
-  // ✅ Sorting Logic - Accepted Stage first (including existing), then by most recent update
+  // ✅ FIX A: Sorting Logic - Now depends directly on 'allCustomers'
   const sortedCustomers = useMemo(() => {
-    return [...customers].sort((a, b) => {
+    return [...allCustomers].sort((a, b) => {
       // Priority 1: Accepted stage customers come first (sort order: Accepted -> Others)
-      const aIsAccepted = a.stage === "Accepted";
-      const bIsAccepted = b.stage === "Accepted";
+      // Use the robust check here too, in case data is inconsistent
+      const aIsAccepted = (a.stage || "").trim().toLowerCase() === "accepted";
+      const bIsAccepted = (b.stage || "").trim().toLowerCase() === "accepted";
       
       if (aIsAccepted && !bIsAccepted) return -1;
       if (!aIsAccepted && bIsAccepted) return 1;
       
       // Priority 2: Within the same priority group, sort by most recent update
-      // This ensures the *most recently* accepted customer (or updated in general) is highest.
       const aDate = new Date(a.updated_at || a.created_at).getTime();
       const bDate = new Date(b.updated_at || b.created_at).getTime();
       
       return bDate - aDate; // Descending order (Most recent first)
     });
-  }, [customers]);
+  }, [allCustomers]); // Depends on the raw list
 
   // ---------------- Filtering ----------------
   const filteredCustomers = useMemo(() => {
@@ -1064,11 +1058,15 @@ export default function CustomersPage() {
         (customer.phone || "").toLowerCase().includes(term) ||
         (customer.postcode || "").toLowerCase().includes(term);
 
-      const matchesStage = stageFilter === "All" || customer.stage === stageFilter;
+      // Use robust comparison for filtering as well
+      const customerStageLower = (customer.stage || "").trim().toLowerCase();
+      const stageFilterLower = (stageFilter === "All" ? "All" : stageFilter).toLowerCase();
+      
+      const matchesStage = stageFilterLower === "all" || customerStageLower === stageFilterLower;
 
       return matchesSearch && matchesStage;
     });
-  }, [sortedCustomers, searchTerm, stageFilter]); // Depend on sortedCustomers
+  }, [sortedCustomers, searchTerm, stageFilter]);
 
   // ---------------- Pagination Calculations ----------------
   const totalPages = Math.ceil(filteredCustomers.length / CUSTOMERS_PER_PAGE);
@@ -1095,14 +1093,14 @@ export default function CustomersPage() {
     return user?.role === "Manager" || user?.role === "HR" || user?.role === "Production";
   };
 
-  // ✅ Clock icon logic: Check if customer is in Accepted stage
+  // ✅ FIX B: Robust check for Accepted stage (Handles casing/whitespace issues)
   const isCustomerInAcceptedStage = (customer: Customer): boolean => {
-    return customer.stage === "Accepted";
+    return (customer.stage || "").trim().toLowerCase() === "accepted";
   };
 
   // ---------------- Delete Customer ----------------
   const deleteCustomer = async (id: string) => {
-    const target = customers.find((c) => c.id === id);
+    const target = allCustomers.find((c) => c.id === id);
     if (!target || !canDeleteCustomer(target)) {
       alert("You don't have permission to delete customers.");
       return;
@@ -1117,8 +1115,7 @@ export default function CustomersPage() {
       });
       if (!res.ok) throw new Error("Failed to delete customer");
 
-      // Update both state arrays to ensure sorting is correct upon next refresh
-      setCustomers((prev) => prev.filter((c) => c.id !== id));
+      // Only update allCustomers, which automatically triggers sorting and filtering via useMemo
       setAllCustomers((prev) => prev.filter((c) => c.id !== id));
       
       // Re-evaluate current page after deletion
@@ -1139,7 +1136,8 @@ export default function CustomersPage() {
   };
 
   // ---------------- UI ----------------
-  const uniqueStages = Array.from(new Set(customers.map((c) => c.stage)));
+  // Generate unique stages from the sorted list
+  const uniqueStages = Array.from(new Set(sortedCustomers.map((c) => c.stage)));
 
   // Pagination Component
   const PaginationControls = () => {
@@ -1234,7 +1232,7 @@ export default function CustomersPage() {
                 All Stages
               </DropdownMenuItem>
               {uniqueStages.map((stage) => (
-                <DropdownMenuItem key={stage} onClick={() => setStageFilter(stage)}>
+                <DropdownMenuItem key={stage} onClick={() => setStageFilter(stage as JobStage)}>
                   {stage}
                 </DropdownMenuItem>
               ))}
@@ -1301,16 +1299,17 @@ export default function CustomersPage() {
                 paginatedCustomers.map((customer) => {
                   const isExpanded = expandedCustomerId === customer.id;
                   const projects = customerProjects[customer.id] || [];
-                  const showTimelineIcon = isCustomerInAcceptedStage(customer);
+                  const isAccepted = isCustomerInAcceptedStage(customer);
 
                   return (
                     <React.Fragment key={customer.id}>
                       {/* Main Customer Row */}
                       <tr
                         onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                        // Use isAccepted for the row highlight
                         className={`cursor-pointer hover:bg-gray-50 transition-colors ${
                           !customer.has_documents ? 'bg-red-50' : ''
-                        } ${customer.stage === 'Accepted' ? 'bg-purple-50' : ''}`}
+                        } ${isAccepted ? 'bg-purple-50' : ''}`}
                       >
                         <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
                           <div className="flex items-center space-x-2">
@@ -1322,8 +1321,8 @@ export default function CustomersPage() {
                                 <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
                               </div>
                             )}
-                            {/* This is the visual indicator you had before, not the clock icon itself */}
-                            {customer.stage === 'Accepted' && (
+                            {/* Visual indicator (pulse) for accepted stage */}
+                            {isAccepted && (
                               <div className="flex items-center" title="Customer in Accepted stage">
                                 <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse" />
                               </div>
@@ -1457,8 +1456,8 @@ export default function CustomersPage() {
                         {user?.role !== "Staff" && (
                           <td className="px-6 py-4 text-right whitespace-nowrap">
                             <div className="flex gap-2 justify-end">
-                              {/* ✅ Clock icon visible only if in Accepted stage and user can view timeline */}
-                              {canViewTimeline() && isCustomerInAcceptedStage(customer) && (
+                              {/* ✅ IMPLEMENTATION: Clock icon visible only if in Accepted stage (using robust check) */}
+                              {canViewTimeline() && isAccepted && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
