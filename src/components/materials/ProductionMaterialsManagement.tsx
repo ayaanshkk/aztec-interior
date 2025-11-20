@@ -144,37 +144,43 @@ export function ProductionMaterialsManagement() {
   const fetchCustomers = async () => {
     setCustomersLoading(true);
     try {
-      console.log('🔄 Fetching customers in Accepted stage...');
+      console.log('🔄 Fetching all customers, then filtering for Accepted stage...');
       
-      // ✅ Use cache-busting timestamp
+      // ✅ Use main customers endpoint (we know this works!)
       const timestamp = new Date().getTime();
-      const response = await fetchWithAuth(`customers/by-stage/Accepted?_t=${timestamp}`);
+      const response = await fetchWithAuth(`customers?_t=${timestamp}`);
       
       if (!response.ok) throw new Error('Failed to fetch customers');
       const data = await response.json();
 
-      console.log('📊 Total customers with Accepted projects:', data.length);
+      console.log('📊 Total customers fetched:', data.length);
       
-      const mappedCustomers = data.map((c: any) => ({ 
+      // ✅ Filter for Accepted stage on client side
+      const acceptedCustomers = data.filter((c: any) => 
+        c.stage && c.stage.toLowerCase() === 'accepted'
+      );
+      
+      console.log('✅ Customers in Accepted stage:', acceptedCustomers.length);
+      
+      const mappedCustomers = acceptedCustomers.map((c: any) => ({ 
         id: c.id, 
         name: c.name,
         email: c.email,
         phone: c.phone,
         address: c.address,
         stage: c.stage,
-        projects_at_stage: c.projects_at_stage || 0,
-        project_details: c.project_details || [],
-        total_projects: c.total_projects || 0
+        project_count: c.project_count || 0,
+        total_projects: c.project_count || 0
       }));
       
       setCustomers(mappedCustomers);
       
       if (mappedCustomers.length > 0) {
-        console.log('✅ Customers with Accepted projects loaded:', 
-          mappedCustomers.map((c: Customer) => `${c.name} (${c.projects_at_stage} project(s) in Accepted)`)
+        console.log('✅ Available customers:', 
+          mappedCustomers.map((c: Customer) => `${c.name} (${c.project_count} project(s))`)
         );
       } else {
-        console.log('⚠️ No customers found with projects in Accepted stage');
+        console.log('⚠️ No customers found in Accepted stage');
       }
       
     } catch (error) {
