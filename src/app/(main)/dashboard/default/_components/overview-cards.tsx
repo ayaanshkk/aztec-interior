@@ -55,6 +55,7 @@ export function OverviewCards() {
   const [loadingPipeline, setLoadingPipeline] = useState(true);
   const [loadingActions, setLoadingActions] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Get user role ONCE
   useEffect(() => {
@@ -156,7 +157,7 @@ export function OverviewCards() {
     fetchPipelineData();
     
     // Refresh every 30 seconds
-    const interval = setInterval(fetchPipelineData, 30000);
+    const interval = setInterval(fetchPipelineData, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -286,7 +287,7 @@ export function OverviewCards() {
       const interval = setInterval(fetchActionItems, 30000);
       return () => clearInterval(interval);
     }
-  }, [userRole]);
+  }, [userRole, refreshTrigger]);
 
   const handleCompleteAction = async (actionId: string) => {
     try {
@@ -306,7 +307,7 @@ export function OverviewCards() {
   };
 
   // Determine action items card color
-  const hasActionItems = loadingActions || actionItems.length > 0;
+  const hasActionItems = actionItems.length > 0;
   const cardBorderColor = hasActionItems ? "border-red-300" : "border-green-300";
   const cardBgColor = hasActionItems ? "bg-red-50/30" : "bg-green-50/30";
   const headerBgColor = hasActionItems ? "bg-red-100/50 border-red-200" : "bg-green-100/50 border-green-200";

@@ -281,7 +281,12 @@ export default function EnhancedPipelinePage() {
 
   // MODIFICATION 3: Filter visible stages/columns based on user role
   const visibleStages: Stage[] = useMemo(() => {
-    // ✅ FIX 2: Show all stages for all roles.
+    // ✅ Production role only sees post-acceptance stages
+    if (userRole === "Production") {
+      return ["Accepted", "Rejected", "Ordered", "Production", "Delivery", "Installation", "Complete", "Remedial"] as Stage[];
+    }
+    
+    // All other roles see all stages
     return STAGES as unknown as Stage[];
   }, [userRole]);
 
@@ -1020,14 +1025,19 @@ export default function EnhancedPipelinePage() {
       return;
     }
 
+    // ✅ Open in new tab
+    let url = '';
     if (itemType === "customer") {
-      router.push(`/dashboard/customers/${item.customer.id}`);
+      url = `/dashboard/customers/${item.customer.id}`;
     } else if (itemType === "project") {
-      router.push(`/dashboard/customers/${item.customer.id}`);
+      url = `/dashboard/customers/${item.customer.id}`;
     } else {
       const jobId = itemId.replace("job-", "");
-      router.push(`/dashboard/jobs/${jobId}`);
+      url = `/dashboard/jobs/${jobId}`;
     }
+    
+    // Open in new tab
+    window.open(url, '_blank');
   };
 
   const handleOpenCustomer = (customerId: string) => {

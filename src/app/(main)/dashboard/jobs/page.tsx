@@ -99,17 +99,18 @@ export default function JobsPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to delete job");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete job");
       }
 
       // Remove from state
       setJobs((prev) => prev.filter((j) => j.id !== jobToDelete.id));
       setDeleteDialogOpen(false);
       setJobToDelete(null);
-      alert("Job deleted successfully!");
+      // ✅ No alert on success - dialog closing is enough feedback
     } catch (error) {
       console.error("Error deleting job:", error);
-      alert("Failed to delete job. Please try again.");
+      alert(`Failed to delete job: ${error instanceof Error ? error.message : 'Please try again'}`);
     }
   };
 
