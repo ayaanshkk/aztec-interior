@@ -31,6 +31,7 @@ interface PipelineItem {
     id: string;
     created_at: string;
     stage: string;
+    name: string;
   };
   stage: string;
 }
@@ -83,21 +84,23 @@ export function OverviewCards() {
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
         const periods = [
-          { label: "1-5", daysAgoStart: 1, daysAgoEnd: 5 },
-          { label: "6-10", daysAgoStart: 6, daysAgoEnd: 10 },
-          { label: "11-15", daysAgoStart: 11, daysAgoEnd: 15 },
-          { label: "16-20", daysAgoStart: 16, daysAgoEnd: 20 },
-          { label: "21-25", daysAgoStart: 21, daysAgoEnd: 25 },
           { label: "26-30", daysAgoStart: 26, daysAgoEnd: 30 },
+          { label: "21-25", daysAgoStart: 21, daysAgoEnd: 25 },
+          { label: "16-20", daysAgoStart: 16, daysAgoEnd: 20 },
+          { label: "11-15", daysAgoStart: 11, daysAgoEnd: 15 },
+          { label: "6-10", daysAgoStart: 6, daysAgoEnd: 10 },
+          { label: "1-5", daysAgoStart: 1, daysAgoEnd: 5 },
         ];
 
         const today = new Date();
         const chartData = periods.map(period => {
-          const endDate = new Date(today);
-          endDate.setDate(today.getDate() - period.daysAgoStart);
-          
           const startDate = new Date(today);
           startDate.setDate(today.getDate() - period.daysAgoEnd);
+          startDate.setHours(0, 0, 0, 0);
+          
+          const endDate = new Date(today);
+          endDate.setDate(today.getDate() - period.daysAgoStart);
+          endDate.setHours(23, 59, 59, 999);
 
           const periodCustomers = pipelineItems.filter(item => {
             if (item.type !== 'customer' || !item.customer.created_at) return false;
@@ -110,7 +113,7 @@ export function OverviewCards() {
             newLeads: periodCustomers.filter(c => c.customer.stage !== 'Rejected').length,
             disqualified: periodCustomers.filter(c => c.customer.stage === 'Rejected').length,
           };
-        }).reverse();
+        });
 
         setLeadsChartData(chartData);
 
@@ -157,7 +160,7 @@ export function OverviewCards() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch Action Items SEPARATELY
+  // Fetch Action Items SEPARATELY + Create for existing Accepted customers
   useEffect(() => {
     const fetchActionItems = async () => {
       if (!["Manager", "HR", "Production"].includes(userRole || "")) {
@@ -177,11 +180,55 @@ export function OverviewCards() {
           setActionItems(actionsData);
         } else {
           console.warn("⚠️ Action items API returned:", actionsRes.status);
+          // If no action items exist, create them for existing Accepted customers
+          await createMissingActionItems();
         }
       } catch (error) {
         console.error("❌ Error fetching action items:", error);
+        // Try to create missing action items
+        await createMissingActionItems();
       } finally {
         setLoadingActions(false);
+      }
+    };
+
+    const createMissingActionItems = async () => {
+      try {
+        console.log("🔄 Checking for customers in Accepted stage...");
+        const pipelineRes = await fetchWithAuth("pipeline");
+        if (!pipelineRes.ok) return;
+        
+        const pipelineItems: PipelineItem[] = await pipelineRes.json();
+        const acceptedCustomers = pipelineItems.filter(
+          item => item.type === 'customer' && item.stage === 'Accepted'
+        );
+        
+        console.log(`📋 Found ${acceptedCustomers.length} customers in Accepted stage`);
+        
+        // Create action items for each
+        for (const item of acceptedCustomers) {
+          try {
+            await fetchWithAuth("action-items", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                customer_id: item.customer.id,
+              }),
+            });
+            console.log(`✅ Created action item for ${item.customer.name}`);
+          } catch (error) {
+            console.log(`⚠️ Action item may already exist for ${item.customer.name}`);
+          }
+        }
+        
+        // Refresh action items after creation
+        const refreshRes = await fetchWithAuth("action-items");
+        if (refreshRes.ok) {
+          const refreshedData: ActionItem[] = await refreshRes.json();
+          setActionItems(refreshedData);
+        }
+      } catch (error) {
+        console.error("❌ Error creating missing action items:", error);
       }
     };
 
@@ -211,6 +258,15 @@ export function OverviewCards() {
     }
   };
 
+  // Determine action items card color
+  const hasActionItems = actionItems.length > 0;
+  const cardBorderColor = hasActionItems ? "border-red-300" : "border-green-300";
+  const cardBgColor = hasActionItems ? "bg-red-50/30" : "bg-green-50/30";
+  const headerBgColor = hasActionItems ? "bg-red-100/50 border-red-200" : "bg-green-100/50 border-green-200";
+  const iconColor = hasActionItems ? "text-red-600" : "text-green-600";
+  const titleColor = hasActionItems ? "text-red-900" : "text-green-900";
+  const descColor = hasActionItems ? "text-red-700" : "text-green-700";
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {/* New Leads Card */}
@@ -226,8 +282,14 @@ export function OverviewCards() {
             </div>
           ) : (
             <ChartContainer config={leadsChartConfig} className="h-full w-full">
-              <BarChart data={leadsChartData} barSize={8}>
-                <XAxis dataKey="date" tickLine={false} axisLine={false} hide />
+              <BarChart data={leadsChartData} margin={{ left: 0, right: 0, top: 20, bottom: 20 }}>
+                <XAxis 
+                  dataKey="date" 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickMargin={8}
+                  className="text-xs"
+                />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Bar
                   dataKey="newLeads"
@@ -235,7 +297,12 @@ export function OverviewCards() {
                   fill="var(--color-newLeads)"
                   radius={[0, 0, 0, 0]}
                 />
-                <Bar dataKey="disqualified" stackId="a" fill="var(--color-disqualified)" radius={[4, 4, 0, 0]} />
+                <Bar 
+                  dataKey="disqualified" 
+                  stackId="a" 
+                  fill="var(--color-disqualified)" 
+                  radius={[4, 4, 0, 0]} 
+                />
               </BarChart>
             </ChartContainer>
           )}
@@ -271,32 +338,38 @@ export function OverviewCards() {
         </CardFooter>
       </Card>
 
-      {/* Action Items */}
-      <Card className="border-2 border-orange-200 bg-orange-50/30">
-        <CardHeader className="bg-orange-100/50 border-b border-orange-200">
+      {/* Action Items - RED when pending, GREEN when complete */}
+      <Card className={cn("border-2", cardBorderColor, cardBgColor)}>
+        <CardHeader className={cn("border-b", headerBgColor)}>
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-orange-600" />
-            <CardTitle className="text-orange-900">Action Items</CardTitle>
+            {hasActionItems ? (
+              <AlertCircle className={cn("h-5 w-5", iconColor)} />
+            ) : (
+              <CheckCircle2 className={cn("h-5 w-5", iconColor)} />
+            )}
+            <CardTitle className={titleColor}>Action Items</CardTitle>
           </div>
-          <CardDescription className="text-orange-700">
-            {actionItems.length} pending
+          <CardDescription className={descColor}>
+            {actionItems.length} pending action{actionItems.length !== 1 ? 's' : ''}
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-4 h-48 overflow-y-auto">
           {loadingActions ? (
             <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+              <div className={cn("animate-spin rounded-full h-8 w-8 border-b-2", 
+                hasActionItems ? "border-red-600" : "border-green-600"
+              )}></div>
             </div>
           ) : actionItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <CheckCircle2 className="h-12 w-12 mb-2 opacity-50" />
-              <p className="font-medium">All caught up!</p>
+              <CheckCircle2 className="h-12 w-12 mb-2 opacity-50 text-green-500" />
+              <p className="font-medium text-green-700">All caught up!</p>
               <p className="text-sm">No pending actions</p>
             </div>
           ) : (
             <ul className="space-y-2">
               {actionItems.map((item) => (
-                <li key={item.id} className="border-2 border-orange-300 bg-white rounded-md p-2 shadow-sm">
+                <li key={item.id} className="border-2 border-red-300 bg-white rounded-md p-2 shadow-sm">
                   <div className="flex items-start gap-2 mb-2">
                     <Checkbox className="mt-0.5" />
                     <div className="flex-1 min-w-0">
@@ -304,7 +377,7 @@ export function OverviewCards() {
                       <div className="flex items-center gap-2 mt-1">
                         <Clock className="h-3 w-3 text-gray-500" />
                         <span className="text-xs text-gray-600">
-                          {format(new Date(item.created_at), "MMM dd")}
+                          {format(new Date(item.created_at), "MMM dd, yyyy")}
                         </span>
                         <span
                           className={cn(
