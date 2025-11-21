@@ -10,9 +10,10 @@ import { DataTableViewOptions } from "@/components/data-table/data-table-view-op
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardAction } from "@/components/ui/card";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
+import { fetchWithAuth } from "@/lib/api";
 
 import { recentLeadsColumns } from "./columns.crm";
-import { recentLeadsData } from "./crm.config";
+import { generateRecentLeadsData } from "./crm.config";
 
 // Define the interface for accepted customers
 interface AcceptedCustomer {
@@ -31,6 +32,7 @@ export function TableCards() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [acceptedCustomers, setAcceptedCustomers] = useState<AcceptedCustomer[]>([]);
+  const [recentLeads, setRecentLeads] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Get user role from localStorage or context
@@ -39,25 +41,18 @@ export function TableCards() {
     setUserRole(role);
   }, []);
 
-  // Fetch accepted customers for production view
+  // Fetch data based on role
   useEffect(() => {
     if (userRole === "Production") {
       fetchAcceptedCustomers();
     } else {
-      setIsLoading(false);
+      fetchRecentLeads();
     }
   }, [userRole]);
 
   const fetchAcceptedCustomers = async () => {
-    const token = localStorage.getItem("auth_token");
-    if (!token) return;
-
     try {
-      const response = await fetch("https://aztec-interiors.onrender.com/customers", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetchWithAuth("customers");
 
       if (response.ok) {
         const customers: AcceptedCustomer[] = await response.json();
@@ -67,6 +62,23 @@ export function TableCards() {
       }
     } catch (error) {
       console.error("Error fetching accepted customers:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchRecentLeads = async () => {
+    try {
+      const response = await fetchWithAuth("pipeline");
+
+      if (response.ok) {
+        const pipelineData = await response.json();
+        // Generate recent leads from pipeline data
+        const leads = generateRecentLeadsData(pipelineData);
+        setRecentLeads(leads);
+      }
+    } catch (error) {
+      console.error("Error fetching recent leads:", error);
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +95,7 @@ export function TableCards() {
 
   // For non-production users, show the regular Recent Leads table
   const table = useDataTableInstance({
-    data: recentLeadsData,
+    data: recentLeads,
     columns: recentLeadsColumns,
     getRowId: (row) => row.id.toString(),
   });
@@ -192,10 +204,22 @@ export function TableCards() {
           </CardAction>
         </CardHeader>
         <CardContent className="flex size-full flex-col gap-4">
-          <div className="overflow-hidden rounded-md border">
-            <DataTable table={table} columns={recentLeadsColumns} />
-          </div>
-          <DataTablePagination table={table} />
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-muted-foreground text-sm">Loading recent leads...</p>
+            </div>
+          ) : recentLeads.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-muted-foreground text-sm">No recent leads found.</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-hidden rounded-md border">
+                <DataTable table={table} columns={recentLeadsColumns} />
+              </div>
+              <DataTablePagination table={table} />
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
