@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { fetchWithAuth } from "@/lib/api";
 
-const JOB_STAGES = ["Lead", "Quote", "Survey", "Measure", "Design", "Quoted", "Accepted", "Production", "Delivery", "Installation", "Complete", "Cancelled"];
 const JOB_TYPES = ["Kitchen", "Bedroom", "Wardrobe", "Remedial", "Other"];
 
 interface Job {
@@ -41,7 +40,6 @@ export default function JobsPage() {
   const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStage, setFilterStage] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
   
   // Delete confirmation dialog
@@ -54,7 +52,7 @@ export default function JobsPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [jobs, searchTerm, filterStage, filterType]);
+  }, [jobs, searchTerm, filterType]);
 
   const loadJobs = async () => {
     try {
@@ -81,10 +79,6 @@ export default function JobsPage() {
           job.job_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           job.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
       );
-    }
-
-    if (filterStage && filterStage !== "all") {
-      filtered = filtered.filter((job) => job.stage === filterStage);
     }
 
     if (filterType && filterType !== "all") {
@@ -186,23 +180,6 @@ export default function JobsPage() {
               />
             </div>
           </div>
-
-          <div className="w-[200px]">
-            <Select value={filterStage} onValueChange={setFilterStage}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Stages" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stages</SelectItem>
-                {JOB_STAGES.map((stage) => (
-                  <SelectItem key={stage} value={stage}>
-                    {stage}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="w-[200px]">
             <Select value={filterType} onValueChange={setFilterType}>
               <SelectTrigger>
@@ -284,9 +261,6 @@ export default function JobsPage() {
                       Type
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
-                      Stage
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
                       Priority
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
@@ -301,28 +275,24 @@ export default function JobsPage() {
                   {filteredJobs.map((job) => (
                     <tr
                       key={job.id}
-                      className="hover:bg-gray-50 transition-colors"
+                      onClick={() => router.push(`/dashboard/jobs/${job.id}`)}
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="font-medium text-gray-900">{job.job_reference || "N/A"}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-gray-900">{job.job_name || "-"}</span>
+                        <span className="text-gray-900">
+                          {job.customer_name && job.job_name 
+                            ? `${job.customer_name} - ${job.job_name}`
+                            : job.job_name || job.customer_name || "-"}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-gray-900">{job.customer_name || "Unknown"}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-700">{job.job_type}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStageColor(
-                            job.stage
-                          )}`}
-                        >
-                          {job.stage}
-                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`text-sm ${getPriorityColor(job.priority)}`}>
@@ -332,15 +302,8 @@ export default function JobsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         {new Date(job.created_at).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => router.push(`/dashboard/jobs/${job.id}`)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"

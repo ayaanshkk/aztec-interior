@@ -391,111 +391,29 @@ export default function EnhancedPipelinePage() {
 
         console.log("🚀 Fetching pipeline data from /pipeline...");
 
-        // CRITICAL FIX: We only try the pipeline endpoint. Removed the faulty fallback.
-        const pipelineResponse = await fetchWithAuth("pipeline"); 
-        
+        const pipelineResponse = await fetchWithAuth("pipeline");
+
         if (!pipelineResponse.ok) {
+          // If we get a timeout or auth error, retry once after a short delay
+          if (pipelineResponse.status === 401 || pipelineResponse.status === 408) {
+            console.log("⚠️ Auth/timeout error, retrying in 1 second...");
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            const retryResponse = await fetchWithAuth("pipeline");
+            if (!retryResponse.ok) {
+              throw new Error(`Failed to fetch pipeline: ${retryResponse.status} ${retryResponse.statusText}`);
+            }
+            
+            const retryData = await retryResponse.json();
+            processPipelineData(retryData);
+            return;
+          }
+          
           throw new Error(`Failed to fetch pipeline: ${pipelineResponse.status} ${pipelineResponse.statusText}`);
         }
 
         const rawPipelineData = await pipelineResponse.json();
-        console.log(`✅ Pipeline data loaded: ${rawPipelineData.length} total items from API`);
-
-        let malformedCount = 0;
-        const pipelineItemsRetrieved = rawPipelineData.map((item: any) => {
-            const isProjectItem = item.id.startsWith("project-");
-
-            const backendStage = item.stage ? item.stage.trim() : "Lead";
-            
-            const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
-            
-            if (backendStage !== "Lead" && validStage === "Lead") {
-              console.error('⚠️ Stage mismatch detected:', {
-                itemId: item.id,
-                received: backendStage,
-                fallback: validStage
-              });
-            }
-
-            const commonItem = {
-              id: item.id,
-              customer: item.customer,
-              name: item.customer.name,
-              salesperson: item.job?.salesperson_name || item.customer.salesperson,
-              measureDate: item.job?.measure_date || item.customer.date_of_measure,
-              stage: validStage,
-            };
-
-            if (item.type === "customer") {
-              return {
-                ...commonItem,
-                type: "customer" as const,
-                reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
-                jobType: item.customer.project_types?.join(", "),
-                project_count: item.project_count || 0,
-              };
-            } else {
-              // ✅ CRITICAL FIX: If item.job is missing (malformed job/project), 
-              // treat it as a customer entry to ensure it is displayed (78 total).
-              if (!item.job) {
-                console.warn(`⚠️ COMPROMISE: Malformed item (${item.id}) of type ${item.type} forced to 'customer' view to ensure all 78 customers are displayed.`);
-                malformedCount++;
-                return {
-                  ...commonItem,
-                  type: "customer" as const, // Force type to customer for safe rendering
-                  reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
-                  jobType: item.customer.project_types?.join(", "),
-                  project_count: item.project_count || 0,
-                };
-              }
-
-              const jobStage = validStage;
-
-              // ✅ SAFE ACCESS
-              const jobReference = isProjectItem
-                ? item.job.job_reference || `PROJ-${item.job.id?.slice(-4).toUpperCase() || 'NEW'}`
-                : item.job.job_reference || `JOB-${item.job.id?.slice(-4).toUpperCase() || 'NEW'}`;
-
-              const jobName = isProjectItem 
-                ? `${item.customer.name} - ${item.job.job_name || 'Project'}` 
-                : item.customer.name;
-
-              return {
-                ...commonItem,
-                type: isProjectItem ? ("project" as const) : ("job" as const),
-                job: item.job,
-                name: jobName,
-                reference: jobReference,
-                stage: jobStage as Stage,
-                jobType: item.job?.job_type,
-                quotePrice: item.job?.quote_price,
-                agreedPrice: item.job?.agreed_price,
-                soldAmount: item.job?.sold_amount,
-                deposit1: item.job?.deposit1,
-                deposit2: item.job?.deposit2,
-                deposit1Paid: item.job?.deposit1_paid || false,
-                deposit2Paid: item.job?.deposit2_paid || false,
-                deliveryDate: item.job?.delivery_date,
-                measureDate: item.job?.measure_date,
-                salesperson: item.job?.salesperson_name || item.customer.salesperson,
-              };
-            }
-        }).filter(Boolean); // Filter out nulls
-
-        const afterMalformedFilter = pipelineItemsRetrieved.length;
-        
-        if (malformedCount > 0) {
-            console.warn(`⚠️ ${malformedCount} malformed items were found and promoted to 'customer' records to ensure all 78 total records are displayed.`);
-        }
-        
-        const filteredItems = pipelineItemsRetrieved.filter((item: PipelineItem) => canUserAccessItem(item));
-        const finalCount = filteredItems.length;
-
-        console.log(`✅ Final count after role filtering: ${finalCount}`);
-        
-        setPipelineItems(filteredItems);
-        setFeatures(mapPipelineToFeatures(filteredItems));
-        prevFeaturesRef.current = mapPipelineToFeatures(filteredItems);
+        processPipelineData(rawPipelineData);
 
       } catch (err) {
         console.error("❌ Error fetching pipeline data:", err);
@@ -507,6 +425,106 @@ export default function EnhancedPipelinePage() {
 
     fetchData();
   }, [authLoading, token, user]);
+
+  // Extract the data processing logic into a separate function
+  const processPipelineData = (rawPipelineData: any[]) => {
+    console.log(`✅ Pipeline data loaded: ${rawPipelineData.length} total items from API`);
+
+    let malformedCount = 0;
+    const pipelineItemsRetrieved = rawPipelineData
+      .map((item: any) => {
+        const isProjectItem = item.id.startsWith("project-");
+
+        const backendStage = item.stage ? item.stage.trim() : "Lead";
+
+        const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
+
+        if (backendStage !== "Lead" && validStage === "Lead") {
+          console.error("⚠️ Stage mismatch detected:", {
+            itemId: item.id,
+            received: backendStage,
+            fallback: validStage,
+          });
+        }
+
+        const commonItem = {
+          id: item.id,
+          customer: item.customer,
+          name: item.customer.name,
+          salesperson: item.job?.salesperson_name || item.customer.salesperson,
+          measureDate: item.job?.measure_date || item.customer.date_of_measure,
+          stage: validStage,
+        };
+
+        if (item.type === "customer") {
+          return {
+            ...commonItem,
+            type: "customer" as const,
+            reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
+            jobType: item.customer.project_types?.join(", "),
+            project_count: item.project_count || 0,
+          };
+        } else {
+          if (!item.job) {
+            console.warn(
+              `⚠️ COMPROMISE: Malformed item (${item.id}) of type ${item.type} forced to 'customer' view to ensure all 78 customers are displayed.`
+            );
+            malformedCount++;
+            return {
+              ...commonItem,
+              type: "customer" as const,
+              reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
+              jobType: item.customer.project_types?.join(", "),
+              project_count: item.project_count || 0,
+            };
+          }
+
+          const jobStage = validStage;
+
+          const jobReference = isProjectItem
+            ? item.job.job_reference || `PROJ-${item.job.id?.slice(-4).toUpperCase() || "NEW"}`
+            : item.job.job_reference || `JOB-${item.job.id?.slice(-4).toUpperCase() || "NEW"}`;
+
+          const jobName = isProjectItem ? `${item.customer.name} - ${item.job.job_name || "Project"}` : item.customer.name;
+
+          return {
+            ...commonItem,
+            type: isProjectItem ? ("project" as const) : ("job" as const),
+            job: item.job,
+            name: jobName,
+            reference: jobReference,
+            stage: jobStage as Stage,
+            jobType: item.job?.job_type,
+            quotePrice: item.job?.quote_price,
+            agreedPrice: item.job?.agreed_price,
+            soldAmount: item.job?.sold_amount,
+            deposit1: item.job?.deposit1,
+            deposit2: item.job?.deposit2,
+            deposit1Paid: item.job?.deposit1_paid || false,
+            deposit2Paid: item.job?.deposit2_paid || false,
+            deliveryDate: item.job?.delivery_date,
+            measureDate: item.job?.measure_date,
+            salesperson: item.job?.salesperson_name || item.customer.salesperson,
+          };
+        }
+      })
+      .filter(Boolean);
+
+    if (malformedCount > 0) {
+      console.warn(
+        `⚠️ ${malformedCount} malformed items were found and promoted to 'customer' records to ensure all 78 total records are displayed.`
+      );
+    }
+
+    const filteredItems = pipelineItemsRetrieved.filter((item: PipelineItem) => canUserAccessItem(item));
+    const finalCount = filteredItems.length;
+
+    console.log(`✅ Final count after role filtering: ${finalCount}`);
+
+    setPipelineItems(filteredItems);
+    setFeatures(mapPipelineToFeatures(filteredItems));
+    prevFeaturesRef.current = mapPipelineToFeatures(filteredItems);
+  };
 
 
   const handleDataChange = async (next: any[]) => {
@@ -1125,17 +1143,6 @@ export default function EnhancedPipelinePage() {
         </div>
         </div>
 
-      {/* Role-based information alerts */}
-      {/* ALERT MODIFIED to reflect new permissions */}
-      <Alert className="border-green-200 bg-green-50">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          {userRole === "Production" && " Pricing information remains hidden."}
-          {userRole === "Sales" && " Editing restrictions still apply to unassigned records."}
-        </AlertDescription>
-      </Alert>
-
-
       {/* Search + Filters */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
@@ -1255,9 +1262,9 @@ export default function EnhancedPipelinePage() {
                           className="flex h-full w-[300px] flex-shrink-0 flex-col rounded-lg border border-gray-200 bg-white shadow-sm md:w-[300px]"
                         >
                           <div className="flex h-full flex-col">
-                              <KanbanHeader className="flex-shrink-0 rounded-t-lg border-b bg-gray-50/80 p-2.5">
+                              <KanbanHeader className="flex-shrink-0 rounded-t-lg border-b bg-white p-2.5 sticky top-0 z-10 shadow-sm">
                                 <div className="flex items-center gap-1.5">
-                                  <div className="h-1.5 w-1.5 flex-shrink-0 rounded-full" />
+                                  <div className="h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ backgroundColor: column.color }} />
                                   <span className="text-xs font-medium">{column.name}</span>
                                   <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
                                     {counts[column.id] ?? 0}
@@ -1265,7 +1272,7 @@ export default function EnhancedPipelinePage() {
                                 </div>
                               </KanbanHeader>
 
-                              <KanbanCards id={column.id} className="max-h-[850px] flex-1 space-y-2 overflow-y-auto p-2">
+                              <KanbanCards id={column.id} className="max-h-[calc(100vh-380px)] flex-1 space-y-2 overflow-y-auto p-2">
                                 {(feature: any) => {
                                   const isEditable = canUserEditItem({
                                     id: feature.itemId,
@@ -1449,7 +1456,7 @@ export default function EnhancedPipelinePage() {
                                           </Button>
 
                                           {/* Documents button - keep for jobs/projects */}
-                                          {(feature.itemType === "job" || feature.itemType === "project") && (
+                                          {/* {(feature.itemType === "job" || feature.itemType === "project") && (
                                             <Button
                                               size="sm"
                                               variant="ghost"
@@ -1462,7 +1469,7 @@ export default function EnhancedPipelinePage() {
                                             >
                                               <File className="h-3 w-3" />
                                             </Button>
-                                          )}
+                                          )} */}
                                         </div>
                                       </div>
                                     </KanbanCard>
@@ -1586,12 +1593,12 @@ export default function EnhancedPipelinePage() {
                               </DropdownMenuItem>
                             )}
                           
-                          {(item.type === "job" || item.type === "project") && (
+                          {/* {(item.type === "job" || item.type === "project") && (
                             <DropdownMenuItem onClick={() => handleViewDocuments(item.id)}>
                               <File className="mr-2 h-4 w-4" />
                               View Documents
                             </DropdownMenuItem>
-                          )}
+                          )} */}
                           
                           {/* NEW: Change Stage submenu - shows all available stages */}
                           {permissions.canEdit && isEditable && (

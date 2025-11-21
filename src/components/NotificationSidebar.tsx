@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation"; // ✅ Changed from react-router-dom
+import { useRouter } from "next/navigation";
 import { useNotifications } from "@/contexts/NotificationContext";
 import {
   Sheet,
@@ -21,7 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import Link from "next/link"; // ✅ Added for navigation
+import Link from "next/link";
 
 type Notification = {
   id: string;
@@ -31,6 +31,7 @@ type Notification = {
   created_at: string;
   moved_by?: string;
   read: boolean;
+  dismissed: boolean;  // ✅ ADDED
 };
 
 /**
@@ -107,6 +108,11 @@ function getNotificationIcon(message: string) {
   if (message.includes('🧾')) return '🧾';
   if (message.includes('➕')) return '➕';
   if (message.includes('➖')) return '➖';
+  if (message.includes('✅') || message.includes('Accepted')) return '✅';
+  if (message.includes('🏭') || message.includes('Production')) return '🏭';
+  if (message.includes('🔧') || message.includes('Installation')) return '🔧';
+  if (message.includes('🎉') || message.includes('Complete')) return '🎉';
+  if (message.includes('🚚') || message.includes('Delivery')) return '🚚';
   return '📌';
 }
 
@@ -132,7 +138,7 @@ function getNotificationPriority(notification: Notification): 'high' | 'medium' 
 
 export function NotificationSidebar() {
   const [isOpen, setIsOpen] = useState(false);
-  const router = useRouter(); // ✅ Changed from useNavigate
+  const router = useRouter();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previousUnreadCountRef = useRef<number>(0);
   
@@ -142,6 +148,7 @@ export function NotificationSidebar() {
     unreadCount,
     markAsRead,
     markAllAsRead,
+    dismissNotification,  // ✅ ADDED
     deleteNotification,
     clearAllNotifications,
   } = useNotifications();
@@ -179,10 +186,13 @@ export function NotificationSidebar() {
    */
   const handleViewAll = () => {
     setIsOpen(false);
-    router.push('/dashboard/notifications'); // ✅ Changed from navigate
+    router.push('/dashboard/notifications');
   };
 
-  const displayedNotifications = notifications.slice(0, 10); // Show only first 10 in sidebar
+  // ✅ Filter out dismissed notifications from sidebar
+  const displayedNotifications = notifications
+    .filter(n => !n.dismissed)
+    .slice(0, 10); // Show only first 10 in sidebar
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -248,7 +258,7 @@ export function NotificationSidebar() {
                   </Tooltip>
                 </TooltipProvider>
               )}
-              {notifications.length > 0 && (
+              {displayedNotifications.length > 0 && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -273,7 +283,7 @@ export function NotificationSidebar() {
 
           {/* Notifications List */}
           <ScrollArea className="flex-1">
-            {notifications.length === 0 ? (
+            {displayedNotifications.length === 0 ? (
               // Empty state
               <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
                 <Bell className="h-16 w-16 text-gray-300 mb-4" />
@@ -336,7 +346,7 @@ export function NotificationSidebar() {
                           </div>
                         </div>
 
-                        {/* Action buttons (mark as read, delete) */}
+                        {/* Action buttons (mark as read, dismiss) */}
                         <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           {!notification.read && (
                             <Button
@@ -352,9 +362,9 @@ export function NotificationSidebar() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => deleteNotification(notification.id)}
-                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-100"
-                            title="Delete notification"
+                            onClick={() => dismissNotification(notification.id)}
+                            className="h-8 w-8 text-gray-600 hover:text-gray-700 hover:bg-gray-100"
+                            title="Dismiss from sidebar"
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -392,7 +402,7 @@ export function NotificationSidebar() {
           </ScrollArea>
 
           {/* Footer - Show "View All" if more than 10 notifications */}
-          {notifications.length > 10 && (
+          {displayedNotifications.length >= 10 && (
             <div className="border-t px-6 py-3 bg-gray-50">
               <Button
                 variant="link"
@@ -400,7 +410,7 @@ export function NotificationSidebar() {
                 onClick={handleViewAll}
                 className="w-full text-blue-600 hover:text-blue-700 font-medium"
               >
-                View all {notifications.length} notifications →
+                View all notifications →
               </Button>
             </div>
           )}

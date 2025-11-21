@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, Check, CheckCheck, Filter, Search, Trash2, X, ExternalLink, FileText } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,12 +22,13 @@ interface Notification {
   id: string;
   message: string;
   read: boolean;
+  dismissed: boolean;  // ✅ NEW
   created_at: string;
   customer_id?: string;
   job_id?: string;
   checklist_id?: string;
-  form_submission_id?: number;  // ✅ For linking to forms
-  form_type?: string;            // ✅ Type of form (kitchen, bedroom, etc)
+  form_submission_id?: number;
+  form_type?: string;
   moved_by?: string;
 }
 
@@ -45,8 +46,13 @@ const NotificationsPage = () => {
     markAllAsRead,
     deleteNotification,
     clearAllNotifications,
-    fetchNotifications,
+    fetchAllNotifications,  // ✅ NEW: Use this instead of fetchNotifications
   } = useNotifications();
+
+  // ✅ Fetch ALL notifications (including dismissed) on mount
+  useEffect(() => {
+    fetchAllNotifications();
+  }, [fetchAllNotifications]);
 
   // ✅ Parse notification message to extract main message and changes
   const parseNotificationMessage = (message: string) => {
@@ -85,10 +91,16 @@ const NotificationsPage = () => {
     if (message.includes('stage') || message.includes('🔄')) return '🔄';
     if (message.includes('Delivery') || message.includes('🚚')) return '🚚';
     if (message.includes('Complete') || message.includes('🎉')) return '🎉';
+    if (message.includes('Accepted') || message.includes('✅')) return '✅';
+    if (message.includes('Production') || message.includes('🏭')) return '🏭';
+    if (message.includes('Installation') || message.includes('🔧')) return '🔧';
     return '🔔';
   };
 
   const deleteAllRead = async () => {
+    if (!window.confirm('Delete all read notifications? This cannot be undone.')) {
+      return;
+    }
     const readIds = notifications.filter(n => n.read).map(n => n.id);
     for (const id of readIds) {
       await deleteNotification(id);
@@ -108,6 +120,9 @@ const NotificationsPage = () => {
   };
 
   const deleteSelected = async () => {
+    if (!window.confirm(`Delete ${selectedNotifications.size} selected notifications? This cannot be undone.`)) {
+      return;
+    }
     for (const id of Array.from(selectedNotifications)) {
       await deleteNotification(id);
     }
@@ -115,17 +130,19 @@ const NotificationsPage = () => {
   };
 
   const handleClearAll = async () => {
-    if (!window.confirm('Are you sure you want to clear all notifications? This action cannot be undone.')) {
+    if (!window.confirm('⚠️ PERMANENTLY DELETE ALL notifications? This action cannot be undone.')) {
       return;
     }
     await clearAllNotifications();
+    setSelectedNotifications(new Set());
   };
 
+  // ✅ Filter notifications based on active tab
   const filteredNotifications = notifications
     .filter((notif) => {
       if (activeTab === 'unread') return !notif.read;
       if (activeTab === 'read') return notif.read;
-      return true;
+      return true;  // 'all' tab shows everything (including dismissed)
     })
     .filter((notif) =>
       notif.message.toLowerCase().includes(searchQuery.toLowerCase())
@@ -139,10 +156,10 @@ const NotificationsPage = () => {
           <div>
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
               <Bell className="h-8 w-8" />
-              Notifications
+              All Notifications
             </h1>
             <p className="text-muted-foreground mt-1">
-              Detailed updates with exact changes made
+              Complete notification history with detailed changes
             </p>
           </div>
           <div className="flex gap-2">
@@ -168,13 +185,13 @@ const NotificationsPage = () => {
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete All Read
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={fetchNotifications}>
+                <DropdownMenuItem onClick={fetchAllNotifications}>
                   <Bell className="h-4 w-4 mr-2" />
                   Refresh
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleClearAll}>
-                  <Trash2 className="h-4 w-4 mr-2 text-red-600" />
-                  <span className="text-red-600">Clear All</span>
+                <DropdownMenuItem onClick={handleClearAll} className="text-red-600">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  <span>Clear All (Permanent)</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -253,7 +270,9 @@ const NotificationsPage = () => {
                   key={notification.id}
                   className={`transition-all hover:shadow-md ${
                     !notification.read ? 'border-l-4 border-l-primary bg-primary/5' : ''
-                  } ${isSelected ? 'ring-2 ring-primary' : ''}`}
+                  } ${isSelected ? 'ring-2 ring-primary' : ''} ${
+                    notification.dismissed ? 'opacity-60' : ''
+                  }`}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
@@ -275,9 +294,16 @@ const NotificationsPage = () => {
                         {/* Main Message */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1">
-                            <p className={`text-sm ${!notification.read ? 'font-semibold' : ''}`}>
-                              {mainMessage}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className={`text-sm ${!notification.read ? 'font-semibold' : ''}`}>
+                                {mainMessage}
+                              </p>
+                              {notification.dismissed && (
+                                <Badge variant="outline" className="text-xs">
+                                  Hidden from sidebar
+                                </Badge>
+                              )}
+                            </div>
                             
                             {/* ✅ Display detailed changes in a styled box */}
                             {hasChanges && (
@@ -344,29 +370,26 @@ const NotificationsPage = () => {
                             </Button>
                           )}
                           
-                          {/* ✅ NEW: View Checklist/Form Button */}
                           {notification.form_submission_id && (
                             <Button
                               variant="default"
                               size="sm"
                               onClick={() => {
-                                // Navigate to form details page
-                                router.push(`/dashboard/forms/${notification.form_submission_id}`);
+                                router.push(`/checklist-view?id=${notification.form_submission_id}`);
                               }}
                               className="h-8 bg-blue-600 hover:bg-blue-700 text-white"
                             >
                               <FileText className="h-3 w-3 mr-1" />
-                              View {notification.form_type ? notification.form_type.charAt(0).toUpperCase() + notification.form_type.slice(1) : 'Form'}
+                              View {notification.form_type ? notification.form_type.charAt(0).toUpperCase() + notification.form_type.slice(1) : 'Checklist'}
                             </Button>
                           )}
                           
-                          {/* Alternative: View Checklist if checklist_id exists */}
                           {notification.checklist_id && !notification.form_submission_id && (
                             <Button
                               variant="default"
                               size="sm"
                               onClick={() => {
-                                router.push(`/dashboard/checklists/${notification.checklist_id}`);
+                                router.push(`/checklist-view?id=${notification.checklist_id}`);
                               }}
                               className="h-8 bg-purple-600 hover:bg-purple-700 text-white"
                             >
@@ -395,7 +418,7 @@ const NotificationsPage = () => {
                           size="sm"
                           onClick={() => deleteNotification(notification.id)}
                           className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                          title="Delete notification"
+                          title="Delete notification permanently"
                         >
                           <X className="h-4 w-4" />
                         </Button>

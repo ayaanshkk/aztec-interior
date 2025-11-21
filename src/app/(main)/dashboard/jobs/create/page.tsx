@@ -22,6 +22,7 @@ interface FormData {
   measure_date: string;
   completion_date: string;
   notes: string;
+  priority: string; 
 }
 
 export default function CreateJobPage() {
@@ -44,6 +45,7 @@ export default function CreateJobPage() {
     measure_date: "",
     completion_date: "",
     notes: "",
+    priority: "Medium",
   });
 
   useEffect(() => {
@@ -129,6 +131,7 @@ export default function CreateJobPage() {
         salesperson_name: formData.salesperson_name || null,
         measure_date: formData.measure_date,
         completion_date: formData.completion_date,
+        priority: formData.priority,
         notes: formData.notes || "",
         attached_forms: attachedForms.map((f) => f.id),
       };
@@ -200,6 +203,25 @@ export default function CreateJobPage() {
                   value={formData.job_name}
                   onChange={(e) => handleInputChange("job_name", e.target.value)}
                 />
+              </div>
+
+              {/* ✅ NEW: Priority Field */}
+              <div>
+                <Label>Priority *</Label>
+                <Select value={formData.priority} onValueChange={(v) => handleInputChange("priority", v)}>
+                  <SelectTrigger className={errors.priority ? "border-red-500" : ""}>
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.priority && <p className="mt-1 text-sm text-red-500">{errors.priority}</p>}
+                <p className="mt-1 text-xs text-gray-500">
+                  Default is Medium if not selected
+                </p>
               </div>
             </div>
           </section>
