@@ -140,7 +140,6 @@ const ROLE_PERMISSIONS: Record<UserRole, any> = {
 
 const PRODUCTION_STAGES: Stage[] = [
   "Accepted",
-  "Rejected",
   "Ordered",
   "Production",
   "Delivery",
@@ -283,7 +282,7 @@ export default function EnhancedPipelinePage() {
   const visibleStages: Stage[] = useMemo(() => {
     // ✅ Production role only sees post-acceptance stages
     if (userRole === "Production") {
-      return ["Accepted", "Rejected", "Ordered", "Production", "Delivery", "Installation", "Complete", "Remedial"] as Stage[];
+      return ["Accepted", "Ordered", "Production", "Delivery", "Installation", "Complete", "Remedial"] as Stage[];
     }
     
     // All other roles see all stages
