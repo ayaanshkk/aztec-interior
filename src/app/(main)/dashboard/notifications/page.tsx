@@ -28,6 +28,7 @@ interface Notification {
   job_id?: string;
   checklist_id?: string;
   form_submission_id?: number;
+  checklist_id?: string;
   form_type?: string;
   moved_by?: string;
 }
