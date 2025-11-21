@@ -1238,7 +1238,7 @@ export default function EnhancedPipelinePage() {
 
         {/* Kanban View */}
           <TabsContent value="kanban" className="mt-6">
-            <div className="h-[calc(100vh-300px)] min-h-[850px]">
+            <div className="h-[calc(100vh-280px)]">
               <div
                 className="h-full overflow-x-auto overflow-y-hidden rounded-lg bg-gray-50/30"
                 // ✅ FIX 1: Ensure container width calculation is correct for horizontal scrolling
@@ -1272,7 +1272,7 @@ export default function EnhancedPipelinePage() {
                                 </div>
                               </KanbanHeader>
 
-                              <KanbanCards id={column.id} className="max-h-[calc(100vh-380px)] flex-1 space-y-2 overflow-y-auto p-2">
+                              <KanbanCards id={column.id} className="flex-1 space-y-2 overflow-y-auto p-2">
                                 {(feature: any) => {
                                   const isEditable = canUserEditItem({
                                     id: feature.itemId,

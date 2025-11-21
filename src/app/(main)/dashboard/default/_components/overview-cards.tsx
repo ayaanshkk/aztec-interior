@@ -178,9 +178,13 @@ export function OverviewCards() {
           const actionsData: ActionItem[] = await actionsRes.json();
           console.log("✅ Action items loaded:", actionsData);
           setActionItems(actionsData);
+
+          if (actionsData.length === 0) {
+            console.log("📋 No action items found, checking for Accepted customers...");
+            await createMissingActionItems();
+          }
         } else {
           console.warn("⚠️ Action items API returned:", actionsRes.status);
-          // If no action items exist, create them for existing Accepted customers
           await createMissingActionItems();
         }
       } catch (error) {
@@ -259,7 +263,7 @@ export function OverviewCards() {
   };
 
   // Determine action items card color
-  const hasActionItems = actionItems.length > 0;
+  const hasActionItems = loadingActions || actionItems.length > 0;
   const cardBorderColor = hasActionItems ? "border-red-300" : "border-green-300";
   const cardBgColor = hasActionItems ? "bg-red-50/30" : "bg-green-50/30";
   const headerBgColor = hasActionItems ? "bg-red-100/50 border-red-200" : "bg-green-100/50 border-green-200";
