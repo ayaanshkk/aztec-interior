@@ -210,12 +210,12 @@ export function OverviewCards() {
         const pipelineItems: PipelineItem[] = await pipelineRes.json();
         console.log("📊 Total pipeline items:", pipelineItems.length);
         
-        // ✅ FIX: Filter for customers in Accepted stage
+        // ✅ FIX: Filter for customers AND projects in Accepted stage
         const acceptedCustomers = pipelineItems.filter(
-          item => item.type === 'customer' && item.stage === 'Accepted'
+          item => (item.type === 'customer' || item.type === 'project') && item.stage === 'Accepted'
         );
-        
-        console.log(`📋 Found ${acceptedCustomers.length} customers in Accepted stage`);
+                
+        console.log(`📋 Found ${acceptedCustomers.length} items (customers + projects) in Accepted stage`);
         
         if (acceptedCustomers.length === 0) {
           console.log("ℹ️ No customers in Accepted stage");
