@@ -66,9 +66,11 @@ export function OverviewCards() {
 
   // Fetch pipeline data (New Leads + Sales Pipeline)
   useEffect(() => {
-    const fetchPipelineData = async () => {
+    const fetchPipelineData = async (showLoading = true) => {
       try {
-        setLoadingPipeline(true);
+        if (showLoading) {
+          setLoadingPipeline(true);
+        }
         console.log("🔄 Fetching pipeline data...");
         
         const pipelineRes = await fetchWithAuth("pipeline");
@@ -150,27 +152,32 @@ export function OverviewCards() {
       } catch (error) {
         console.error("❌ Error fetching pipeline data:", error);
       } finally {
-        setLoadingPipeline(false);
+        if (showLoading) {
+          setLoadingPipeline(false);
+        }
       }
     };
 
-    fetchPipelineData();
+    // Initial load with spinner
+    fetchPipelineData(true);
     
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchPipelineData, 5000);
+    // Background refresh every 60 seconds WITHOUT spinner
+    const interval = setInterval(() => fetchPipelineData(false), 60000);
     return () => clearInterval(interval);
   }, []);
 
   // Fetch Action Items SEPARATELY + Create for existing Accepted customers
   useEffect(() => {
-    const fetchActionItems = async () => {
+    const fetchActionItems = async (showLoading = true) => {
       if (!["Manager", "HR", "Production"].includes(userRole || "")) {
         setLoadingActions(false);
         return;
       }
 
       try {
-        setLoadingActions(true);
+        if (showLoading) {
+          setLoadingActions(true);
+        }
         console.log("🔄 Fetching action items...");
         
         const actionsRes = await fetchWithAuth("action-items");
@@ -180,20 +187,26 @@ export function OverviewCards() {
           console.log("✅ Action items loaded:", actionsData);
           setActionItems(actionsData);
 
-          if (actionsData.length === 0) {
+          if (actionsData.length === 0 && showLoading) {
+            // Only check for missing action items on initial load
             console.log("📋 No action items found, checking for Accepted customers...");
             await createMissingActionItems();
           }
         } else {
           console.warn("⚠️ Action items API returned:", actionsRes.status);
-          await createMissingActionItems();
+          if (showLoading) {
+            await createMissingActionItems();
+          }
         }
       } catch (error) {
         console.error("❌ Error fetching action items:", error);
-        // Try to create missing action items
-        await createMissingActionItems();
+        if (showLoading) {
+          await createMissingActionItems();
+        }
       } finally {
-        setLoadingActions(false);
+        if (showLoading) {
+          setLoadingActions(false);
+        }
       }
     };
 
@@ -281,10 +294,11 @@ export function OverviewCards() {
     };
 
     if (userRole) {
-      fetchActionItems();
+      // Initial load with spinner
+      fetchActionItems(true);
       
-      // Refresh every 30 seconds
-      const interval = setInterval(fetchActionItems, 30000);
+      // Background refresh every 60 seconds WITHOUT spinner
+      const interval = setInterval(() => fetchActionItems(false), 60000);
       return () => clearInterval(interval);
     }
   }, [userRole, refreshTrigger]);
@@ -401,7 +415,7 @@ export function OverviewCards() {
             {actionItems.length} pending action{actionItems.length !== 1 ? 's' : ''}
           </CardDescription>
         </CardHeader>
-        <CardContent className="pt-4 h-48 overflow-y-auto">
+        <CardContent className="h-48 overflow-y-auto">
           {loadingActions ? (
             <div className="flex items-center justify-center h-full">
               <div className={cn("animate-spin rounded-full h-8 w-8 border-b-2", 

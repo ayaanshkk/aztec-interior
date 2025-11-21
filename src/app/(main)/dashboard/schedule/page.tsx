@@ -79,11 +79,11 @@ interface Assignment {
   status?: string;
   user_id?: number;
   team_member?: string;
-  job_type?: string;
+  job_type?: string; // ✅ KEEP THIS
   created_by?: number;
-  created_by_name?: string;
+  created_by_name?: string; // ✅ ADD THIS
   updated_by?: number;
-  updated_by_name?: string;
+  updated_by_name?: string; // ✅ ADD THIS
 }
 
 // ... constants stay the same ...
@@ -1271,10 +1271,9 @@ export default function SchedulePage() {
                           // It's a task like "Consultation"
                           setNewAssignment({
                             ...newAssignment,
-                            title: value, // Set title to the task name
-                            job_type: value, // --- (Task 1) ---
+                            title: value,
+                            job_type: value, // ✅ This line should be there
                             job_id: undefined,
-                            // Keep customer_id if it was already set
                             customer_id: newAssignment.customer_id,
                           });
                         } else {
@@ -1282,8 +1281,8 @@ export default function SchedulePage() {
                           const job = availableJobs.find((j) => j.id === value);
                           setNewAssignment({
                             ...newAssignment,
-                            title: undefined, // Let createAssignment handle title
-                            job_type: job?.job_type, // --- (Task 1) ---
+                            title: undefined,
+                            job_type: job?.job_type, // ✅ This line should be there
                             job_id: value,
                             customer_id: job?.customer_id,
                           });
@@ -1447,6 +1446,12 @@ export default function SchedulePage() {
                     <Label className="text-gray-500">Created By</Label>
                     <p>{selectedAssignment.created_by_name || "N/A"}</p>
                   </div>
+                  {selectedAssignment.updated_by_name && (
+                    <div className="space-y-1 col-span-2">
+                      <Label className="text-gray-500">Last Updated By</Label>
+                      <p>{selectedAssignment.updated_by_name}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1534,7 +1539,7 @@ export default function SchedulePage() {
                             setSelectedAssignment({
                               ...selectedAssignment,
                               title: value,
-                              job_type: value, // <-- (Task 1)
+                              job_type: value, // ✅ This line should be there
                               job_id: undefined,
                             });
                           } else {
@@ -1542,7 +1547,7 @@ export default function SchedulePage() {
                             setSelectedAssignment({
                               ...selectedAssignment,
                               job_id: value,
-                              job_type: job?.job_type, // <-- (Task 1)
+                              job_type: job?.job_type, // ✅ This line should be there
                               customer_id: job?.customer_id,
                             });
                           }
