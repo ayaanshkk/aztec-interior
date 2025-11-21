@@ -549,6 +549,13 @@ export default function EnhancedPipelinePage() {
         return;
       }
 
+      // ✅ ADD THIS DEBUG CODE
+      console.log("🎯 Moved items details:");
+      moved.forEach(item => {
+        const newStage = columnIdToStage(item.column);
+        console.log(`  - ${item.name}: ${item.column} → Stage: ${newStage}`);
+      });
+
       // Create stage updates map
       const stageUpdates = new Map(
         moved.map((item) => [item.itemId, columnIdToStage(item.column)]),
@@ -1272,7 +1279,7 @@ export default function EnhancedPipelinePage() {
                                 </div>
                               </KanbanHeader>
 
-                              <KanbanCards id={column.id} className="flex-1 space-y-2 overflow-y-auto p-2">
+                              <KanbanCards id={column.id} className="flex-1 space-y-2 overflow-y-auto p-2" style={{ maxHeight: 'calc(100vh - 380px)' }}>
                                 {(feature: any) => {
                                   const isEditable = canUserEditItem({
                                     id: feature.itemId,
@@ -1292,7 +1299,8 @@ export default function EnhancedPipelinePage() {
                                       id={feature.id}
                                       key={feature.id}
                                       name={feature.name}
-                                      className={`rounded-md border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md ${permissions.canDragDrop && isEditable ? "cursor-grab" : "cursor-not-allowed opacity-90"} p-2 ${feature.itemType === "job" ? "pb-0" : ""}`}
+                                      className={`rounded-md border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md ${permissions.canDragDrop && isEditable ? "cursor-grab" : "cursor-not-allowed opacity-90"} p-2 ${feature.itemType === "job" ? "pb-0" : ""} overflow-hidden`}
+                                      style={{ maxWidth: '100%', wordBreak: 'break-word' }}
                                     >
                                       <div className="space-y-3">
                                         {/* Lock icon for non-editable items */}

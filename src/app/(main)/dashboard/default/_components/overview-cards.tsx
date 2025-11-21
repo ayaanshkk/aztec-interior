@@ -199,40 +199,83 @@ export function OverviewCards() {
     const createMissingActionItems = async () => {
       try {
         console.log("🔄 Checking for customers in Accepted stage...");
+        
         const pipelineRes = await fetchWithAuth("pipeline");
-        if (!pipelineRes.ok) return;
+        if (!pipelineRes.ok) {
+          console.error("❌ Pipeline request failed:", pipelineRes.status);
+          return;
+        }
         
         const pipelineItems: PipelineItem[] = await pipelineRes.json();
+        console.log("📊 Total pipeline items:", pipelineItems.length);
+        
+        // ✅ FIX: Filter for customers in Accepted stage
         const acceptedCustomers = pipelineItems.filter(
           item => item.type === 'customer' && item.stage === 'Accepted'
         );
         
         console.log(`📋 Found ${acceptedCustomers.length} customers in Accepted stage`);
         
-        // Create action items for each
+        if (acceptedCustomers.length === 0) {
+          console.log("ℹ️ No customers in Accepted stage");
+          return;
+        }
+        
+        // Get existing action items to avoid duplicates
+        const existingRes = await fetchWithAuth("action-items");
+        const existingActionItems: ActionItem[] = existingRes.ok ? await existingRes.json() : [];
+        const existingCustomerIds = new Set(existingActionItems.map(item => item.customer_id));
+        
+        console.log(`📌 Existing action items for ${existingCustomerIds.size} customers`);
+        
+        // Create action items for customers that don't have one
+        let createdCount = 0;
         for (const item of acceptedCustomers) {
+          const customerId = item.customer.id;
+          
+          if (existingCustomerIds.has(customerId)) {
+            console.log(`⏭️ Skipping ${item.customer.name} - action item already exists`);
+            continue;
+          }
+          
           try {
-            await fetchWithAuth("action-items", {
+            console.log(`🔄 Creating action item for: ${item.customer.name}`);
+            
+            const createRes = await fetchWithAuth("action-items", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                customer_id: item.customer.id,
+                customer_id: customerId,
               }),
             });
-            console.log(`✅ Created action item for ${item.customer.name}`);
+            
+            if (createRes.ok) {
+              const responseData = await createRes.json();
+              console.log(`✅ Created action item for ${item.customer.name}`);
+              createdCount++;
+            } else {
+              const errorText = await createRes.text();
+              console.log(`⚠️ Failed to create action item for ${item.customer.name}:`, errorText);
+            }
           } catch (error) {
-            console.log(`⚠️ Action item may already exist for ${item.customer.name}`);
+            console.error(`❌ Error creating action item for ${item.customer.name}:`, error);
           }
         }
         
+        console.log(`🎉 Created ${createdCount} new action items`);
+        
         // Refresh action items after creation
-        const refreshRes = await fetchWithAuth("action-items");
-        if (refreshRes.ok) {
-          const refreshedData: ActionItem[] = await refreshRes.json();
-          setActionItems(refreshedData);
+        if (createdCount > 0) {
+          console.log("🔄 Refreshing action items list...");
+          const refreshRes = await fetchWithAuth("action-items");
+          if (refreshRes.ok) {
+            const refreshedData: ActionItem[] = await refreshRes.json();
+            console.log(`✅ Loaded ${refreshedData.length} total action items`);
+            setActionItems(refreshedData);
+          }
         }
       } catch (error) {
-        console.error("❌ Error creating missing action items:", error);
+        console.error("❌ Error in createMissingActionItems:", error);
       }
     };
 
