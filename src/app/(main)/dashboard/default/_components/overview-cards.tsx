@@ -83,6 +83,7 @@ export function OverviewCards() {
   useEffect(() => {
     const role = localStorage.getItem("user_role");
     setUserRole(role);
+    console.log("User role:", role); // Debug log
   }, []);
 
   useEffect(() => {
@@ -185,9 +186,11 @@ export function OverviewCards() {
 
         // --- 3. Fetch Action Items (only for Manager, HR, Production) ---
         if (["Manager", "HR", "Production"].includes(userRole || "")) {
+          console.log("Fetching action items..."); // Debug log
           const actionsRes = await fetchWithAuth("action-items");
           if (actionsRes.ok) {
             const actionsData: ActionItem[] = await actionsRes.json();
+            console.log("Action items fetched:", actionsData); // Debug log
             setActionItems(actionsData);
           }
         }
@@ -198,11 +201,13 @@ export function OverviewCards() {
       }
     };
 
-    fetchDashboardData();
+    if (userRole) {
+      fetchDashboardData();
 
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchDashboardData, 30000);
-    return () => clearInterval(interval);
+      // Refresh every 30 seconds
+      const interval = setInterval(fetchDashboardData, 30000);
+      return () => clearInterval(interval);
+    }
   }, [userRole]);
 
   const handleCompleteAction = async (actionId: string) => {
@@ -224,8 +229,8 @@ export function OverviewCards() {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs sm:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs sm:grid-cols-2 xl:grid-cols-3">
+        {[...Array(3)].map((_, i) => (
           <Card key={i} className="h-96 animate-pulse">
             <div className="h-full bg-gray-100" />
           </Card>
@@ -235,7 +240,7 @@ export function OverviewCards() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs sm:grid-cols-2 xl:grid-cols-3">
       {/* New Leads Card */}
       <Card>
         <CardHeader>
@@ -283,78 +288,72 @@ export function OverviewCards() {
         </CardFooter>
       </Card>
 
-      {/* Action Items Card - Only for Manager, HR, Production */}
-      {["Manager", "HR", "Production"].includes(userRole || "") && (
-        <Card className="border-2 border-orange-200 bg-orange-50/30">
-          <CardHeader className="border-b border-orange-200 bg-orange-100/50">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-orange-600" />
-              <CardTitle className="text-orange-900">Action Items</CardTitle>
-            </div>
-            <CardDescription className="text-orange-700">
-              {actionItems.length} pending action{actionItems.length !== 1 ? 's' : ''}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-4">
-            {actionItems.length === 0 ? (
-              <div className="py-12 text-center text-gray-500">
-                <CheckCircle2 className="mx-auto mb-4 h-12 w-12 opacity-50" />
-                <p className="font-medium">All caught up!</p>
-                <p className="text-sm mt-1">No pending action items</p>
-              </div>
-            ) : (
-              <ul className="space-y-2 max-h-[300px] overflow-y-auto">
-                {actionItems.map((item) => (
-                  <li 
-                    key={item.id} 
-                    className="space-y-1.5 rounded-md border-2 border-orange-300 bg-white px-2 py-1.5 shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Checkbox className="size-3" />
-                      <span className="text-xs font-medium">Order materials for {item.customer_name}</span>
-                      <span
-                        className={cn(
-                          "ml-auto w-fit rounded-md px-1.5 py-0.5 text-xs font-medium",
-                          item.priority === "High" && "text-red-700 bg-red-100",
-                          item.priority === "Medium" && "bg-yellow-100 text-yellow-700",
-                          item.priority === "Low" && "bg-green-100 text-green-700",
-                        )}
-                      >
-                        {item.priority}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="text-muted-foreground size-2.5" />
-                      <span className="text-muted-foreground text-xs font-medium">
-                        {format(new Date(item.created_at), "MMM dd")}
-                      </span>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full mt-1 h-6 text-xs border-green-200 bg-green-50 hover:bg-green-100 text-green-700"
-                      onClick={() => handleCompleteAction(item.id)}
-                    >
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Mark as Completed
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Placeholder for 4th card - can add another metric here */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pipeline Value</CardTitle>
-          <CardDescription>Total estimated value</CardDescription>
+      {/* Action Items Card - For Manager, HR, Production */}
+      <Card className="border-2 border-orange-200 bg-orange-50/30">
+        <CardHeader className="border-b border-orange-200 bg-orange-100/50">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-orange-600" />
+            <CardTitle className="text-orange-900">Action Items</CardTitle>
+          </div>
+          <CardDescription className="text-orange-700">
+            {actionItems.length} pending action{actionItems.length !== 1 ? 's' : ''}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold">£0</div>
-          <p className="text-xs text-gray-600 mt-2">Coming soon</p>
+        <CardContent className="pt-4">
+          {actionItems.length === 0 ? (
+            <div className="py-8 text-center text-gray-500">
+              <CheckCircle2 className="mx-auto mb-4 h-12 w-12 opacity-50" />
+              <p className="font-medium">All caught up!</p>
+              <p className="text-sm mt-1">No pending action items</p>
+            </div>
+          ) : (
+            <ul className="space-y-2.5 max-h-[300px] overflow-y-auto">
+              {actionItems.map((item) => (
+                <li 
+                  key={item.id} 
+                  className="space-y-2 rounded-md border-2 border-orange-300 bg-white px-3 py-2 shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start gap-2">
+                    <Checkbox className="mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold">
+                        Order materials for {item.customer_name}
+                      </p>
+                      <div className="text-xs text-gray-600 mt-1">
+                        Customer moved to Accepted stage
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Clock className="text-muted-foreground h-3 w-3" />
+                        <span className="text-muted-foreground text-xs font-medium">
+                          {format(new Date(item.created_at), "MMM dd, yyyy")}
+                        </span>
+                        <span
+                          className={cn(
+                            "ml-auto w-fit rounded-md px-2 py-0.5 text-xs font-medium",
+                            item.priority === "High" && "text-red-700 bg-red-100",
+                            item.priority === "Medium" && "bg-yellow-100 text-yellow-700",
+                            item.priority === "Low" && "bg-green-100 text-green-700",
+                          )}
+                        >
+                          {item.priority}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full mt-2 border-green-200 bg-green-50 hover:bg-green-100 text-green-700"
+                    onClick={() => handleCompleteAction(item.id)}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Mark as Completed
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
     </div>
