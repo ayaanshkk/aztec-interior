@@ -22,13 +22,12 @@ interface Notification {
   id: string;
   message: string;
   read: boolean;
-  dismissed: boolean;  // ✅ NEW
+  dismissed: boolean;
   created_at: string;
   customer_id?: string;
   job_id?: string;
   checklist_id?: string;
   form_submission_id?: number;
-  checklist_id?: string;
   form_type?: string;
   moved_by?: string;
 }
@@ -47,15 +46,13 @@ const NotificationsPage = () => {
     markAllAsRead,
     deleteNotification,
     clearAllNotifications,
-    fetchAllNotifications,  // ✅ NEW: Use this instead of fetchNotifications
+    fetchAllNotifications,
   } = useNotifications();
 
-  // ✅ Fetch ALL notifications (including dismissed) on mount
   useEffect(() => {
     fetchAllNotifications();
   }, [fetchAllNotifications]);
 
-  // ✅ Parse notification message to extract main message and changes
   const parseNotificationMessage = (message: string) => {
     const parts = message.split('\n');
     const mainMessage = parts[0];
@@ -64,7 +61,6 @@ const NotificationsPage = () => {
     return { mainMessage, changes };
   };
 
-  // ✅ Render individual change with appropriate styling
   const renderChange = (change: string) => {
     const trimmed = change.trim();
     
@@ -138,14 +134,13 @@ const NotificationsPage = () => {
     setSelectedNotifications(new Set());
   };
 
-  // ✅ Filter notifications based on active tab
   const filteredNotifications = notifications
-    .filter((notif) => {
+    .filter((notif: Notification) => {
       if (activeTab === 'unread') return !notif.read;
       if (activeTab === 'read') return notif.read;
-      return true;  // 'all' tab shows everything (including dismissed)
+      return true;
     })
-    .filter((notif) =>
+    .filter((notif: Notification) =>
       notif.message.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -260,7 +255,7 @@ const NotificationsPage = () => {
       ) : (
         <ScrollArea className="h-[calc(100vh-320px)]">
           <div className="space-y-3">
-            {filteredNotifications.map((notification) => {
+            {filteredNotifications.map((notification: Notification) => {
               const { mainMessage, changes } = parseNotificationMessage(notification.message);
               const icon = getNotificationIcon(notification.message, notification.form_type);
               const isSelected = selectedNotifications.has(notification.id);
@@ -306,7 +301,7 @@ const NotificationsPage = () => {
                               )}
                             </div>
                             
-                            {/* ✅ Display detailed changes in a styled box */}
+                            {/* Display detailed changes */}
                             {hasChanges && (
                               <div className="mt-3 space-y-2 bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200 shadow-sm">
                                 <div className="flex items-center gap-2 mb-2">
