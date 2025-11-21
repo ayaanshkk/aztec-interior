@@ -653,14 +653,48 @@ export default function EnhancedPipelinePage() {
           updated_by: user?.email || "current_user",
         };
 
-        const response = await fetchWithAuth(endpoint, {
-          method: "PATCH",
-          body: JSON.stringify(bodyData),
-        });
+        let response;
+        let retryCount = 0;
+        const maxRetries = 2;
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to update ${item.itemType} ${entityId}: ${errorText}`);
+        while (retryCount <= maxRetries) {
+          try {
+            response = await fetchWithAuth(endpoint, {
+              method: "PATCH",
+              body: JSON.stringify(bodyData),
+            });
+            
+            if (response.ok) {
+              break; // Success, exit retry loop
+            }
+            
+            // If we get a timeout or server error, retry
+            if (response.status === 408 || response.status >= 500) {
+              retryCount++;
+              if (retryCount <= maxRetries) {
+                console.log(`⏳ Retry ${retryCount}/${maxRetries} for ${item.itemType} ${entityId}`);
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
+                continue;
+              }
+            }
+            
+            // Non-retryable error
+            const errorText = await response.text();
+            throw new Error(`Failed to update ${item.itemType} ${entityId}: ${errorText}`);
+            
+          } catch (error: any) {
+            if (error.name === 'AbortError' && retryCount < maxRetries) {
+              retryCount++;
+              console.log(`⏳ Timeout - Retry ${retryCount}/${maxRetries} for ${item.itemType} ${entityId}`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              continue;
+            }
+            throw error;
+          }
+        }
+
+        if (!response || !response.ok) {
+          throw new Error(`Failed to update ${item.itemType} ${entityId} after ${maxRetries} retries`);
         }
 
         return await response.json();
@@ -875,13 +909,15 @@ export default function EnhancedPipelinePage() {
 
       let entityId;
       let endpoint;
+      let method = "PATCH";
 
       if (isJob) {
         entityId = itemId.replace("job-", "");
         endpoint = `jobs/${entityId}/stage`;
       } else if (isProject) {
         entityId = itemId.replace("project-", "");
-        endpoint = `projects/${entityId}/stage`;
+        endpoint = `projects/${entityId}`;
+        method = "PUT";
       } else if (isCustomer) {
         entityId = itemId.replace("customer-", "");
         endpoint = `customers/${entityId}/stage`;
@@ -889,14 +925,31 @@ export default function EnhancedPipelinePage() {
         throw new Error(`Unknown pipeline item type: ${itemId}`);
       }
 
-      const bodyData = {
-        stage: newStage,
-        reason: "Rejected via quick button on Kanban board",
-        updated_by: user?.email || "current_user",
-      };
+      // Get original item for project data
+      const originalItem = pipelineItems.find((pi) => pi.id === itemId);
+      let bodyData: any;
+
+      if (isProject) {
+        // For projects, send full data (PUT requires all fields)
+        bodyData = {
+          project_name: originalItem?.job?.job_name,
+          project_type: originalItem?.job?.job_type,
+          date_of_measure: originalItem?.job?.measure_date,
+          notes: originalItem?.job?.notes,
+          stage: newStage,
+          updated_by: user?.email || "current_user",
+        };
+      } else {
+        // For customers/jobs, send only stage update
+        bodyData = {
+          stage: newStage,
+          reason: "Rejected via quick button on Kanban board",
+          updated_by: user?.email || "current_user",
+        };
+      }
 
       const response = await fetchWithAuth(endpoint, {
-        method: "PATCH",
+        method: method,
         body: JSON.stringify(bodyData),
       });
 

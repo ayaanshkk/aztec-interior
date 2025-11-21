@@ -56,15 +56,80 @@ export default function JobsPage() {
   }, [jobs, searchTerm, filterType]);
 
   const loadJobs = async () => {
+    setLoading(true);
+    const startTime = performance.now();
+    
     try {
-      setLoading(true);
-      const response = await fetchWithAuth("jobs");
-      if (response.ok) {
-        const data = await response.json();
-        setJobs(data);
+      const token = localStorage.getItem("auth_token");
+      if (!token) {
+        console.error("❌ No auth token found");
+        setLoading(false);
+        return;
       }
+
+      console.log("🔄 Fetching jobs...");
+      
+      const headers: HeadersInit = { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      // ✅ Retry logic
+      let response;
+      let retryCount = 0;
+      const maxRetries = 2;
+
+      while (retryCount <= maxRetries) {
+        try {
+          response = await fetch("https://aztec-interiors.onrender.com/jobs", {
+            headers,
+            signal: AbortSignal.timeout(15000), // 15 second timeout
+          });
+
+          if (response.ok) {
+            break; // Success, exit retry loop
+          }
+
+          // If we get a timeout or server error, retry
+          if (response.status === 408 || response.status >= 500) {
+            retryCount++;
+            if (retryCount <= maxRetries) {
+              console.log(`⏳ Retry ${retryCount}/${maxRetries} for jobs...`);
+              await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
+              continue;
+            }
+          }
+
+          throw new Error(`Failed to fetch jobs: ${response.status}`);
+          
+        } catch (error: any) {
+          if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+            if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(`⏳ Timeout - Retry ${retryCount}/${maxRetries} for jobs...`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              continue;
+            }
+          }
+          throw error;
+        }
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(`Failed to fetch jobs after ${maxRetries} retries`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ Jobs received: ${data.length} jobs`);
+      
+      setJobs(data);
+
+      const endTime = performance.now();
+      console.log(`⏱️ Jobs page loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+
     } catch (error) {
-      console.error("Error loading jobs:", error);
+      console.error("❌ Error loading jobs:", error);
+      setJobs([]); // Set empty array instead of leaving undefined
     } finally {
       setLoading(false);
     }

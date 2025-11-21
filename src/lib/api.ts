@@ -26,7 +26,7 @@ function redirectToLogin() {
 }
 
 // ✅ Helper to add timeout to fetch calls
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 5000) {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 15000) { // ✅ Increased from 5s to 15s
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   
@@ -89,11 +89,11 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
   };
 
   try {
-    // ✅ Add 5-second timeout
+    // ✅ Increased timeout to 15 seconds for backend operations
     const response = await fetchWithTimeout(url, {
       ...options,
       headers,
-    }, 5000);
+    }, 15000);
 
     // ✅ DON'T logout on 401 - mock auth setup
     if (response.status === 401) {
