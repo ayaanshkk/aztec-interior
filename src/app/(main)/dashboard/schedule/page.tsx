@@ -392,14 +392,32 @@ export default function SchedulePage() {
         }
       }
 
-      const finalAssignmentData = {
-        ...assignmentData,
-        title,
-        user_id: assignmentData.user_id || user?.id,
+      // ✅ CLEAN THE DATA - Remove any invalid fields
+      const cleanedData = {
+        type: assignmentData.type,
+        title: title,
+        date: assignmentData.date,
+        start_time: assignmentData.start_time,
+        end_time: assignmentData.end_time,
+        estimated_hours: assignmentData.estimated_hours,
+        notes: assignmentData.notes,
+        priority: assignmentData.priority,
         status: user?.role === "Manager" || assignmentData.user_id === user?.id ? "Accepted" : "Scheduled",
+        user_id: assignmentData.user_id || user?.id,
+        team_member: assignmentData.team_member,
+        job_id: assignmentData.job_id,
+        customer_id: assignmentData.customer_id,
+        job_type: assignmentData.job_type,
       };
 
-      const newAssignment = await api.createAssignment(finalAssignmentData);
+      // Remove undefined values
+      Object.keys(cleanedData).forEach(key => {
+        if (cleanedData[key as keyof typeof cleanedData] === undefined) {
+          delete cleanedData[key as keyof typeof cleanedData];
+        }
+      });
+
+      const newAssignment = await api.createAssignment(cleanedData);
       setAssignments((prev) => [...prev, newAssignment]);
       return newAssignment;
     } finally {
@@ -706,9 +724,9 @@ export default function SchedulePage() {
               return (
                 <div
                   key={idx}
-                  className={`min-h-[100px] border-b border-r p-2 last:border-r-0 ${
+                  className={`min-h-[100px] border-b border-r p-2 last:border-r-0 cursor-pointer transition-colors hover:bg-gray-50 ${
                     isCurrentMonth ? "bg-white" : "bg-gray-50"
-                  } ${isToday ? "ring-2 ring-blue-500" : ""}`}
+                  } ${isToday ? "ring-2 ring-inset ring-blue-500" : ""}`}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, day)}
                   onClick={() => {
@@ -822,6 +840,7 @@ export default function SchedulePage() {
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Type */}
             <div className="space-y-2">
               <Label>Type</Label>
               <Select
@@ -840,6 +859,7 @@ export default function SchedulePage() {
               </Select>
             </div>
 
+            {/* Date */}
             <div className="space-y-2">
               <Label>Date</Label>
               <Input
@@ -851,6 +871,7 @@ export default function SchedulePage() {
 
             {(newAssignment.type === "job" || newAssignment.type === "off") && (
               <>
+                {/* Start/End Time */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Start Time</Label>
@@ -877,6 +898,7 @@ export default function SchedulePage() {
                   </div>
                 </div>
 
+                {/* Assign To */}
                 <div className="space-y-2">
                   <Label>Assign To</Label>
                   <Input
@@ -903,40 +925,100 @@ export default function SchedulePage() {
             )}
 
             {newAssignment.type === "job" && (
-              <div className="space-y-2">
-                <Label>Job / Task</Label>
-                <Input
-                  placeholder="Type job or task..."
-                  list="task-suggestions"
-                  value={customTaskInput || newAssignment.title || ""}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setCustomTaskInput(value);
-                    setNewAssignment({
-                      ...newAssignment,
-                      title: value,
-                      job_type: value,
-                      job_id: undefined,
-                    });
-                  }}
-                />
-                <datalist id="task-suggestions">
-                  {interiorDesignJobTypes.map((task) => (
-                    <option key={task} value={task} />
-                  ))}
-                  {customJobTasks.map((task) => (
-                    <option key={task} value={task} />
-                  ))}
-                  {availableJobs.map((job) => (
-                    <option 
-                      key={job.id} 
-                      value={`${job.job_reference} - ${job.customer_name}`} 
-                    />
-                  ))}
-                </datalist>
-              </div>
+              <>
+                {/* Job/Task Dropdown */}
+                <div className="space-y-2">
+                  <Label>Job / Task</Label>
+                  <Select
+                    value={newAssignment.job_type || newAssignment.title || ""}
+                    onValueChange={(value) => {
+                      // Check if it's a job reference
+                      if (value.includes(" - ")) {
+                        const jobId = availableJobs.find(j => `${j.job_reference} - ${j.customer_name}` === value)?.id;
+                        setNewAssignment({
+                          ...newAssignment,
+                          title: value,
+                          job_id: jobId,
+                          job_type: undefined
+                        });
+                      } else {
+                        setNewAssignment({
+                          ...newAssignment,
+                          title: value,
+                          job_type: value,
+                          job_id: undefined
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select job or task" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>Standard Tasks</SelectLabel>
+                        {interiorDesignJobTypes.map((task) => (
+                          <SelectItem key={task} value={task}>
+                            {task}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      {customJobTasks.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Custom Tasks</SelectLabel>
+                          {customJobTasks.map((task) => (
+                            <SelectItem key={task} value={task}>
+                              {task}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      {availableJobs.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Available Jobs</SelectLabel>
+                          {availableJobs.map((job) => (
+                            <SelectItem 
+                              key={job.id} 
+                              value={`${job.job_reference} - ${job.customer_name}`}
+                            >
+                              {job.job_reference} - {job.customer_name}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Customer Dropdown */}
+                <div className="space-y-2">
+                  <Label>Customer (Optional)</Label>
+                  <Select
+                    value={newAssignment.customer_id || ""}
+                    onValueChange={(value) => {
+                      setNewAssignment({
+                        ...newAssignment,
+                        customer_id: value
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
             )}
 
+            {/* Notes */}
             <div className="space-y-2">
               <Label>Notes</Label>
               <Textarea
