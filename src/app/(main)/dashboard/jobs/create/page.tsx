@@ -13,6 +13,13 @@ import { fetchWithAuth } from "@/lib/api";
 
 const JOB_TYPES = ["Kitchen", "Bedroom", "Wardrobe", "Remedial", "Other"];
 
+// ✅ NEW: Work stages
+const WORK_STAGES = [
+  { value: "Survey", label: "Survey", icon: "📏" },
+  { value: "Delivery", label: "Delivery", icon: "🚚" },
+  { value: "Installation", label: "Installation", icon: "🏗️" },
+];
+
 interface FormData {
   job_type: string;
   job_name: string;
@@ -23,6 +30,7 @@ interface FormData {
   completion_date: string;
   notes: string;
   priority: string; 
+  work_stage: string; // ✅ NEW
 }
 
 export default function CreateJobPage() {
@@ -46,6 +54,7 @@ export default function CreateJobPage() {
     completion_date: "",
     notes: "",
     priority: "Medium",
+    work_stage: "Survey", // ✅ NEW: Default to Survey
   });
 
   useEffect(() => {
@@ -132,6 +141,7 @@ export default function CreateJobPage() {
         measure_date: formData.measure_date,
         completion_date: formData.completion_date,
         priority: formData.priority,
+        work_stage: formData.work_stage, // ✅ NEW: Include work stage
         notes: formData.notes || "",
         attached_forms: attachedForms.map((f) => f.id),
       };
@@ -150,7 +160,6 @@ export default function CreateJobPage() {
 
       const newJob = await response.json();
       
-      // ✅ FIXED: Redirect to jobs list instead of job details
       router.push(`/dashboard/jobs?success=created`);
       
     } catch (error) {
@@ -205,7 +214,6 @@ export default function CreateJobPage() {
                 />
               </div>
 
-              {/* ✅ NEW: Priority Field */}
               <div>
                 <Label>Priority *</Label>
                 <Select value={formData.priority} onValueChange={(v) => handleInputChange("priority", v)}>
@@ -221,6 +229,29 @@ export default function CreateJobPage() {
                 {errors.priority && <p className="mt-1 text-sm text-red-500">{errors.priority}</p>}
                 <p className="mt-1 text-xs text-gray-500">
                   Default is Medium if not selected
+                </p>
+              </div>
+
+              {/* ✅ NEW: Work Stage Field */}
+              <div>
+                <Label>Work Stage *</Label>
+                <Select value={formData.work_stage} onValueChange={(v) => handleInputChange("work_stage", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select work stage" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WORK_STAGES.map((stage) => (
+                      <SelectItem key={stage.value} value={stage.value}>
+                        <div className="flex items-center gap-2">
+                          <span>{stage.icon}</span>
+                          <span>{stage.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Track job execution progress (default: Survey)
                 </p>
               </div>
             </div>
@@ -306,7 +337,6 @@ export default function CreateJobPage() {
               </div>
             </div>
 
-            {/* ✅ NEW: Salesperson field */}
             <div className="mt-6">
               <Label>Salesperson</Label>
               <Input

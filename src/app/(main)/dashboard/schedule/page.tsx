@@ -38,9 +38,9 @@ import {
   X,
   Archive,
 } from "lucide-react";
-import { fetchWithAuth, api } from "@/lib/api"; // Import the centralized API helper
+import { fetchWithAuth, api } from "@/lib/api";
 
-// ... interfaces stay the same ...
+// Interfaces
 interface Employee {
   id: number;
   full_name: string;
@@ -79,14 +79,14 @@ interface Assignment {
   status?: string;
   user_id?: number;
   team_member?: string;
-  job_type?: string; // ✅ KEEP THIS
+  job_type?: string;
   created_by?: number;
-  created_by_name?: string; // ✅ ADD THIS
+  created_by_name?: string;
   updated_by?: number;
-  updated_by_name?: string; // ✅ ADD THIS
+  updated_by_name?: string;
 }
 
-// ... constants stay the same ...
+// Constants
 const START_HOUR_WEEK = 7;
 const HOUR_HEIGHT_PX = 60;
 const timeSlotsWeek = Array.from({ length: 14 }, (_, i) => {
@@ -121,6 +121,10 @@ export default function SchedulePage() {
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
   const [isEditingAssignment, setIsEditingAssignment] = useState(false);
 
+  // NEW: Custom assignees and tasks state
+  const [customAssignees, setCustomAssignees] = useState<string[]>([]);
+  const [customJobTasks, setCustomJobTasks] = useState<string[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,7 +140,7 @@ export default function SchedulePage() {
 
   const [viewMode, setViewMode] = useState<"month" | "week" | "year">("month");
 
-  // ... all memos stay the same ...
+  // Memos
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -201,7 +205,48 @@ export default function SchedulePage() {
     return assignments.filter((a) => a.user_id === user?.id && a.status === "Declined");
   }, [assignments, user]);
 
-  // ... formatting & navigation functions stay the same ...
+  // NEW: Load custom values from localStorage on mount
+  useEffect(() => {
+    const savedAssignees = localStorage.getItem('custom_assignees');
+    const savedJobTasks = localStorage.getItem('custom_job_tasks');
+    
+    if (savedAssignees) {
+      try {
+        setCustomAssignees(JSON.parse(savedAssignees));
+      } catch (e) {
+        console.error('Failed to parse custom assignees:', e);
+      }
+    }
+    if (savedJobTasks) {
+      try {
+        setCustomJobTasks(JSON.parse(savedJobTasks));
+      } catch (e) {
+        console.error('Failed to parse custom job tasks:', e);
+      }
+    }
+  }, []);
+
+  // NEW: Function to add custom assignee
+  const addCustomAssignee = (name: string) => {
+    const trimmedName = name.trim();
+    if (trimmedName && !customAssignees.includes(trimmedName)) {
+      const updated = [...customAssignees, trimmedName];
+      setCustomAssignees(updated);
+      localStorage.setItem('custom_assignees', JSON.stringify(updated));
+    }
+  };
+
+  // NEW: Function to add custom job/task
+  const addCustomJobTask = (task: string) => {
+    const trimmedTask = task.trim();
+    if (trimmedTask && !customJobTasks.includes(trimmedTask) && !interiorDesignJobTypes.includes(trimmedTask)) {
+      const updated = [...customJobTasks, trimmedTask];
+      setCustomJobTasks(updated);
+      localStorage.setItem('custom_job_tasks', JSON.stringify(updated));
+    }
+  };
+
+  // Helper functions
   const formatDateKey = (date: Date | string) => {
     if (typeof date === "string") return date;
     const yyyy = date.getFullYear();
@@ -281,7 +326,7 @@ export default function SchedulePage() {
     };
   };
 
-  // --- UPDATED DATA FETCHING ---
+  // Data fetching
   const fetchData = async () => {
     if (!token || !user) {
       console.warn("⚠️ No token or user found");
@@ -295,8 +340,7 @@ export default function SchedulePage() {
       console.log("🔄 Starting data fetch...");
       console.log(`User: ${user.full_name} (${user.role})`);
 
-      // ✅ Fetch assignments (CRITICAL - must work)
-      let assignmentsData = []; // ⬅️ DECLARE VARIABLE HERE
+      let assignmentsData = [];
       try {
         assignmentsData = await api.getAssignments();
         setAssignments(assignmentsData);
@@ -306,12 +350,10 @@ export default function SchedulePage() {
         setAssignments([]);
       }
 
-      // ✅ Fetch jobs (IMPORTANT but not critical - gracefully degrades)
-      const jobsData = await api.getAvailableJobs(); // Returns [] on error
+      const jobsData = await api.getAvailableJobs();
       setAvailableJobs(jobsData);
 
-      // ✅ Fetch customers (IMPORTANT but not critical - gracefully degrades)
-      const customersData = await api.getActiveCustomers(); // Returns [] on error
+      const customersData = await api.getActiveCustomers();
       setCustomers(customersData);
 
       console.log("✅ Data fetch complete");
@@ -325,7 +367,7 @@ export default function SchedulePage() {
     }
   };
 
-  // --- UPDATED CRUD OPERATIONS ---
+  // CRUD operations
   const createAssignment = async (assignmentData: Partial<Assignment>) => {
     if (!token) throw new Error("Not authenticated");
 
@@ -375,7 +417,6 @@ export default function SchedulePage() {
 
       console.log("Sending assignment data:", finalAssignmentData);
 
-      // ✅ Use the new api method
       const newAssignment = await api.createAssignment(finalAssignmentData);
       
       setAssignments((prev) => [...prev, newAssignment]);
@@ -394,7 +435,6 @@ export default function SchedulePage() {
     try {
       setSaving(true);
       
-      // ✅ Use the new api method
       const updatedAssignment = await api.updateAssignment(id, assignmentData);
       
       setAssignments((prev) => prev.map((a) => (a.id === id ? updatedAssignment : a)));
@@ -413,7 +453,6 @@ export default function SchedulePage() {
     try {
       setSaving(true);
       
-      // ✅ Use the new api method
       await api.deleteAssignment(id);
       
       setAssignments((prev) => prev.filter((a) => a.id !== id));
@@ -433,7 +472,7 @@ export default function SchedulePage() {
     }
   };
 
-  // --- USE EFFECTS ---
+  // Effects
   useEffect(() => {
     if (!user || !token) return;
 
@@ -443,7 +482,7 @@ export default function SchedulePage() {
       if (user.role !== "Manager") return;
 
       try {
-        const res = await fetchWithAuth("auth/users/staff"); // Updated
+        const res = await fetchWithAuth("auth/users/staff");
 
         if (!res.ok) {
           throw new Error(`Failed to fetch staff: ${res.status}`);
@@ -465,7 +504,7 @@ export default function SchedulePage() {
     }
   }, [user, token]);
 
-  // ... rest of the event handlers and helper functions stay the same ...
+  // Event handlers
   const toggleCalendarVisibility = (name: string) => {
     setVisibleCalendars((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
   };
@@ -590,7 +629,7 @@ export default function SchedulePage() {
   const gridColumnStyle = { gridTemplateColumns: `repeat(7, 156.4px)` } as React.CSSProperties;
   const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-  // --- LOADING / ERROR (Unchanged) ---
+  // Loading/Error states
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
@@ -615,9 +654,7 @@ export default function SchedulePage() {
     );
   }
 
-  // --- RENDER FUNCTIONS ---
-
-  // --- MODIFIED renderMonthView (Task 6) ---
+  // Render functions
   const renderMonthView = () => (
     <div className="p-6 pr-0">
       <div className="overflow-auto rounded-lg border shadow-sm">
@@ -660,7 +697,6 @@ export default function SchedulePage() {
 
                     <div className="flex flex-col space-y-1">
                       {dayAssignments.map((assignment) => {
-                        // --- NEW PENDING LOGIC (Task 6) ---
                         const isPending =
                           user?.role !== "Manager" &&
                           assignment.created_by !== user?.id &&
@@ -708,7 +744,6 @@ export default function SchedulePage() {
                             </div>
                           );
                         }
-                        // --- END PENDING LOGIC ---
 
                         return (
                           <div
@@ -717,10 +752,9 @@ export default function SchedulePage() {
                             draggable
                             onDragStart={() => handleDragStart(assignment)}
                             onClick={() => {
-                              // --- MODIFIED CLICK (Task 3) ---
                               setSelectedAssignment(assignment);
-                              setOriginalAssignment(assignment); // Store original
-                              setIsEditingAssignment(false); // Start in view mode
+                              setOriginalAssignment(assignment);
+                              setIsEditingAssignment(false);
                               setShowAssignmentDialog(true);
                             }}
                             title={assignment.title}
@@ -767,16 +801,14 @@ export default function SchedulePage() {
     </div>
   );
 
-  // --- MODIFIED renderWeekView (Task 6) ---
   const renderWeekView = () => (
     <div className="p-6">
       <div
         className="overflow-auto rounded-lg border shadow-sm"
-        style={{ maxHeight: "calc(100vh - 200px)" }} // Limit height and make scrollable
+        style={{ maxHeight: "calc(100vh - 200px)" }}
       >
         <div className="grid" style={{ gridTemplateColumns: "60px repeat(7, minmax(140px, 1fr))" }}>
-          {/* Header Row */}
-          <div className="sticky top-0 z-10 border-r border-b bg-gray-50"></div> {/* Top-left corner */}
+          <div className="sticky top-0 z-10 border-r border-b bg-gray-50"></div>
           {daysOfWeek.map((day) => (
             <div key={day.toISOString()} className="sticky top-0 z-10 border-r border-b bg-gray-50 p-3 text-center">
               <div className="text-xs font-medium text-gray-900">
@@ -789,7 +821,6 @@ export default function SchedulePage() {
               </div>
             </div>
           ))}
-          {/* Time Gutter Column */}
           <div className="sticky left-0 z-10 border-r bg-gray-50">
             {timeSlotsWeek.map((time) => (
               <div
@@ -801,7 +832,6 @@ export default function SchedulePage() {
               </div>
             ))}
           </div>
-          {/* Day Columns */}
           {daysOfWeek.map((day) => {
             const dayKey = formatDateKey(day);
             const dayAssignments = getAssignmentsForDate(day);
@@ -813,14 +843,11 @@ export default function SchedulePage() {
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, day)}
               >
-                {/* Grid lines */}
                 {timeSlotsWeek.map((_, idx) => (
                   <div key={idx} style={{ height: `${HOUR_HEIGHT_PX}px` }} className="border-b"></div>
                 ))}
 
-                {/* Assignments */}
                 {dayAssignments.map((a) => {
-                  // --- NEW PENDING LOGIC (Task 6) ---
                   const isPending =
                     user?.role !== "Manager" &&
                     a.created_by !== user?.id &&
@@ -865,7 +892,6 @@ export default function SchedulePage() {
                       </div>
                     );
                   }
-                  // --- END PENDING LOGIC ---
 
                   return (
                     <div
@@ -875,10 +901,9 @@ export default function SchedulePage() {
                       draggable
                       onDragStart={() => handleDragStart(a)}
                       onClick={() => {
-                        // --- MODIFIED CLICK (Task 3) ---
                         setSelectedAssignment(a);
-                        setOriginalAssignment(a); // Store original
-                        setIsEditingAssignment(false); // Start in view mode
+                        setOriginalAssignment(a);
+                        setIsEditingAssignment(false);
                         setShowAssignmentDialog(true);
                       }}
                       title={a.title}
@@ -899,11 +924,9 @@ export default function SchedulePage() {
     </div>
   );
 
-  // --- Internal Component for Year View (Unchanged) ---
   const MiniCalendar = ({ month, year }: { month: number; year: number }) => {
     const monthName = new Date(year, month).toLocaleDateString("en-US", { month: "long" });
 
-    // Logic to get days (copied and adapted from calendarDays)
     const firstDay = new Date(year, month, 1);
     const firstDayOfWeek = firstDay.getDay();
     const lastDay = new Date(year, month + 1, 0).getDate();
@@ -917,7 +940,7 @@ export default function SchedulePage() {
       days.push(new Date(year, month, day));
     }
     const totalDays = days.length;
-    const remainingDays = totalDays <= 35 ? 35 - totalDays : 42 - totalDays; // 5 or 6 rows
+    const remainingDays = totalDays <= 35 ? 35 - totalDays : 42 - totalDays;
     for (let day = 1; day <= remainingDays; day++) {
       days.push(new Date(year, month + 1, day));
     }
@@ -925,7 +948,6 @@ export default function SchedulePage() {
     const today = new Date();
     const todayKey = formatDateKey(today);
 
-    // Get assignments relevant to this user for the dots
     const relevantAssignments =
       user?.role === "Manager"
         ? assignmentsByDate
@@ -982,7 +1004,7 @@ export default function SchedulePage() {
 
   const renderYearView = () => {
     const year = currentDate.getFullYear();
-    const months = Array.from({ length: 12 }, (_, i) => i); // 0 to 11
+    const months = Array.from({ length: 12 }, (_, i) => i);
 
     return (
       <div className="p-6">
@@ -996,16 +1018,13 @@ export default function SchedulePage() {
     );
   };
 
-  // --- MAIN RETURN ---
-
+  // Main render
   return (
     <div className="min-h-screen bg-white">
-      {/* --- MAIN HEADER (Unchanged) --- */}
       <div className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-5">
         <div className="flex items-center space-x-4">
           <h1 className="text-2xl font-semibold text-gray-900">Schedule</h1>
 
-          {/* --- Calendar Navigation --- */}
           <div className="flex items-center space-x-2">
             <Button variant="outline" size="sm" onClick={() => navigateView("prev")}>
               <ChevronLeft className="h-4 w-4" />
@@ -1029,10 +1048,8 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {/* --- MODIFIED CONTROLS BAR (Task 7) --- */}
       <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
         <div className="flex items-center space-x-4">
-          {/* --- View Switcher --- */}
           <Select value={viewMode} onValueChange={(value: "month" | "week" | "year") => setViewMode(value)}>
             <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Select view" />
@@ -1044,7 +1061,6 @@ export default function SchedulePage() {
             </SelectContent>
           </Select>
 
-          {/* --- Employee Selection Dropdown --- */}
           {user?.role === "Manager" && employees.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1081,9 +1097,7 @@ export default function SchedulePage() {
           )}
         </div>
 
-        {/* --- Right-aligned Controls --- */}
         <div className="flex items-center space-x-3">
-          {/* --- Declined Events Dropdown (Task 7) --- */}
           {user?.role !== "Manager" && declinedAssignments.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1099,7 +1113,7 @@ export default function SchedulePage() {
                   <DropdownMenuItem
                     key={a.id}
                     className="group flex items-center justify-between p-2 text-sm"
-                    onSelect={(e) => e.preventDefault()} // Prevent closing
+                    onSelect={(e) => e.preventDefault()}
                   >
                     <div className="flex-1 truncate">
                       <div className="truncate font-medium">{a.title}</div>
@@ -1120,7 +1134,6 @@ export default function SchedulePage() {
             </DropdownMenu>
           )}
 
-          {/* --- Active Filters Display --- */}
           {user?.role === "Manager" && visibleCalendars.length > 0 && (
             <div className="flex items-center space-x-2 text-sm text-gray-700">
               <span className="font-medium">Viewing:</span>
@@ -1134,14 +1147,11 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {/* --- CALENDAR GRID (CONDITIONAL) --- */}
       {viewMode === "month" && renderMonthView()}
       {viewMode === "week" && renderWeekView()}
       {viewMode === "year" && renderYearView()}
 
-      {/* --- DIALOGS --- */}
-
-      {/* --- MODIFIED Add Dialog (Task 1) --- */}
+      {/* Add Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1219,27 +1229,97 @@ export default function SchedulePage() {
                   </div>
                 </div>
 
+                {/* NEW: Custom Assign To Field */}
                 <div className="space-y-2">
                   <Label>Assign To</Label>
-                  <Select
-                    value={newAssignment.user_id?.toString() || ""}
-                    onValueChange={(value) => setNewAssignment({ ...newAssignment, user_id: parseInt(value) })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select team member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {/* Self-assignment option for everyone */}
-                      {user && <SelectItem value={user.id.toString()}>{user.full_name} (Me)</SelectItem>}
-                      {/* Manager can assign to others */}
-                      {user?.role === "Manager" &&
-                        employees.map((emp) => (
-                          <SelectItem key={emp.id} value={emp.id.toString()}>
-                            {emp.full_name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Select
+                      value={newAssignment.user_id?.toString() || newAssignment.team_member || ""}
+                      onValueChange={(value) => {
+                        const isCustomName = isNaN(Number(value));
+                        if (isCustomName) {
+                          setNewAssignment({ 
+                            ...newAssignment, 
+                            user_id: undefined,
+                            team_member: value 
+                          });
+                        } else {
+                          const userId = parseInt(value);
+                          const selectedUser = user?.id === userId ? user : employees.find(emp => emp.id === userId);
+                          setNewAssignment({ 
+                            ...newAssignment, 
+                            user_id: userId,
+                            team_member: selectedUser?.full_name 
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select or add team member" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectLabel>Custom Assignees</SelectLabel>
+                          {customAssignees.map((name) => (
+                            <SelectItem key={name} value={name}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                          {customAssignees.length === 0 && (
+                            <div className="px-2 py-1.5 text-sm text-gray-500">No custom assignees yet</div>
+                          )}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Or type new name..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const input = e.currentTarget;
+                            const value = input.value.trim();
+                            if (value) {
+                              addCustomAssignee(value);
+                              setNewAssignment({ 
+                                ...newAssignment, 
+                                user_id: undefined,
+                                team_member: value 
+                              });
+                              input.value = '';
+                            }
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                          const value = input.value.trim();
+                          if (value) {
+                            addCustomAssignee(value);
+                            setNewAssignment({ 
+                              ...newAssignment, 
+                              user_id: undefined,
+                              team_member: value 
+                            });
+                            input.value = '';
+                          }
+                        }}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                    {newAssignment.team_member && (
+                      <div className="text-sm text-gray-600">
+                        Selected: <span className="font-medium">{newAssignment.team_member}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </>
             )}
@@ -1247,56 +1327,128 @@ export default function SchedulePage() {
             {newAssignment.type === "job" && (
               <>
                 <div className="grid grid-cols-2 gap-4">
+                  {/* NEW: Custom Job/Task Field */}
                   <div className="space-y-2">
                     <Label>Job / Task</Label>
-                    <Select
-                      value={newAssignment.job_id || newAssignment.title || ""}
-                      onValueChange={(value) => {
-                        const isTask = interiorDesignJobTypes.includes(value);
-                        if (isTask) {
-                          // It's a task like "Consultation"
-                          setNewAssignment({
-                            ...newAssignment,
-                            title: value,
-                            job_type: value, // ✅ This line should be there
-                            job_id: undefined,
-                            customer_id: newAssignment.customer_id,
-                          });
-                        } else {
-                          // It's an existing job
-                          const job = availableJobs.find((j) => j.id === value);
-                          setNewAssignment({
-                            ...newAssignment,
-                            title: undefined,
-                            job_type: job?.job_type, // ✅ This line should be there
-                            job_id: value,
-                            customer_id: job?.customer_id,
-                          });
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select job or task" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Tasks</SelectLabel>
-                          {interiorDesignJobTypes.map((task) => (
-                            <SelectItem key={task} value={task}>
-                              {task}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                        <SelectGroup>
-                          <SelectLabel>Active Jobs</SelectLabel>
-                          {availableJobs.map((job) => (
-                            <SelectItem key={job.id} value={job.id}>
-                              {job.job_reference} - {job.customer_name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Select
+                        value={newAssignment.job_id || newAssignment.title || ""}
+                        onValueChange={(value) => {
+                          const isTask = interiorDesignJobTypes.includes(value) || customJobTasks.includes(value);
+                          if (isTask) {
+                            setNewAssignment({
+                              ...newAssignment,
+                              title: value,
+                              job_type: value,
+                              job_id: undefined,
+                              customer_id: newAssignment.customer_id,
+                            });
+                          } else {
+                            const job = availableJobs.find((j) => j.id === value);
+                            setNewAssignment({
+                              ...newAssignment,
+                              title: undefined,
+                              job_type: job?.job_type,
+                              job_id: value,
+                              customer_id: job?.customer_id,
+                            });
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select or add job/task" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectLabel>Standard Tasks</SelectLabel>
+                            {interiorDesignJobTypes.map((task) => (
+                              <SelectItem key={task} value={task}>
+                                {task}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                          
+                          {customJobTasks.length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Custom Tasks</SelectLabel>
+                              {customJobTasks.map((task) => (
+                                <SelectItem key={task} value={task}>
+                                  {task}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          )}
+                          
+                          {availableJobs.length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Active Jobs</SelectLabel>
+                              {availableJobs.map((job) => (
+                                <SelectItem key={job.id} value={job.id}>
+                                  {job.job_reference} - {job.customer_name}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Or type new task..."
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const input = e.currentTarget;
+                              const value = input.value.trim();
+                              if (value) {
+                                addCustomJobTask(value);
+                                setNewAssignment({
+                                  ...newAssignment,
+                                  title: value,
+                                  job_type: value,
+                                  job_id: undefined,
+                                });
+                                input.value = '';
+                              }
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                            const value = input.value.trim();
+                            if (value) {
+                              addCustomJobTask(value);
+                              setNewAssignment({
+                                ...newAssignment,
+                                title: value,
+                                job_type: value,
+                                job_id: undefined,
+                              });
+                              input.value = '';
+                            }
+                          }}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                      {newAssignment.title && !newAssignment.job_id && (
+                        <div className="text-sm text-gray-600">
+                          Selected task: <span className="font-medium">{newAssignment.title}</span>
+                        </div>
+                      )}
+                      {newAssignment.job_id && (
+                        <div className="text-sm text-gray-600">
+                          Selected job: <span className="font-medium">
+                            {availableJobs.find(j => j.id === newAssignment.job_id)?.job_reference}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -1304,7 +1456,6 @@ export default function SchedulePage() {
                     <Select
                       value={newAssignment.customer_id || ""}
                       onValueChange={(value) => setNewAssignment({ ...newAssignment, customer_id: value })}
-                      // Disable if a job is selected (customer is auto-set)
                       disabled={!!newAssignment.job_id}
                     >
                       <SelectTrigger className="w-full">
@@ -1365,13 +1516,12 @@ export default function SchedulePage() {
         </DialogContent>
       </Dialog>
 
-      {/* --- MODIFIED View/Edit Dialog (Task 3, 8) --- */}
+      {/* Edit Dialog */}
       <Dialog
         open={showAssignmentDialog}
         onOpenChange={(isOpen) => {
           setShowAssignmentDialog(isOpen);
           if (!isOpen) {
-            // Reset state on close
             setIsEditingAssignment(false);
             setSelectedAssignment(null);
             setOriginalAssignment(null);
@@ -1396,7 +1546,7 @@ export default function SchedulePage() {
                   <Select
                     value={selectedAssignment.type}
                     onValueChange={(value: any) => setSelectedAssignment({ ...selectedAssignment, type: value })}
-                    disabled={!isEditingAssignment} // <-- (Task 3)
+                    disabled={!isEditingAssignment}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
@@ -1416,12 +1566,11 @@ export default function SchedulePage() {
                     type="date"
                     value={selectedAssignment.date}
                     onChange={(e) => setSelectedAssignment({ ...selectedAssignment, date: e.target.value })}
-                    disabled={!isEditingAssignment} // <-- (Task 3)
+                    disabled={!isEditingAssignment}
                   />
                 </div>
               </div>
 
-              {/* --- Display Created By / Assigned To (Task 2) --- */}
               {!isEditingAssignment && (
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="space-y-1">
@@ -1458,7 +1607,7 @@ export default function SchedulePage() {
                             estimated_hours: newHours,
                           });
                         }}
-                        disabled={!isEditingAssignment} // <-- (Task 3)
+                        disabled={!isEditingAssignment}
                       />
                     </div>
 
@@ -1476,38 +1625,100 @@ export default function SchedulePage() {
                             estimated_hours: newHours,
                           });
                         }}
-                        disabled={!isEditingAssignment} // <-- (Task 3)
+                        disabled={!isEditingAssignment}
                       />
                     </div>
                   </div>
 
+                  {/* NEW: Custom Assign To Field for Edit */}
                   <div className="space-y-2">
                     <Label>Assigned To</Label>
-                    <Select
-                      value={selectedAssignment.user_id?.toString() || ""}
-                      onValueChange={(value) =>
-                        setSelectedAssignment({
-                          ...selectedAssignment,
-                          user_id: parseInt(value),
-                        })
-                      }
-                      disabled={!isEditingAssignment} // <-- (Task 3)
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select team member" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {/* Self-assignment option for everyone */}
-                        {user && <SelectItem value={user.id.toString()}>{user.full_name} (Me)</SelectItem>}
-                        {/* Manager can assign to others */}
-                        {user?.role === "Manager" &&
-                          employees.map((emp) => (
-                            <SelectItem key={emp.id} value={emp.id.toString()}>
-                              {emp.full_name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Select
+                        value={selectedAssignment.user_id?.toString() || selectedAssignment.team_member || ""}
+                        onValueChange={(value) => {
+                          const isCustomName = isNaN(Number(value));
+                          if (isCustomName) {
+                            setSelectedAssignment({ 
+                              ...selectedAssignment, 
+                              user_id: undefined,
+                              team_member: value 
+                            });
+                          } else {
+                            const userId = parseInt(value);
+                            const selectedUser = user?.id === userId ? user : employees.find(emp => emp.id === userId);
+                            setSelectedAssignment({ 
+                              ...selectedAssignment, 
+                              user_id: userId,
+                              team_member: selectedUser?.full_name 
+                            });
+                          }
+                        }}
+                        disabled={!isEditingAssignment}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select or add team member" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectLabel>Custom Assignees</SelectLabel>
+                            {customAssignees.map((name) => (
+                              <SelectItem key={name} value={name}>
+                                {name}
+                              </SelectItem>
+                            ))}
+                            {customAssignees.length === 0 && (
+                              <div className="px-2 py-1.5 text-sm text-gray-500">No custom assignees yet</div>
+                            )}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      
+                      {isEditingAssignment && (
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Or type new name..."
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const input = e.currentTarget;
+                                const value = input.value.trim();
+                                if (value) {
+                                  addCustomAssignee(value);
+                                  setSelectedAssignment({ 
+                                    ...selectedAssignment, 
+                                    user_id: undefined,
+                                    team_member: value 
+                                  });
+                                  input.value = '';
+                                }
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                              const value = input.value.trim();
+                              if (value) {
+                                addCustomAssignee(value);
+                                setSelectedAssignment({ 
+                                  ...selectedAssignment, 
+                                  user_id: undefined,
+                                  team_member: value 
+                                });
+                                input.value = '';
+                              }
+                            }}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
@@ -1515,53 +1726,117 @@ export default function SchedulePage() {
               {selectedAssignment.type === "job" && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
+                    {/* NEW: Custom Job/Task Field for Edit */}
                     <div className="space-y-2">
                       <Label>Job / Task</Label>
-                      <Select
-                        value={selectedAssignment.job_id || selectedAssignment.job_type || ""} // <-- (Task 1)
-                        onValueChange={(value) => {
-                          const isTask = interiorDesignJobTypes.includes(value);
-                          if (isTask) {
-                            setSelectedAssignment({
-                              ...selectedAssignment,
-                              title: value,
-                              job_type: value, // ✅ This line should be there
-                              job_id: undefined,
-                            });
-                          } else {
-                            const job = availableJobs.find((j) => j.id === value);
-                            setSelectedAssignment({
-                              ...selectedAssignment,
-                              job_id: value,
-                              job_type: job?.job_type, // ✅ This line should be there
-                              customer_id: job?.customer_id,
-                            });
-                          }
-                        }}
-                        disabled={!isEditingAssignment} // <-- (Task 3)
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select job or task" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectLabel>Tasks</SelectLabel>
-                            {interiorDesignJobTypes.map((task) => (
-                              <SelectItem key={task} value={task}>
-                                {task}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                          <SelectGroup>
-                            <SelectLabel>Active Jobs</SelectLabel>
-                            {availableJobs.map((job) => (
-                              <SelectItem key={job.id} value={job.id}>
-                                {job.job_reference} - {job.customer_name}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-2">
+                        <Select
+                          value={selectedAssignment.job_id || selectedAssignment.job_type || ""}
+                          onValueChange={(value) => {
+                            const isTask = interiorDesignJobTypes.includes(value) || customJobTasks.includes(value);
+                            if (isTask) {
+                              setSelectedAssignment({
+                                ...selectedAssignment,
+                                title: value,
+                                job_type: value,
+                                job_id: undefined,
+                              });
+                            } else {
+                              const job = availableJobs.find((j) => j.id === value);
+                              setSelectedAssignment({
+                                ...selectedAssignment,
+                                job_id: value,
+                                job_type: job?.job_type,
+                                customer_id: job?.customer_id,
+                              });
+                            }
+                          }}
+                          disabled={!isEditingAssignment}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select or add job/task" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel>Standard Tasks</SelectLabel>
+                              {interiorDesignJobTypes.map((task) => (
+                                <SelectItem key={task} value={task}>
+                                  {task}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                            
+                            {customJobTasks.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Custom Tasks</SelectLabel>
+                                {customJobTasks.map((task) => (
+                                  <SelectItem key={task} value={task}>
+                                    {task}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                            
+                            {availableJobs.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Active Jobs</SelectLabel>
+                                {availableJobs.map((job) => (
+                                  <SelectItem key={job.id} value={job.id}>
+                                    {job.job_reference} - {job.customer_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        
+                        {isEditingAssignment && (
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Or type new task..."
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const input = e.currentTarget;
+                                  const value = input.value.trim();
+                                  if (value) {
+                                    addCustomJobTask(value);
+                                    setSelectedAssignment({
+                                      ...selectedAssignment,
+                                      title: value,
+                                      job_type: value,
+                                      job_id: undefined,
+                                    });
+                                    input.value = '';
+                                  }
+                                }
+                              }}
+                              className="flex-1"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                                const value = input.value.trim();
+                                if (value) {
+                                  addCustomJobTask(value);
+                                  setSelectedAssignment({
+                                    ...selectedAssignment,
+                                    title: value,
+                                    job_type: value,
+                                    job_id: undefined,
+                                  });
+                                  input.value = '';
+                                }
+                              }}
+                            >
+                              Add
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -1569,7 +1844,7 @@ export default function SchedulePage() {
                       <Select
                         value={selectedAssignment.customer_id || ""}
                         onValueChange={(value) => setSelectedAssignment({ ...selectedAssignment, customer_id: value })}
-                        disabled={!isEditingAssignment || !!selectedAssignment.job_id} // <-- (Task 3)
+                        disabled={!isEditingAssignment || !!selectedAssignment.job_id}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select customer" />
@@ -1602,7 +1877,7 @@ export default function SchedulePage() {
                         });
                       }
                     }}
-                    disabled={!isEditingAssignment} // <-- (Task 3)
+                    disabled={!isEditingAssignment}
                   />
                   <Label htmlFor="full-day-edit">Full day</Label>
                 </div>
@@ -1614,16 +1889,12 @@ export default function SchedulePage() {
                   value={selectedAssignment.notes || ""}
                   onChange={(e) => setSelectedAssignment({ ...selectedAssignment, notes: e.target.value })}
                   placeholder="Enter notes..."
-                  disabled={!isEditingAssignment} // <-- (Task 3)
+                  disabled={!isEditingAssignment}
                 />
               </div>
 
-              {/* --- MODIFIED FOOTER (Task 3, 8) --- */}
               <div className="flex justify-end space-x-2 pt-4">
-                {/* Delete button removed per Task 8 */}
-
                 {!isEditingAssignment ? (
-                  // --- VIEW MODE ---
                   <>
                     <Button variant="outline" onClick={() => setShowAssignmentDialog(false)}>
                       Close
@@ -1631,13 +1902,12 @@ export default function SchedulePage() {
                     <Button onClick={() => setIsEditingAssignment(true)}>Edit</Button>
                   </>
                 ) : (
-                  // --- EDIT MODE ---
                   <>
                     <Button
                       variant="outline"
                       onClick={() => {
                         setIsEditingAssignment(false);
-                        setSelectedAssignment(originalAssignment); // Restore original on cancel
+                        setSelectedAssignment(originalAssignment);
                       }}
                     >
                       Cancel

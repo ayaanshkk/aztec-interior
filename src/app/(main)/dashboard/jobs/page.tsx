@@ -17,8 +17,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { fetchWithAuth } from "@/lib/api";
+import JobStageBadge from "@/components/JobStageBadge"; // ✅ Import the badge component
 
 const JOB_TYPES = ["Kitchen", "Bedroom", "Wardrobe", "Remedial", "Other"];
+
+// ✅ Work stages definition
+const WORK_STAGES = [
+  { value: "Survey", label: "Survey", icon: "📏" },
+  { value: "Delivery", label: "Delivery", icon: "🚚" },
+  { value: "Installation", label: "Installation", icon: "🏗️" },
+];
 
 interface Job {
   id: string;
@@ -27,6 +35,7 @@ interface Job {
   customer_name: string;
   job_type: string;
   stage: string;
+  work_stage?: string; // ✅ NEW: Work stage field
   priority: string;
   start_date: string;
   end_date: string;
@@ -41,7 +50,7 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
-  const [filterStage, setFilterStage] = useState("all"); // ✅ MOVED HERE - inside component
+  const [filterWorkStage, setFilterWorkStage] = useState<string>("all"); // ✅ NEW: Work stage filter
   
   // Delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -53,7 +62,7 @@ export default function JobsPage() {
 
   useEffect(() => {
     applyFilters();
-  }, [jobs, searchTerm, filterType]);
+  }, [jobs, searchTerm, filterType, filterWorkStage]); // ✅ Added filterWorkStage
 
   const loadJobs = async () => {
     setLoading(true);
@@ -151,7 +160,39 @@ export default function JobsPage() {
       filtered = filtered.filter((job) => job.job_type === filterType);
     }
 
+    // ✅ NEW: Filter by work stage
+    if (filterWorkStage && filterWorkStage !== "all") {
+      filtered = filtered.filter((job) => job.work_stage === filterWorkStage);
+    }
+
     setFilteredJobs(filtered);
+  };
+
+  // ✅ NEW: Update job work stage
+  const handleUpdateWorkStage = async (jobId: string, newWorkStage: string) => {
+    try {
+      const response = await fetchWithAuth(`jobs/${jobId}`, {
+        method: "PUT",
+        body: JSON.stringify({ work_stage: newWorkStage }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to update work stage");
+      }
+
+      const updatedJob = await response.json();
+      
+      // Update state
+      setJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, work_stage: updatedJob.work_stage } : j))
+      );
+      
+      console.log(`✅ Updated job ${jobId} work stage to ${newWorkStage}`);
+    } catch (error) {
+      console.error("Error updating work stage:", error);
+      alert(`Failed to update work stage: ${error instanceof Error ? error.message : 'Please try again'}`);
+    }
   };
 
   // ✅ Delete job handler
@@ -172,7 +213,6 @@ export default function JobsPage() {
       setJobs((prev) => prev.filter((j) => j.id !== jobToDelete.id));
       setDeleteDialogOpen(false);
       setJobToDelete(null);
-      // ✅ No alert on success - dialog closing is enough feedback
     } catch (error) {
       console.error("Error deleting job:", error);
       alert(`Failed to delete job: ${error instanceof Error ? error.message : 'Please try again'}`);
@@ -247,6 +287,7 @@ export default function JobsPage() {
               />
             </div>
           </div>
+          
           <div className="w-[200px]">
             <Select value={filterType} onValueChange={setFilterType}>
               <SelectTrigger>
@@ -263,13 +304,33 @@ export default function JobsPage() {
             </Select>
           </div>
 
-          {(searchTerm || filterStage !== "all" || filterType !== "all") && (
+          {/* ✅ NEW: Work Stage Filter */}
+          <div className="w-[200px]">
+            <Select value={filterWorkStage} onValueChange={setFilterWorkStage}>
+              <SelectTrigger>
+                <SelectValue placeholder="All Work Stages" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Work Stages</SelectItem>
+                {WORK_STAGES.map((stage) => (
+                  <SelectItem key={stage.value} value={stage.value}>
+                    <div className="flex items-center gap-2">
+                      <span>{stage.icon}</span>
+                      <span>{stage.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {(searchTerm || filterWorkStage !== "all" || filterType !== "all") && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
                 setSearchTerm("");
-                setFilterStage("all");
+                setFilterWorkStage("all");
                 setFilterType("all");
               }}
             >
@@ -289,6 +350,17 @@ export default function JobsPage() {
             <p className="text-sm text-gray-600">Filtered Results</p>
             <p className="text-2xl font-semibold">{filteredJobs.length}</p>
           </div>
+          {/* ✅ NEW: Work stage counts */}
+          {WORK_STAGES.map((stage) => {
+            const count = jobs.filter((j) => j.work_stage === stage.value).length;
+            if (count === 0) return null;
+            return (
+              <div key={stage.value}>
+                <p className="text-sm text-gray-600">{stage.icon} {stage.label}</p>
+                <p className="text-2xl font-semibold">{count}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -327,6 +399,10 @@ export default function JobsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
                       Type
                     </th>
+                    {/* ✅ NEW: Work Stage column */}
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
+                      Work Stage
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
                       Priority
                     </th>
@@ -360,6 +436,33 @@ export default function JobsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-700">{job.job_type}</span>
+                      </td>
+                      {/* ✅ NEW: Work Stage cell with inline editing */}
+                      <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <Select
+                          value={job.work_stage || "Survey"}
+                          onValueChange={(value) => handleUpdateWorkStage(job.id, value)}
+                        >
+                          <SelectTrigger className="w-[150px] h-8">
+                            <SelectValue>
+                              {job.work_stage ? (
+                                <JobStageBadge stage={job.work_stage as any} size="sm" showIcon={true} />
+                              ) : (
+                                <span className="text-gray-400">Not set</span>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {WORK_STAGES.map((stage) => (
+                              <SelectItem key={stage.value} value={stage.value}>
+                                <div className="flex items-center gap-2">
+                                  <span>{stage.icon}</span>
+                                  <span>{stage.label}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`text-sm ${getPriorityColor(job.priority)}`}>
