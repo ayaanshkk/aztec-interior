@@ -95,13 +95,9 @@ const timeSlotsWeek = Array.from({ length: 14 }, (_, i) => {
 });
 
 const interiorDesignJobTypes = [
-  "Consultation",
-  "Space Planning",
-  "Concept Development",
-  "FF&E Sourcing",
-  "Site Visit",
-  "Project Management",
-  "Styling",
+  "Survey",
+  "Delivery", 
+  "Installation",
 ];
 
 export default function SchedulePage() {
@@ -121,11 +117,9 @@ export default function SchedulePage() {
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
   const [isEditingAssignment, setIsEditingAssignment] = useState(false);
 
-  // ✅ NEW: Custom assignees and tasks state
+  // ✅ Custom assignees and tasks state
   const [customAssignees, setCustomAssignees] = useState<string[]>([]);
   const [customJobTasks, setCustomJobTasks] = useState<string[]>([]);
-
-  // ✅ NEW: Input values for custom fields
   const [customAssigneeInput, setCustomAssigneeInput] = useState("");
   const [customTaskInput, setCustomTaskInput] = useState("");
 
@@ -342,30 +336,21 @@ export default function SchedulePage() {
       setError(null);
       
       console.log("🔄 Starting data fetch...");
-      console.log(`User: ${user.full_name} (${user.role})`);
 
-      let assignmentsData = [];
-      try {
-        assignmentsData = await api.getAssignments();
-        setAssignments(assignmentsData);
-      } catch (err) {
-        console.error("❌ Failed to fetch assignments:", err);
-        setError("Failed to load assignments. Please try again.");
-        setAssignments([]);
-      }
+      const [assignmentsData, jobsData, customersData] = await Promise.all([
+        api.getAssignments().catch(() => []),
+        api.getAvailableJobs().catch(() => []),
+        api.getActiveCustomers().catch(() => [])
+      ]);
 
-      const jobsData = await api.getAvailableJobs();
+      setAssignments(assignmentsData);
       setAvailableJobs(jobsData);
-
-      const customersData = await api.getActiveCustomers();
       setCustomers(customersData);
 
-      console.log("✅ Data fetch complete");
-      console.log(`Summary: ${assignmentsData.length} assignments, ${jobsData.length} jobs, ${customersData.length} customers`);
-
+      console.log("✅ Data loaded successfully");
     } catch (err) {
-      console.error("❌ Critical error in fetchData:", err);
-      setError(err instanceof Error ? err.message : "Failed to load data");
+      console.error("❌ Error in fetchData:", err);
+      setError("Failed to load schedule data");
     } finally {
       setLoading(false);
     }
@@ -405,11 +390,6 @@ export default function SchedulePage() {
           default:
             title = "Assignment";
         }
-      } else if (assignmentData.type === "job" && assignmentData.customer_id && !assignmentData.job_id) {
-        const customer = customers.find((c) => c.id === assignmentData.customer_id);
-        if (customer) {
-          title = `${title} - ${customer.name}`;
-        }
       }
 
       const finalAssignmentData = {
@@ -419,15 +399,9 @@ export default function SchedulePage() {
         status: user?.role === "Manager" || assignmentData.user_id === user?.id ? "Accepted" : "Scheduled",
       };
 
-      console.log("Sending assignment data:", finalAssignmentData);
-
       const newAssignment = await api.createAssignment(finalAssignmentData);
-      
       setAssignments((prev) => [...prev, newAssignment]);
       return newAssignment;
-    } catch (err) {
-      console.error("Error creating assignment:", err);
-      throw err;
     } finally {
       setSaving(false);
     }
@@ -438,14 +412,9 @@ export default function SchedulePage() {
 
     try {
       setSaving(true);
-      
       const updatedAssignment = await api.updateAssignment(id, assignmentData);
-      
       setAssignments((prev) => prev.map((a) => (a.id === id ? updatedAssignment : a)));
       return updatedAssignment;
-    } catch (err) {
-      console.error("Error updating assignment:", err);
-      throw err;
     } finally {
       setSaving(false);
     }
@@ -456,23 +425,10 @@ export default function SchedulePage() {
 
     try {
       setSaving(true);
-      
       await api.deleteAssignment(id);
-      
       setAssignments((prev) => prev.filter((a) => a.id !== id));
-    } catch (err) {
-      console.error("Error deleting assignment:", err);
-      throw err;
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleAssignmentResponse = async (assignment: Assignment, newStatus: "Accepted" | "Declined") => {
-    try {
-      await updateAssignment(assignment.id, { status: newStatus });
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update status");
     }
   };
 
@@ -487,13 +443,10 @@ export default function SchedulePage() {
 
       try {
         const res = await fetchWithAuth("auth/users/staff");
-
-        if (!res.ok) {
-          throw new Error(`Failed to fetch staff: ${res.status}`);
+        if (res.ok) {
+          const data = await res.json();
+          setEmployees(data.users || []);
         }
-
-        const data = await res.json();
-        setEmployees(data.users || []);
       } catch (err) {
         console.error("Error fetching employees:", err);
       }
@@ -555,13 +508,8 @@ export default function SchedulePage() {
       return;
     }
 
-    // ✅ Save custom values if they were typed
-    if (customAssigneeInput.trim()) {
-      saveCustomAssignee(customAssigneeInput);
-    }
-    if (customTaskInput.trim()) {
-      saveCustomJobTask(customTaskInput);
-    }
+    if (customAssigneeInput.trim()) saveCustomAssignee(customAssigneeInput);
+    if (customTaskInput.trim()) saveCustomJobTask(customTaskInput);
 
     try {
       await createAssignment(newAssignment);
@@ -584,19 +532,13 @@ export default function SchedulePage() {
   const handleEditAssignment = async () => {
     if (!selectedAssignment) return;
     
-    // ✅ Save custom values if they were typed
-    if (customAssigneeInput.trim()) {
-      saveCustomAssignee(customAssigneeInput);
-    }
-    if (customTaskInput.trim()) {
-      saveCustomJobTask(customTaskInput);
-    }
+    if (customAssigneeInput.trim()) saveCustomAssignee(customAssigneeInput);
+    if (customTaskInput.trim()) saveCustomJobTask(customTaskInput);
     
     try {
       await updateAssignment(selectedAssignment.id, selectedAssignment);
       setShowAssignmentDialog(false);
       setSelectedAssignment(null);
-      setOriginalAssignment(null);
       setIsEditingAssignment(false);
       setCustomAssigneeInput("");
       setCustomTaskInput("");
@@ -612,7 +554,6 @@ export default function SchedulePage() {
       await deleteAssignment(assignmentId);
       setShowAssignmentDialog(false);
       setSelectedAssignment(null);
-      setOriginalAssignment(null);
       setIsEditingAssignment(false);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to delete assignment");
@@ -631,22 +572,12 @@ export default function SchedulePage() {
     e.preventDefault();
     if (!draggedAssignment) return;
 
-    if (
-      user?.role !== "Manager" &&
-      draggedAssignment.created_by !== user?.id &&
-      draggedAssignment.status === "Scheduled"
-    ) {
-      alert("Please accept or decline the assignment before moving it.");
-      setDraggedAssignment(null);
-      return;
-    }
-
     const dateKey = formatDateKey(date);
     try {
       await updateAssignment(draggedAssignment.id, { date: dateKey });
       setDraggedAssignment(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to move assignment");
+      alert("Failed to move assignment");
       setDraggedAssignment(null);
     }
   };
@@ -679,30 +610,273 @@ export default function SchedulePage() {
     );
   }
 
-  // Render functions (keeping the existing month/week/year view render functions...)
-  // [Previous render functions remain the same - too long to repeat here]
-
   // Main render
   return (
-    <div className="min-h-screen bg-white">
-      {/* Previous header and toolbar code remains the same */}
-      
-      {/* Add Dialog - UPDATED */}
+    <div className="min-h-screen bg-white p-6">
+      {/* Header */}
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Schedule</h1>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchData}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+          {user?.role === "Manager" && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Calendars <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Visible Calendars</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {employees.map((emp) => (
+                  <DropdownMenuCheckboxItem
+                    key={emp.id}
+                    checked={visibleCalendars.includes(emp.full_name)}
+                    onCheckedChange={() => toggleCalendarVisibility(emp.full_name)}
+                  >
+                    {emp.full_name}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigateView("prev")}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
+            Today
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigateView("next")}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <h2 className="ml-4 text-xl font-semibold">
+            {formatHeaderDate(currentDate, viewMode)}
+          </h2>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Select value={viewMode} onValueChange={(v: any) => setViewMode(v)}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="month">Month</SelectItem>
+              <SelectItem value="week">Week</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={() => {
+            setNewAssignment({ ...newAssignment, date: formatDateKey(new Date()) });
+            setShowAddDialog(true);
+          }}>
+            Add Assignment
+          </Button>
+        </div>
+      </div>
+
+      {/* Calendar View */}
+      {viewMode === "month" && (
+        <div className="rounded-lg border">
+          <div className="grid grid-cols-7 border-b bg-gray-50">
+            {weekdayShort.map((day) => (
+              <div key={day} className="border-r p-2 text-center text-sm font-medium last:border-r-0">
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {calendarDays.map((day, idx) => {
+              const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+              const isToday = day.toDateString() === new Date().toDateString();
+              const dayAssignments = getAssignmentsForDate(day);
+              const overbooked = isOverbooked(day);
+
+              return (
+                <div
+                  key={idx}
+                  className={`min-h-[100px] border-b border-r p-2 last:border-r-0 ${
+                    isCurrentMonth ? "bg-white" : "bg-gray-50"
+                  } ${isToday ? "ring-2 ring-blue-500" : ""}`}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, day)}
+                  onClick={() => {
+                    setNewAssignment({ ...newAssignment, date: formatDateKey(day) });
+                    setShowAddDialog(true);
+                  }}
+                >
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className={`text-sm ${isToday ? "font-bold text-blue-600" : ""}`}>
+                      {day.getDate()}
+                    </span>
+                    {overbooked && (
+                      <AlertTriangle className="h-3 w-3 text-red-500" />
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    {dayAssignments.slice(0, 3).map((assignment) => (
+                      <div
+                        key={assignment.id}
+                        draggable
+                        onDragStart={() => handleDragStart(assignment)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAssignment(assignment);
+                          setShowAssignmentDialog(true);
+                        }}
+                        className={`cursor-pointer rounded border px-2 py-1 text-xs ${getAssignmentColor(assignment)}`}
+                      >
+                        {assignment.title}
+                      </div>
+                    ))}
+                    {dayAssignments.length > 3 && (
+                      <div className="text-xs text-gray-500">
+                        +{dayAssignments.length - 3} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {viewMode === "week" && (
+        <div className="rounded-lg border">
+          <div className="grid grid-cols-8 border-b bg-gray-50">
+            <div className="border-r p-2"></div>
+            {daysOfWeek.map((day) => (
+              <div key={day.toISOString()} className="border-r p-2 text-center last:border-r-0">
+                <div className="text-sm font-medium">{weekdayShort[day.getDay() === 0 ? 6 : day.getDay() - 1]}</div>
+                <div className="text-xs text-gray-600">{day.getDate()}</div>
+              </div>
+            ))}
+          </div>
+          <div className="relative grid grid-cols-8">
+            <div className="border-r">
+              {timeSlotsWeek.map((time) => (
+                <div key={time} className="border-b p-2 text-xs text-gray-600" style={{ height: `${HOUR_HEIGHT_PX}px` }}>
+                  {time}
+                </div>
+              ))}
+            </div>
+            {daysOfWeek.map((day) => {
+              const dayAssignments = getAssignmentsForDate(day);
+              return (
+                <div
+                  key={day.toISOString()}
+                  className="relative border-r last:border-r-0"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, day)}
+                >
+                  {timeSlotsWeek.map((time) => (
+                    <div
+                      key={time}
+                      className="border-b"
+                      style={{ height: `${HOUR_HEIGHT_PX}px` }}
+                    />
+                  ))}
+                  {dayAssignments.map((assignment) => (
+                    <div
+                      key={assignment.id}
+                      draggable
+                      onDragStart={() => handleDragStart(assignment)}
+                      onClick={() => {
+                        setSelectedAssignment(assignment);
+                        setShowAssignmentDialog(true);
+                      }}
+                      className={`cursor-pointer rounded border p-1 text-xs ${getAssignmentColor(assignment)}`}
+                      style={getAssignmentWeekStyle(assignment.start_time, assignment.end_time)}
+                    >
+                      <div className="font-medium">{assignment.title}</div>
+                      <div className="text-xs opacity-75">
+                        {assignment.start_time} - {assignment.end_time}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Add Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add Assignment</DialogTitle>
-            <DialogDescription>Schedule a new assignment for the selected day.</DialogDescription>
+            <DialogDescription>Schedule a new assignment.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Type and Date fields remain the same */}
-            
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select
+                value={newAssignment.type}
+                onValueChange={(value: any) => setNewAssignment({ ...newAssignment, type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="job">Job</SelectItem>
+                  <SelectItem value="off">Day Off</SelectItem>
+                  <SelectItem value="delivery">Delivery</SelectItem>
+                  <SelectItem value="note">Note</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={newAssignment.date || ""}
+                onChange={(e) => setNewAssignment({ ...newAssignment, date: e.target.value })}
+              />
+            </div>
+
             {(newAssignment.type === "job" || newAssignment.type === "off") && (
               <>
-                {/* Start/End Time fields remain the same */}
-                
-                {/* ✅ NEW: Simple Type-Only Assign To Field */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Time</Label>
+                    <Input
+                      type="time"
+                      value={newAssignment.start_time || ""}
+                      onChange={(e) => setNewAssignment({ ...newAssignment, start_time: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Time</Label>
+                    <Input
+                      type="time"
+                      value={newAssignment.end_time || ""}
+                      onChange={(e) => {
+                        const hours = calculateHours(newAssignment.start_time, e.target.value);
+                        setNewAssignment({
+                          ...newAssignment,
+                          end_time: e.target.value,
+                          estimated_hours: hours ? parseFloat(hours) : undefined,
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label>Assign To</Label>
                   <Input
@@ -724,63 +898,54 @@ export default function SchedulePage() {
                       <option key={name} value={name} />
                     ))}
                   </datalist>
-                  {customAssignees.length > 0 && (
-                    <p className="text-xs text-gray-500">
-                      Previously used: {customAssignees.join(", ")}
-                    </p>
-                  )}
                 </div>
               </>
             )}
 
             {newAssignment.type === "job" && (
-              <>
-                {/* ✅ NEW: Simple Type-Only Job/Task Field */}
-                <div className="space-y-2">
-                  <Label>Job / Task</Label>
-                  <Input
-                    placeholder="Type job or task..."
-                    list="task-suggestions"
-                    value={customTaskInput || newAssignment.title || ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setCustomTaskInput(value);
-                      setNewAssignment({
-                        ...newAssignment,
-                        title: value,
-                        job_type: value,
-                        job_id: undefined,
-                      });
-                    }}
-                  />
-                  <datalist id="task-suggestions">
-                    {interiorDesignJobTypes.map((task) => (
-                      <option key={task} value={task} />
-                    ))}
-                    {customJobTasks.map((task) => (
-                      <option key={task} value={task} />
-                    ))}
-                    {availableJobs.map((job) => (
-                      <option 
-                        key={job.id} 
-                        value={`${job.job_reference} - ${job.customer_name}`} 
-                      />
-                    ))}
-                  </datalist>
-                  {(interiorDesignJobTypes.length > 0 || customJobTasks.length > 0) && (
-                    <p className="text-xs text-gray-500">
-                      Standard tasks: {interiorDesignJobTypes.join(", ")}
-                      {customJobTasks.length > 0 && `, Custom: ${customJobTasks.join(", ")}`}
-                    </p>
-                  )}
-                </div>
-
-                {/* Customer field remains the same */}
-              </>
+              <div className="space-y-2">
+                <Label>Job / Task</Label>
+                <Input
+                  placeholder="Type job or task..."
+                  list="task-suggestions"
+                  value={customTaskInput || newAssignment.title || ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCustomTaskInput(value);
+                    setNewAssignment({
+                      ...newAssignment,
+                      title: value,
+                      job_type: value,
+                      job_id: undefined,
+                    });
+                  }}
+                />
+                <datalist id="task-suggestions">
+                  {interiorDesignJobTypes.map((task) => (
+                    <option key={task} value={task} />
+                  ))}
+                  {customJobTasks.map((task) => (
+                    <option key={task} value={task} />
+                  ))}
+                  {availableJobs.map((job) => (
+                    <option 
+                      key={job.id} 
+                      value={`${job.job_reference} - ${job.customer_name}`} 
+                    />
+                  ))}
+                </datalist>
+              </div>
             )}
 
-            {/* Rest of the dialog remains the same */}
-            
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={newAssignment.notes || ""}
+                onChange={(e) => setNewAssignment({ ...newAssignment, notes: e.target.value })}
+                placeholder="Additional notes..."
+              />
+            </div>
+
             <div className="flex justify-end space-x-2 pt-4">
               <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                 Cancel
@@ -794,7 +959,64 @@ export default function SchedulePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog - Similar updates */}
+      {/* View/Edit Dialog */}
+      <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {isEditingAssignment ? "Edit Assignment" : "Assignment Details"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedAssignment && (
+            <div className="space-y-4">
+              <div>
+                <Label>Title</Label>
+                <p className="text-sm">{selectedAssignment.title}</p>
+              </div>
+              <div>
+                <Label>Date</Label>
+                <p className="text-sm">{selectedAssignment.date}</p>
+              </div>
+              {selectedAssignment.start_time && (
+                <div>
+                  <Label>Time</Label>
+                  <p className="text-sm">
+                    {selectedAssignment.start_time} - {selectedAssignment.end_time}
+                  </p>
+                </div>
+              )}
+              {selectedAssignment.notes && (
+                <div>
+                  <Label>Notes</Label>
+                  <p className="text-sm">{selectedAssignment.notes}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAssignmentDialog(false);
+                    setSelectedAssignment(null);
+                  }}
+                >
+                  Close
+                </Button>
+                {user?.role === "Manager" && (
+                  <Button
+                    variant="destructive"
+                    onClick={() => selectedAssignment && handleDeleteAssignment(selectedAssignment.id)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
