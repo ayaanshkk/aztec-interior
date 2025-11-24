@@ -843,7 +843,7 @@ export default function SchedulePage() {
               <Label>Type</Label>
               <Select
                 value={newAssignment.type}
-                onValueChange={(value: "Job" | "Off" | "Delivery" | "Note") => {
+                onValueChange={(value: "job" | "off" | "delivery" | "note") => {
                   setNewAssignment({ ...newAssignment, type: value });
                 }}
               >
@@ -851,10 +851,10 @@ export default function SchedulePage() {
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Job">Job</SelectItem>
-                  <SelectItem value="Off">Off</SelectItem>
-                  <SelectItem value="Delivery">Delivery</SelectItem>
-                  <SelectItem value="Note">Note</SelectItem>
+                  <SelectItem value="job">Job</SelectItem>
+                  <SelectItem value="off">Off</SelectItem>
+                  <SelectItem value="delivery">Delivery</SelectItem>
+                  <SelectItem value="note">Note</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -870,7 +870,7 @@ export default function SchedulePage() {
             </div>
 
             {/* Time fields - only for Job and Off */}
-            {(newAssignment.type === "Job" || newAssignment.type === "Off") && (
+            {(newAssignment.type === "job" || newAssignment.type === "off") && (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -913,7 +913,7 @@ export default function SchedulePage() {
             </div>
 
             {/* Job/Task - only for Job type */}
-            {newAssignment.type === "Job" && (
+            {newAssignment.type === "job" && (
               <div className="space-y-2">
                 <Label>Job/Task</Label>
                 <Select
