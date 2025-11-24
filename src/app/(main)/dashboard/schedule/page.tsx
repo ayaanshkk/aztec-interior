@@ -994,11 +994,11 @@ export default function SchedulePage() {
                 <div className="space-y-2">
                   <Label>Customer (Optional)</Label>
                   <Select
-                    value={newAssignment.customer_id || ""}
+                    value={newAssignment.customer_id || "none"}
                     onValueChange={(value) => {
                       setNewAssignment({
                         ...newAssignment,
-                        customer_id: value
+                        customer_id: value === "none" ? undefined : value
                       });
                     }}
                   >
@@ -1006,7 +1006,7 @@ export default function SchedulePage() {
                       <SelectValue placeholder="Select customer" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {customers.map((customer) => (
                         <SelectItem key={customer.id} value={customer.id}>
                           {customer.name}
@@ -1015,8 +1015,6 @@ export default function SchedulePage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </>
-            )}
 
             {/* Notes */}
             <div className="space-y-2">
