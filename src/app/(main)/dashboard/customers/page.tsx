@@ -21,7 +21,7 @@
 //   PopoverContent,
 //   PopoverTrigger,
 // } from "@/components/ui/popover";
-// import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation"; 
 // import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 // import { CustomerProjectTimeline } from "@/components/materials/CustomerProjectTimeline";
 // import { useAuth } from "@/contexts/AuthContext";
@@ -88,6 +88,7 @@
 //   form_document_count: number;
 //   total_documents: number;
 //   has_documents: boolean;
+//   updated_at?: string;
 // }
 
 // // ---------------- Utility functions ----------------
@@ -138,8 +139,7 @@
 
 // // ---------------- Component ----------------
 // export default function CustomersPage() {
-//   const [customers, setCustomers] = useState<Customer[]>([]);
-//   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+//   const [allCustomers, setAllCustomers] = useState<Customer[]>([]); 
 //   const [searchTerm, setSearchTerm] = useState("");
 //   const [stageFilter, setStageFilter] = useState<JobStage | "All">("All");
 //   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -165,26 +165,6 @@
 //   useEffect(() => {
 //     fetchCustomers();
 //   }, []);
-
-//   // Filter customers based on user role
-//   useEffect(() => {
-//     if (user?.role === "Sales") {
-//       const filteredData = allCustomers.filter((customer: Customer) => {
-//         const matchesCreatedBy = customer.created_by === String(user.id);
-//         const matchesSalesperson = customer.salesperson === user.name;
-//         return matchesCreatedBy || matchesSalesperson;
-//       });
-
-//       if (filteredData.length === 0 && allCustomers.length > 0) {
-//         console.warn("No customers match Sales filter. Showing all temporarily.");
-//         setCustomers(allCustomers);
-//       } else {
-//         setCustomers(filteredData);
-//       }
-//     } else {
-//       setCustomers(allCustomers);
-//     }
-//   }, [user, allCustomers]);
 
 //   // Reset page when filters/search change
 //   useEffect(() => {
@@ -222,6 +202,7 @@
 //           stage: c.stage || c.status || "Lead",
 //           project_count: Number(c.project_count) || 0,
 //           form_submissions: c.form_submissions || [],
+//           updated_at: c.updated_at || c.created_at, 
 //         };
 
 //         return customer;
@@ -232,11 +213,13 @@
 //       const endTime = performance.now();
 //       console.log(`⏱️ Page loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
-//       // ✅ OPTIMIZATION: Document checks removed
-//       // Previously this made 2 API calls per customer (drawings + forms)
-//       // For 100 customers = 200 API calls = 30+ seconds load time
-//       // Now: Only 1 API call = instant load
-//       // Document alerts will be shown on individual customer detail pages
+//       // ✅ DEBUG: Log Accepted stage customers
+//       const acceptedCustomers = customersWithData.filter((c: Customer) => 
+//         (c.stage || "").trim().toLowerCase() === "accepted"
+//       );
+//       console.log(`🟣 Found ${acceptedCustomers.length} customers in Accepted stage:`, 
+//         acceptedCustomers.map((c: Customer) => c.name)
+//       );
 
 //     } catch (err) {
 //       console.error("Error fetching customers:", err);
@@ -289,9 +272,49 @@
 //     }
 //   };
 
-//   // ---------------- Filtering ----------------
+//   // ✅ STEP 1: Apply role-based filtering FIRST
+//   const roleFilteredCustomers = useMemo(() => {
+//     if (user?.role === "Sales") {
+//       const filtered = allCustomers.filter((customer: Customer) => {
+//         const matchesCreatedBy = customer.created_by === String(user.id);
+//         const matchesSalesperson = customer.salesperson === user.name;
+//         return matchesCreatedBy || matchesSalesperson;
+//       });
+//       console.log(`👤 Sales filter: ${filtered.length} customers visible to ${user.name}`);
+//       return filtered;
+//     }
+//     return allCustomers;
+//   }, [allCustomers, user]);
+
+//   // ✅ STEP 2: Sort with Accepted stage first
+//   const sortedCustomers = useMemo(() => {
+//     const sorted = [...roleFilteredCustomers].sort((a, b) => {
+//       // Priority 1: Accepted stage customers come first
+//       const aIsAccepted = (a.stage || "").trim().toLowerCase() === "accepted";
+//       const bIsAccepted = (b.stage || "").trim().toLowerCase() === "accepted";
+      
+//       if (aIsAccepted && !bIsAccepted) return -1;
+//       if (!aIsAccepted && bIsAccepted) return 1;
+      
+//       // Priority 2: Within same group, sort by most recent update
+//       const aDate = new Date(a.updated_at || a.created_at).getTime();
+//       const bDate = new Date(b.updated_at || b.created_at).getTime();
+      
+//       return bDate - aDate;
+//     });
+
+//     // ✅ DEBUG: Log sorting results
+//     const acceptedCount = sorted.filter(c => 
+//       (c.stage || "").trim().toLowerCase() === "accepted"
+//     ).length;
+//     console.log(`🔄 Sorted: ${acceptedCount} Accepted customers at top of ${sorted.length} total`);
+    
+//     return sorted;
+//   }, [roleFilteredCustomers]);
+
+//   // ✅ STEP 3: Apply search and stage filters
 //   const filteredCustomers = useMemo(() => {
-//     return customers.filter((customer) => {
+//     return sortedCustomers.filter((customer) => {
 //       const term = searchTerm.toLowerCase();
 //       const matchesSearch =
 //         (customer.name || "").toLowerCase().includes(term) ||
@@ -300,11 +323,14 @@
 //         (customer.phone || "").toLowerCase().includes(term) ||
 //         (customer.postcode || "").toLowerCase().includes(term);
 
-//       const matchesStage = stageFilter === "All" || customer.stage === stageFilter;
+//       const customerStageLower = (customer.stage || "").trim().toLowerCase();
+//       const stageFilterLower = (stageFilter === "All" ? "All" : stageFilter).toLowerCase();
+      
+//       const matchesStage = stageFilterLower === "all" || customerStageLower === stageFilterLower;
 
 //       return matchesSearch && matchesStage;
 //     });
-//   }, [customers, searchTerm, stageFilter]);
+//   }, [sortedCustomers, searchTerm, stageFilter]);
 
 //   // ---------------- Pagination Calculations ----------------
 //   const totalPages = Math.ceil(filteredCustomers.length / CUSTOMERS_PER_PAGE);
@@ -331,9 +357,14 @@
 //     return user?.role === "Manager" || user?.role === "HR" || user?.role === "Production";
 //   };
 
+//   // ✅ Robust check for Accepted stage
+//   const isCustomerInAcceptedStage = (customer: Customer): boolean => {
+//     return (customer.stage || "").trim().toLowerCase() === "accepted";
+//   };
+
 //   // ---------------- Delete Customer ----------------
 //   const deleteCustomer = async (id: string) => {
-//     const target = customers.find((c) => c.id === id);
+//     const target = allCustomers.find((c) => c.id === id);
 //     if (!target || !canDeleteCustomer(target)) {
 //       alert("You don't have permission to delete customers.");
 //       return;
@@ -348,10 +379,8 @@
 //       });
 //       if (!res.ok) throw new Error("Failed to delete customer");
 
-//       setCustomers((prev) => prev.filter((c) => c.id !== id));
 //       setAllCustomers((prev) => prev.filter((c) => c.id !== id));
       
-//       // Re-evaluate current page after deletion
 //       if (paginatedCustomers.length === 1 && currentPage > 1) {
 //         setCurrentPage(prev => prev - 1);
 //       }
@@ -369,7 +398,7 @@
 //   };
 
 //   // ---------------- UI ----------------
-//   const uniqueStages = Array.from(new Set(customers.map((c) => c.stage)));
+//   const uniqueStages = Array.from(new Set(sortedCustomers.map((c) => c.stage)));
 
 //   // Pagination Component
 //   const PaginationControls = () => {
@@ -404,7 +433,6 @@
 //             <ChevronLeft className="h-4 w-4" />
 //           </Button>
           
-//           {/* Page numbers */}
 //           <div className="flex items-center px-3 text-sm text-gray-700">
 //             Page {currentPage} of {totalPages}
 //           </div>
@@ -464,7 +492,7 @@
 //                 All Stages
 //               </DropdownMenuItem>
 //               {uniqueStages.map((stage) => (
-//                 <DropdownMenuItem key={stage} onClick={() => setStageFilter(stage)}>
+//                 <DropdownMenuItem key={stage} onClick={() => setStageFilter(stage as JobStage)}>
 //                   {stage}
 //                 </DropdownMenuItem>
 //               ))}
@@ -531,15 +559,15 @@
 //                 paginatedCustomers.map((customer) => {
 //                   const isExpanded = expandedCustomerId === customer.id;
 //                   const projects = customerProjects[customer.id] || [];
+//                   const isAccepted = isCustomerInAcceptedStage(customer);
 
 //                   return (
 //                     <React.Fragment key={customer.id}>
-//                       {/* Main Customer Row */}
 //                       <tr
 //                         onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
 //                         className={`cursor-pointer hover:bg-gray-50 transition-colors ${
 //                           !customer.has_documents ? 'bg-red-50' : ''
-//                         }`}
+//                         } ${isAccepted ? 'bg-purple-50' : ''}`}
 //                       >
 //                         <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
 //                           <div className="flex items-center space-x-2">
@@ -549,6 +577,11 @@
 //                                 className="flex items-center"
 //                               >
 //                                 <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+//                               </div>
+//                             )}
+//                             {isAccepted && (
+//                               <div className="flex items-center" title="Customer in Accepted stage">
+//                                 <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse" />
 //                               </div>
 //                             )}
 //                             <span>{customer.name}</span>
@@ -565,7 +598,6 @@
 //                           {customer.postcode || "—"}
 //                         </td>
 
-//                         {/* Stage */}
 //                         <td className="px-6 py-4 whitespace-nowrap">
 //                           <span
 //                             className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStageColor(
@@ -576,7 +608,6 @@
 //                           </span>
 //                         </td>
 
-//                         {/* Projects - With Expandable Breakdown */}
 //                         <td className="px-6 py-4 whitespace-nowrap">
 //                           {customer.project_count > 0 ? (
 //                             <Popover>
@@ -680,7 +711,7 @@
 //                         {user?.role !== "Staff" && (
 //                           <td className="px-6 py-4 text-right whitespace-nowrap">
 //                             <div className="flex gap-2 justify-end">
-//                               {canViewTimeline() && (
+//                               {canViewTimeline() && isAccepted && (
 //                                 <Button
 //                                   variant="ghost"
 //                                   size="sm"
@@ -688,9 +719,10 @@
 //                                     e.stopPropagation();
 //                                     openTimelineModal(customer.id, customer.name);
 //                                   }}
-//                                   title="View Project Timeline & Materials"
+//                                   title="View Project Timeline & Materials (Accepted Stage)"
+//                                   className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
 //                                 >
-//                                   <Clock className="h-4 w-4 text-blue-600" />
+//                                   <Clock className="h-4 w-4" />
 //                                 </Button>
 //                               )}
 
@@ -730,11 +762,9 @@
 //           </table>
 //         </div>
 
-//         {/* Pagination Controls */}
 //         {!isLoading && filteredCustomers.length > 0 && <PaginationControls />}
 //       </div>
 
-//       {/* Create Customer Modal */}
 //       {showCreateModal && (
 //         <CreateCustomerModal
 //           isOpen={showCreateModal}
@@ -743,7 +773,6 @@
 //         />
 //       )}
 
-//       {/* Timeline Modal */}
 //       <Dialog open={showTimelineModal} onOpenChange={setShowTimelineModal}>
 //         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
 //           <DialogHeader>
@@ -1033,17 +1062,54 @@ export default function CustomersPage() {
     }
   };
 
-  // ✅ STEP 1: Apply role-based filtering FIRST
+  // ✅ STEP 1: Apply role-based filtering FIRST with comprehensive debugging
   const roleFilteredCustomers = useMemo(() => {
     if (user?.role === "Sales") {
+      console.log("🔍 Sales Role Filter Debug:");
+      console.log("- User ID:", user.id, "Type:", typeof user.id);
+      console.log("- User Name:", user.name);
+      console.log("- Total Customers:", allCustomers.length);
+      
       const filtered = allCustomers.filter((customer: Customer) => {
-        const matchesCreatedBy = customer.created_by === String(user.id);
-        const matchesSalesperson = customer.salesperson === user.name;
-        return matchesCreatedBy || matchesSalesperson;
+        // Normalize values for comparison
+        const customerCreatedBy = String(customer.created_by || "").trim();
+        const userId = String(user.id || "").trim();
+        const matchesCreatedBy = customerCreatedBy === userId;
+        
+        const customerSalesperson = String(customer.salesperson || "").trim();
+        const userName = String(user.name || "").trim();
+        // Case-insensitive comparison for salesperson name
+        const matchesSalesperson = customerSalesperson.toLowerCase() === userName.toLowerCase();
+        
+        const isVisible = matchesCreatedBy || matchesSalesperson;
+        
+        // Log first 5 customers for debugging
+        if (allCustomers.indexOf(customer) < 5) {
+          console.log(`\nCustomer: ${customer.name}`);
+          console.log(`  - created_by: "${customer.created_by}" (type: ${typeof customer.created_by})`);
+          console.log(`  - salesperson: "${customer.salesperson}"`);
+          console.log(`  - matchesCreatedBy: ${matchesCreatedBy} ("${customerCreatedBy}" === "${userId}")`);
+          console.log(`  - matchesSalesperson: ${matchesSalesperson} ("${customerSalesperson.toLowerCase()}" === "${userName.toLowerCase()}")`);
+          console.log(`  - isVisible: ${isVisible}`);
+        }
+        
+        return isVisible;
       });
-      console.log(`👤 Sales filter: ${filtered.length} customers visible to ${user.name}`);
+      
+      console.log(`\n✅ Sales filter result: ${filtered.length} customers visible to ${user.name}`);
+      if (filtered.length > 0) {
+        console.log("Visible customers:", filtered.map(c => c.name));
+      } else {
+        console.warn("⚠️ NO CUSTOMERS VISIBLE - Check if:");
+        console.warn("  1. Customer created_by matches user ID");
+        console.warn("  2. Customer salesperson matches user name");
+        console.warn("  3. Data types are consistent (all strings)");
+      }
+      
       return filtered;
     }
+    
+    console.log(`✅ Non-Sales role (${user?.role}): Showing all ${allCustomers.length} customers`);
     return allCustomers;
   }, [allCustomers, user]);
 
@@ -1106,7 +1172,11 @@ export default function CustomersPage() {
   const canEditCustomer = (customer: Customer): boolean => {
     if (user?.role === "Manager" || user?.role === "HR") return true;
     if (user?.role === "Sales") {
-      return customer.created_by === String(user.id) || customer.salesperson === user.name;
+      const customerCreatedBy = String(customer.created_by || "").trim();
+      const userId = String(user.id || "").trim();
+      const customerSalesperson = String(customer.salesperson || "").trim().toLowerCase();
+      const userName = String(user.name || "").trim().toLowerCase();
+      return customerCreatedBy === userId || customerSalesperson === userName;
     }
     return false;
   };
