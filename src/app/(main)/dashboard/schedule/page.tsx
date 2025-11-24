@@ -38,7 +38,7 @@ import {
   X,
   Archive,
 } from "lucide-react";
-import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
+import { fetchWithAuth, api } from "@/lib/api"; // Import the centralized API helper
 
 // ... interfaces stay the same ...
 interface Employee {
@@ -283,33 +283,41 @@ export default function SchedulePage() {
 
   // --- UPDATED DATA FETCHING ---
   const fetchData = async () => {
-    if (!token || !user) return;
+    if (!token || !user) {
+      console.warn("⚠️ No token or user found");
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
+      
+      console.log("🔄 Starting data fetch...");
+      console.log(`User: ${user.full_name} (${user.role})`);
 
-      const [assignmentsRes, jobsRes, customersRes] = await Promise.all([
-        fetchWithAuth("assignments"), // Updated
-        fetchWithAuth("jobs/available"), // Updated
-        fetchWithAuth("customers/active"), // Updated
-      ]);
-
-      if (!assignmentsRes.ok || !jobsRes.ok || !customersRes.ok) {
-        throw new Error("API not available");
+      // ✅ Fetch assignments (CRITICAL - must work)
+      try {
+        const assignmentsData = await api.getAssignments();
+        setAssignments(assignmentsData);
+      } catch (err) {
+        console.error("❌ Failed to fetch assignments:", err);
+        setError("Failed to load assignments. Please try again.");
+        setAssignments([]);
       }
 
-      const [assignmentsData, jobsData, customersData] = await Promise.all([
-        assignmentsRes.json(),
-        jobsRes.json(),
-        customersRes.json(),
-      ]);
-
-      setAssignments(assignmentsData);
+      // ✅ Fetch jobs (IMPORTANT but not critical - gracefully degrades)
+      const jobsData = await api.getAvailableJobs(); // Returns [] on error
       setAvailableJobs(jobsData);
+
+      // ✅ Fetch customers (IMPORTANT but not critical - gracefully degrades)
+      const customersData = await api.getActiveCustomers(); // Returns [] on error
       setCustomers(customersData);
+
+      console.log("✅ Data fetch complete");
+      console.log(`Summary: ${assignmentsData.length || 0} assignments, ${jobsData.length} jobs, ${customersData.length} customers`);
+
     } catch (err) {
-      console.error("Error fetching data:", err);
+      console.error("❌ Critical error in fetchData:", err);
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
@@ -366,20 +374,11 @@ export default function SchedulePage() {
 
       console.log("Sending assignment data:", finalAssignmentData);
 
-      const response = await fetchWithAuth("assignments", {
-        // Updated
-        method: "POST",
-        body: JSON.stringify(finalAssignmentData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create assignment");
-      }
-
-      const result = await response.json();
-      setAssignments((prev) => [...prev, result.assignment]);
-      return result.assignment;
+      // ✅ Use the new api method
+      const newAssignment = await api.createAssignment(finalAssignmentData);
+      
+      setAssignments((prev) => [...prev, newAssignment]);
+      return newAssignment;
     } catch (err) {
       console.error("Error creating assignment:", err);
       throw err;
@@ -393,20 +392,12 @@ export default function SchedulePage() {
 
     try {
       setSaving(true);
-      const response = await fetchWithAuth(`assignments/${id}`, {
-        // Updated
-        method: "PUT",
-        body: JSON.stringify(assignmentData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update assignment");
-      }
-
-      const result = await response.json();
-      setAssignments((prev) => prev.map((a) => (a.id === id ? result.assignment : a)));
-      return result.assignment;
+      
+      // ✅ Use the new api method
+      const updatedAssignment = await api.updateAssignment(id, assignmentData);
+      
+      setAssignments((prev) => prev.map((a) => (a.id === id ? updatedAssignment : a)));
+      return updatedAssignment;
     } catch (err) {
       console.error("Error updating assignment:", err);
       throw err;
@@ -420,16 +411,10 @@ export default function SchedulePage() {
 
     try {
       setSaving(true);
-      const response = await fetchWithAuth(`assignments/${id}`, {
-        // Updated
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete assignment");
-      }
-
+      
+      // ✅ Use the new api method
+      await api.deleteAssignment(id);
+      
       setAssignments((prev) => prev.filter((a) => a.id !== id));
     } catch (err) {
       console.error("Error deleting assignment:", err);

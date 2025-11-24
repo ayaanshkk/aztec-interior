@@ -210,4 +210,146 @@ export const api = {
     });
     return handleApiResponse(response);
   },
+
+  // ✅ ASSIGNMENT ENDPOINTS (Schedule Page)
+  async getAssignments() {
+    try {
+      console.log("📋 Fetching assignments...");
+      const response = await fetchWithAuth("/assignments");
+      
+      if (!response.ok) {
+        console.error(`❌ Assignments API returned ${response.status}`);
+        throw new Error(`Failed to fetch assignments: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log(`✅ Got ${data.length} assignments`);
+      return data;
+    } catch (error) {
+      console.error("❌ getAssignments failed:", error);
+      throw error;
+    }
+  },
+
+  async getAvailableJobs() {
+    try {
+      console.log("🔨 Fetching available jobs...");
+      const response = await fetchWithAuth("/jobs/available");
+      
+      if (!response.ok) {
+        console.warn(`⚠️ Jobs API returned ${response.status}`);
+        return []; // Return empty array instead of throwing
+      }
+      
+      const data = await response.json();
+      console.log(`✅ Got ${data.length} jobs`);
+      return data;
+    } catch (error) {
+      console.warn("⚠️ getAvailableJobs failed (non-critical):", error);
+      return []; // Return empty array for graceful degradation
+    }
+  },
+
+  async getActiveCustomers() {
+    try {
+      console.log("👥 Fetching active customers...");
+      const response = await fetchWithAuth("/customers/active");
+      
+      if (!response.ok) {
+        console.warn(`⚠️ Customers API returned ${response.status}`);
+        return []; // Return empty array instead of throwing
+      }
+      
+      const data = await response.json();
+      console.log(`✅ Got ${data.length} customers`);
+      return data;
+    } catch (error) {
+      console.warn("⚠️ getActiveCustomers failed (non-critical):", error);
+      return []; // Return empty array for graceful degradation
+    }
+  },
+
+  async createAssignment(assignmentData: any) {
+    try {
+      console.log("📝 Creating assignment:", assignmentData);
+      const response = await fetchWithAuth("/assignments", {
+        method: "POST",
+        body: JSON.stringify(assignmentData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create assignment");
+      }
+      
+      const result = await response.json();
+      console.log("✅ Assignment created:", result.assignment.id);
+      return result.assignment;
+    } catch (error) {
+      console.error("❌ createAssignment failed:", error);
+      throw error;
+    }
+  },
+
+  async updateAssignment(assignmentId: string, assignmentData: any) {
+    try {
+      console.log(`📝 Updating assignment ${assignmentId}:`, assignmentData);
+      const response = await fetchWithAuth(`/assignments/${assignmentId}`, {
+        method: "PUT",
+        body: JSON.stringify(assignmentData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update assignment");
+      }
+      
+      const result = await response.json();
+      console.log("✅ Assignment updated:", result.assignment.id);
+      return result.assignment;
+    } catch (error) {
+      console.error("❌ updateAssignment failed:", error);
+      throw error;
+    }
+  },
+
+  async deleteAssignment(assignmentId: string) {
+    try {
+      console.log(`🗑️ Deleting assignment ${assignmentId}`);
+      const response = await fetchWithAuth(`/assignments/${assignmentId}`, {
+        method: "DELETE",
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete assignment");
+      }
+      
+      console.log("✅ Assignment deleted");
+      return true;
+    } catch (error) {
+      console.error("❌ deleteAssignment failed:", error);
+      throw error;
+    }
+  },
+
+  async getAssignmentsByDateRange(startDate: string, endDate: string) {
+    try {
+      console.log(`📅 Fetching assignments from ${startDate} to ${endDate}`);
+      const response = await fetchWithAuth(
+        `/assignments/by-date-range?start_date=${startDate}&end_date=${endDate}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch assignments by date range: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log(`✅ Got ${data.length} assignments in range`);
+      return data;
+    } catch (error) {
+      console.error("❌ getAssignmentsByDateRange failed:", error);
+      throw error;
+    }
+  },
 };
