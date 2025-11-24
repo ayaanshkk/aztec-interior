@@ -833,28 +833,28 @@ export default function SchedulePage() {
 
       {/* Add Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Assignment</DialogTitle>
-            <DialogDescription>Schedule a new assignment.</DialogDescription>
+            <DialogTitle>Add New Assignment</DialogTitle>
           </DialogHeader>
-
           <div className="space-y-4">
             {/* Type */}
             <div className="space-y-2">
               <Label>Type</Label>
               <Select
                 value={newAssignment.type}
-                onValueChange={(value: any) => setNewAssignment({ ...newAssignment, type: value })}
+                onValueChange={(value: "Job" | "Off" | "Delivery" | "Note") => {
+                  setNewAssignment({ ...newAssignment, type: value });
+                }}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="job">Job</SelectItem>
-                  <SelectItem value="off">Day Off</SelectItem>
-                  <SelectItem value="delivery">Delivery</SelectItem>
-                  <SelectItem value="note">Note</SelectItem>
+                  <SelectItem value="Job">Job</SelectItem>
+                  <SelectItem value="Off">Off</SelectItem>
+                  <SelectItem value="Delivery">Delivery</SelectItem>
+                  <SelectItem value="Note">Note</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -864,14 +864,14 @@ export default function SchedulePage() {
               <Label>Date</Label>
               <Input
                 type="date"
-                value={newAssignment.date || ""}
+                value={newAssignment.date}
                 onChange={(e) => setNewAssignment({ ...newAssignment, date: e.target.value })}
               />
             </div>
 
-            {(newAssignment.type === "job" || newAssignment.type === "off") && (
+            {/* Time fields - only for Job and Off */}
+            {(newAssignment.type === "Job" || newAssignment.type === "Off") && (
               <>
-                {/* Start/End Time */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Start Time</Label>
@@ -886,152 +886,142 @@ export default function SchedulePage() {
                     <Input
                       type="time"
                       value={newAssignment.end_time || ""}
-                      onChange={(e) => {
-                        const hours = calculateHours(newAssignment.start_time, e.target.value);
-                        setNewAssignment({
-                          ...newAssignment,
-                          end_time: e.target.value,
-                          estimated_hours: hours ? parseFloat(hours) : undefined,
-                        });
-                      }}
+                      onChange={(e) => setNewAssignment({ ...newAssignment, end_time: e.target.value })}
                     />
                   </div>
-                </div>
-
-                {/* Assign To */}
-                <div className="space-y-2">
-                  <Label>Assign To</Label>
-                  <Input
-                    placeholder="Type team member name..."
-                    list="assignee-suggestions"
-                    value={customAssigneeInput || newAssignment.team_member || ""}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setCustomAssigneeInput(value);
-                      setNewAssignment({ 
-                        ...newAssignment, 
-                        team_member: value,
-                        user_id: undefined 
-                      });
-                    }}
-                  />
-                  <datalist id="assignee-suggestions">
-                    {customAssignees.map((name) => (
-                      <option key={name} value={name} />
-                    ))}
-                  </datalist>
                 </div>
               </>
             )}
 
-            {newAssignment.type === "job" && (
-              <>
-                {/* Job/Task Dropdown */}
-                <div className="space-y-2">
-                  <Label>Job / Task</Label>
-                  <Select
-                    value={newAssignment.job_type || newAssignment.title || ""}
-                    onValueChange={(value) => {
-                      // Check if it's a job reference
-                      if (value.includes(" - ")) {
-                        const jobId = availableJobs.find(j => `${j.job_reference} - ${j.customer_name}` === value)?.id;
-                        setNewAssignment({
-                          ...newAssignment,
-                          title: value,
-                          job_id: jobId,
-                          job_type: undefined
-                        });
-                      } else {
-                        setNewAssignment({
-                          ...newAssignment,
-                          title: value,
-                          job_type: value,
-                          job_id: undefined
-                        });
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select job or task" />
-                    </SelectTrigger>
-                    <SelectContent>
+            {/* Assign To */}
+            <div className="space-y-2">
+              <Label>Assign To</Label>
+              <Input
+                placeholder="Type team member name..."
+                list="assignee-suggestions"
+                value={customAssigneeInput}
+                onChange={(e) => {
+                  setCustomAssigneeInput(e.target.value);
+                  setNewAssignment({ ...newAssignment, team_member: e.target.value });
+                }}
+              />
+              <datalist id="assignee-suggestions">
+                {customAssignees.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+            </div>
+
+            {/* Job/Task - only for Job type */}
+            {newAssignment.type === "Job" && (
+              <div className="space-y-2">
+                <Label>Job/Task</Label>
+                <Select
+                  value={newAssignment.job_type || newAssignment.title || ""}
+                  onValueChange={(value) => {
+                    if (value.includes(" - ")) {
+                      const jobId = availableJobs.find(
+                        (j) => `${j.job_reference} - ${j.customer_name}` === value
+                      )?.id;
+                      setNewAssignment({
+                        ...newAssignment,
+                        title: value,
+                        job_id: jobId,
+                        job_type: undefined,
+                      });
+                    } else {
+                      setNewAssignment({
+                        ...newAssignment,
+                        title: value,
+                        job_type: value,
+                        job_id: undefined,
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select job or task" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Standard Tasks</SelectLabel>
+                      {interiorDesignJobTypes.map((task) => (
+                        <SelectItem key={task} value={task}>
+                          {task}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                    {customJobTasks.length > 0 && (
                       <SelectGroup>
-                        <SelectLabel>Standard Tasks</SelectLabel>
-                        {interiorDesignJobTypes.map((task) => (
+                        <SelectLabel>Custom Tasks</SelectLabel>
+                        {customJobTasks.map((task) => (
                           <SelectItem key={task} value={task}>
                             {task}
                           </SelectItem>
                         ))}
                       </SelectGroup>
-                      {customJobTasks.length > 0 && (
-                        <SelectGroup>
-                          <SelectLabel>Custom Tasks</SelectLabel>
-                          {customJobTasks.map((task) => (
-                            <SelectItem key={task} value={task}>
-                              {task}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      )}
-                      {availableJobs.length > 0 && (
-                        <SelectGroup>
-                          <SelectLabel>Available Jobs</SelectLabel>
-                          {availableJobs.map((job) => (
-                            <SelectItem 
-                              key={job.id} 
-                              value={`${job.job_reference} - ${job.customer_name}`}
-                            >
-                              {job.job_reference} - {job.customer_name}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    )}
+                    {availableJobs.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Available Jobs</SelectLabel>
+                        {availableJobs.map((job) => (
+                          <SelectItem
+                            key={job.id}
+                            value={`${job.job_reference} - ${job.customer_name}`}
+                          >
+                            {job.job_reference} - {job.customer_name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-                {/* Customer Dropdown */}
-                <div className="space-y-2">
-                  <Label>Customer (Optional)</Label>
-                  <Select
-                    value={newAssignment.customer_id || "none"}
-                    onValueChange={(value) => {
-                      setNewAssignment({
-                        ...newAssignment,
-                        customer_id: value === "none" ? undefined : value
-                      });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            {/* Customer Dropdown */}
+            <div className="space-y-2">
+              <Label>Customer (Optional)</Label>
+              <Select
+                value={newAssignment.customer_id || "none"}
+                onValueChange={(value) => {
+                  setNewAssignment({
+                    ...newAssignment,
+                    customer_id: value === "none" ? undefined : value,
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Notes */}
             <div className="space-y-2">
               <Label>Notes</Label>
-              <Textarea
+              <textarea
+                className="w-full min-h-[100px] p-2 border rounded-md"
                 value={newAssignment.notes || ""}
                 onChange={(e) => setNewAssignment({ ...newAssignment, notes: e.target.value })}
-                placeholder="Additional notes..."
+                placeholder="Add any additional notes..."
               />
             </div>
 
-            <div className="flex justify-end space-x-2 pt-4">
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAddAssignment} disabled={saving}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button onClick={handleAddAssignment}>
                 Add Assignment
               </Button>
             </div>
