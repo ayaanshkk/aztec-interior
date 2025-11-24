@@ -296,8 +296,9 @@ export default function SchedulePage() {
       console.log(`User: ${user.full_name} (${user.role})`);
 
       // ✅ Fetch assignments (CRITICAL - must work)
+      let assignmentsData = []; // ⬅️ DECLARE VARIABLE HERE
       try {
-        const assignmentsData = await api.getAssignments();
+        assignmentsData = await api.getAssignments();
         setAssignments(assignmentsData);
       } catch (err) {
         console.error("❌ Failed to fetch assignments:", err);
@@ -314,7 +315,7 @@ export default function SchedulePage() {
       setCustomers(customersData);
 
       console.log("✅ Data fetch complete");
-      console.log(`Summary: ${assignmentsData.length || 0} assignments, ${jobsData.length} jobs, ${customersData.length} customers`);
+      console.log(`Summary: ${assignmentsData.length} assignments, ${jobsData.length} jobs, ${customersData.length} customers`);
 
     } catch (err) {
       console.error("❌ Critical error in fetchData:", err);
