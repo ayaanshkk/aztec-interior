@@ -678,7 +678,7 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
                   <h3 className="mb-4 text-xl font-bold text-green-900">1. Material Specifications (Ordering)</h3>
                   <div className="space-y-4">
-                    {/* Door Style and Door Color */}
+                    {/* Door Style, Door Color, and Conditional Fields in ONE ROW */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
@@ -704,54 +704,54 @@ export default function FormPage() {
                           onChange={(e) => handleInputChange("door_color", e.target.value)}
                         />
                       </div>
-                    </div>
 
-                    {/* Conditional: Door Manufacturer and Door Name - if Vinyl */}
-                    {formData.door_style === "vinyl" && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="mb-1 block text-sm font-bold text-gray-700">Door Manufacturer</label>
+                      {/* Show Door Manufacturer if Vinyl */}
+                      {formData.door_style === "vinyl" && (
+                        <>
+                          <div>
+                            <label className="mb-1 block text-sm font-bold text-gray-700">Door Manufacturer</label>
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white p-2"
+                              value={formData.door_manufacturer}
+                              onChange={(e) => handleInputChange("door_manufacturer", e.target.value)}
+                            >
+                              <option value="">Select manufacturer</option>
+                              <option value="Integral">Integral</option>
+                              <option value="Trade mouldings">Trade mouldings</option>
+                              <option value="Hpp">Hpp</option>
+                              <option value="Uform">Uform</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-sm font-bold text-gray-700">Door Name</label>
+                            <Input
+                              placeholder="Enter door name"
+                              className="w-full bg-white"
+                              value={formData.door_name}
+                              onChange={(e) => handleInputChange("door_name", e.target.value)}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* Show Glazing Material if Glazed */}
+                      {formData.door_style === "glazed" && (
+                        <div className="col-span-2">
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Glazing Material</label>
                           <select
                             className="w-full rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.door_manufacturer}
-                            onChange={(e) => handleInputChange("door_manufacturer", e.target.value)}
+                            value={formData.glazing_material}
+                            onChange={(e) => handleInputChange("glazing_material", e.target.value)}
                           >
-                            <option value="">Select manufacturer</option>
-                            <option value="Integral">Integral</option>
-                            <option value="Trade mouldings">Trade mouldings</option>
-                            <option value="Hpp">Hpp</option>
-                            <option value="Uform">Uform</option>
-                            <option value="Other">Other</option>
+                            <option value="">Select material</option>
+                            <option value="vinyl">Vinyl</option>
+                            <option value="aluminium">Aluminium</option>
+                            <option value="N/A">N/A</option>
                           </select>
                         </div>
-                        <div>
-                          <label className="mb-1 block text-sm font-bold text-gray-700">Door Name</label>
-                          <Input
-                            placeholder="Enter door name"
-                            className="w-full bg-white"
-                            value={formData.door_name}
-                            onChange={(e) => handleInputChange("door_name", e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Conditional: Glazing Material - if Glazed */}
-                    {formData.door_style === "glazed" && (
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Glazing Material</label>
-                        <select
-                          className="w-full rounded-md border border-gray-300 bg-white p-2"
-                          value={formData.glazing_material}
-                          onChange={(e) => handleInputChange("glazing_material", e.target.value)}
-                        >
-                          <option value="">Select material</option>
-                          <option value="vinyl">Vinyl</option>
-                          <option value="aluminium">Aluminium</option>
-                          <option value="N/A">N/A</option>
-                        </select>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     {/* Panel Color and Plinth/Filler Color */}
                     <div className="grid grid-cols-2 gap-4">
@@ -850,8 +850,8 @@ export default function FormPage() {
                 {/* 2. Hardware Specifications - Purple Section */}
                 <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-6">
                   <h3 className="mb-4 text-xl font-bold text-purple-900">2. Hardware Specifications</h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
                         <Input
@@ -885,7 +885,7 @@ export default function FormPage() {
                     <div>
                       <label className="mb-1 block text-sm font-bold text-gray-700">Accessories (e.g., Pullouts)</label>
                       <textarea
-                        className="h-20 w-full resize-none rounded-md border border-gray-300 bg-white p-3"
+                        className="h-16 w-full resize-none rounded-md border border-gray-300 bg-white p-2 text-sm"
                         placeholder="Enter accessory details"
                         value={formData.accessories}
                         onChange={(e) => handleInputChange("accessories", e.target.value)}
@@ -895,7 +895,7 @@ export default function FormPage() {
                     <div>
                       <label className="mb-1 block text-sm font-bold text-gray-700">Lighting Specification</label>
                       <textarea
-                        className="h-20 w-full resize-none rounded-md border border-gray-300 bg-white p-3"
+                        className="h-16 w-full resize-none rounded-md border border-gray-300 bg-white p-2 text-sm"
                         placeholder="Enter lighting details"
                         value={formData.lighting_spec}
                         onChange={(e) => handleInputChange("lighting_spec", e.target.value)}
@@ -905,9 +905,9 @@ export default function FormPage() {
                     {/* Lighting Details */}
                     <div>
                       <label className="mb-1 block text-sm font-bold text-gray-700">Under Wall Unit Lights</label>
-                      <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
                         <select
-                          className="w-full rounded-md border border-gray-300 bg-white p-2"
+                          className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm"
                           value={formData.under_wall_unit_lights_color}
                           onChange={(e) => handleInputChange("under_wall_unit_lights_color", e.target.value)}
                         >
@@ -917,7 +917,7 @@ export default function FormPage() {
                           <option value="N/A">N/A</option>
                         </select>
                         <select
-                          className="w-full rounded-md border border-gray-300 bg-white p-2"
+                          className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm"
                           value={formData.under_wall_unit_lights_profile}
                           onChange={(e) => handleInputChange("under_wall_unit_lights_profile", e.target.value)}
                         >
@@ -932,7 +932,7 @@ export default function FormPage() {
                     <div>
                       <label className="mb-1 block text-sm font-bold text-gray-700">Under Worktop Lights</label>
                       <select
-                        className="w-full rounded-md border border-gray-300 bg-white p-2"
+                        className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm"
                         value={formData.under_worktop_lights_color}
                         onChange={(e) => handleInputChange("under_worktop_lights_color", e.target.value)}
                       >
@@ -1262,7 +1262,7 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
                   <h3 className="mb-4 text-xl font-bold text-green-900">1. Material Specifications</h3>
                   <div className="space-y-4">
-                    {/* Door Style and Door Color */}
+                    {/* Door Style, Door Color, and Conditional Fields in ONE ROW */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
@@ -1287,37 +1287,37 @@ export default function FormPage() {
                           onChange={(e) => handleInputChange("door_color", e.target.value)}
                         />
                       </div>
-                    </div>
 
-                    {/* Conditional: Door Manufacturer and Door Name - if Vinyl */}
-                    {formData.door_style === "vinyl" && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="mb-1 block text-sm font-bold text-gray-700">Door Manufacturer</label>
-                          <select
-                            className="w-full rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.door_manufacturer}
-                            onChange={(e) => handleInputChange("door_manufacturer", e.target.value)}
-                          >
-                            <option value="">Select manufacturer</option>
-                            <option value="Integral">Integral</option>
-                            <option value="Trade mouldings">Trade mouldings</option>
-                            <option value="Hpp">Hpp</option>
-                            <option value="Uform">Uform</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="mb-1 block text-sm font-bold text-gray-700">Door Name</label>
-                          <Input
-                            placeholder="Enter door name"
-                            className="w-full bg-white"
-                            value={formData.door_name}
-                            onChange={(e) => handleInputChange("door_name", e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
+                      {/* Show Door Manufacturer and Door Name if Vinyl */}
+                      {formData.door_style === "vinyl" && (
+                        <>
+                          <div>
+                            <label className="mb-1 block text-sm font-bold text-gray-700">Door Manufacturer</label>
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white p-2"
+                              value={formData.door_manufacturer}
+                              onChange={(e) => handleInputChange("door_manufacturer", e.target.value)}
+                            >
+                              <option value="">Select manufacturer</option>
+                              <option value="Integral">Integral</option>
+                              <option value="Trade mouldings">Trade mouldings</option>
+                              <option value="Hpp">Hpp</option>
+                              <option value="Uform">Uform</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-sm font-bold text-gray-700">Door Name</label>
+                            <Input
+                              placeholder="Enter door name"
+                              className="w-full bg-white"
+                              value={formData.door_name}
+                              onChange={(e) => handleInputChange("door_name", e.target.value)}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
 
                     {/* Panel Color and Plinth/Filler Color */}
                     <div className="grid grid-cols-2 gap-4">
@@ -1604,7 +1604,7 @@ export default function FormPage() {
           {/* Terms and Conditions - Gray Section */}
           <div className="rounded-lg border-2 border-gray-300 bg-gray-100 p-6">
             <h3 className="mb-4 text-xl font-bold text-gray-900">Terms & Information</h3>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-bold text-gray-700">Date Terms and Conditions Given</label>
                 <Input
@@ -1630,7 +1630,7 @@ export default function FormPage() {
                 </select>
               </div>
               {formType === "kitchen" && (
-                <div>
+                <div className="md:col-span-2">
                   <label className="mb-1 block text-sm font-bold text-gray-700">
                     Appliance Promotion Information Given
                   </label>
