@@ -3251,12 +3251,18 @@ const handleConfirmDeleteFormDocument = async () => {
                 const customerInfoFields = ["customer_name", "customer_phone", "customer_address", "room"];
                 const designFields = [
                   "fitting_style",
+                  "door_style",  // Added
+                  "glazing_material",  // Added
                   "door_color",
                   "drawer_color",
                   "end_panel_color",
                   "plinth_filler_color",
                   "cabinet_color",
                   "worktop_color",
+                  "handles_code",  // Added
+                  "handles_quantity",  // Added
+                  "handles_size",  // Added
+                  "floor_protection",  // Added (from bedroom section)
                 ];
                 const termsFields = ["terms_date", "gas_electric_info", "appliance_promotion_info"];
                 const signatureFields = ["signature_data", "signature_date"];
@@ -3304,6 +3310,28 @@ const handleConfirmDeleteFormDocument = async () => {
                     return <Row label={label} value={value} name={name} />;
                   }
 
+                  // Handle arrays (like floor_protection, worktop_features)
+                  if (Array.isArray(value)) {
+                    return (
+                      <div className="grid grid-cols-1 items-start gap-4 border-b py-3 last:border-b-0 md:grid-cols-3">
+                        <div className="md:col-span-1">
+                          <div className="text-sm font-medium text-gray-700">{label}</div>
+                        </div>
+                        <div className="md:col-span-2">
+                          <Input
+                            value={value.join(", ") || ""}
+                            onChange={(e) => {
+                              const newValue = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
+                              handleFormFieldChange(name, newValue);
+                            }}
+                            className="w-full"
+                            placeholder="Comma-separated values"
+                          />
+                        </div>
+                      </div>
+                    );
+                  }
+
                   // Render editable input
                   return (
                     <div className="grid grid-cols-1 items-start gap-4 border-b py-3 last:border-b-0 md:grid-cols-3">
@@ -3312,8 +3340,9 @@ const handleConfirmDeleteFormDocument = async () => {
                       </div>
                       <div className="md:col-span-2">
                         <Input
-                          value={value || ""}
-                          onChange={(e) => handleFormFieldChange(name, e.target.value)}
+                          key={`${name}-${value}`}  // Add key to force re-render
+                          defaultValue={value || ""}  // Changed from value to defaultValue
+                          onBlur={(e) => handleFormFieldChange(name, e.target.value)}  // Changed from onChange to onBlur
                           className="w-full"
                         />
                       </div>
@@ -3349,11 +3378,10 @@ const handleConfirmDeleteFormDocument = async () => {
                             if (k === "appliances" && Array.isArray(rawData[k])) {
                               const appliances = rawData[k].filter((app: any) => app.make || app.model || app.quantity || app.details || app.order_date);
                               
-                              if (appliances.length === 0) {
+                              if (appliances.length === 0 && !isEditingForm) {
                                 return <EditableRow key={k} label={humanizeLabel(k)} value="—" name={k} />;
                               }
 
-                              // Define standard appliance types for labeling
                               const standardAppliances = ["Oven", "Microwave", "Washing Machine", "HOB", "Extractor", "INTG Dishwasher"];
 
                               return (
@@ -3364,11 +3392,8 @@ const handleConfirmDeleteFormDocument = async () => {
                                   <div className="md:col-span-2">
                                     <div className="space-y-3">
                                       {appliances.map((app: any, index: number) => {
-                                        // Check if this is new format (make/model/quantity) or old format (details)
                                         const hasNewFormat = app.make || app.model || app.quantity;
                                         const hasOldFormat = app.details;
-                                        
-                                        // Get appliance label
                                         const applianceLabel = index < standardAppliances.length 
                                           ? standardAppliances[index] 
                                           : `Appliance ${index + 1}`;
@@ -3377,45 +3402,130 @@ const handleConfirmDeleteFormDocument = async () => {
                                           <div key={index} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                                             <div className="mb-2 text-sm font-semibold text-gray-800">{applianceLabel}</div>
                                             
-                                            {hasNewFormat ? (
+                                            {isEditingForm ? (
+                                              // EDIT MODE - Show editable inputs
                                               <div className="space-y-2">
-                                                {app.make && (
-                                                  <div className="flex items-start">
-                                                    <span className="w-24 text-xs font-medium text-gray-600">Make:</span>
-                                                    <span className="flex-1 text-sm text-gray-900">{app.make}</span>
-                                                  </div>
-                                                )}
-                                                {app.model && (
-                                                  <div className="flex items-start">
-                                                    <span className="w-24 text-xs font-medium text-gray-600">Model:</span>
-                                                    <span className="flex-1 text-sm text-gray-900">{app.model}</span>
-                                                  </div>
-                                                )}
-                                                {app.quantity && (
-                                                  <div className="flex items-start">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="w-24 text-xs font-medium text-gray-600">Make:</span>
+                                                  <Input
+                                                    key={`make-${index}-${app.make}`}
+                                                    defaultValue={app.make || ""}
+                                                    onBlur={(e) => {
+                                                      const updatedAppliances = [...rawData[k]];
+                                                      updatedAppliances[index] = { ...updatedAppliances[index], make: e.target.value };
+                                                      handleFormFieldChange(k, updatedAppliances);
+                                                    }}
+                                                    className="flex-1"
+                                                    placeholder="Enter make"
+                                                  />
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                  <span className="w-24 text-xs font-medium text-gray-600">Model:</span>
+                                                  <Input
+                                                    key={`model-${index}-${app.model}`}
+                                                    defaultValue={app.model || ""}
+                                                    onBlur={(e) => {
+                                                      const updatedAppliances = [...rawData[k]];
+                                                      updatedAppliances[index] = { ...updatedAppliances[index], model: e.target.value };
+                                                      handleFormFieldChange(k, updatedAppliances);
+                                                    }}
+                                                    className="flex-1"
+                                                    placeholder="Enter model"
+                                                  />
+                                                </div>
+                                                {app.quantity !== undefined && (
+                                                  <div className="flex items-center gap-2">
                                                     <span className="w-24 text-xs font-medium text-gray-600">Quantity:</span>
-                                                    <span className="flex-1 text-sm text-gray-900">{app.quantity}</span>
+                                                    <Input
+                                                      key={`quantity-${index}-${app.quantity}`}
+                                                      defaultValue={app.quantity || ""}
+                                                      onBlur={(e) => {
+                                                        const updatedAppliances = [...rawData[k]];
+                                                        updatedAppliances[index] = { ...updatedAppliances[index], quantity: e.target.value };
+                                                        handleFormFieldChange(k, updatedAppliances);
+                                                      }}
+                                                      className="flex-1"
+                                                      placeholder="Enter quantity"
+                                                    />
                                                   </div>
                                                 )}
-                                                {app.order_date && (
-                                                  <div className="flex items-start">
+                                                {app.order_date !== undefined && (
+                                                  <div className="flex items-center gap-2">
                                                     <span className="w-24 text-xs font-medium text-gray-600">Order Date:</span>
-                                                    <span className="flex-1 text-sm text-gray-900">{formatDate(app.order_date)}</span>
+                                                    <Input
+                                                      type="date"
+                                                      key={`order_date-${index}-${app.order_date}`}
+                                                      defaultValue={formatDateForInput(app.order_date)}
+                                                      onBlur={(e) => {
+                                                        const updatedAppliances = [...rawData[k]];
+                                                        updatedAppliances[index] = { ...updatedAppliances[index], order_date: e.target.value };
+                                                        handleFormFieldChange(k, updatedAppliances);
+                                                      }}
+                                                      className="flex-1"
+                                                    />
                                                   </div>
                                                 )}
-                                              </div>
-                                            ) : hasOldFormat ? (
-                                              <div className="space-y-2">
-                                                <div className="text-sm text-gray-900">{app.details}</div>
-                                                {app.order_date && (
-                                                  <div className="flex items-start">
-                                                    <span className="w-24 text-xs font-medium text-gray-600">Order Date:</span>
-                                                    <span className="flex-1 text-sm text-gray-900">{formatDate(app.order_date)}</span>
+                                                {hasOldFormat && (
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="w-24 text-xs font-medium text-gray-600">Details:</span>
+                                                    <Input
+                                                      key={`details-${index}-${app.details}`}
+                                                      defaultValue={app.details || ""}
+                                                      onBlur={(e) => {
+                                                        const updatedAppliances = [...rawData[k]];
+                                                        updatedAppliances[index] = { ...updatedAppliances[index], details: e.target.value };
+                                                        handleFormFieldChange(k, updatedAppliances);
+                                                      }}
+                                                      className="flex-1"
+                                                      placeholder="Enter details"
+                                                    />
                                                   </div>
                                                 )}
                                               </div>
                                             ) : (
-                                              <div className="text-sm text-gray-500">No details provided</div>
+                                              // VIEW MODE - Show read-only display
+                                              <div className="space-y-2">
+                                                {hasNewFormat ? (
+                                                  <>
+                                                    {app.make && (
+                                                      <div className="flex items-start">
+                                                        <span className="w-24 text-xs font-medium text-gray-600">Make:</span>
+                                                        <span className="flex-1 text-sm text-gray-900">{app.make}</span>
+                                                      </div>
+                                                    )}
+                                                    {app.model && (
+                                                      <div className="flex items-start">
+                                                        <span className="w-24 text-xs font-medium text-gray-600">Model:</span>
+                                                        <span className="flex-1 text-sm text-gray-900">{app.model}</span>
+                                                      </div>
+                                                    )}
+                                                    {app.quantity && (
+                                                      <div className="flex items-start">
+                                                        <span className="w-24 text-xs font-medium text-gray-600">Quantity:</span>
+                                                        <span className="flex-1 text-sm text-gray-900">{app.quantity}</span>
+                                                      </div>
+                                                    )}
+                                                    {app.order_date && (
+                                                      <div className="flex items-start">
+                                                        <span className="w-24 text-xs font-medium text-gray-600">Order Date:</span>
+                                                        <span className="flex-1 text-sm text-gray-900">{formatDate(app.order_date)}</span>
+                                                      </div>
+                                                    )}
+                                                  </>
+                                                ) : hasOldFormat ? (
+                                                  <>
+                                                    <div className="text-sm text-gray-900">{app.details}</div>
+                                                    {app.order_date && (
+                                                      <div className="flex items-start">
+                                                        <span className="w-24 text-xs font-medium text-gray-600">Order Date:</span>
+                                                        <span className="flex-1 text-sm text-gray-900">{formatDate(app.order_date)}</span>
+                                                      </div>
+                                                    )}
+                                                  </>
+                                                ) : (
+                                                  <div className="text-sm text-gray-500">No details provided</div>
+                                                )}
+                                              </div>
                                             )}
                                           </div>
                                         );
@@ -3425,7 +3535,6 @@ const handleConfirmDeleteFormDocument = async () => {
                                 </div>
                               );
                             }
-                          }
 
                           if (k === "signature_data" && rawData[k]) {
                             return (
