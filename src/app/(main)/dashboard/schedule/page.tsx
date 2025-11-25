@@ -509,7 +509,7 @@ export default function SchedulePage() {
 
   const getAssignmentsForDate = (date: Date) => {
     const dateKey = formatDateKey(date);
-    const allDayAssignments = assignments.filter((a) => a.date === dateKey);
+    const allDayAssignments = assignments.filter((a) => a && a.date && a.date === dateKey);
 
     if (user?.role === "Manager") {
       return allDayAssignments.filter((a) => visibleCalendars.includes(a.team_member ?? ""));
@@ -521,6 +521,7 @@ export default function SchedulePage() {
   const getDailyHours = (date: Date) => {
     const dayAssignments = getAssignmentsForDate(date);
     return dayAssignments.reduce((total, a) => {
+      if (!a || !a.estimated_hours) return total;
       const h = typeof a.estimated_hours === "string" ? parseFloat(a.estimated_hours) : a.estimated_hours || 0;
       return total + (isNaN(h) ? 0 : h);
     }, 0);
@@ -789,6 +790,7 @@ export default function SchedulePage() {
                   </div>
                   <div className="space-y-1">
                     {dayAssignments.slice(0, 3).map((assignment) => (
+                    assignment && assignment.id ?
                       <div
                         key={assignment.id}
                         draggable
