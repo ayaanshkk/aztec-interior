@@ -487,7 +487,6 @@ export default function ChecklistViewPage() {
 
       {/* Main Content */}
       <div className="flex-1">
-      </div>
         
 
         {/* Delete Dialog */}
@@ -1718,6 +1717,7 @@ export default function ChecklistViewPage() {
             </div>
           </div>
         </div>
+      </div>  
     </SidebarProvider>
   );
 }
