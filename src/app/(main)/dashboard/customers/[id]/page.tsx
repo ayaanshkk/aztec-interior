@@ -285,18 +285,6 @@ const formatDateForInput = (dateString: string | null | undefined): string => {
   }
 };
 
-const handleDeleteAppliance = (applianceField: string, index: number) => {
-  if (!editFormData) return;
-  
-  const updatedAppliances = [...(editFormData[applianceField] || [])];
-  updatedAppliances.splice(index, 1);
-  
-  setEditFormData((prev: any) => ({
-    ...prev,
-    [applianceField]: updatedAppliances,
-  }));
-};
-
 export default function CustomerDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -728,6 +716,18 @@ const handleConfirmDeleteFormDocument = async () => {
     } else {
       setSelectedFormDocs(new Set(formDocuments.map(d => d.id)));
     }
+  };
+
+  const handleDeleteAppliance = (applianceField: string, index: number) => {
+    if (!editFormData) return;
+    
+    const updatedAppliances = [...(editFormData[applianceField] || [])];
+    updatedAppliances.splice(index, 1);
+    
+    setEditFormData((prev: any) => ({
+      ...prev,
+      [applianceField]: updatedAppliances,
+    }));
   };
 
   const handleBulkDeleteFormDocs = () => {
@@ -3576,6 +3576,7 @@ const handleConfirmDeleteFormDocument = async () => {
                                 </div>
                               );
                             }
+                          }
 
                           if (k === "signature_data" && rawData[k]) {
                             return (
@@ -3602,6 +3603,7 @@ const handleConfirmDeleteFormDocument = async () => {
                   );
                 };
 
+                // And the return statement that uses renderSection:
                 return (
                   <div className="space-y-6">
                     {renderSection("Customer Information", customerInfoFields)}
