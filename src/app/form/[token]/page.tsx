@@ -37,6 +37,8 @@ interface FormData {
   deposit_date: string;
   door_style: string;
   door_color: string;
+  door_manufacturer: string;  // ADD THIS
+  door_name: string;  // ADD THIS
   glazing_material: string;
   plinth_filler_color: string;
   end_panel_color: string;
@@ -47,7 +49,7 @@ interface FormData {
   handles_size: string;
   accessories: string;
   lighting_spec: string;
-  worktop_material_type: string; // stone or laminate
+  worktop_material_type: string;
   worktop_material_color: string;
   worktop_features: string[];
   worktop_other_details: string;
@@ -135,6 +137,8 @@ export default function FormPage() {
     deposit_date: "",
     door_style: "",
     door_color: "",
+    door_manufacturer: "",
+    door_name: "",
     glazing_material: "",
     plinth_filler_color: "",
     end_panel_color: "",
@@ -700,6 +704,36 @@ export default function FormPage() {
                     </div>
                   </div>
 
+                  {/* NEW: Door Manufacturer and Door Name - Only if Door Style is Vinyl */}
+                  {formData.door_style === "vinyl" && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Door Manufacturer</label>
+                        <select
+                          className="w-full rounded-md border border-gray-300 bg-white p-2"
+                          value={formData.door_manufacturer}
+                          onChange={(e) => handleInputChange("door_manufacturer", e.target.value)}
+                        >
+                          <option value="">Select manufacturer</option>
+                          <option value="Integral">Integral</option>
+                          <option value="Trade mouldings">Trade mouldings</option>
+                          <option value="Hpp">Hpp</option>
+                          <option value="Uform">Uform</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Door Name</label>
+                        <Input
+                          placeholder="Enter door name"
+                          className="w-full bg-white"
+                          value={formData.door_name}
+                          onChange={(e) => handleInputChange("door_name", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Glazing Material - Only if Door Style is Glazed */}
                   {formData.door_style === "glazed" && (
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1247,6 +1281,36 @@ export default function FormPage() {
                     </div>
                   </div>
 
+                  {/* NEW: Door Manufacturer and Door Name - Only if Door Style is Vinyl */}
+                  {formData.door_style === "vinyl" && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Door Manufacturer</label>
+                        <select
+                          className="w-full rounded-md border border-gray-300 bg-white p-2"
+                          value={formData.door_manufacturer}
+                          onChange={(e) => handleInputChange("door_manufacturer", e.target.value)}
+                        >
+                          <option value="">Select manufacturer</option>
+                          <option value="Integral">Integral</option>
+                          <option value="Trade mouldings">Trade mouldings</option>
+                          <option value="Hpp">Hpp</option>
+                          <option value="Uform">Uform</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Door Name</label>
+                        <Input
+                          placeholder="Enter door name"
+                          className="w-full bg-white"
+                          value={formData.door_name}
+                          onChange={(e) => handleInputChange("door_name", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Panel Color and Plinth/Filler Color */}
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
@@ -1269,26 +1333,26 @@ export default function FormPage() {
                     </div>
                   </div>
 
-                  {/* Cabinet Color - Full Width */}
-                  <div>
-                    <label className="mb-1 block text-sm font-bold text-gray-700">Cabinet Color</label>
-                    <Input
-                      placeholder="Enter cabinet color"
-                      className="w-full bg-white"
-                      value={formData.cabinet_color}
-                      onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
-                    />
-                  </div>
-
-                  {/* Worktop Color */}
-                  <div>
-                    <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Color</label>
-                    <Input
-                      placeholder="Enter worktop color"
-                      className="w-full bg-white"
-                      value={formData.worktop_material_color}
-                      onChange={(e) => handleInputChange("worktop_material_color", e.target.value)}
-                    />
+                  {/* Cabinet Color and Worktop Color - Same Line */}
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-sm font-bold text-gray-700">Cabinet Color</label>
+                      <Input
+                        placeholder="Enter cabinet color"
+                        className="w-full bg-white"
+                        value={formData.cabinet_color}
+                        onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Color</label>
+                      <Input
+                        placeholder="Enter worktop color"
+                        className="w-full bg-white"
+                        value={formData.worktop_material_color}
+                        onChange={(e) => handleInputChange("worktop_material_color", e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1420,12 +1484,13 @@ export default function FormPage() {
               {/* 4. Lighting - Yellow Section */}
               <div className="mb-6 rounded-lg border-2 border-yellow-200 bg-yellow-50 p-6">
                 <h3 className="mb-4 text-xl font-bold text-yellow-900">4. Lighting Specifications</h3>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-4">
+                  {/* Soffit Lights - Full Width Row */}
                   <div>
-                    <label className="mb-1 block text-sm font-bold text-gray-700">Soffit Lights</label>
-                    <div className="flex gap-2">
+                    <label className="mb-2 block text-sm font-bold text-gray-700">Soffit Lights</label>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <select
-                        className="flex-1 rounded-md border border-gray-300 bg-white p-2"
+                        className="w-full rounded-md border border-gray-300 bg-white p-2"
                         value={formData.soffit_lights_type}
                         onChange={(e) => handleInputChange("soffit_lights_type", e.target.value)}
                       >
@@ -1435,7 +1500,7 @@ export default function FormPage() {
                         <option value="N/A">N/A</option>
                       </select>
                       <select
-                        className="flex-1 rounded-md border border-gray-300 bg-white p-2"
+                        className="w-full rounded-md border border-gray-300 bg-white p-2"
                         value={formData.soffit_lights_color}
                         onChange={(e) => handleInputChange("soffit_lights_color", e.target.value)}
                       >
@@ -1447,8 +1512,9 @@ export default function FormPage() {
                     </div>
                   </div>
 
+                  {/* Gable Lights - Full Width Row */}
                   <div>
-                    <label className="mb-1 block text-sm font-bold text-gray-700">Gable Lights</label>
+                    <label className="mb-2 block text-sm font-bold text-gray-700">Gable Lights</label>
                     <div className="space-y-2">
                       <select
                         className="w-full rounded-md border border-gray-300 bg-white p-2"
@@ -1460,26 +1526,28 @@ export default function FormPage() {
                         <option value="sensor">Sensor</option>
                         <option value="N/A">N/A</option>
                       </select>
-                      <select
-                        className="w-full rounded-md border border-gray-300 bg-white p-2"
-                        value={formData.gable_lights_main_color}
-                        onChange={(e) => handleInputChange("gable_lights_main_color", e.target.value)}
-                      >
-                        <option value="">Main Colour</option>
-                        <option value="cool-white">Cool White</option>
-                        <option value="warm-white">Warm White</option>
-                        <option value="N/A">N/A</option>
-                      </select>
-                      <select
-                        className="w-full rounded-md border border-gray-300 bg-white p-2"
-                        value={formData.gable_lights_profile_color}
-                        onChange={(e) => handleInputChange("gable_lights_profile_color", e.target.value)}
-                      >
-                        <option value="">Profile Colour</option>
-                        <option value="black">Black</option>
-                        <option value="white">White</option>
-                        <option value="N/A">N/A</option>
-                      </select>
+                      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                        <select
+                          className="w-full rounded-md border border-gray-300 bg-white p-2"
+                          value={formData.gable_lights_main_color}
+                          onChange={(e) => handleInputChange("gable_lights_main_color", e.target.value)}
+                        >
+                          <option value="">Main Colour</option>
+                          <option value="cool-white">Cool White</option>
+                          <option value="warm-white">Warm White</option>
+                          <option value="N/A">N/A</option>
+                        </select>
+                        <select
+                          className="w-full rounded-md border border-gray-300 bg-white p-2"
+                          value={formData.gable_lights_profile_color}
+                          onChange={(e) => handleInputChange("gable_lights_profile_color", e.target.value)}
+                        >
+                          <option value="">Profile Colour</option>
+                          <option value="black">Black</option>
+                          <option value="white">White</option>
+                          <option value="N/A">N/A</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
