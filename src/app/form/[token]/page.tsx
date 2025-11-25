@@ -21,6 +21,8 @@ interface Appliance {
 interface AdditionalDoor {
   door_style: string;
   door_color: string;
+  panel_color?: string;
+  plinth_color?: string;
   quantity: string;
 }
 
@@ -322,7 +324,7 @@ export default function FormPage() {
   const addAdditionalDoor = () => {
     setFormData((prev) => ({
       ...prev,
-      additional_doors: [...prev.additional_doors, { door_style: "", door_color: "", quantity: "" }],
+      additional_doors: [...prev.additional_doors, { door_style: "", door_color: "", panel_color: "", plinth_color: "", quantity: "" }],
     }));
   };
 
@@ -678,8 +680,8 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
                   <h3 className="mb-4 text-xl font-bold text-green-900">1. Material Specifications (Ordering)</h3>
                   <div className="space-y-4">
-                    {/* Door Style, Door Color, and Conditional Fields in ONE ROW */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Dynamic Grid based on door style */}
+                    <div className={`grid gap-4 ${formData.door_style === "vinyl" || formData.door_style === "glazed" ? "grid-cols-2" : "grid-cols-2"}`}>
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
                         <select
@@ -705,7 +707,6 @@ export default function FormPage() {
                         />
                       </div>
 
-                      {/* Show Door Manufacturer if Vinyl */}
                       {formData.door_style === "vinyl" && (
                         <>
                           <div>
@@ -735,7 +736,6 @@ export default function FormPage() {
                         </>
                       )}
 
-                      {/* Show Glazing Material if Glazed */}
                       {formData.door_style === "glazed" && (
                         <div className="col-span-2">
                           <label className="mb-1 block text-sm font-bold text-gray-700">Glazing Material</label>
@@ -795,51 +795,77 @@ export default function FormPage() {
                         </Button>
                       </div>
                       {formData.additional_doors.map((door, idx) => (
-                        <div key={idx} className="mb-3 grid grid-cols-4 gap-3 rounded border border-green-300 bg-white p-3">
-                          <div>
-                            <label className="mb-1 block text-xs font-bold text-gray-600">Door Style</label>
-                            <select
-                              className="w-full rounded-md border border-gray-300 p-2 text-sm"
-                              value={door.door_style}
-                              onChange={(e) => handleAdditionalDoorChange(idx, "door_style", e.target.value)}
-                            >
-                              <option value="">Select</option>
-                              <option value="vinyl">Vinyl</option>
-                              <option value="slab">Slab</option>
-                              <option value="glazed">Glazed</option>
-                              <option value="shaker">Shaker</option>
-                              <option value="N/A">N/A</option>
-                            </select>
+                        <div key={idx} className="mb-3 space-y-3 rounded border-2 border-green-300 bg-white p-4">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Door Style</label>
+                              <select
+                                className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                value={door.door_style}
+                                onChange={(e) => handleAdditionalDoorChange(idx, "door_style", e.target.value)}
+                              >
+                                <option value="">Select</option>
+                                <option value="vinyl">Vinyl</option>
+                                <option value="slab">Slab</option>
+                                <option value="glazed">Glazed</option>
+                                <option value="shaker">Shaker</option>
+                                <option value="N/A">N/A</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Door Color</label>
+                              <Input
+                                placeholder="Enter door color"
+                                className="text-sm"
+                                value={door.door_color}
+                                onChange={(e) => handleAdditionalDoorChange(idx, "door_color", e.target.value)}
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-bold text-gray-600">Door Color</label>
-                            <Input
-                              placeholder="Color"
-                              className="text-sm"
-                              value={door.door_color}
-                              onChange={(e) => handleAdditionalDoorChange(idx, "door_color", e.target.value)}
-                            />
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Panel Color</label>
+                              <Input
+                                placeholder="Enter panel color"
+                                className="text-sm"
+                                value={door.panel_color || ""}
+                                onChange={(e) => handleAdditionalDoorChange(idx, "panel_color", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Plinth/Filler Color</label>
+                              <Input
+                                placeholder="Enter plinth/filler color"
+                                className="text-sm"
+                                value={door.plinth_color || ""}
+                                onChange={(e) => handleAdditionalDoorChange(idx, "plinth_color", e.target.value)}
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
-                            <Input
-                              placeholder="QTY"
-                              type="text"
-                              className="text-sm"
-                              value={door.quantity}
-                              onChange={(e) => handleAdditionalDoorChange(idx, "quantity", e.target.value)}
-                            />
-                          </div>
-                          <div className="flex items-end">
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => removeAdditionalDoor(idx)}
-                              className="w-full"
-                            >
-                              Remove
-                            </Button>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
+                              <Input
+                                placeholder="Enter quantity"
+                                type="text"
+                                className="text-sm"
+                                value={door.quantity}
+                                onChange={(e) => handleAdditionalDoorChange(idx, "quantity", e.target.value)}
+                              />
+                            </div>
+                            <div className="flex items-end">
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => removeAdditionalDoor(idx)}
+                                className="w-full"
+                              >
+                                Remove
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1262,8 +1288,8 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
                   <h3 className="mb-4 text-xl font-bold text-green-900">1. Material Specifications</h3>
                   <div className="space-y-4">
-                    {/* Door Style, Door Color, and Conditional Fields in ONE ROW */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Dynamic Grid based on door style */}
+                    <div className={`grid gap-4 ${formData.door_style === "vinyl" ? "grid-cols-2" : "grid-cols-2"}`}>
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
                         <select
@@ -1288,7 +1314,6 @@ export default function FormPage() {
                         />
                       </div>
 
-                      {/* Show Door Manufacturer and Door Name if Vinyl */}
                       {formData.door_style === "vinyl" && (
                         <>
                           <div>
