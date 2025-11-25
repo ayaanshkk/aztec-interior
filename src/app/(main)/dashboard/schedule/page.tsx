@@ -789,22 +789,23 @@ export default function SchedulePage() {
                     )}
                   </div>
                   <div className="space-y-1">
-                    {dayAssignments.slice(0, 3).map((assignment) => (
-                    assignment && assignment.id ?
-                      <div
-                        key={assignment.id}
-                        draggable
-                        onDragStart={() => handleDragStart(assignment)}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedAssignment(assignment);
-                          setShowAssignmentDialog(true);
-                        }}
-                        className={`cursor-pointer rounded border px-2 py-1 text-xs ${getAssignmentColor(assignment)}`}
-                      >
-                        {assignment.title}
-                      </div>
-                    ))}
+                    {dayAssignments.slice(0, 3).map((assignment) => 
+                      assignment && assignment.id ? (
+                        <div
+                          key={assignment.id}
+                          draggable
+                          onDragStart={() => handleDragStart(assignment)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedAssignment(assignment);
+                            setShowAssignmentDialog(true);
+                          }}
+                          className={`cursor-pointer rounded border px-2 py-1 text-xs ${getAssignmentColor(assignment)}`}
+                        >
+                          {assignment.title}
+                        </div>
+                      ) : null
+                    )}
                     {dayAssignments.length > 3 && (
                       <div className="text-xs text-gray-500">
                         +{dayAssignments.length - 3} more
