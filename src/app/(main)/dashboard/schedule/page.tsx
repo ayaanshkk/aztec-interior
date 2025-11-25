@@ -86,6 +86,15 @@ interface Assignment {
   updated_by_name?: string;
 }
 
+// Helper functions - MOVED BEFORE COMPONENT
+const formatDateKey = (date: Date | string) => {
+  if (typeof date === "string") return date;
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 // Constants
 const START_HOUR_WEEK = 7;
 const HOUR_HEIGHT_PX = 60;
@@ -127,8 +136,11 @@ export default function SchedulePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draggedAssignment, setDraggedAssignment] = useState<Assignment | null>(null);
+  
+  // ✅ FIXED: Pre-fill date and time with defaults
   const [newAssignment, setNewAssignment] = useState<Partial<Assignment>>({
     type: "job",
+    date: formatDateKey(new Date()),
     start_time: "09:00",
     end_time: "17:00",
     priority: "Medium",
@@ -184,9 +196,15 @@ export default function SchedulePage() {
     return days;
   }, [currentDate]);
 
+  // ✅ FIXED: Handle assignments without dates
   const assignmentsByDate = useMemo(() => {
     return assignments.reduce(
       (acc, assignment) => {
+        // Skip assignments without a date
+        if (!assignment || !assignment.date) {
+          console.warn("Assignment without date found:", assignment);
+          return acc;
+        }
         const dateKey = assignment.date;
         if (!acc[dateKey]) {
           acc[dateKey] = [];
@@ -242,15 +260,6 @@ export default function SchedulePage() {
       setCustomJobTasks(updated);
       localStorage.setItem('custom_job_tasks', JSON.stringify(updated));
     }
-  };
-
-  // Helper functions
-  const formatDateKey = (date: Date | string) => {
-    if (typeof date === "string") return date;
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, "0");
-    const dd = String(date.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
   };
 
   const formatHeaderDate = (date: Date, view: "month" | "week" | "year") => {
@@ -359,6 +368,11 @@ export default function SchedulePage() {
   // CRUD operations
   const createAssignment = async (assignmentData: Partial<Assignment>) => {
     if (!token) throw new Error("Not authenticated");
+    
+    // ✅ VALIDATE: Ensure date is provided
+    if (!assignmentData.date) {
+      throw new Error("Date is required for assignment");
+    }
 
     try {
       setSaving(true);
@@ -392,6 +406,13 @@ export default function SchedulePage() {
         }
       }
 
+      // ✅ Calculate estimated hours if start and end time are provided
+      let estimatedHours = assignmentData.estimated_hours;
+      if (assignmentData.start_time && assignmentData.end_time && !estimatedHours) {
+        const hours = calculateHours(assignmentData.start_time, assignmentData.end_time);
+        estimatedHours = hours ? parseFloat(hours) : 8;
+      }
+
       // ✅ CLEAN THE DATA - Remove any invalid fields
       const cleanedData = {
         type: assignmentData.type,
@@ -399,7 +420,7 @@ export default function SchedulePage() {
         date: assignmentData.date,
         start_time: assignmentData.start_time,
         end_time: assignmentData.end_time,
-        estimated_hours: assignmentData.estimated_hours,
+        estimated_hours: estimatedHours,
         notes: assignmentData.notes,
         priority: assignmentData.priority,
         status: user?.role === "Manager" || assignmentData.user_id === user?.id ? "Accepted" : "Scheduled",
@@ -416,6 +437,8 @@ export default function SchedulePage() {
           delete cleanedData[key as keyof typeof cleanedData];
         }
       });
+
+      console.log("📤 Creating assignment with data:", cleanedData);
 
       const newAssignment = await api.createAssignment(cleanedData);
       setAssignments((prev) => [...prev, newAssignment]);
@@ -522,7 +545,7 @@ export default function SchedulePage() {
 
   const handleAddAssignment = async () => {
     if (!newAssignment.date || !newAssignment.type) {
-      alert("Please fill in required fields");
+      alert("Please fill in required fields (Type and Date)");
       return;
     }
 
@@ -532,8 +555,10 @@ export default function SchedulePage() {
     try {
       await createAssignment(newAssignment);
       setShowAddDialog(false);
+      // ✅ Reset with default values including today's date
       setNewAssignment({
         type: "job",
+        date: formatDateKey(new Date()),
         start_time: "09:00",
         end_time: "17:00",
         priority: "Medium",
@@ -543,6 +568,7 @@ export default function SchedulePage() {
       setCustomAssigneeInput("");
       setCustomTaskInput("");
     } catch (err) {
+      console.error("Error creating assignment:", err);
       alert(err instanceof Error ? err.message : "Failed to create assignment");
     }
   };
@@ -696,7 +722,17 @@ export default function SchedulePage() {
             </SelectContent>
           </Select>
           <Button onClick={() => {
-            setNewAssignment({ ...newAssignment, date: formatDateKey(new Date()) });
+            // ✅ FIXED: Keep existing defaults, only update date to today if needed
+            setNewAssignment(prev => ({
+              ...prev,
+              type: prev.type || "job",
+              date: formatDateKey(new Date()),
+              start_time: prev.start_time || "09:00",
+              end_time: prev.end_time || "17:00",
+              priority: prev.priority || "Medium",
+              status: prev.status || "Scheduled",
+              estimated_hours: prev.estimated_hours || 8,
+            }));
             setShowAddDialog(true);
           }}>
             Add Assignment
@@ -730,7 +766,16 @@ export default function SchedulePage() {
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, day)}
                   onClick={() => {
-                    setNewAssignment({ ...newAssignment, date: formatDateKey(day) });
+                    // ✅ FIXED: Set clicked date but keep default times
+                    setNewAssignment({
+                      type: "job",
+                      date: formatDateKey(day),
+                      start_time: "09:00",
+                      end_time: "17:00",
+                      priority: "Medium",
+                      status: "Scheduled",
+                      estimated_hours: 8,
+                    });
                     setShowAddDialog(true);
                   }}
                 >
@@ -1021,8 +1066,8 @@ export default function SchedulePage() {
               <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAddAssignment}>
-                Add Assignment
+              <Button onClick={handleAddAssignment} disabled={saving}>
+                {saving ? "Adding..." : "Add Assignment"}
               </Button>
             </div>
           </div>
