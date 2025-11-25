@@ -13,8 +13,22 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { SidebarProvider, Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
+import {
+  Home,
+  BarChart3,
+  Users,
+  Briefcase,
+  Package,
+  CalendarDays,
+  FileText,
+  Wrench,
+  MessageSquare,
+  CheckSquare,
+  Bell,
+  Settings,
+  Menu,
+  X as CloseIcon
+} from "lucide-react";
 import Link from "next/link";
 
 interface User {
@@ -98,7 +112,23 @@ export default function ChecklistViewPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const formSubmissionId = searchParams.get("id");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const navItems = [
+  { icon: Home, label: "Dashboard", href: "/dashboard" },
+  { icon: BarChart3, label: "Sales Pipeline", href: "/dashboard/sales-pipeline" },
+  { icon: Users, label: "Customers", href: "/dashboard/customers" },
+  { icon: Briefcase, label: "Jobs", href: "/dashboard/jobs" },
+  { icon: Package, label: "Materials", href: "/dashboard/materials" },
+  { icon: CalendarDays, label: "Schedule", href: "/dashboard/schedule" },
+  { icon: FileText, label: "Forms/Checklists", href: "/dashboard/forms", active: true },
+  { icon: Wrench, label: "Appliances", href: "/dashboard/appliances" },
+  { icon: MessageSquare, label: "Chatbot", href: "/dashboard/chatbot" },
+  { icon: CheckSquare, label: "Approvals", href: "/dashboard/approvals" },
+  { icon: Bell, label: "Notifications", href: "/dashboard/notifications" },
+  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
+];
+  
   const [user, setUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<FormData | null>(null);
   const [originalFormData, setOriginalFormData] = useState<FormData | null>(null);
@@ -119,12 +149,12 @@ export default function ChecklistViewPage() {
 
   const canEdit = () => {
     if (!user) return false;
-    return ["Manager", "HR", "Sales"].includes(user.role);
+    return ["Manager", "HR", "Sales", "Production"].includes(user.role);
   };
 
   const canDelete = () => {
     if (!user) return false;
-    return ["Manager", "HR", "Sales"].includes(user.role);
+    return ["Manager", "HR", "Sales", "Production"].includes(user.role);
   };
 
   useEffect(() => {
@@ -458,35 +488,75 @@ export default function ChecklistViewPage() {
   const standardAppliances = ["Oven", "Microwave", "Washing Machine", "Dryer", "HOB", "Extractor", "INTG Dishwasher"];
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {getSidebarItems(user?.role || "sales").map((group) =>
-                  group.items.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild isActive={item.title === "Forms/Checklists"}>
-                        <Link href={item.url}>
-                          {item.icon && <item.icon />}
-                          <span>{item.title}</span>
-                          {item.badge && (
-                            <span className="ml-auto">{item.badge}</span>
-                          )}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))
-                )}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-      </Sidebar>
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r bg-white transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex h-full flex-col">
+          {/* Logo */}
+          <div className="flex items-center justify-between border-b p-4">
+            <div className="flex items-center space-x-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-900 text-white">
+                <span className="text-sm font-bold">AI</span>
+              </div>
+              <span className="text-lg font-semibold">Aztec Interiors</span>
+            </div>
+            <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
+              <CloseIcon className="h-6 w-6" />
+            </button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 overflow-y-auto p-4">
+            <div className="mb-4 text-xs font-semibold uppercase text-gray-500">Dashboard</div>
+            <div className="space-y-1">
+              {navItems.map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`flex items-center space-x-3 rounded-lg px-3 py-2 text-sm ${
+                    item.active
+                      ? "bg-blue-50 text-blue-600 font-medium"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          </nav>
+
+          {/* User Info */}
+          <div className="border-t p-4">
+            <div className="flex items-center space-x-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold">
+                {user ? user.name.substring(0, 2).toUpperCase() : "MM"}
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium">{user?.name || "manager manager"}</div>
+                <div className="text-xs text-gray-500">{user?.email || "manager@gmail.com"}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       {/* Main Content */}
       <div className="flex-1">
+        {/* Mobile Header */}
+        <div className="border-b bg-white p-4 lg:hidden">
+          <button onClick={() => setSidebarOpen(true)}>
+            <Menu className="h-6 w-6" />
+          </button>
+        </div>
         
 
         {/* Delete Dialog */}
@@ -1717,7 +1787,7 @@ export default function ChecklistViewPage() {
             </div>
           </div>
         </div>
-      </div>  
-    </SidebarProvider>
+      </div>
+    </div>
   );
 }
