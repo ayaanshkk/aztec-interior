@@ -285,6 +285,18 @@ const formatDateForInput = (dateString: string | null | undefined): string => {
   }
 };
 
+const handleDeleteAppliance = (applianceField: string, index: number) => {
+  if (!editFormData) return;
+  
+  const updatedAppliances = [...(editFormData[applianceField] || [])];
+  updatedAppliances.splice(index, 1);
+  
+  setEditFormData((prev: any) => ({
+    ...prev,
+    [applianceField]: updatedAppliances,
+  }));
+};
+
 export default function CustomerDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -3389,7 +3401,7 @@ const handleConfirmDeleteFormDocument = async () => {
                                     <div className="text-sm font-medium text-gray-700">{humanizeLabel(k)}</div>
                                   </div>
                                   <div className="md:col-span-2">
-                                    <div className="space-y-3">
+                                    <div className="space-y-4">
                                       {appliances.map((app: any, index: number) => {
                                         const hasNewFormat = app.make || app.model || app.quantity;
                                         const hasOldFormat = app.details;
@@ -3398,53 +3410,96 @@ const handleConfirmDeleteFormDocument = async () => {
                                           : `Appliance ${index + 1}`;
 
                                         return (
-                                          <div key={index} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                                            <div className="mb-2 text-sm font-semibold text-gray-800">{applianceLabel}</div>
+                                          <div 
+                                            key={index} 
+                                            className="group relative overflow-hidden rounded-lg border-2 border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:border-blue-300"
+                                          >
+                                            {/* Header with appliance name and delete button */}
+                                            <div className="mb-3 flex items-center justify-between border-b border-gray-200 pb-2">
+                                              <div className="flex items-center space-x-2">
+                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                                                  <Package className="h-4 w-4" />
+                                                </div>
+                                                <h4 className="text-base font-bold text-gray-900">{applianceLabel}</h4>
+                                              </div>
+                                              {isEditingForm && (
+                                                <Button
+                                                  type="button"
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  onClick={() => handleDeleteAppliance(k, index)}
+                                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                >
+                                                  <Trash2 className="h-4 w-4 mr-1" />
+                                                  <span className="text-xs">Delete</span>
+                                                </Button>
+                                              )}
+                                            </div>
                                             
                                             {isEditingForm ? (
-                                              <div className="space-y-2">
-                                                <div className="flex items-center gap-2">
-                                                  <span className="w-24 text-xs font-medium text-gray-600">Make:</span>
-                                                  <Input
-                                                    key={`make-${index}-${app.make}`}
-                                                    defaultValue={app.make || ""}
-                                                    onBlur={(e) => {
-                                                      const updatedAppliances = [...rawData[k]];
-                                                      updatedAppliances[index] = { ...updatedAppliances[index], make: e.target.value };
-                                                      handleFormFieldChange(k, updatedAppliances);
-                                                    }}
-                                                    className="flex-1"
-                                                    placeholder="Enter make"
-                                                  />
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                  <span className="w-24 text-xs font-medium text-gray-600">Model:</span>
-                                                  <Input
-                                                    key={`model-${index}-${app.model}`}
-                                                    defaultValue={app.model || ""}
-                                                    onBlur={(e) => {
-                                                      const updatedAppliances = [...rawData[k]];
-                                                      updatedAppliances[index] = { ...updatedAppliances[index], model: e.target.value };
-                                                      handleFormFieldChange(k, updatedAppliances);
-                                                    }}
-                                                    className="flex-1"
-                                                    placeholder="Enter model"
-                                                  />
-                                                </div>
-                                                {app.order_date !== undefined && (
-                                                  <div className="flex items-center gap-2">
-                                                    <span className="w-24 text-xs font-medium text-gray-600">Order Date:</span>
+                                              <div className="space-y-3">
+                                                {/* Make Field */}
+                                                <div className="flex items-center gap-3">
+                                                  <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-50 text-blue-600">
+                                                    <span className="text-xs font-bold">M</span>
+                                                  </div>
+                                                  <div className="flex-1">
+                                                    <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">Make</label>
                                                     <Input
-                                                      type="date"
-                                                      key={`order_date-${index}-${app.order_date}`}
-                                                      defaultValue={formatDateForInput(app.order_date)}
+                                                      key={`make-${index}-${app.make}`}
+                                                      defaultValue={app.make || ""}
                                                       onBlur={(e) => {
                                                         const updatedAppliances = [...rawData[k]];
-                                                        updatedAppliances[index] = { ...updatedAppliances[index], order_date: e.target.value };
+                                                        updatedAppliances[index] = { ...updatedAppliances[index], make: e.target.value };
                                                         handleFormFieldChange(k, updatedAppliances);
                                                       }}
-                                                      className="flex-1"
+                                                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                                      placeholder="Enter appliance make"
                                                     />
+                                                  </div>
+                                                </div>
+
+                                                {/* Model Field */}
+                                                <div className="flex items-center gap-3">
+                                                  <div className="flex h-6 w-6 items-center justify-center rounded bg-green-50 text-green-600">
+                                                    <span className="text-xs font-bold">#</span>
+                                                  </div>
+                                                  <div className="flex-1">
+                                                    <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">Model</label>
+                                                    <Input
+                                                      key={`model-${index}-${app.model}`}
+                                                      defaultValue={app.model || ""}
+                                                      onBlur={(e) => {
+                                                        const updatedAppliances = [...rawData[k]];
+                                                        updatedAppliances[index] = { ...updatedAppliances[index], model: e.target.value };
+                                                        handleFormFieldChange(k, updatedAppliances);
+                                                      }}
+                                                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                                      placeholder="Enter model number"
+                                                    />
+                                                  </div>
+                                                </div>
+
+                                                {/* Order Date Field (if exists) */}
+                                                {app.order_date !== undefined && (
+                                                  <div className="flex items-center gap-3">
+                                                    <div className="flex h-6 w-6 items-center justify-center rounded bg-purple-50 text-purple-600">
+                                                      <Calendar className="h-3 w-3" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                      <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">Order Date</label>
+                                                      <Input
+                                                        type="date"
+                                                        key={`order_date-${index}-${app.order_date}`}
+                                                        defaultValue={formatDateForInput(app.order_date)}
+                                                        onBlur={(e) => {
+                                                          const updatedAppliances = [...rawData[k]];
+                                                          updatedAppliances[index] = { ...updatedAppliances[index], order_date: e.target.value };
+                                                          handleFormFieldChange(k, updatedAppliances);
+                                                        }}
+                                                        className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                                      />
+                                                    </div>
                                                   </div>
                                                 )}
                                               </div>
@@ -3453,36 +3508,63 @@ const handleConfirmDeleteFormDocument = async () => {
                                                 {hasNewFormat ? (
                                                   <>
                                                     {app.make && (
-                                                      <div className="flex items-start">
-                                                        <span className="w-24 text-xs font-medium text-gray-600">Make:</span>
-                                                        <span className="flex-1 text-sm text-gray-900">{app.make}</span>
+                                                      <div className="flex items-center gap-3">
+                                                        <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-50 text-blue-600">
+                                                          <span className="text-xs font-bold">M</span>
+                                                        </div>
+                                                        <div className="flex-1">
+                                                          <span className="block text-xs font-medium text-gray-500">Make</span>
+                                                          <span className="text-sm font-semibold text-gray-900">{app.make}</span>
+                                                        </div>
                                                       </div>
                                                     )}
                                                     {app.model && (
-                                                      <div className="flex items-start">
-                                                        <span className="w-24 text-xs font-medium text-gray-600">Model:</span>
-                                                        <span className="flex-1 text-sm text-gray-900">{app.model}</span>
+                                                      <div className="flex items-center gap-3">
+                                                        <div className="flex h-6 w-6 items-center justify-center rounded bg-green-50 text-green-600">
+                                                          <span className="text-xs font-bold">#</span>
+                                                        </div>
+                                                        <div className="flex-1">
+                                                          <span className="block text-xs font-medium text-gray-500">Model</span>
+                                                          <span className="text-sm font-semibold text-gray-900">{app.model}</span>
+                                                        </div>
                                                       </div>
                                                     )}
                                                     {app.order_date && (
-                                                      <div className="flex items-start">
-                                                        <span className="w-24 text-xs font-medium text-gray-600">Order Date:</span>
-                                                        <span className="flex-1 text-sm text-gray-900">{formatDate(app.order_date)}</span>
+                                                      <div className="flex items-center gap-3">
+                                                        <div className="flex h-6 w-6 items-center justify-center rounded bg-purple-50 text-purple-600">
+                                                          <Calendar className="h-3 w-3" />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                          <span className="block text-xs font-medium text-gray-500">Order Date</span>
+                                                          <span className="text-sm font-semibold text-gray-900">{formatDate(app.order_date)}</span>
+                                                        </div>
                                                       </div>
                                                     )}
                                                   </>
                                                 ) : hasOldFormat ? (
                                                   <>
-                                                    <div className="text-sm text-gray-900">{app.details}</div>
+                                                    <div className="rounded-md bg-gray-100 p-3">
+                                                      <p className="text-sm text-gray-900">{app.details}</p>
+                                                    </div>
                                                     {app.order_date && (
-                                                      <div className="flex items-start">
-                                                        <span className="w-24 text-xs font-medium text-gray-600">Order Date:</span>
-                                                        <span className="flex-1 text-sm text-gray-900">{formatDate(app.order_date)}</span>
+                                                      <div className="flex items-center gap-3">
+                                                        <div className="flex h-6 w-6 items-center justify-center rounded bg-purple-50 text-purple-600">
+                                                          <Calendar className="h-3 w-3" />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                          <span className="block text-xs font-medium text-gray-500">Order Date</span>
+                                                          <span className="text-sm font-semibold text-gray-900">{formatDate(app.order_date)}</span>
+                                                        </div>
                                                       </div>
                                                     )}
                                                   </>
                                                 ) : (
-                                                  <div className="text-sm text-gray-500">No details provided</div>
+                                                  <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3">
+                                                    <p className="text-sm text-yellow-800 flex items-center">
+                                                      <AlertCircle className="h-4 w-4 mr-2" />
+                                                      No details provided
+                                                    </p>
+                                                  </div>
                                                 )}
                                               </div>
                                             )}
@@ -3494,7 +3576,6 @@ const handleConfirmDeleteFormDocument = async () => {
                                 </div>
                               );
                             }
-                          }
 
                           if (k === "signature_data" && rawData[k]) {
                             return (
