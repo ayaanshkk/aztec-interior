@@ -763,22 +763,17 @@ const handleConfirmDeleteFormDocument = async () => {
     }
   };
 
-const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  const files = event.target.files;
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
 
-  if (!files || files.length === 0) {
-    return;
-  }
+    if (!files || files.length === 0) {
+      return;
+    }
 
-  // Show project selection dialog before uploading
-  setShowProjectSelectDialog(true);
-  
-  // Store files temporarily
-  const fileInputElement = event.target;
-  
-  // Wait for project selection
-  // The actual upload will happen in handleConfirmProjectUpload
-};
+    // Show project selection dialog
+    setShowProjectSelectDialog(true);
+    // Files will be processed in handleConfirmProjectUpload
+  };
 
   const handleConfirmProjectUpload = async () => {
     const files = fileInputRef.current?.files;
@@ -2401,7 +2396,7 @@ const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
                           </>
                         )}
                         <Button
-                          onClick={() => handleViewProjectDetails(project)}
+                          onClick={() => window.open(`/dashboard/projects/${project.id}`, '_blank')}
                           variant="outline"
                           size="sm"
                           className="flex items-center space-x-2"
