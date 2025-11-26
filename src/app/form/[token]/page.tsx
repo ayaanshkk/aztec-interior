@@ -27,6 +27,7 @@ interface AdditionalDoor {
   panel_color?: string;
   plinth_color?: string;
   cabinet_color?: string;
+  worktop_color?: string;
   quantity: string;
 }
 
@@ -337,6 +338,7 @@ export default function FormPage() {
         panel_color: "", 
         plinth_color: "", 
         cabinet_color: "",
+        worktop_color: "",
         quantity: "" 
       }],
     }));
