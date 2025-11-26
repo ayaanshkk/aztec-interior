@@ -238,46 +238,58 @@ export default function ProjectDetailsPage() {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-        // Fetch project details
-        const projectRes = await fetch(`https://aztec-interiors.onrender.com/projects/${projectId}`, { headers });
+        // ✅ PARALLEL FETCH - All requests happen at once
+        const [projectRes, drawingsRes, formsRes] = await Promise.all([
+        fetch(`https://aztec-interiors.onrender.com/projects/${projectId}`, { headers }),
+        fetch(`https://aztec-interiors.onrender.com/files/drawings?project_id=${projectId}`, { headers })
+            .catch(() => null),
+        fetch(`https://aztec-interiors.onrender.com/projects/${projectId}/forms`, { headers })
+            .catch(() => null),
+        ]);
+
+        if (!projectRes.ok) {
+        throw new Error("Failed to load project");
+        }
+
         const projectData = await projectRes.json();
         setProject(projectData);
 
-        // Fetch customer details
+        // ✅ Fetch customer data only if needed
         if (projectData.customer_id) {
-        const customerRes = await fetch(`https://aztec-interiors.onrender.com/customers/${projectData.customer_id}`, { headers });
-        const customerData = await customerRes.json();
-        setCustomer(customerData);
+        const customerRes = await fetch(
+            `https://aztec-interiors.onrender.com/customers/${projectData.customer_id}`,
+            { headers }
+        );
+        
+        if (customerRes.ok) {
+            const customerData = await customerRes.json();
+            setCustomer(customerData);
 
-        // Pre-fill task data
-        setTaskData(prev => ({
+            // Pre-fill task data
+            setTaskData(prev => ({
             ...prev,
             jobTask: `${projectData.project_type} - ${projectData.project_name}`,
             notes: `Customer: ${customerData.name}\nAddress: ${customerData.address}\nPhone: ${customerData.phone}`,
-        }));
+            }));
+        }
         }
 
-        // ✅ FIX 1: Fetch drawings for this CUSTOMER, then filter by project on frontend
-        const drawingsRes = await fetch(
-        `https://aztec-interiors.onrender.com/files/drawings?customer_id=${projectData.customer_id}`,
-        { headers }
-        );
-        if (drawingsRes.ok) {
-        const allDrawings = await drawingsRes.json();
-        // Filter on frontend
-        const projectDrawings = allDrawings.filter((d: any) => d.project_id === projectId);
-        setDrawings(projectDrawings);
+        // ✅ Process drawings - only this project's drawings
+        if (drawingsRes && drawingsRes.ok) {
+        const drawingsData = await drawingsRes.json();
+        if (Array.isArray(drawingsData)) {
+            setDrawings(drawingsData);
+        }
         }
 
-        // ✅ FIX 2: Fetch forms for this PROJECT using the existing endpoint
-        const formsRes = await fetch(
-        `https://aztec-interiors.onrender.com/projects/${projectId}/forms`,
-        { headers }
-        );
-        if (formsRes.ok) {
+        // ✅ Process forms
+        if (formsRes && formsRes.ok) {
         const formsData = await formsRes.json();
-        setForms(formsData);
+        if (Array.isArray(formsData)) {
+            setForms(formsData);
         }
+        }
+
     } catch (error) {
         console.error("Error loading project data:", error);
     } finally {
@@ -285,7 +297,7 @@ export default function ProjectDetailsPage() {
     }
     };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
@@ -293,40 +305,52 @@ export default function ProjectDetailsPage() {
     const headers: HeadersInit = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
+    const uploadedDocs: DrawingDocument[] = [];
+
     for (const file of Array.from(files)) {
-      try {
+        try {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("customer_id", project?.customer_id || "");
         formData.append("project_id", projectId);
 
         const response = await fetch("https://aztec-interiors.onrender.com/files/drawings", {
-          method: "POST",
-          headers: headers,
-          body: formData,
+            method: "POST",
+            headers: headers,
+            body: formData,
         });
 
         if (response.ok) {
-          const data = await response.json();
-          if (data.drawing && data.drawing.id) {
+            const data = await response.json();
+            if (data.drawing && data.drawing.id) {
             const newDoc: DrawingDocument = {
-              id: data.drawing.id,
-              filename: data.drawing.filename || data.drawing.file_name || file.name,
-              url: data.drawing.url || data.drawing.file_url,
-              type: data.drawing.type || data.drawing.category || "other",
-              created_at: data.drawing.created_at || new Date().toISOString(),
-              project_id: data.drawing.project_id,
+                id: data.drawing.id,
+                filename: data.drawing.filename || data.drawing.file_name || file.name,
+                url: data.drawing.url || data.drawing.file_url,
+                type: data.drawing.type || data.drawing.category || "other",
+                created_at: data.drawing.created_at || new Date().toISOString(),
+                project_id: data.drawing.project_id,
             };
-            setDrawings((prev) => [newDoc, ...prev]);
-          }
+            uploadedDocs.push(newDoc);
+            }
         }
-      } catch (error) {
+        } catch (error) {
         console.error("Upload error:", error);
-      }
+        }
+    }
+
+    // ✅ UPDATE STATE IN ONE GO - NO RELOAD
+    if (uploadedDocs.length > 0) {
+        setDrawings((prev) => {
+        const updated = [...uploadedDocs, ...prev];
+        return updated.sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        });
     }
 
     if (event.target) event.target.value = "";
-  };
+    };
 
   const handleViewDrawing = (doc: DrawingDocument) => {
     const BACKEND_URL = "https://aztec-interiors.onrender.com";
@@ -351,36 +375,41 @@ export default function ProjectDetailsPage() {
     setDrawingToDelete(doc);
     setShowDeleteDrawingDialog(true);
   };
-
+  
   const handleConfirmDeleteDrawing = async () => {
     if (!drawingToDelete || isDeletingDrawing) return;
-
     setIsDeletingDrawing(true);
     const token = localStorage.getItem("auth_token");
     const headers: HeadersInit = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      const res = await fetch(
+        const res = await fetch(
         `https://aztec-interiors.onrender.com/files/drawings/${drawingToDelete.id}`,
         { method: "DELETE", headers }
-      );
+        );
 
-      if (res.ok) {
+        if (res.ok) {
+        // ✅ UPDATE STATE IMMEDIATELY - NO RELOAD
         setDrawings((prev) => prev.filter((d) => d.id !== drawingToDelete.id));
+        setSelectedDrawings((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(drawingToDelete.id);
+            return newSet;
+        });
         setShowDeleteDrawingDialog(false);
         setDrawingToDelete(null);
-      } else {
+        } else {
         const err = await res.json().catch(() => ({ error: "Server error" }));
         alert(`Failed to delete: ${err.error}`);
-      }
+        }
     } catch (e) {
-      console.error(e);
-      alert("Network error");
+        console.error(e);
+        alert("Network error");
     } finally {
-      setIsDeletingDrawing(false);
+        setIsDeletingDrawing(false);
     }
-  };
+    };
 
   const handleToggleDrawingSelection = (drawingId: string) => {
     setSelectedDrawings((prev) => {
@@ -540,9 +569,83 @@ export default function ProjectDetailsPage() {
       window.open(editUrl, "_blank");
     }
   };
+  
+  // Loading state with skeleton
+  if (loading) {
+    return (
+        <div className="min-h-screen bg-white">
+        {/* Header Skeleton */}
+        <div className="border-b border-gray-200 bg-white px-8 py-6">
+            <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+                <div className="h-10 w-10 bg-gray-200 rounded animate-pulse" />
+                <div className="space-y-2">
+                <div className="h-8 w-64 bg-gray-200 rounded animate-pulse" />
+                <div className="h-4 w-96 bg-gray-100 rounded animate-pulse" />
+                </div>
+            </div>
+            <div className="flex space-x-3">
+                <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
+                <div className="h-10 w-40 bg-gray-200 rounded animate-pulse" />
+            </div>
+            </div>
+        </div>
 
-  if (loading) return <div className="p-8">Loading project details...</div>;
-  if (!project) return <div className="p-8">Project not found.</div>;
+        <div className="px-8 py-6">
+            {/* Project Overview Skeleton */}
+            <div className="mb-8 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+            <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mb-4" />
+            <div className="grid grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="space-y-2">
+                    <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-6 w-32 bg-gray-100 rounded animate-pulse" />
+                </div>
+                ))}
+            </div>
+            </div>
+
+            {/* Customer Info Skeleton */}
+            <div className="mb-8 rounded-lg border bg-white p-6">
+            <div className="h-6 w-56 bg-gray-200 rounded animate-pulse mb-4" />
+            <div className="grid grid-cols-3 gap-4">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="space-y-2">
+                    <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-5 w-full bg-gray-100 rounded animate-pulse" />
+                </div>
+                ))}
+            </div>
+            </div>
+
+            {/* Checklists Skeleton */}
+            <div className="mb-8 border-t pt-8">
+            <div className="h-6 w-40 bg-gray-200 rounded animate-pulse mb-6" />
+            <div className="space-y-4">
+                {[1, 2].map((i) => (
+                <div key={i} className="h-20 bg-gray-100 rounded animate-pulse" />
+                ))}
+            </div>
+            </div>
+
+            {/* Drawings Skeleton */}
+            <div className="border-t pt-8">
+            <div className="flex items-center justify-between mb-6">
+                <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
+                <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
+            </div>
+            <div className="grid grid-cols-2 gap-6">
+                {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-24 bg-gray-100 rounded animate-pulse" />
+                ))}
+            </div>
+            </div>
+        </div>
+        </div>
+    );
+    }
+
+if (!project) return <div className="p-8">Project not found.</div>;
 
   return (
     <div className="min-h-screen bg-white">

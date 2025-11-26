@@ -359,12 +359,18 @@ export default function CustomerDetailsPage() {
     }
 
     try {
-      // ✅ FETCH EVERYTHING IN PARALLEL
+      // ✅ PARALLEL FETCH - All requests happen at once
       const [customerRes, drawingsRes, formDocsRes] = await Promise.all([
         fetch(`https://aztec-interiors.onrender.com/customers/${id}`, { headers }),
-        fetch(`https://aztec-interiors.onrender.com/files/drawings?customer_id=${id}`, { headers }).catch(() => null),
-        fetch(`https://aztec-interiors.onrender.com/files/forms?customer_id=${id}`, { headers }).catch(() => null),
+        fetch(`https://aztec-interiors.onrender.com/files/drawings?customer_id=${id}`, { headers })
+          .catch(() => null),
+        fetch(`https://aztec-interiors.onrender.com/files/forms?customer_id=${id}`, { headers })
+          .catch(() => null),
       ]);
+
+      if (!customerRes.ok) {
+        throw new Error("Failed to load customer data");
+      }
 
       // Process customer data
       const customerData = await customerRes.json();
@@ -391,30 +397,35 @@ export default function CustomerDetailsPage() {
 
       setCustomer(normalizedCustomer);
 
-      // Process drawings
+      // ✅ Process drawings - Filter out assigned files (only show unassigned)
       if (drawingsRes && drawingsRes.ok) {
         const contentType = drawingsRes.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const drawingsData = await drawingsRes.json();
           if (Array.isArray(drawingsData)) {
-            setDrawingDocuments(drawingsData);
+            // ✅ ONLY SHOW FILES WITHOUT project_id (unassigned files)
+            const unassignedDrawings = drawingsData.filter(doc => !doc.project_id);
+            setDrawingDocuments(unassignedDrawings);
           }
         }
       }
 
-      // Process form documents
+      // ✅ Process form documents - Filter out assigned files
       if (formDocsRes && formDocsRes.ok) {
         const contentType = formDocsRes.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const formDocsData = await formDocsRes.json();
           if (Array.isArray(formDocsData)) {
-            setFormDocuments(formDocsData);
+            // ✅ ONLY SHOW FORMS WITHOUT project_id (unassigned forms)
+            const unassignedForms = formDocsData.filter(form => !form.project_id);
+            setFormDocuments(unassignedForms);
           }
         }
       }
 
     } catch (error) {
       console.error("Error loading customer data:", error);
+      setError("Failed to load customer data. Please refresh the page.");
     } finally {
       setLoading(false);
     }
@@ -526,28 +537,26 @@ const handleDrop = async (e: React.DragEvent, projectId: string) => {
     });
 
     if (response.ok) {
-      // ✅ UPDATE STATE LOCALLY - NO RELOAD
+      // ✅ REMOVE FILE FROM LOCAL STATE - IT NOW BELONGS TO THE PROJECT
       if (draggedItem.type === "drawing") {
         setDrawingDocuments(prev => 
-          prev.map(doc => 
-            doc.id === draggedItem.id 
-              ? { ...doc, project_id: projectId }
-              : doc
-          )
+          prev.filter(doc => doc.id !== draggedItem.id)
         );
       } else if (draggedItem.type === "form") {
         setCustomer(prev => {
           if (!prev) return prev;
           return {
             ...prev,
-            form_submissions: prev.form_submissions.map(form =>
-              String(form.id) === draggedItem.id
-                ? { ...form, project_id: projectId }
-                : form
+            form_submissions: prev.form_submissions.filter(
+              form => String(form.id) !== draggedItem.id
             )
           };
         });
       }
+      
+      // ✅ Optional: Show success message
+      // alert("File assigned to project successfully!");
+      
     } else {
       const error = await response.json().catch(() => ({ error: "Failed to assign" }));
       alert(`Error: ${error.error || error.message || "Failed to assign to project"}`);
@@ -754,6 +763,7 @@ const handleConfirmDeleteFormDocument = async () => {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
+    setUploading(true);
     const uploadedDocs: DrawingDocument[] = [];
 
     for (const file of Array.from(files)) {
@@ -785,19 +795,24 @@ const handleConfirmDeleteFormDocument = async () => {
               project_id: data.drawing.project_id,
             };
 
-            uploadedDocs.push(newDoc);
+            // ✅ Only add to state if NO project_id (unassigned)
+            if (!newDoc.project_id) {
+              uploadedDocs.push(newDoc);
+            }
           }
         }
       } catch (error) {
-        console.error(`Network error:`, error);
+        console.error(`Upload error:`, error);
       }
     }
 
-    // ✅ UPDATE STATE IN ONE GO
+    // ✅ UPDATE STATE - Only unassigned files
     if (uploadedDocs.length > 0) {
       setDrawingDocuments(prev => {
         const updated = [...uploadedDocs, ...prev];
-        return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        return updated.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
       });
     }
 
@@ -807,6 +822,7 @@ const handleConfirmDeleteFormDocument = async () => {
     }
     setShowProjectSelectDialog(false);
     setSelectedProjectForUpload(null);
+    setUploading(false);
   };
 
   const handleUploadDrawing = () => {
@@ -2053,27 +2069,50 @@ const handleConfirmDeleteFormDocument = async () => {
     }
   };
 
-  if (loading) return <div className="p-8">Loading...</div>;
-
-  if (!hasAccess) {
+  // Loading state
+  if (loading) {
     return (
-      <div className="min-h-screen bg-white">
-        <div className="border-b border-gray-200 bg-white px-8 py-6">
-          <div className="flex items-center space-x-2">
-            <div
-              onClick={() => router.push("/dashboard/customers")}
-              className="flex cursor-pointer items-center text-gray-500 hover:text-gray-700"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </div>
-            <h1 className="text-3xl font-semibold text-gray-900">Access Denied</h1>
+      <div className="container mx-auto space-y-8 p-6">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="h-10 w-64 bg-gray-200 rounded animate-pulse" />
+          <div className="flex gap-2">
+            <div className="h-10 w-24 bg-gray-200 rounded animate-pulse" />
+            <div className="h-10 w-24 bg-gray-200 rounded animate-pulse" />
           </div>
         </div>
-        <div className="px-8 py-12 text-center">
-          <AlertCircle className="mx-auto mb-4 h-16 w-16 text-red-500" />
-          <h2 className="mb-2 text-2xl font-semibold text-gray-900">No Access</h2>
-          <p className="mb-6 text-gray-600">You don't have permission to view this customer's details.</p>
-          <Button onClick={() => router.push("/dashboard/customers")}>Return to Customers</Button>
+
+        {/* Contact Info Skeleton */}
+        <div className="rounded-lg border bg-white p-6 shadow-sm">
+          <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mb-6" />
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="space-y-2">
+                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                <div className="h-6 w-full bg-gray-100 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Projects Skeleton */}
+        <div className="rounded-lg border bg-white p-6 shadow-sm">
+          <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-4" />
+          <div className="grid gap-4 md:grid-cols-2">
+            {[1, 2].map((i) => (
+              <div key={i} className="h-32 bg-gray-100 rounded animate-pulse" />
+            ))}
+          </div>
+        </div>
+
+        {/* Drawings Skeleton */}
+        <div className="rounded-lg border bg-white p-6 shadow-sm">
+          <div className="h-6 w-40 bg-gray-200 rounded animate-pulse mb-4" />
+          <div className="grid gap-4 md:grid-cols-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 bg-gray-100 rounded animate-pulse" />
+            ))}
+          </div>
         </div>
       </div>
     );
