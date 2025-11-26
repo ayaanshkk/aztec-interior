@@ -524,18 +524,109 @@ export default function ProjectDetailsPage() {
       setGenerating(false);
     }
   };
+  
+  // Replace the generateToken function with this:
+  const handleCreateKitchenChecklist = async () => {
+    if (generating || !canEdit()) return;
 
-  const handleCreateKitchenChecklist = () => generateToken("kitchen");
-  const handleCreateBedroomChecklist = () => generateToken("bedroom");
-  const handleCreateRemedialChecklist = () => generateToken("remedial");
-  const handleCreateChecklist = () => generateToken("checklist");
-  const handleCreateQuote = () => generateToken("quotation");
-  const handleCreateInvoice = () => generateToken("invoice");
-  const handleCreateProformaInvoice = () => generateToken("proforma");
-  const handleCreateReceipt = () => generateToken("receipt");
-  const handleCreateDepositReceipt = () => generateToken("deposit");
-  const handleCreateFinalReceipt = () => generateToken("final");
-  const handleCreatePaymentTerms = () => generateToken("payment");
+    // ✅ Validate we have customer data
+    if (!customer?.id) {
+        alert("Error: No customer associated with this project");
+        return;
+    }
+
+    setGenerating(true);
+    try {
+        const response = await fetch(
+        `https://aztec-interiors.onrender.com/customers/${customer.id}/generate-form-link`,
+        {
+            method: "POST",
+            headers: {
+            "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ formType: "kitchen" }),
+        }
+        );
+
+        if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+            const params = new URLSearchParams({
+            type: "kitchen",
+            customerId: customer.id,
+            customerName: customer.name || "",
+            customerAddress: customer.address || "",
+            customerPhone: customer.phone || "",
+            });
+            // Open in current window instead of new tab
+            router.push(`/form/${data.token}?${params.toString()}`);
+        } else {
+            alert(`Failed to generate kitchen form: ${data.error}`);
+        }
+        } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("API Error Response:", errorData);
+        console.error("Response Status:", response.status);
+        alert(`Failed to generate kitchen form: ${errorData.error || errorData.message || "Unknown error"}`);
+        }
+    } catch (error) {
+        console.error("Network error generating kitchen form:", error);
+        alert("Network error: Please check your connection and try again.");
+    } finally {
+        setGenerating(false);
+    }
+    };
+
+    const handleCreateBedroomChecklist = async () => {
+    if (generating || !canEdit()) return;
+
+    // ✅ Validate we have customer data
+    if (!customer?.id) {
+        alert("Error: No customer associated with this project");
+        return;
+    }
+
+    setGenerating(true);
+    try {
+        const response = await fetch(
+        `https://aztec-interiors.onrender.com/customers/${customer.id}/generate-form-link`,
+        {
+            method: "POST",
+            headers: {
+            "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ formType: "bedroom" }),
+        }
+        );
+
+        if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+            const params = new URLSearchParams({
+            type: "bedroom",
+            customerId: customer.id,
+            customerName: customer.name || "",
+            customerAddress: customer.address || "",
+            customerPhone: customer.phone || "",
+            });
+            // Open in current window instead of new tab
+            router.push(`/form/${data.token}?${params.toString()}`);
+        } else {
+            alert(`Failed to generate bedroom form: ${data.error}`);
+        }
+        } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("API Error Response:", errorData);
+        console.error("Response Status:", response.status);
+        alert(`Failed to generate bedroom form: ${errorData.error || errorData.message || "Unknown error"}`);
+        }
+    } catch (error) {
+        console.error("Network error generating bedroom form:", error);
+        alert("Network error: Please check your connection and try again.");
+    } finally {
+        setGenerating(false);
+    }
+    };
 
   const handleViewChecklist = (submission: FormSubmission) => {
     window.open(`/checklist-view?id=${submission.id}`, "_blank");
