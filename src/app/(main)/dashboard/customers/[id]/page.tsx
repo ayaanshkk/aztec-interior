@@ -2371,7 +2371,7 @@ const handleConfirmDeleteFormDocument = async () => {
             </div>
             <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">Project Type (Legacy)</span>
+                <span className="text-sm font-medium text-gray-500">Project Type</span>
                 <div className="mt-1">
                   {allProjectTypes.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
@@ -2390,20 +2390,27 @@ const handleConfirmDeleteFormDocument = async () => {
                 </div>
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">Stage</span>
-                <span className="mt-1 text-base text-gray-900">{customer.status || "—"}</span>
+                <span className="text-sm font-medium text-gray-500">Pipeline Stage</span>
+                <div className="mt-1">
+                  {customer.projects && customer.projects.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {customer.projects.map((project, index) => (
+                        <span
+                          key={index}
+                          className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${getStageColor(project.stage)}`}
+                        >
+                          {project.stage}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-base text-gray-900">—</span>
+                  )}
+                </div>
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-gray-500">Customer Since</span>
                 <span className="mt-1 text-base text-gray-900">{formatDate(customer.created_at)}</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">Marketing Opt-in</span>
-                <span className={`mt-1 text-base ${customer.marketing_opt_in ? "text-green-600" : "text-gray-600"}`}>
-                  {customer.marketing_opt_in ? "Yes" : "No"}
-                </span>
               </div>
             </div>
           </div>
@@ -2526,10 +2533,10 @@ const handleConfirmDeleteFormDocument = async () => {
           )}
         </div>
 
-        {/* DRAWINGS & LAYOUTS SECTION - GROUPED BY PROJECT WITH DRAG & DROP */}
+        {/* DRAWINGS & LAYOUTS SECTION - NO GROUPING, JUST SIMPLE LIST */}
         <div className="mb-8 border-t border-gray-200 pt-8">
           <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Drawings & Layouts</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Drawings & Layouts ({drawingDocuments.length})</h2>
             <div className="flex items-center space-x-2">
               {canEdit() && selectedDrawings.size > 0 && (
                 <>
@@ -2568,177 +2575,84 @@ const handleConfirmDeleteFormDocument = async () => {
           </div>
 
           {drawingDocuments.length > 0 ? (
-            <div className="space-y-8">
-              {/* Group drawings by project */}
-              {(() => {
-                // Separate drawings by project
-                const projectDrawings = new Map<string, DrawingDocument[]>();
-                const unassignedDrawings: DrawingDocument[] = [];
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {drawingDocuments
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                .map((doc) => {
+                  const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
+                  const docType = doc.type || (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
+                  const isAssignedToProject = !!doc.project_id;
 
-                drawingDocuments.forEach(doc => {
-                  if (doc.project_id) {
-                    if (!projectDrawings.has(doc.project_id)) {
-                      projectDrawings.set(doc.project_id, []);
-                    }
-                    projectDrawings.get(doc.project_id)!.push(doc);
-                  } else {
-                    unassignedDrawings.push(doc);
-                  }
-                });
-
-                return (
-                  <>
-                    {/* Project-specific drawings */}
-                    {Array.from(projectDrawings.entries()).map(([projectId, docs]) => {
-                      const project = customer.projects?.find(p => p.id === projectId);
-                      if (!project) return null;
-
-                      return (
-                        <div key={projectId} className="rounded-lg border-2 border-blue-200 bg-blue-50/30 p-6">
-                          <div className="mb-4 flex items-center space-x-3">
-                            <Package className="h-5 w-5 text-blue-600" />
-                            <h3 className="text-lg font-semibold text-gray-900">{project.project_name}</h3>
-                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getProjectTypeColor(project.project_type)}`}>
-                              {project.project_type}
-                            </span>
-                            <span className="text-sm text-gray-600">({docs.length} file{docs.length !== 1 ? 's' : ''})</span>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                            {docs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((doc) => {
-                              const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
-                              const docType = doc.type || (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
-
-                              return (
-                                <div 
-                                  key={doc.id} 
-                                  className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
-                                >
-                                  <div className="flex items-start justify-between">
-                                    {canEdit() && (
-                                      <Checkbox
-                                        checked={selectedDrawings.has(doc.id)}
-                                        onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
-                                        className="mr-4 mt-1"
-                                      />
-                                    )}
-                                    <div className="flex flex-1 items-start space-x-4">
-                                      <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
-                                        {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
-                                      </div>
-                                      <div className="min-w-0 flex-1">
-                                        <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
-                                        <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
-                                      </div>
-                                    </div>
-                                    <div className="ml-6 flex items-center space-x-2">
-                                      <Button onClick={() => handleViewDrawing(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
-                                        <Eye className="h-4 w-4" />
-                                        <span>View</span>
-                                      </Button>
-                                      {canEdit() && (
-                                        <Button
-                                          onClick={() => handleDeleteDrawing(doc)}
-                                          disabled={isDeletingDrawing}
-                                          variant="outline"
-                                          size="sm"
-                                          className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {/* Unassigned drawings - DRAGGABLE */}
-                    {unassignedDrawings.length > 0 && (
-                      <div className="rounded-lg border-2 border-gray-200 bg-gray-50/30 p-6">
-                        <div className="mb-4 flex items-center space-x-3">
-                          <Image className="h-5 w-5 text-gray-600" />
-                          <h3 className="text-lg font-semibold text-gray-900">General Documents</h3>
-                          <span className="text-sm text-gray-600">({unassignedDrawings.length} file{unassignedDrawings.length !== 1 ? 's' : ''})</span>
-                          <span className="text-xs text-blue-600 font-medium">← Drag to assign to a project</span>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                          {unassignedDrawings.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((doc) => {
-                            const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
-                            const docType = doc.type || (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
-
-                            return (
-                              <div 
-                                key={doc.id}
-                                draggable={canEdit()}
-                                onDragStart={() => canEdit() && handleDragStart('drawing', doc.id)}
-                                onDragEnd={handleDragEnd}
-                                className={`rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
-                                  canEdit() ? 'cursor-move hover:border-blue-400' : ''
-                                } ${draggedItem?.type === 'drawing' && draggedItem?.id === doc.id ? 'opacity-50' : ''}`}
+                  return (
+                    <div
+                      key={doc.id}
+                      draggable={!isAssignedToProject && canEdit()}
+                      onDragStart={() => !isAssignedToProject && canEdit() && handleDragStart('drawing', doc.id)}
+                      onDragEnd={handleDragEnd}
+                      className={`rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
+                        !isAssignedToProject && canEdit() ? 'cursor-move hover:border-blue-400' : ''
+                      } ${draggedItem?.type === 'drawing' && draggedItem?.id === doc.id ? 'opacity-50' : ''}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        {canEdit() && (
+                          <div className="mr-3 flex flex-col items-center">
+                            <Checkbox
+                              checked={selectedDrawings.has(doc.id)}
+                              onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
+                              className="mb-2"
+                            />
+                            {!isAssignedToProject && (
+                              <svg 
+                                className="h-5 w-5 text-gray-400" 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
                               >
-                                <div className="flex items-start justify-between">
-                                  {canEdit() && (
-                                    <div className="mr-3 flex flex-col items-center">
-                                      <Checkbox
-                                        checked={selectedDrawings.has(doc.id)}
-                                        onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
-                                        className="mb-2"
-                                      />
-                                      <svg 
-                                        className="h-5 w-5 text-gray-400" 
-                                        fill="none" 
-                                        stroke="currentColor" 
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                                      </svg>
-                                    </div>
-                                  )}
-                                  <div className="flex flex-1 items-start space-x-4">
-                                    <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
-                                      {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
-                                      <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
-                                      {canEdit() && (
-                                        <p className="mt-1 text-xs text-blue-600">Drag to assign to project</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="ml-6 flex items-center space-x-2">
-                                    <Button onClick={() => handleViewDrawing(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
-                                      <Eye className="h-4 w-4" />
-                                      <span>View</span>
-                                    </Button>
-                                    {canEdit() && (
-                                      <Button
-                                        onClick={() => handleDeleteDrawing(doc)}
-                                        disabled={isDeletingDrawing}
-                                        variant="outline"
-                                        size="sm"
-                                        className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                              </svg>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex flex-1 items-start space-x-4">
+                          <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
+                            {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
+                            <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
+                            {isAssignedToProject ? (
+                              <span className="mt-1 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                                <Package className="mr-1 h-3 w-3" />
+                                Assigned to project
+                              </span>
+                            ) : (
+                              canEdit() && (
+                                <p className="mt-1 text-xs text-blue-600">← Drag to assign to project</p>
+                              )
+                            )}
+                          </div>
+                        </div>
+                        <div className="ml-6 flex items-center space-x-2">
+                          <Button onClick={() => handleViewDrawing(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
+                            <Eye className="h-4 w-4" />
+                            <span>View</span>
+                          </Button>
+                          {canEdit() && (
+                            <Button
+                              onClick={() => handleDeleteDrawing(doc)}
+                              disabled={isDeletingDrawing}
+                              variant="outline"
+                              size="sm"
+                              className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </>
-                );
-              })()}
+                    </div>
+                  );
+                })}
             </div>
           ) : (
             <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-8 text-center">
@@ -3028,7 +2942,7 @@ const handleConfirmDeleteFormDocument = async () => {
           </DialogContent>
         </Dialog>
 
-        {/* JOBS SECTION */}
+        {/* JOBS SECTION
         <div className="mb-8 border-t border-gray-200 pt-8">
           <h2 className="mb-6 text-xl font-semibold text-gray-900">Tasks</h2>
           {jobs.length > 0 ? (
@@ -3073,7 +2987,7 @@ const handleConfirmDeleteFormDocument = async () => {
         </div>
 
         {/* FINANCIAL DOCUMENTS SECTION */}
-        <div className="border-t border-gray-200 pt-8">
+        {/* <div className="border-t border-gray-200 pt-8">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">Financial Documents</h2>
             <div className="text-sm font-medium text-gray-500">
@@ -3115,7 +3029,7 @@ const handleConfirmDeleteFormDocument = async () => {
               </div>
             </div>
           )}
-        </div>
+        </div> */} 
       </div>
 
       {/* Dialogs remain the same as in your original code */}
