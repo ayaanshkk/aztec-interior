@@ -616,7 +616,7 @@ const handleDragLeave = () => {
 const handleDrop = async (e: React.DragEvent, projectId: string) => {
   e.preventDefault();
   setDragOverProject(null);
-  
+
   if (!draggedItem) return;
 
   const token = localStorage.getItem("auth_token");
@@ -626,36 +626,33 @@ const handleDrop = async (e: React.DragEvent, projectId: string) => {
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   try {
-    let endpoint = '';
-    let body = {};
-
-    if (draggedItem.type === 'form') {
+    let endpoint = "";
+    
+    if (draggedItem.type === "form") {
       endpoint = `https://aztec-interiors.onrender.com/form-submissions/${draggedItem.id}`;
-      body = { project_id: projectId };
-    } else if (draggedItem.type === 'drawing') {
+    } else if (draggedItem.type === "drawing") {
       endpoint = `https://aztec-interiors.onrender.com/files/drawings/${draggedItem.id}`;
-      body = { project_id: projectId };
     }
 
     const response = await fetch(endpoint, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify(body),
+      method: "PATCH",  // ← This is critical
+      headers: headers,
+      body: JSON.stringify({ project_id: projectId }),
     });
 
     if (response.ok) {
-      alert(`${draggedItem.type === 'form' ? 'Form' : 'Drawing'} assigned to project successfully!`);
-      loadCustomerData(); // Reload to show updated data
+      // Reload customer data to reflect changes
+      loadCustomerData();
     } else {
-      const error = await response.json();
-      alert(`Failed to assign: ${error.message || 'Unknown error'}`);
+      const error = await response.json().catch(() => ({ error: "Failed to assign" }));
+      alert(`Error: ${error.error || error.message || "Failed to assign to project"}`);
     }
   } catch (error) {
-    console.error('Error assigning to project:', error);
-    alert('Network error');
-  } finally {
-    setDraggedItem(null);
+    console.error("Error assigning to project:", error);
+    alert("Network error");
   }
+
+  setDraggedItem(null);
 };
 
 const handleViewFormDocument = (doc: FormDocument) => {

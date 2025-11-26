@@ -229,59 +229,61 @@ export default function ProjectDetailsPage() {
     loadProjectData();
   }, [projectId]);
 
-  const loadProjectData = async () => {
+    const loadProjectData = async () => {
     setLoading(true);
     const token = localStorage.getItem("auth_token");
     const headers: HeadersInit = {
-      "Content-Type": "application/json",
+        "Content-Type": "application/json",
     };
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      // Fetch project details
-      const projectRes = await fetch(`https://aztec-interiors.onrender.com/projects/${projectId}`, { headers });
-      const projectData = await projectRes.json();
-      setProject(projectData);
+        // Fetch project details
+        const projectRes = await fetch(`https://aztec-interiors.onrender.com/projects/${projectId}`, { headers });
+        const projectData = await projectRes.json();
+        setProject(projectData);
 
-      // Fetch customer details
-      if (projectData.customer_id) {
+        // Fetch customer details
+        if (projectData.customer_id) {
         const customerRes = await fetch(`https://aztec-interiors.onrender.com/customers/${projectData.customer_id}`, { headers });
         const customerData = await customerRes.json();
         setCustomer(customerData);
 
-        // Pre-fill task data with customer info
+        // Pre-fill task data
         setTaskData(prev => ({
-          ...prev,
-          jobTask: `${projectData.project_type} - ${projectData.project_name}`,
-          notes: `Customer: ${customerData.name}\nAddress: ${customerData.address}\nPhone: ${customerData.phone}`,
+            ...prev,
+            jobTask: `${projectData.project_type} - ${projectData.project_name}`,
+            notes: `Customer: ${customerData.name}\nAddress: ${customerData.address}\nPhone: ${customerData.phone}`,
         }));
-      }
+        }
 
-      // Fetch drawings for this project
-      const drawingsRes = await fetch(
-        `https://aztec-interiors.onrender.com/files/drawings?project_id=${projectId}`,
+        // ✅ FIX 1: Fetch drawings for this CUSTOMER, then filter by project on frontend
+        const drawingsRes = await fetch(
+        `https://aztec-interiors.onrender.com/files/drawings?customer_id=${projectData.customer_id}`,
         { headers }
-      );
-      if (drawingsRes.ok) {
-        const drawingsData = await drawingsRes.json();
-        setDrawings(drawingsData);
-      }
+        );
+        if (drawingsRes.ok) {
+        const allDrawings = await drawingsRes.json();
+        // Filter on frontend
+        const projectDrawings = allDrawings.filter((d: any) => d.project_id === projectId);
+        setDrawings(projectDrawings);
+        }
 
-      // Fetch forms for this project
-      const formsRes = await fetch(
-        `https://aztec-interiors.onrender.com/form-submissions?project_id=${projectId}`,
+        // ✅ FIX 2: Fetch forms for this PROJECT using the existing endpoint
+        const formsRes = await fetch(
+        `https://aztec-interiors.onrender.com/projects/${projectId}/forms`,
         { headers }
-      );
-      if (formsRes.ok) {
+        );
+        if (formsRes.ok) {
         const formsData = await formsRes.json();
         setForms(formsData);
-      }
+        }
     } catch (error) {
-      console.error("Error loading project data:", error);
+        console.error("Error loading project data:", error);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+    };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
