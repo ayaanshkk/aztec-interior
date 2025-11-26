@@ -310,6 +310,7 @@ export default function CustomerDetailsPage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [generatedLink, setGeneratedLink] = useState("");
   const [formType, setFormType] = useState("");
