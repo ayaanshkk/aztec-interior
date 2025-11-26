@@ -336,6 +336,8 @@ export default function CustomerDetailsPage() {
   const [isEditingForm, setIsEditingForm] = useState(false);
   const [editFormData, setEditFormData] = useState<any>(null);
   const [isSavingForm, setIsSavingForm] = useState(false);
+  const [selectedProjectForUpload, setSelectedProjectForUpload] = useState<string | null>(null);
+  const [showProjectSelectDialog, setShowProjectSelectDialog] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -761,12 +763,26 @@ const handleConfirmDeleteFormDocument = async () => {
     }
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
+const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const files = event.target.files;
 
-    if (!files || files.length === 0) {
-      return;
-    }
+  if (!files || files.length === 0) {
+    return;
+  }
+
+  // Show project selection dialog before uploading
+  setShowProjectSelectDialog(true);
+  
+  // Store files temporarily
+  const fileInputElement = event.target;
+  
+  // Wait for project selection
+  // The actual upload will happen in handleConfirmProjectUpload
+};
+
+  const handleConfirmProjectUpload = async () => {
+    const files = fileInputRef.current?.files;
+    if (!files || files.length === 0) return;
 
     const token = localStorage.getItem("auth_token");
     const headers: HeadersInit = {};
@@ -780,6 +796,11 @@ const handleConfirmDeleteFormDocument = async () => {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("customer_id", id);
+        
+        // Add project_id if a project was selected
+        if (selectedProjectForUpload) {
+          formData.append("project_id", selectedProjectForUpload);
+        }
 
         const response = await fetch("https://aztec-interiors.onrender.com/files/drawings", {
           method: "POST",
@@ -804,8 +825,6 @@ const handleConfirmDeleteFormDocument = async () => {
               const updated = [...prev, newDoc];
               return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
             });
-          } else {
-            console.error("Invalid response structure:", data);
           }
         } else {
           const errorData = await response.json().catch(() => ({
@@ -818,9 +837,12 @@ const handleConfirmDeleteFormDocument = async () => {
       }
     }
 
-    if (event.target) {
-      event.target.value = "";
+    // Clean up
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
+    setShowProjectSelectDialog(false);
+    setSelectedProjectForUpload(null);
   };
 
   const handleUploadDrawing = () => {
@@ -2401,7 +2423,7 @@ const handleConfirmDeleteFormDocument = async () => {
           )}
         </div>
 
-        {/* DRAWINGS & LAYOUTS SECTION */}
+        {/* DRAWINGS & LAYOUTS SECTION - GROUPED BY PROJECT */}
         <div className="mb-8 border-t border-gray-200 pt-8">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">Drawings & Layouts</h2>
@@ -2443,66 +2465,152 @@ const handleConfirmDeleteFormDocument = async () => {
           </div>
 
           {drawingDocuments.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {drawingDocuments
-                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                .map((doc) => {
-                  const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
-                  const docType =
-                    doc.type ||
-                    (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
+            <div className="space-y-8">
+              {/* Group drawings by project */}
+              {(() => {
+                // Separate drawings by project
+                const projectDrawings = new Map<string, DrawingDocument[]>();
+                const unassignedDrawings: DrawingDocument[] = [];
 
-                  return (
-                    <div
-                      key={doc.id}
-                      className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
-                    >
-                      <div className="flex items-start justify-between">
-                        {canEdit() && (
-                          <Checkbox
-                            checked={selectedDrawings.has(doc.id)}
-                            onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
-                            className="mr-4 mt-1"
-                          />
-                        )}
-                        <div className="flex flex-1 items-start space-x-4">
-                          <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
-                            {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
+                drawingDocuments.forEach(doc => {
+                  if (doc.project_id) {
+                    if (!projectDrawings.has(doc.project_id)) {
+                      projectDrawings.set(doc.project_id, []);
+                    }
+                    projectDrawings.get(doc.project_id)!.push(doc);
+                  } else {
+                    unassignedDrawings.push(doc);
+                  }
+                });
+
+                return (
+                  <>
+                    {/* Project-specific drawings */}
+                    {Array.from(projectDrawings.entries()).map(([projectId, docs]) => {
+                      const project = customer.projects?.find(p => p.id === projectId);
+                      if (!project) return null;
+
+                      return (
+                        <div key={projectId} className="rounded-lg border-2 border-blue-200 bg-blue-50/30 p-6">
+                          <div className="mb-4 flex items-center space-x-3">
+                            <Package className="h-5 w-5 text-blue-600" />
+                            <h3 className="text-lg font-semibold text-gray-900">{project.project_name}</h3>
+                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getProjectTypeColor(project.project_type)}`}>
+                              {project.project_type}
+                            </span>
+                            <span className="text-sm text-gray-600">({docs.length} file{docs.length !== 1 ? 's' : ''})</span>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
-                            <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
-                            {doc.project_id && <p className="mt-1 text-xs text-blue-500">Project ID: {doc.project_id}</p>}
+                          
+                          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                            {docs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((doc) => {
+                              const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
+                              const docType = doc.type || (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
+
+                              return (
+                                <div key={doc.id} className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
+                                  <div className="flex items-start justify-between">
+                                    {canEdit() && (
+                                      <Checkbox
+                                        checked={selectedDrawings.has(doc.id)}
+                                        onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
+                                        className="mr-4 mt-1"
+                                      />
+                                    )}
+                                    <div className="flex flex-1 items-start space-x-4">
+                                      <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
+                                        {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
+                                        <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
+                                      </div>
+                                    </div>
+                                    <div className="ml-6 flex items-center space-x-2">
+                                      <Button onClick={() => handleViewDrawing(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
+                                        <Eye className="h-4 w-4" />
+                                        <span>View</span>
+                                      </Button>
+                                      {canEdit() && (
+                                        <Button
+                                          onClick={() => handleDeleteDrawing(doc)}
+                                          disabled={isDeletingDrawing}
+                                          variant="outline"
+                                          size="sm"
+                                          className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
+                      );
+                    })}
 
-                        <div className="ml-6 flex items-center space-x-2">
-                          <Button
-                            onClick={() => handleViewDrawing(doc)}
-                            variant="outline"
-                            size="sm"
-                            className="flex items-center space-x-2"
-                          >
-                            <Eye className="h-4 w-4" />
-                            <span>View</span>
-                          </Button>
+                    {/* Unassigned drawings */}
+                    {unassignedDrawings.length > 0 && (
+                      <div className="rounded-lg border-2 border-gray-200 bg-gray-50/30 p-6">
+                        <div className="mb-4 flex items-center space-x-3">
+                          <Image className="h-5 w-5 text-gray-600" />
+                          <h3 className="text-lg font-semibold text-gray-900">General Documents</h3>
+                          <span className="text-sm text-gray-600">({unassignedDrawings.length} file{unassignedDrawings.length !== 1 ? 's' : ''})</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                          {unassignedDrawings.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map((doc) => {
+                            const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
+                            const docType = doc.type || (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
 
-                          {canEdit() && (
-                            <Button
-                              onClick={() => handleDeleteDrawing(doc)}
-                              disabled={isDeletingDrawing}
-                              variant="outline"
-                              size="sm"
-                              className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
+                            return (
+                              <div key={doc.id} className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
+                                <div className="flex items-start justify-between">
+                                  {canEdit() && (
+                                    <Checkbox
+                                      checked={selectedDrawings.has(doc.id)}
+                                      onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
+                                      className="mr-4 mt-1"
+                                    />
+                                  )}
+                                  <div className="flex flex-1 items-start space-x-4">
+                                    <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
+                                      {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
+                                      <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
+                                    </div>
+                                  </div>
+                                  <div className="ml-6 flex items-center space-x-2">
+                                    <Button onClick={() => handleViewDrawing(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
+                                      <Eye className="h-4 w-4" />
+                                      <span>View</span>
+                                    </Button>
+                                    {canEdit() && (
+                                      <Button
+                                        onClick={() => handleDeleteDrawing(doc)}
+                                        disabled={isDeletingDrawing}
+                                        variant="outline"
+                                        size="sm"
+                                        className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    )}
+                  </>
+                );
+              })()}
             </div>
           ) : (
             <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-8 text-center">
@@ -2639,6 +2747,78 @@ const handleConfirmDeleteFormDocument = async () => {
             )
           )}
         </div>
+
+        {/* PROJECT SELECTION DIALOG FOR UPLOADS */}
+        <Dialog open={showProjectSelectDialog} onOpenChange={setShowProjectSelectDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Select Project for Upload</DialogTitle>
+              <DialogDescription>
+                Choose which project these drawings belong to, or leave unassigned for general documents.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div
+                onClick={() => setSelectedProjectForUpload(null)}
+                className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
+                  selectedProjectForUpload === null
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Image className="h-5 w-5 text-gray-600" />
+                  <div>
+                    <h4 className="font-semibold text-gray-900">General Documents</h4>
+                    <p className="text-sm text-gray-600">Not linked to any specific project</p>
+                  </div>
+                </div>
+              </div>
+
+              {customer?.projects && customer.projects.length > 0 && (
+                <>
+                  <div className="text-sm font-medium text-gray-700">Or select a project:</div>
+                  {customer.projects.map((project) => (
+                    <div
+                      key={project.id}
+                      onClick={() => setSelectedProjectForUpload(project.id)}
+                      className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
+                        selectedProjectForUpload === project.id
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Package className="h-5 w-5 text-blue-600" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900">{project.project_name}</h4>
+                          <div className="mt-1 flex items-center space-x-2">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getProjectTypeColor(project.project_type)}`}>
+                              {project.project_type}
+                            </span>
+                            <span className="text-xs text-gray-500">{project.stage}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowProjectSelectDialog(false);
+                setSelectedProjectForUpload(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmProjectUpload}>
+                Upload to {selectedProjectForUpload === null ? "General" : "Selected Project"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* DELETE FORM DOCUMENT DIALOG */}
         <Dialog open={showDeleteFormDocDialog} onOpenChange={setShowDeleteFormDocDialog}>
