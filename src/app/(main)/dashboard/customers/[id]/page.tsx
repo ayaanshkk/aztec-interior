@@ -309,6 +309,7 @@ export default function CustomerDetailsPage() {
   const [drawingDocuments, setDrawingDocuments] = useState<DrawingDocument[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [generatedLink, setGeneratedLink] = useState("");
   const [formType, setFormType] = useState("");
@@ -2068,6 +2069,22 @@ const handleConfirmDeleteFormDocument = async () => {
       setIsDeleting(false);
     }
   };
+
+  // Error state
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex h-64 items-center justify-center">
+          <div className="text-center">
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-red-500" />
+            <h3 className="mb-2 text-lg font-medium text-red-900">Error Loading Data</h3>
+            <p className="mb-4 text-red-600">{error}</p>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Loading state
   if (loading) {
