@@ -1370,185 +1370,203 @@ export default function EnhancedPipelinePage() {
                                       id={feature.id}
                                       key={feature.id}
                                       name={feature.name}
-                                      className={`rounded-md border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md ${permissions.canDragDrop && isEditable ? "cursor-grab" : "cursor-not-allowed opacity-90"} p-2 ${feature.itemType === "job" ? "pb-0" : ""} overflow-hidden`}
+                                      className={`rounded-md border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md ${permissions.canDragDrop && isEditable ? "cursor-grab" : "cursor-not-allowed opacity-90"} p-3 overflow-hidden`}
                                       style={{ maxWidth: '100%', wordBreak: 'break-word' }}
                                     >
                                       <div className="space-y-3">
                                         {/* Lock icon for non-editable items */}
                                         {!isEditable && (
-                                          <div className="absolute top-1 right-1">
+                                          <div className="absolute top-2 right-2">
                                             <Lock className="h-3 w-3 text-gray-400" />
                                           </div>
                                         )}
 
-                                        {/* Header */}
-                                        <div className="flex items-start justify-between gap-2">
-                                          <div className="min-w-0 flex-1 pr-2">
-                                            <p className="text-sm font-semibold break-words text-black">
+                                        {/* ✅ NEW HEADER DESIGN */}
+                                        <div className="space-y-2">
+                                          {/* Customer Name - Large and Bold */}
+                                          <div className="flex items-start justify-between gap-2">
+                                            <h3 className="text-base font-bold text-gray-900 leading-tight">
                                               {feature.customer.name}
-                                            </p>
+                                            </h3>
+                                            {!isEditable && <Lock className="h-3.5 w-3.5 text-gray-400 flex-shrink-0 mt-0.5" />}
+                                          </div>
 
-                                            {/* Show reference below customer name for both types */}
-                                            <div className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
-                                              <span className="truncate">{feature.reference}</span>
-                                            </div>
-
-                                            {/* ✅ NEW: Project Count Badge - only for customers with multiple projects */}
-                                            {feature.itemType === "customer" && feature.project_count > 1 && (
-                                              <div className="mt-1 flex items-center gap-1">
-                                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 flex items-center gap-1">
-                                                  <FolderOpen className="h-2.5 w-2.5" />
-                                                  <span>{feature.project_count} projects</span>
-                                                </Badge>
+                                          {/* Project Details - Clear Visual Hierarchy */}
+                                          {feature.itemType === "project" && feature.job?.job_name && (
+                                            <div className="bg-blue-50 border border-blue-200 rounded-md p-2 space-y-1">
+                                              <div className="flex items-center gap-2">
+                                                <Briefcase className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
+                                                <span className="text-sm font-semibold text-blue-900">
+                                                  {feature.job.job_name}
+                                                </span>
                                               </div>
-                                            )}
-                                          </div>
+                                              <div className="flex items-center gap-2 text-xs text-blue-700">
+                                                <span className="font-medium">{feature.reference}</span>
+                                                {feature.jobType && (
+                                                  <>
+                                                    <span className="text-blue-400">•</span>
+                                                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                                                      {feature.jobType}
+                                                    </Badge>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </div>
+                                          )}
 
-                                          <div className="flex flex-shrink-0 flex-col gap-1">
-                                            {/* Render each job/project type as its own badge */}
-                                            {feature.jobType &&
-                                              feature.jobType.split(",").map((t: string, i: number) => (
-                                                <Badge key={i} variant="outline" className="text-xs whitespace-nowrap">
-                                                  {t.trim()}
-                                                </Badge>
-                                              ))}
-                                          </div>
+                                          {/* Customer-only view (no project) */}
+                                          {feature.itemType === "customer" && (
+                                            <div className="flex items-center justify-between gap-2">
+                                              <div className="flex items-center gap-2 text-xs text-gray-600">
+                                                <span className="font-medium">{feature.reference}</span>
+                                              </div>
+                                              
+                                              {/* Job Types for customer */}
+                                              {feature.jobType && (
+                                                <div className="flex flex-wrap gap-1 justify-end">
+                                                  {feature.jobType.split(",").map((t: string, i: number) => (
+                                                    <Badge key={i} variant="outline" className="text-xs whitespace-nowrap">
+                                                      {t.trim()}
+                                                    </Badge>
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+
+                                          {/* Project Count Badge - only for customers with multiple projects */}
+                                          {feature.itemType === "customer" && feature.project_count > 1 && (
+                                            <div className="flex items-center gap-1">
+                                              <Badge variant="secondary" className="text-xs px-2 py-1 flex items-center gap-1.5 bg-purple-50 text-purple-700 border-purple-200">
+                                                <FolderOpen className="h-3 w-3" />
+                                                <span>{feature.project_count} projects</span>
+                                              </Badge>
+                                            </div>
+                                          )}
                                         </div>
 
-                                        {/* Contact Info - only show if available */}
+                                        {/* Contact Info - Compact */}
                                         {(feature.customer.phone || feature.customer.email || feature.customer.address) && (
-                                          <div className="text-muted-foreground space-y-1 text-xs">
+                                          <div className="space-y-1.5 text-xs text-gray-600 border-t border-gray-100 pt-2">
                                             {feature.customer.phone && (
                                               <div className="flex items-center gap-2">
-                                                <Phone className="h-3 w-3 flex-shrink-0" />
+                                                <Phone className="h-3 w-3 flex-shrink-0 text-gray-400" />
                                                 <span className="truncate">{feature.customer.phone}</span>
                                               </div>
                                             )}
                                             {feature.customer.email && (
                                               <div className="flex items-center gap-2">
-                                                <Mail className="h-3 w-3 flex-shrink-0" />
+                                                <Mail className="h-3 w-3 flex-shrink-0 text-gray-400" />
                                                 <span className="truncate">{feature.customer.email}</span>
                                               </div>
                                             )}
                                             {feature.customer.address && (
                                               <div className="flex items-center gap-2">
-                                                <MapPin className="h-3 w-3 flex-shrink-0" />
+                                                <MapPin className="h-3 w-3 flex-shrink-0 text-gray-400" />
                                                 <span className="truncate">{feature.customer.address}</span>
                                               </div>
                                             )}
                                           </div>
                                         )}
 
-                                        {/* Job Details - conditional rendering based on available data and permissions */}
-                                        <div className="space-y-2 text-xs">
-                                          {feature.salesperson && (
-                                            <div className="flex items-center gap-2">
-                                              <Users className="text-muted-foreground h-3 w-3 flex-shrink-0" />
-                                              <span className="truncate">{feature.salesperson}</span>
-                                            </div>
-                                          )}
-                                          {feature.measureDate && (
-                                            <div className="flex items-center gap-2">
-                                              <Calendar className="text-muted-foreground h-3 w-3 flex-shrink-0" />
-                                              <span className="truncate">Measure: {formatDate(feature.measureDate)}</span>
-                                            </div>
-                                          )}
+                                        {/* Job Details */}
+                                        {(feature.salesperson || feature.measureDate || 
+                                          (permissions.canViewFinancials && (feature.quotePrice || feature.agreedPrice || feature.soldAmount || feature.deposit1 || feature.deposit2)) ||
+                                          feature.deliveryDate) && (
+                                          <div className="space-y-1.5 text-xs border-t border-gray-100 pt-2">
+                                            {feature.salesperson && (
+                                              <div className="flex items-center gap-2">
+                                                <Users className="h-3 w-3 flex-shrink-0 text-gray-400" />
+                                                <span className="truncate text-gray-700">{feature.salesperson}</span>
+                                              </div>
+                                            )}
+                                            {feature.measureDate && (
+                                              <div className="flex items-center gap-2">
+                                                <Calendar className="h-3 w-3 flex-shrink-0 text-gray-400" />
+                                                <span className="text-gray-700">Measure: {formatDate(feature.measureDate)}</span>
+                                              </div>
+                                            )}
 
-                                          {/* Financial information - only show if user has permission */}
-                                          {permissions.canViewFinancials && (
-                                            <>
-                                              {feature.quotePrice && (
-                                                <div className="flex items-center gap-2">
-                                                  <DollarSign className="text-muted-foreground h-3 w-3 flex-shrink-0" />
-                                                  <span className="truncate">Quote: £{feature.quotePrice.toFixed(2)}</span>
-                                                </div>
-                                              )}
-                                              {feature.agreedPrice && (
-                                                <div className="flex items-center gap-2">
-                                                  <Check className="h-3 w-3 flex-shrink-0 text-green-500" />
-                                                  <span className="truncate">Agreed: £{feature.agreedPrice.toFixed(2)}</span>
-                                                </div>
-                                              )}
-                                              {feature.soldAmount && (
-                                                <div className="flex items-center gap-2">
-                                                  <Check className="h-3 w-3 flex-shrink-0 text-green-500" />
-                                                  <span className="truncate">Sold: £{feature.soldAmount.toFixed(2)}</span>
-                                                </div>
-                                              )}
-                                              {feature.deposit1 && (
-                                                <div className="flex items-center gap-2">
-                                                  <div
-                                                    className={`h-2 w-2 flex-shrink-0 rounded-full ${feature.deposit1Paid ? "bg-green-500" : "bg-red-500"}`}
-                                                  />
-                                                  <span className="truncate">Deposit 1: £{feature.deposit1.toFixed(2)}</span>
-                                                </div>
-                                              )}
-                                              {feature.deposit2 && (
-                                                <div className="flex items-center gap-2">
-                                                  <div
-                                                    className={`h-2 w-2 flex-shrink-0 rounded-full ${feature.deposit2Paid ? "bg-green-500" : "bg-red-500"}`}
-                                                  />
-                                                  <span className="truncate">Deposit 2: £{feature.deposit2.toFixed(2)}</span>
-                                                </div>
-                                              )}
-                                            </>
-                                          )}
+                                            {/* Financial information - only show if user has permission */}
+                                            {permissions.canViewFinancials && (
+                                              <>
+                                                {feature.quotePrice && (
+                                                  <div className="flex items-center gap-2">
+                                                    <DollarSign className="h-3 w-3 flex-shrink-0 text-gray-400" />
+                                                    <span className="text-gray-700">Quote: £{feature.quotePrice.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                                {feature.agreedPrice && (
+                                                  <div className="flex items-center gap-2">
+                                                    <Check className="h-3 w-3 flex-shrink-0 text-green-500" />
+                                                    <span className="text-gray-700">Agreed: £{feature.agreedPrice.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                                {feature.soldAmount && (
+                                                  <div className="flex items-center gap-2">
+                                                    <Check className="h-3 w-3 flex-shrink-0 text-green-500" />
+                                                    <span className="text-gray-700">Sold: £{feature.soldAmount.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                                {feature.deposit1 && (
+                                                  <div className="flex items-center gap-2">
+                                                    <div
+                                                      className={`h-2 w-2 flex-shrink-0 rounded-full ${feature.deposit1Paid ? "bg-green-500" : "bg-red-500"}`}
+                                                    />
+                                                    <span className="text-gray-700">Deposit 1: £{feature.deposit1.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                                {feature.deposit2 && (
+                                                  <div className="flex items-center gap-2">
+                                                    <div
+                                                      className={`h-2 w-2 flex-shrink-0 rounded-full ${feature.deposit2Paid ? "bg-green-500" : "bg-red-500"}`}
+                                                    />
+                                                    <span className="text-gray-700">Deposit 2: £{feature.deposit2.toFixed(2)}</span>
+                                                  </div>
+                                                )}
+                                              </>
+                                            )}
 
-                                          {feature.deliveryDate && (
-                                            <div className="flex items-center gap-2">
-                                              <Calendar className="text-muted-foreground h-3 w-3 flex-shrink-0" />
-                                              <span className="truncate">Delivery: {formatDate(feature.deliveryDate)}</span>
-                                            </div>
-                                          )}
-                                        </div>
+                                            {feature.deliveryDate && (
+                                              <div className="flex items-center gap-2">
+                                                <Calendar className="h-3 w-3 flex-shrink-0 text-gray-400" />
+                                                <span className="text-gray-700">Delivery: {formatDate(feature.deliveryDate)}</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
 
-                                        {/* Action Buttons (fixed to the bottom with padding) */}
-                                        <div className="flex gap-1 pt-2 pb-1">
-                                          {/* ✅ MODIFIED: Quick Reject Button - now instant on click */}
+                                        {/* Action Buttons */}
+                                        <div className="flex gap-1 pt-2 border-t border-gray-100">
+                                          {/* Quick Reject Button */}
                                           {isEditable && feature.stage !== "Rejected" && (
                                             <Button
                                               size="sm"
                                               variant="ghost"
-                                              className="h-6 flex-1 px-1 text-xs hover:bg-red-50 text-red-600"
+                                              className="h-7 flex-1 px-2 text-xs hover:bg-red-50 text-red-600"
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 handleQuickStageChange(feature.itemId, "Rejected", feature.itemType);
                                               }}
                                               title="Move to Rejected"
                                             >
-                                              <X className="h-3 w-3" />
+                                              <X className="h-3.5 w-3.5" />
                                             </Button>
                                           )}
                                           
-                                          {/* Eye button - always visible */}
+                                          {/* View Button */}
                                           <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="h-6 flex-1 px-1 text-xs hover:bg-gray-100"
+                                            className="h-7 flex-1 px-2 text-xs hover:bg-gray-100"
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               handleOpenItem(feature.itemId, feature.itemType);
                                             }}
                                             title={`Open ${feature.itemType === "customer" ? "Customer" : feature.itemType === "project" ? "Project" : "Job"}`}
                                           >
-                                            <Eye className="h-3 w-3" />
+                                            <Eye className="h-3.5 w-3.5" />
                                           </Button>
-
-                                          {/* Documents button - keep for jobs/projects */}
-                                          {/* {(feature.itemType === "job" || feature.itemType === "project") && (
-                                            <Button
-                                              size="sm"
-                                              variant="ghost"
-                                              className="h-6 flex-1 px-1 text-xs hover:bg-gray-100"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleViewDocuments(feature.itemId);
-                                              }}
-                                              title="View Documents"
-                                            >
-                                              <File className="h-3 w-3" />
-                                            </Button>
-                                          )} */}
                                         </div>
                                       </div>
                                     </KanbanCard>
