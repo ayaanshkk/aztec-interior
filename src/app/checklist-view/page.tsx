@@ -36,7 +36,7 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { getSidebarItems } from "@/lib/sidebar-items";
+import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
 
 interface User {
   id: number;
