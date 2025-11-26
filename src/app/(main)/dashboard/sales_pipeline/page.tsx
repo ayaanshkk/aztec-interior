@@ -716,6 +716,7 @@ export default function EnhancedPipelinePage() {
       
       alert(`Failed to update stage. Changes reverted.`);
     }
+  };
 
   const refetchPipelineData = async () => {
     try {
@@ -881,7 +882,7 @@ export default function EnhancedPipelinePage() {
     [pipelineItems],
   );
 
-// Quick stage change handler (no confirmation dialog, direct move)
+  // Quick stage change handler (no confirmation dialog, direct move)
   const handleQuickStageChange = async (
     itemId: string,
     newStage: Stage,
