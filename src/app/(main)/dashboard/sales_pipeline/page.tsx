@@ -340,20 +340,24 @@ export default function EnhancedPipelinePage() {
       const jobWithoutNotes = item.job ? (({ notes: jobNotes, ...rest }) => rest)(item.job) : undefined;
 
       const isProjectItem = item.id.startsWith("project-");
-      // ✅ SAFE ACCESS
-      const jobName = isProjectItem ? `${item.customer.name} - ${item.job?.job_name || "Project"}` : item.customer.name;
+      
+      // ✅ FIX: Create truly unique display names for projects
+      const jobName = isProjectItem 
+        ? `${item.customer.name} - ${item.job?.job_name || "Project"}` 
+        : item.customer.name;
+      
       const jobReference = isProjectItem
         ? item.job?.job_reference || `PROJ-${item.job?.id?.slice(-4).toUpperCase() || "NEW"}`
         : item.job?.job_reference || `JOB-${item.job?.id?.slice(-4).toUpperCase() || "NEW"}`;
 
-
+      // ✅ CRITICAL FIX: Use item.id directly as the unique feature ID
+      // This ensures each project gets its own card, even if same customer
       return {
-        id: item.id,
-        name: `${jobReference} — ${jobName}`, // Use the corrected, unique name
+        id: item.id, // This is already unique: "project-uuid" or "customer-uuid"
+        name: `${jobReference} — ${jobName}`,
         column: stageToColumnId(item.stage),
         itemId: item.id,
-        itemType: isProjectItem ? "project" : item.type, // Explicitly set 'project' type
-        // PASS the new objects that DO NOT have the notes field
+        itemType: isProjectItem ? "project" : item.type,
         customer: customerWithoutNotes,
         job: jobWithoutNotes,
         reference: jobReference,
@@ -469,9 +473,12 @@ export default function EnhancedPipelinePage() {
             project_count: item.project_count || 0,
           };
         } else {
-          if (!item.job) {
+          // ✅ Handle project items (which come with a 'project' field from backend)
+          const projectData = item.project || item.job;
+          
+          if (!projectData) {
             console.warn(
-              `⚠️ COMPROMISE: Malformed item (${item.id}) of type ${item.type} forced to 'customer' view to ensure all 78 customers are displayed.`
+              `⚠️ COMPROMISE: Malformed item (${item.id}) of type ${item.type} forced to 'customer' view.`
             );
             malformedCount++;
             return {
@@ -486,29 +493,31 @@ export default function EnhancedPipelinePage() {
           const jobStage = validStage;
 
           const jobReference = isProjectItem
-            ? item.job.job_reference || `PROJ-${item.job.id?.slice(-4).toUpperCase() || "NEW"}`
-            : item.job.job_reference || `JOB-${item.job.id?.slice(-4).toUpperCase() || "NEW"}`;
+            ? projectData.job_reference || `PROJ-${projectData.id?.slice(-4).toUpperCase() || "NEW"}`
+            : projectData.job_reference || `JOB-${projectData.id?.slice(-4).toUpperCase() || "NEW"}`;
 
-          const jobName = isProjectItem ? `${item.customer.name} - ${item.job.job_name || "Project"}` : item.customer.name;
+          const jobName = isProjectItem 
+            ? `${item.customer.name} - ${projectData.project_name || projectData.job_name || "Project"}` 
+            : item.customer.name;
 
           return {
             ...commonItem,
             type: isProjectItem ? ("project" as const) : ("job" as const),
-            job: item.job,
+            job: projectData,
             name: jobName,
             reference: jobReference,
             stage: jobStage as Stage,
-            jobType: item.job?.job_type,
-            quotePrice: item.job?.quote_price,
-            agreedPrice: item.job?.agreed_price,
-            soldAmount: item.job?.sold_amount,
-            deposit1: item.job?.deposit1,
-            deposit2: item.job?.deposit2,
-            deposit1Paid: item.job?.deposit1_paid || false,
-            deposit2Paid: item.job?.deposit2_paid || false,
-            deliveryDate: item.job?.delivery_date,
-            measureDate: item.job?.measure_date,
-            salesperson: item.job?.salesperson_name || item.customer.salesperson,
+            jobType: projectData.project_type || projectData.job_type,
+            quotePrice: projectData.quote_price,
+            agreedPrice: projectData.agreed_price,
+            soldAmount: projectData.sold_amount,
+            deposit1: projectData.deposit1,
+            deposit2: projectData.deposit2,
+            deposit1Paid: projectData.deposit1_paid || false,
+            deposit2Paid: projectData.deposit2_paid || false,
+            deliveryDate: projectData.delivery_date,
+            measureDate: projectData.date_of_measure || projectData.measure_date,
+            salesperson: projectData.salesperson_name || item.customer.salesperson,
           };
         }
       })
