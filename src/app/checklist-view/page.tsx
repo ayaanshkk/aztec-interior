@@ -12,21 +12,7 @@ import {
   Edit, 
   PenTool, 
   Upload,
-  Home,
-  BarChart3,
-  Users,
-  Briefcase,
-  Package,
-  CalendarDays,
-  FileText,
-  Wrench,
-  MessageSquare,
-  CheckSquare,
-  Bell,
-  Settings,
-  Menu,
 } from "lucide-react";
-const CloseIcon = X;
 import Link from "next/link";
 import {
   Dialog,
@@ -36,6 +22,21 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { getSidebarItems } from "@/lib/sidebar-items";
 
 interface User {
   id: number;
@@ -53,6 +54,13 @@ interface Appliance {
 interface AdditionalDoor {
   door_style: string;
   door_color: string;
+  door_manufacturer?: string;
+  door_name?: string;
+  glazing_material?: string;
+  panel_color?: string;
+  plinth_color?: string;
+  cabinet_color?: string;
+  worktop_color?: string;
   quantity: string;
 }
 
@@ -68,6 +76,8 @@ interface FormData {
   completion_date: string;
   deposit_date: string;
   door_style: string;
+  door_manufacturer: string;
+  door_name: string;
   glazing_material: string;
   door_color: string;
   end_panel_color: string;
@@ -117,6 +127,14 @@ interface FormData {
   signature_date: string;
   signature_data: string;
   form_type: string;
+  integ_fridge_qty: string;
+  integ_fridge_make: string;
+  integ_fridge_model: string;
+  integ_fridge_order_date: string;
+  integ_freezer_qty: string;
+  integ_freezer_make: string;
+  integ_freezer_model: string;
+  integ_freezer_order_date: string;
 }
 
 export default function ChecklistViewPage() {
@@ -126,6 +144,9 @@ export default function ChecklistViewPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   
   const [user, setUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<string>("manager");
+  const sidebarItems = getSidebarItems(userRole);
+  
   const [formData, setFormData] = useState<FormData | null>(null);
   const [originalFormData, setOriginalFormData] = useState<FormData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -137,22 +158,6 @@ export default function ChecklistViewPage() {
   const [signatureMode, setSignatureMode] = useState("existing");
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPoint, setLastPoint] = useState<{ x: number; y: number } | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  const navItems = [
-    { icon: Home, label: "Dashboard", href: "/dashboard" },
-    { icon: BarChart3, label: "Sales Pipeline", href: "/dashboard/sales-pipeline" },
-    { icon: Users, label: "Customers", href: "/dashboard/customers" },
-    { icon: Briefcase, label: "Jobs", href: "/dashboard/jobs" },
-    { icon: Package, label: "Materials", href: "/dashboard/materials" },
-    { icon: CalendarDays, label: "Schedule", href: "/dashboard/schedule" },
-    { icon: FileText, label: "Forms/Checklists", href: "/dashboard/forms", active: true },
-    { icon: Wrench, label: "Appliances", href: "/dashboard/appliances" },
-    { icon: MessageSquare, label: "Chatbot", href: "/dashboard/chatbot" },
-    { icon: CheckSquare, label: "Approvals", href: "/dashboard/approvals" },
-    { icon: Bell, label: "Notifications", href: "/dashboard/notifications" },
-    { icon: Settings, label: "Settings", href: "/dashboard/settings" },
-  ];
 
   const canEdit = () => {
     if (!user) return false;
@@ -184,6 +189,7 @@ export default function ChecklistViewPage() {
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setUser(userData);
+          setUserRole(userData.role || "manager");
         }
       } catch (err) {
         console.error("Error fetching user:", err);
@@ -241,6 +247,10 @@ export default function ChecklistViewPage() {
           parsedFormData.additional_doors = [];
         }
 
+        // Initialize new fields if they don't exist
+        if (!parsedFormData.door_manufacturer) parsedFormData.door_manufacturer = "";
+        if (!parsedFormData.door_name) parsedFormData.door_name = "";
+
         setFormData(parsedFormData);
         setOriginalFormData(JSON.parse(JSON.stringify(parsedFormData)));
       } catch (err) {
@@ -283,7 +293,18 @@ export default function ChecklistViewPage() {
     if (!formData) return;
     const additional_doors = [...(formData.additional_doors || [])];
     if (!additional_doors[index]) {
-      additional_doors[index] = { door_style: "", door_color: "", quantity: "" };
+      additional_doors[index] = { 
+        door_style: "", 
+        door_color: "", 
+        door_manufacturer: "",
+        door_name: "",
+        glazing_material: "",
+        panel_color: "", 
+        plinth_color: "", 
+        cabinet_color: "",
+        worktop_color: "",
+        quantity: "" 
+      };
     }
     additional_doors[index] = { ...additional_doors[index], [field]: value };
     setFormData({ ...formData, additional_doors });
@@ -293,7 +314,18 @@ export default function ChecklistViewPage() {
     if (!formData) return;
     setFormData({
       ...formData,
-      additional_doors: [...(formData.additional_doors || []), { door_style: "", door_color: "", quantity: "" }],
+      additional_doors: [...(formData.additional_doors || []), { 
+        door_style: "", 
+        door_color: "", 
+        door_manufacturer: "",
+        door_name: "",
+        glazing_material: "",
+        panel_color: "", 
+        plinth_color: "", 
+        cabinet_color: "",
+        worktop_color: "",
+        quantity: "" 
+      }],
     });
   };
 
@@ -477,7 +509,7 @@ export default function ChecklistViewPage() {
   const standardAppliances = ["Oven", "Microwave", "Washing Machine", "Dryer", "HOB", "Extractor", "INTG Dishwasher"];
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <SidebarProvider>
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
@@ -501,148 +533,109 @@ export default function ChecklistViewPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r bg-white transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="flex items-center justify-between border-b p-4">
+      <Sidebar>
+        <SidebarHeader>
+          <div className="flex items-center space-x-2 px-4 py-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-900 text-white">
+              <span className="text-sm font-bold">AI</span>
+            </div>
+            <span className="text-lg font-semibold">Aztec Interiors</span>
+          </div>
+        </SidebarHeader>
+        <SidebarContent>
+          {sidebarItems.map((group) => (
+            <SidebarGroup key={group.id}>
+              {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {group.items.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild isActive={item.url === "/dashboard/forms"}>
+                        <Link href={item.url}>
+                          {item.icon && <item.icon />}
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
+        </SidebarContent>
+      </Sidebar>
+
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
+          <div className="flex flex-1 items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => window.close()}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Installation Checklist {isEditing ? "- Editing" : ""}
+                </h1>
+                <p className="text-sm text-gray-600">
+                  {isEditing ? "Make changes to the checklist" : "View and manage checklist"}
+                </p>
+              </div>
+            </div>
             <div className="flex items-center space-x-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-900 text-white">
-                <span className="text-sm font-bold">AI</span>
-              </div>
-              <span className="text-lg font-semibold">Aztec Interiors</span>
-            </div>
-            <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
-              <CloseIcon className="h-6 w-6" />
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto p-4">
-            <div className="mb-4 text-xs font-semibold uppercase text-gray-500">Dashboard</div>
-            <div className="space-y-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`flex items-center space-x-3 rounded-lg px-3 py-2 text-sm ${
-                    item.active
-                      ? "bg-blue-50 text-blue-600 font-medium"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          </nav>
-
-          {/* User Info */}
-          <div className="border-t p-4">
-            <div className="flex items-center space-x-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold">
-                {user ? user.name.substring(0, 2).toUpperCase() : "MM"}
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium">{user?.name || "manager manager"}</div>
-                <div className="text-xs text-gray-500">{user?.email || "manager@gmail.com"}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Main Content */}
-      <div className="flex-1">
-        {/* Mobile Header */}
-        <div className="border-b bg-white p-4 lg:hidden">
-          <button onClick={() => setSidebarOpen(true)}>
-            <Menu className="h-6 w-6" />
-          </button>
-        </div>
-
-        {/* Header - Full Width */}
-        <div className="border-b bg-white shadow-sm">
-          <div className="mx-auto max-w-[1800px] px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => window.close()}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">
-                    Installation Checklist {isEditing ? "- Editing" : ""}
-                  </h1>
-                  <p className="mt-1 text-gray-600">
-                    {isEditing ? "Make changes to the checklist" : "View and manage checklist"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {isEditing ? (
-                  <>
+              {isEditing ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    disabled={isSaving}
+                    className="flex items-center space-x-2"
+                  >
+                    <X className="h-4 w-4" />
+                    <span>Cancel</span>
+                  </Button>
+                  <Button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="flex items-center space-x-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    <span>{isSaving ? "Saving..." : "Save Changes"}</span>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {canEdit() && (
                     <Button
-                      variant="outline"
-                      onClick={handleCancelEdit}
-                      disabled={isSaving}
+                      onClick={handleEdit}
                       className="flex items-center space-x-2"
                     >
-                      <X className="h-4 w-4" />
-                      <span>Cancel</span>
+                      <Edit className="h-4 w-4" />
+                      <span>Edit</span>
                     </Button>
+                  )}
+                  {canDelete() && (
                     <Button
-                      onClick={handleSave}
-                      disabled={isSaving}
+                      onClick={handleDelete}
+                      variant="destructive"
                       className="flex items-center space-x-2"
                     >
-                      <Save className="h-4 w-4" />
-                      <span>{isSaving ? "Saving..." : "Save Changes"}</span>
+                      <Trash2 className="h-4 w-4" />
+                      <span>Delete</span>
                     </Button>
-                  </>
-                ) : (
-                  <>
-                    {canEdit() && (
-                      <Button
-                        onClick={handleEdit}
-                        className="flex items-center space-x-2"
-                      >
-                        <Edit className="h-4 w-4" />
-                        <span>Edit</span>
-                      </Button>
-                    )}
-                    {canDelete() && (
-                      <Button
-                        onClick={handleDelete}
-                        variant="destructive"
-                        className="flex items-center space-x-2"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span>Delete</span>
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
-        </div>
+        </header>
 
-        {/* Form Container - Full Width */}
-        <div className="mx-auto max-w-[1800px] px-8 py-6">
+        <div className="flex flex-1 flex-col gap-4 p-4">
           <div className="rounded-lg border bg-white p-8 shadow-sm">
             <h2 className="mb-2 text-center text-xl font-semibold">
               {formType === "kitchen" ? "Kitchen Installation Checklist" : "Bedroom Installation Checklist"}
@@ -661,7 +654,7 @@ export default function ChecklistViewPage() {
                     value={formData.customer_name || ""} 
                     onChange={(e) => handleInputChange("customer_name", e.target.value)}
                     readOnly={!isEditing} 
-                    className={!isEditing ? "bg-white" : "bg-white"} 
+                    className="bg-white" 
                   />
                 </div>
                 <div>
@@ -670,7 +663,7 @@ export default function ChecklistViewPage() {
                     value={formData.customer_phone || ""} 
                     onChange={(e) => handleInputChange("customer_phone", e.target.value)}
                     readOnly={!isEditing} 
-                    className={!isEditing ? "bg-white" : "bg-white"} 
+                    className="bg-white" 
                   />
                 </div>
                 <div>
@@ -679,7 +672,7 @@ export default function ChecklistViewPage() {
                     value={formData.customer_address || ""} 
                     onChange={(e) => handleInputChange("customer_address", e.target.value)}
                     readOnly={!isEditing} 
-                    className={!isEditing ? "bg-white" : "bg-white"} 
+                    className="bg-white" 
                   />
                 </div>
                 {formType === "bedroom" && (
@@ -689,7 +682,7 @@ export default function ChecklistViewPage() {
                       value={formData.room || ""} 
                       onChange={(e) => handleInputChange("room", e.target.value)}
                       readOnly={!isEditing} 
-                      className={!isEditing ? "bg-white" : "bg-white"} 
+                      className="bg-white" 
                     />
                   </div>
                 )}
@@ -698,97 +691,134 @@ export default function ChecklistViewPage() {
 
             {/* KITCHEN SPECIFIC SECTIONS */}
             {formType === "kitchen" && (
-              <>
-                {/* 1. Material Specifications - Green Section */}
-                <div className="mb-6 rounded-lg border-2 border-green-200 bg-green-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-green-900">1. Material Specifications (Ordering)</h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
-                        {isEditing ? (
-                          <select
-                            className="w-full rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.door_style || ""}
-                            onChange={(e) => handleInputChange("door_style", e.target.value)}
-                          >
-                            <option value="">Select door style</option>
-                            <option value="vinyl">Vinyl</option>
-                            <option value="slab">Slab</option>
-                            <option value="glazed">Glazed</option>
-                            <option value="shaker">Shaker</option>
-                            <option value="N/A">N/A</option>
-                          </select>
-                        ) : (
-                          <Input value={formData.door_style || ""} readOnly className="bg-white" />
-                        )}
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Door Color</label>
-                        <Input 
-                          value={formData.door_color || ""} 
-                          onChange={(e) => handleInputChange("door_color", e.target.value)}
-                          readOnly={!isEditing} 
-                          className="bg-white" 
-                        />
-                      </div>
-                    </div>
-
-                    {formData.door_style === "glazed" && (
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* LEFT COLUMN */}
+                <div className="space-y-6">
+                  {/* 1. Material Specifications - Green Section */}
+                  <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
+                    <h3 className="mb-4 text-xl font-bold text-green-900">1. Material Specifications (Ordering)</h3>
+                    <div className="space-y-4">
+                      {/* Dynamic Grid based on door style */}
+                      <div className="grid gap-4 grid-cols-2">
                         <div>
-                          <label className="mb-1 block text-sm font-bold text-gray-700">Glazing Material</label>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
                           {isEditing ? (
                             <select
                               className="w-full rounded-md border border-gray-300 bg-white p-2"
-                              value={formData.glazing_material || ""}
-                              onChange={(e) => handleInputChange("glazing_material", e.target.value)}
+                              value={formData.door_style || ""}
+                              onChange={(e) => handleInputChange("door_style", e.target.value)}
                             >
-                              <option value="">Select material</option>
+                              <option value="">Select door style</option>
                               <option value="vinyl">Vinyl</option>
-                              <option value="aluminium">Aluminium</option>
+                              <option value="slab">Slab</option>
+                              <option value="glazed">Glazed</option>
+                              <option value="shaker">Shaker</option>
                               <option value="N/A">N/A</option>
                             </select>
                           ) : (
-                            <Input value={formData.glazing_material || ""} readOnly className="bg-white" />
+                            <Input value={formData.door_style || ""} readOnly className="bg-white" />
                           )}
                         </div>
-                      </div>
-                    )}
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Door Color</label>
+                          <Input 
+                            value={formData.door_color || ""} 
+                            onChange={(e) => handleInputChange("door_color", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        {/* Conditional: Door Manufacturer and Door Name - if Vinyl */}
+                        {formData.door_style === "vinyl" && (
+                          <>
+                            <div>
+                              <label className="mb-1 block text-sm font-bold text-gray-700">Door Manufacturer</label>
+                              {isEditing ? (
+                                <select
+                                  className="w-full rounded-md border border-gray-300 bg-white p-2"
+                                  value={formData.door_manufacturer || ""}
+                                  onChange={(e) => handleInputChange("door_manufacturer", e.target.value)}
+                                >
+                                  <option value="">Select manufacturer</option>
+                                  <option value="Integral">Integral</option>
+                                  <option value="Trade mouldings">Trade mouldings</option>
+                                  <option value="Hpp">Hpp</option>
+                                  <option value="Uform">Uform</option>
+                                  <option value="Other">Other</option>
+                                </select>
+                              ) : (
+                                <Input value={formData.door_manufacturer || ""} readOnly className="bg-white" />
+                              )}
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-sm font-bold text-gray-700">Door Name</label>
+                              <Input 
+                                value={formData.door_name || ""} 
+                                onChange={(e) => handleInputChange("door_name", e.target.value)}
+                                readOnly={!isEditing} 
+                                className="bg-white" 
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {/* Conditional: Glazing Material - if Glazed */}
+                        {formData.door_style === "glazed" && (
+                          <div className="col-span-2">
+                            <label className="mb-1 block text-sm font-bold text-gray-700">Glazing Material</label>
+                            {isEditing ? (
+                              <select
+                                className="w-full rounded-md border border-gray-300 bg-white p-2"
+                                value={formData.glazing_material || ""}
+                                onChange={(e) => handleInputChange("glazing_material", e.target.value)}
+                              >
+                                <option value="">Select material</option>
+                                <option value="vinyl">Vinyl</option>
+                                <option value="aluminium">Aluminium</option>
+                                <option value="N/A">N/A</option>
+                              </select>
+                            ) : (
+                              <Input value={formData.glazing_material || ""} readOnly className="bg-white" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Panel Color and Plinth/Filler Color */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Panel Color</label>
+                          <Input 
+                            value={formData.end_panel_color || ""} 
+                            onChange={(e) => handleInputChange("end_panel_color", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Plinth/Filler Color</label>
+                          <Input 
+                            value={formData.plinth_filler_color || ""} 
+                            onChange={(e) => handleInputChange("plinth_filler_color", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Cabinet Color */}
                       <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Panel Color</label>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Cabinet Color</label>
                         <Input 
-                          value={formData.end_panel_color || ""} 
-                          onChange={(e) => handleInputChange("end_panel_color", e.target.value)}
+                          value={formData.cabinet_color || ""} 
+                          onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
                           readOnly={!isEditing} 
                           className="bg-white" 
                         />
                       </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Plinth/Filler Color</label>
-                        <Input 
-                          value={formData.plinth_filler_color || ""} 
-                          onChange={(e) => handleInputChange("plinth_filler_color", e.target.value)}
-                          readOnly={!isEditing} 
-                          className="bg-white" 
-                        />
-                      </div>
-                    </div>
 
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Cabinet Color</label>
-                      <Input 
-                        value={formData.cabinet_color || ""} 
-                        onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                      />
-                    </div>
-
-                    {/* Additional Doors Section */}
-                    {formData.additional_doors && formData.additional_doors.length > 0 && (
+                      {/* Additional Doors */}
                       <div className="border-t pt-4">
                         <div className="mb-3 flex items-center justify-between">
                           <label className="text-sm font-bold text-gray-700">Door Details (Additional Doors)</label>
@@ -798,771 +828,1174 @@ export default function ChecklistViewPage() {
                             </Button>
                           )}
                         </div>
-                        {formData.additional_doors.map((door, idx) => (
-                          <div key={idx} className="mb-3 grid grid-cols-1 gap-3 rounded border border-green-300 bg-white p-3 md:grid-cols-4">
-                            <div>
-                              <label className="mb-1 block text-xs font-bold text-gray-600">Door Style</label>
-                              {isEditing ? (
-                                <select
-                                  className="w-full rounded-md border border-gray-300 p-2 text-sm"
-                                  value={door.door_style || ""}
-                                  onChange={(e) => handleAdditionalDoorChange(idx, "door_style", e.target.value)}
-                                >
-                                  <option value="">Select</option>
-                                  <option value="vinyl">Vinyl</option>
-                                  <option value="slab">Slab</option>
-                                  <option value="glazed">Glazed</option>
-                                  <option value="shaker">Shaker</option>
-                                  <option value="N/A">N/A</option>
-                                </select>
-                              ) : (
-                                <Input value={door.door_style || ""} readOnly className="text-sm" />
+                        {formData.additional_doors && formData.additional_doors.map((door, idx) => (
+                          <div key={idx} className="mb-3 space-y-3 rounded border-2 border-green-300 bg-white p-4">
+                            {/* Door Style and Door Color + Conditional Fields */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Door Style</label>
+                                {isEditing ? (
+                                  <select
+                                    className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                    value={door.door_style || ""}
+                                    onChange={(e) => handleAdditionalDoorChange(idx, "door_style", e.target.value)}
+                                  >
+                                    <option value="">Select</option>
+                                    <option value="vinyl">Vinyl</option>
+                                    <option value="slab">Slab</option>
+                                    <option value="glazed">Glazed</option>
+                                    <option value="shaker">Shaker</option>
+                                    <option value="N/A">N/A</option>
+                                  </select>
+                                ) : (
+                                  <Input value={door.door_style || ""} readOnly className="text-sm" />
+                                )}
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Door Color</label>
+                                <Input 
+                                  value={door.door_color || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "door_color", e.target.value)}
+                                  readOnly={!isEditing}
+                                  className="text-sm" 
+                                />
+                              </div>
+
+                              {/* Show Door Manufacturer and Door Name if Vinyl */}
+                              {door.door_style === "vinyl" && (
+                                <>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Door Manufacturer</label>
+                                    {isEditing ? (
+                                      <select
+                                        className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                        value={door.door_manufacturer || ""}
+                                        onChange={(e) => handleAdditionalDoorChange(idx, "door_manufacturer", e.target.value)}
+                                      >
+                                        <option value="">Select manufacturer</option>
+                                        <option value="Integral">Integral</option>
+                                        <option value="Trade mouldings">Trade mouldings</option>
+                                        <option value="Hpp">Hpp</option>
+                                        <option value="Uform">Uform</option>
+                                        <option value="Other">Other</option>
+                                      </select>
+                                    ) : (
+                                      <Input value={door.door_manufacturer || ""} readOnly className="text-sm" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Door Name</label>
+                                    <Input 
+                                      value={door.door_name || ""} 
+                                      onChange={(e) => handleAdditionalDoorChange(idx, "door_name", e.target.value)}
+                                      readOnly={!isEditing}
+                                      className="text-sm" 
+                                    />
+                                  </div>
+                                </>
+                              )}
+
+                              {/* Show Glazing Material if Glazed */}
+                              {door.door_style === "glazed" && (
+                                <div className="col-span-2">
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Glazing Material</label>
+                                  {isEditing ? (
+                                    <select
+                                      className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                      value={door.glazing_material || ""}
+                                      onChange={(e) => handleAdditionalDoorChange(idx, "glazing_material", e.target.value)}
+                                    >
+                                      <option value="">Select material</option>
+                                      <option value="vinyl">Vinyl</option>
+                                      <option value="aluminium">Aluminium</option>
+                                      <option value="N/A">N/A</option>
+                                    </select>
+                                  ) : (
+                                    <Input value={door.glazing_material || ""} readOnly className="text-sm" />
+                                  )}
+                                </div>
                               )}
                             </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-bold text-gray-600">Door Color</label>
-                              <Input 
-                                value={door.door_color || ""} 
-                                onChange={(e) => handleAdditionalDoorChange(idx, "door_color", e.target.value)}
-                                readOnly={!isEditing}
-                                className="text-sm" 
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
-                              <Input 
-                                value={door.quantity || ""} 
-                                onChange={(e) => handleAdditionalDoorChange(idx, "quantity", e.target.value)}
-                                readOnly={!isEditing}
-                                type="text"
-                                className="text-sm" 
-                              />
-                            </div>
-                            {isEditing && (
-                              <div className="flex items-end">
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => removeAdditionalDoor(idx)}
-                                  className="w-full"
-                                >
-                                  Remove
-                                </Button>
+
+                            {/* Panel Color and Plinth/Filler Color */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Panel Color</label>
+                                <Input 
+                                  value={door.panel_color || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "panel_color", e.target.value)}
+                                  readOnly={!isEditing}
+                                  className="text-sm" 
+                                />
                               </div>
-                            )}
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Plinth/Filler Color</label>
+                                <Input 
+                                  value={door.plinth_color || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "plinth_color", e.target.value)}
+                                  readOnly={!isEditing}
+                                  className="text-sm" 
+                                />
+                              </div>
+                            </div>
+
+                            {/* Cabinet Color (full width) */}
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Cabinet Color</label>
+                              <Input 
+                                value={door.cabinet_color || ""} 
+                                onChange={(e) => handleAdditionalDoorChange(idx, "cabinet_color", e.target.value)}
+                                readOnly={!isEditing}
+                                className="text-sm" 
+                              />
+                            </div>
+
+                            {/* Quantity and Remove Button */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
+                                <Input 
+                                  value={door.quantity || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "quantity", e.target.value)}
+                                  readOnly={!isEditing}
+                                  type="text"
+                                  className="text-sm" 
+                                />
+                              </div>
+                              {isEditing && (
+                                <div className="flex items-end">
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => removeAdditionalDoor(idx)}
+                                    className="w-full"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. Hardware Specifications - Purple Section */}
-                <div className="mb-6 rounded-lg border-2 border-purple-200 bg-purple-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-purple-900">2. Hardware Specifications</h3>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
-                      <Input 
-                        value={formData.handles_code || ""} 
-                        onChange={(e) => handleInputChange("handles_code", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Quantity</label>
-                      <Input 
-                        value={formData.handles_quantity || ""} 
-                        onChange={(e) => handleInputChange("handles_quantity", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Size</label>
-                      <Input 
-                        value={formData.handles_size || ""} 
-                        onChange={(e) => handleInputChange("handles_size", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                      />
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Accessories (e.g., Pullouts)</label>
-                      <textarea
-                        className={`h-20 w-full resize-none rounded-md border border-gray-300 bg-white p-3 ${!isEditing ? "cursor-not-allowed" : ""}`}
-                        value={formData.accessories || ""}
-                        onChange={(e) => handleInputChange("accessories", e.target.value)}
-                        readOnly={!isEditing}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Lighting Specification</label>
-                      <textarea
-                        className={`h-20 w-full resize-none rounded-md border border-gray-300 bg-white p-3 ${!isEditing ? "cursor-not-allowed" : ""}`}
-                        value={formData.lighting_spec || ""}
-                        onChange={(e) => handleInputChange("lighting_spec", e.target.value)}
-                        readOnly={!isEditing}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Lighting Details */}
-                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Under Wall Unit Lights</label>
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <select
-                            className="w-full rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.under_wall_unit_lights_color || ""}
-                            onChange={(e) => handleInputChange("under_wall_unit_lights_color", e.target.value)}
-                          >
-                            <option value="">Main Colour</option>
-                            <option value="cool-white">Cool White</option>
-                            <option value="warm-white">Warm White</option>
-                            <option value="N/A">N/A</option>
-                          </select>
-                          <select
-                            className="w-full rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.under_wall_unit_lights_profile || ""}
-                            onChange={(e) => handleInputChange("under_wall_unit_lights_profile", e.target.value)}
-                          >
-                            <option value="">Profile Colour</option>
-                            <option value="black">Black</option>
-                            <option value="white">White</option>
-                            <option value="N/A">N/A</option>
-                          </select>
-                        </div>
-                      ) : (
-                        <>
-                          <Input value={formData.under_wall_unit_lights_color || ""} readOnly className="mb-2 bg-white" placeholder="Main Color" />
-                          <Input value={formData.under_wall_unit_lights_profile || ""} readOnly className="bg-white" placeholder="Profile" />
-                        </>
-                      )}
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Under Worktop Lights</label>
-                      {isEditing ? (
-                        <select
-                          className="w-full rounded-md border border-gray-300 bg-white p-2"
-                          value={formData.under_worktop_lights_color || ""}
-                          onChange={(e) => handleInputChange("under_worktop_lights_color", e.target.value)}
-                        >
-                          <option value="">Colour</option>
-                          <option value="cool-white">Cool White</option>
-                          <option value="warm-white">Warm White</option>
-                          <option value="N/A">N/A</option>
-                        </select>
-                      ) : (
-                        <Input value={formData.under_worktop_lights_color || ""} readOnly className="bg-white" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Worktop Specifications - Orange Section */}
-                <div className="mb-6 rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-orange-900">3. Worktop Specifications (Ordering)</h3>
-                  
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Material Type</label>
-                      {isEditing ? (
-                        <select
-                          className="w-full rounded-md border border-gray-300 bg-white p-2"
-                          value={formData.worktop_material_type || ""}
-                          onChange={(e) => handleInputChange("worktop_material_type", e.target.value)}
-                        >
-                          <option value="">Select material type</option>
-                          <option value="stone">Stone</option>
-                          <option value="laminate">Laminate</option>
-                        </select>
-                      ) : (
-                        <Input value={formData.worktop_material_type || ""} readOnly className="bg-white" />
-                      )}
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Material Color</label>
-                      <Input 
-                        value={formData.worktop_material_color || ""} 
-                        onChange={(e) => handleInputChange("worktop_material_color", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Size/Thickness</label>
-                      {isEditing ? (
-                        <select
-                          className="w-full rounded-md border border-gray-300 bg-white p-2"
-                          value={formData.worktop_size || ""}
-                          onChange={(e) => handleInputChange("worktop_size", e.target.value)}
-                        >
-                          <option value="">Select thickness</option>
-                          <option value="12mm">12mm</option>
-                          <option value="18mm">18mm</option>
-                          <option value="20mm">20mm</option>
-                          <option value="25mm">25mm</option>
-                          <option value="30mm">30mm</option>
-                          <option value="38mm">38mm</option>
-                          <option value="N/A">N/A</option>
-                        </select>
-                      ) : (
-                        <Input value={formData.worktop_size || ""} readOnly className="bg-white" />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <label className="mb-2 block text-sm font-bold text-gray-700">Worktop Further Info</label>
-                    <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                      {[
-                        "Upstand",
-                        "Splashback",
-                        "Wall Cladding",
-                        "Sink Cut Out",
-                        "Drainer Grooves",
-                        "Hob Cut Out",
-                        "Window Cill",
-                        "LED Grooves",
-                      ].map((item) => (
-                        <label key={item} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            className="rounded"
-                            checked={formData.worktop_features?.includes(item) || false}
-                            onChange={(e) => handleCheckboxChange("worktop_features", item, e.target.checked)}
-                            disabled={!isEditing}
+                  {/* 2. Hardware Specifications - Purple Section */}
+                  <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-6">
+                    <h3 className="mb-4 text-xl font-bold text-purple-900">2. Hardware Specifications</h3>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
+                          <Input 
+                            value={formData.handles_code || ""} 
+                            onChange={(e) => handleInputChange("handles_code", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
                           />
-                          <span className="text-sm">{item}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <Input 
-                      placeholder="Other worktop details"
-                      className="mt-3 w-full bg-white"
-                      value={formData.worktop_other_details || ""}
-                      onChange={(e) => handleInputChange("worktop_other_details", e.target.value)}
-                      readOnly={!isEditing}
-                    />
-                  </div>
-                </div>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Handle Quantity</label>
+                          <Input 
+                            value={formData.handles_quantity || ""} 
+                            onChange={(e) => handleInputChange("handles_quantity", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Handle Size</label>
+                          <Input 
+                            value={formData.handles_size || ""} 
+                            onChange={(e) => handleInputChange("handles_size", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+                      </div>
 
-                {/* 4. Appliance and Sink & Tap - Yellow Section */}
-                <div className="mb-6 rounded-lg border-2 border-yellow-200 bg-yellow-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-yellow-900">4. Appliance and Sink & Tap Information</h3>
-                  
-                  <div className="mb-6">
-                    <label className="mb-2 block text-sm font-bold text-gray-700">Appliances Customer Owned</label>
-                    {isEditing ? (
-                      <select
-                        className="w-full rounded-md border border-gray-300 bg-white p-2"
-                        value={formData.appliances_customer_owned || ""}
-                        onChange={(e) => handleInputChange("appliances_customer_owned", e.target.value)}
-                      >
-                        <option value="">Select</option>
-                        <option value="yes">Yes</option>
-                        <option value="no">No</option>
-                        <option value="N/A">N/A</option>
-                      </select>
-                    ) : (
-                      <Input value={formData.appliances_customer_owned || ""} readOnly className="bg-white" />
-                    )}
-                  </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Accessories (e.g., Pullouts)</label>
+                        <textarea
+                          className={`h-16 w-full resize-none rounded-md border border-gray-300 bg-white p-2 text-sm ${!isEditing ? "cursor-not-allowed" : ""}`}
+                          value={formData.accessories || ""}
+                          onChange={(e) => handleInputChange("accessories", e.target.value)}
+                          readOnly={!isEditing}
+                        />
+                      </div>
 
-                  {formData.appliances_customer_owned && formData.appliances && formData.appliances.length > 0 && (
-                    <div className="mb-6">
-                      <label className="mb-2 block text-sm font-bold text-gray-700">
-                        {formData.appliances_customer_owned === "yes"
-                          ? "Customer Owned Appliances Details"
-                          : "Client Supplied Appliances Details"}
-                      </label>
-                      <div className="space-y-3">
-                        {standardAppliances.map((appliance, idx) => {
-                          const appData = formData.appliances[idx] || { make: "", model: "", order_date: "" };
-                          
-                          // Skip if completely empty
-                          if (!appData.make && !appData.model && !appData.order_date) return null;
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Lighting Specification</label>
+                        <textarea
+                          className={`h-16 w-full resize-none rounded-md border border-gray-300 bg-white p-2 text-sm ${!isEditing ? "cursor-not-allowed" : ""}`}
+                          value={formData.lighting_spec || ""}
+                          onChange={(e) => handleInputChange("lighting_spec", e.target.value)}
+                          readOnly={!isEditing}
+                        />
+                      </div>
 
-                          return (
-                            <div key={appliance} className="rounded border border-yellow-300 bg-white p-3">
-                              <label className="mb-2 block text-sm font-bold text-gray-700">{appliance}</label>
-                              <div className={`grid ${standardApplianceGridTemplate} gap-3`}>
-                                <div>
-                                  <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
-                                  <Input
-                                    value={appData.make || ""}
-                                    onChange={(e) => handleApplianceChange(idx, "make", e.target.value)}
-                                    readOnly={!isEditing}
-                                    className="w-full"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
-                                  <Input
-                                    value={appData.model || ""}
-                                    onChange={(e) => handleApplianceChange(idx, "model", e.target.value)}
-                                    readOnly={!isEditing}
-                                    className="w-full"
-                                  />
-                                </div>
-                                {showOrderDate && (
-                                  <div>
-                                    <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
-                                    <input
-                                      type="date"
-                                      className={`w-full rounded-md border border-gray-300 p-2 ${!isEditing ? "cursor-not-allowed" : ""}`}
-                                      value={appData.order_date || ""}
-                                      onChange={(e) => handleApplianceChange(idx, "order_date", e.target.value)}
-                                      readOnly={!isEditing}
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                        
-                        {formData.other_appliances && (
-                          <div>
-                            <label className="mb-1 block text-xs font-bold text-gray-600">Other / Misc Appliances</label>
-                            <Input
-                              value={formData.other_appliances || ""}
-                              onChange={(e) => handleInputChange("other_appliances", e.target.value)}
-                              readOnly={!isEditing}
-                              className="w-full"
-                            />
+                      {/* Lighting Details */}
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Under Wall Unit Lights</label>
+                        {isEditing ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm"
+                              value={formData.under_wall_unit_lights_color || ""}
+                              onChange={(e) => handleInputChange("under_wall_unit_lights_color", e.target.value)}
+                            >
+                              <option value="">Main Colour</option>
+                              <option value="cool-white">Cool White</option>
+                              <option value="warm-white">Warm White</option>
+                              <option value="N/A">N/A</option>
+                            </select>
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm"
+                              value={formData.under_wall_unit_lights_profile || ""}
+                              onChange={(e) => handleInputChange("under_wall_unit_lights_profile", e.target.value)}
+                            >
+                              <option value="">Profile Colour</option>
+                              <option value="black">Black</option>
+                              <option value="white">White</option>
+                              <option value="N/A">N/A</option>
+                            </select>
                           </div>
+                        ) : (
+                          <Input value={`${formData.under_wall_unit_lights_color || ""} / ${formData.under_wall_unit_lights_profile || ""}`} readOnly className="bg-white" />
                         )}
                       </div>
-                    </div>
-                  )}
 
-                  <div>
-                    <label className="mb-2 block text-sm font-bold text-gray-700">Sink & Tap Customer Owned</label>
-                    {isEditing ? (
-                      <select
-                        className="w-full rounded-md border border-gray-300 bg-white p-2"
-                        value={formData.sink_tap_customer_owned || ""}
-                        onChange={(e) => handleInputChange("sink_tap_customer_owned", e.target.value)}
-                      >
-                        <option value="">Select</option>
-                        <option value="yes">Yes</option>
-                        <option value="no">No</option>
-                        <option value="N/A">N/A</option>
-                      </select>
-                    ) : (
-                      <Input value={formData.sink_tap_customer_owned || ""} readOnly className="bg-white" />
-                    )}
-                  </div>
-
-                  {formData.sink_tap_customer_owned && (
-                    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Sink Details</label>
-                        <Input 
-                          placeholder="Sink details (e.g., Make/Size)"
-                          value={formData.sink_details || ""}
-                          onChange={(e) => handleInputChange("sink_details", e.target.value)}
-                          readOnly={!isEditing}
-                          className="bg-white"
-                        />
-                        <Input 
-                          placeholder="Sink model code"
-                          value={formData.sink_model || ""}
-                          onChange={(e) => handleInputChange("sink_model", e.target.value)}
-                          readOnly={!isEditing}
-                          className="bg-white"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Tap Details</label>
-                        <Input 
-                          placeholder="Tap details (e.g., Make)"
-                          value={formData.tap_details || ""}
-                          onChange={(e) => handleInputChange("tap_details", e.target.value)}
-                          readOnly={!isEditing}
-                          className="bg-white"
-                        />
-                        <Input 
-                          placeholder="Tap model code"
-                          value={formData.tap_model || ""}
-                          onChange={(e) => handleInputChange("tap_model", e.target.value)}
-                          readOnly={!isEditing}
-                          className="bg-white"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* BEDROOM SPECIFIC SECTIONS */}
-            {formType === "bedroom" && (
-              <>
-                {/* 1. Material Specifications - Green Section */}
-                <div className="mb-6 rounded-lg border-2 border-green-200 bg-green-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-green-900">1. Material Specifications</h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Under Worktop Lights</label>
                         {isEditing ? (
                           <select
-                            className="w-full rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.door_style || ""}
-                            onChange={(e) => handleInputChange("door_style", e.target.value)}
-                          >
-                            <option value="">Select door style</option>
-                            <option value="vinyl">Vinyl</option>
-                            <option value="slab">Slab</option>
-                            <option value="shaker">Shaker</option>
-                            <option value="N/A">N/A</option>
-                          </select>
-                        ) : (
-                          <Input value={formData.door_style || ""} readOnly className="bg-white" />
-                        )}
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Door Color</label>
-                        <Input 
-                          value={formData.door_color || ""} 
-                          onChange={(e) => handleInputChange("door_color", e.target.value)}
-                          readOnly={!isEditing} 
-                          className="bg-white" 
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Panel Color</label>
-                        <Input 
-                          value={formData.end_panel_color || ""} 
-                          onChange={(e) => handleInputChange("end_panel_color", e.target.value)}
-                          readOnly={!isEditing} 
-                          className="bg-white" 
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Plinth/Filler Color</label>
-                        <Input 
-                          value={formData.plinth_filler_color || ""} 
-                          onChange={(e) => handleInputChange("plinth_filler_color", e.target.value)}
-                          readOnly={!isEditing} 
-                          className="bg-white" 
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Cabinet Color</label>
-                      <Input 
-                        value={formData.cabinet_color || ""} 
-                        onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Color</label>
-                      <Input 
-                        value={formData.worktop_material_color || ""} 
-                        onChange={(e) => handleInputChange("worktop_material_color", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Hardware Specifications - Purple Section */}
-                <div className="mb-6 rounded-lg border-2 border-purple-200 bg-purple-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-purple-900">2. Hardware Specifications</h3>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
-                      <Input 
-                        value={formData.handles_code || ""} 
-                        onChange={(e) => handleInputChange("handles_code", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Quantity</label>
-                      <Input 
-                        value={formData.handles_quantity || ""} 
-                        onChange={(e) => handleInputChange("handles_quantity", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Size</label>
-                      <Input 
-                        value={formData.handles_size || ""} 
-                        onChange={(e) => handleInputChange("handles_size", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Bedroom Furniture - Orange Section */}
-                <div className="mb-6 rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-orange-900">3. Bedroom Furniture Specifications</h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Bedside Cabinets</label>
-                        {isEditing ? (
-                          <>
-                            <select
-                              className="w-full rounded-md border border-gray-300 bg-white p-2"
-                              value={formData.bedside_cabinets_type || ""}
-                              onChange={(e) => handleInputChange("bedside_cabinets_type", e.target.value)}
-                            >
-                              <option value="">Select option</option>
-                              <option value="floating">Floating</option>
-                              <option value="fitted">Fitted</option>
-                              <option value="freestand">Freestand</option>
-                              <option value="N/A">N/A</option>
-                            </select>
-                            <Input
-                              placeholder="Quantity"
-                              className="mt-2 w-full bg-white"
-                              type="text"
-                              value={formData.bedside_cabinets_qty || ""}
-                              onChange={(e) => handleInputChange("bedside_cabinets_qty", e.target.value)}
-                            />
-                          </>
-                        ) : (
-                          <>
-                            <Input value={formData.bedside_cabinets_type || ""} readOnly className="bg-white" />
-                            <Input value={formData.bedside_cabinets_qty || ""} readOnly className="mt-2 bg-white" placeholder="Quantity" />
-                          </>
-                        )}
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Dresser/Desk</label>
-                        {isEditing ? (
-                          <>
-                            <select
-                              className="w-full rounded-md border border-gray-300 bg-white p-2"
-                              value={formData.dresser_desk || ""}
-                              onChange={(e) => handleInputChange("dresser_desk", e.target.value)}
-                            >
-                              <option value="">Select option</option>
-                              <option value="yes">Yes</option>
-                              <option value="no">No</option>
-                              <option value="N/A">N/A</option>
-                            </select>
-                            <Input
-                              placeholder="QTY/Size"
-                              className="mt-2 w-full bg-white"
-                              value={formData.dresser_desk_details || ""}
-                              onChange={(e) => handleInputChange("dresser_desk_details", e.target.value)}
-                            />
-                          </>
-                        ) : (
-                          <>
-                            <Input value={formData.dresser_desk || ""} readOnly className="bg-white" />
-                            <Input value={formData.dresser_desk_details || ""} readOnly className="mt-2 bg-white" placeholder="Details" />
-                          </>
-                        )}
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Internal Mirror</label>
-                        {isEditing ? (
-                          <>
-                            <select
-                              className="w-full rounded-md border border-gray-300 bg-white p-2"
-                              value={formData.internal_mirror || ""}
-                              onChange={(e) => handleInputChange("internal_mirror", e.target.value)}
-                            >
-                              <option value="">Select option</option>
-                              <option value="yes">Yes</option>
-                              <option value="no">No</option>
-                              <option value="N/A">N/A</option>
-                            </select>
-                            <Input
-                              placeholder="QTY/Size"
-                              className="mt-2 w-full bg-white"
-                              value={formData.internal_mirror_details || ""}
-                              onChange={(e) => handleInputChange("internal_mirror_details", e.target.value)}
-                            />
-                          </>
-                        ) : (
-                          <>
-                            <Input value={formData.internal_mirror || ""} readOnly className="bg-white" />
-                            <Input value={formData.internal_mirror_details || ""} readOnly className="mt-2 bg-white" placeholder="Details" />
-                          </>
-                        )}
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Mirror</label>
-                        {isEditing ? (
-                          <>
-                            <select
-                              className="w-full rounded-md border border-gray-300 bg-white p-2"
-                              value={formData.mirror_type || ""}
-                              onChange={(e) => handleInputChange("mirror_type", e.target.value)}
-                            >
-                              <option value="">Select option</option>
-                              <option value="silver">Silver</option>
-                              <option value="bronze">Bronze</option>
-                              <option value="grey">Grey</option>
-                              <option value="N/A">N/A</option>
-                            </select>
-                            <Input
-                              placeholder="Quantity"
-                              className="mt-2 w-full bg-white"
-                              type="text"
-                              value={formData.mirror_qty || ""}
-                              onChange={(e) => handleInputChange("mirror_qty", e.target.value)}
-                            />
-                          </>
-                        ) : (
-                          <>
-                            <Input value={formData.mirror_type || ""} readOnly className="bg-white" />
-                            <Input value={formData.mirror_qty || ""} readOnly className="mt-2 bg-white" placeholder="Quantity" />
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. Lighting - Yellow Section */}
-                <div className="mb-6 rounded-lg border-2 border-yellow-200 bg-yellow-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-yellow-900">4. Lighting Specifications</h3>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Soffit Lights</label>
-                      {isEditing ? (
-                        <div className="flex gap-2">
-                          <select
-                            className="flex-1 rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.soffit_lights_type || ""}
-                            onChange={(e) => handleInputChange("soffit_lights_type", e.target.value)}
-                          >
-                            <option value="">Select type</option>
-                            <option value="spot">Spot</option>
-                            <option value="strip">Strip</option>
-                            <option value="N/A">N/A</option>
-                          </select>
-                          <select
-                            className="flex-1 rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.soffit_lights_color || ""}
-                            onChange={(e) => handleInputChange("soffit_lights_color", e.target.value)}
+                            className="w-full rounded-md border border-gray-300 bg-white p-2 text-sm"
+                            value={formData.under_worktop_lights_color || ""}
+                            onChange={(e) => handleInputChange("under_worktop_lights_color", e.target.value)}
                           >
                             <option value="">Colour</option>
                             <option value="cool-white">Cool White</option>
                             <option value="warm-white">Warm White</option>
                             <option value="N/A">N/A</option>
                           </select>
-                        </div>
-                      ) : (
-                        <Input value={`${formData.soffit_lights_type || ""} - ${formData.soffit_lights_color || ""}`} readOnly className="bg-white" />
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Gable Lights</label>
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <select
-                            className="w-full rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.gable_lights_type || ""}
-                            onChange={(e) => handleInputChange("gable_lights_type", e.target.value)}
-                          >
-                            <option value="">Select type</option>
-                            <option value="rocker">Rocker</option>
-                            <option value="sensor">Sensor</option>
-                            <option value="N/A">N/A</option>
-                          </select>
-                          <select
-                            className="w-full rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.gable_lights_main_color || ""}
-                            onChange={(e) => handleInputChange("gable_lights_main_color", e.target.value)}
-                          >
-                            <option value="">Main Colour</option>
-                            <option value="cool-white">Cool White</option>
-                            <option value="warm-white">Warm White</option>
-                            <option value="N/A">N/A</option>
-                          </select>
-                          <select
-                            className="w-full rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.gable_lights_profile_color || ""}
-                            onChange={(e) => handleInputChange("gable_lights_profile_color", e.target.value)}
-                          >
-                            <option value="">Profile Colour</option>
-                            <option value="black">Black</option>
-                            <option value="white">White</option>
-                            <option value="N/A">N/A</option>
-                          </select>
-                        </div>
-                      ) : (
-                        <>
-                          <Input value={formData.gable_lights_type || ""} readOnly className="mb-2 bg-white" placeholder="Type" />
-                          <Input value={formData.gable_lights_main_color || ""} readOnly className="mb-2 bg-white" placeholder="Main Color" />
-                          <Input value={formData.gable_lights_profile_color || ""} readOnly className="bg-white" placeholder="Profile Color" />
-                        </>
-                      )}
+                        ) : (
+                          <Input value={formData.under_worktop_lights_color || ""} readOnly className="bg-white" />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* 5. Accessories & Floor Protection - Pink Section */}
-                <div className="mb-6 rounded-lg border-2 border-pink-200 bg-pink-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-pink-900">5. Accessories & Floor Protection</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Other/Misc/Accessories</label>
-                      <textarea
-                        className={`h-20 w-full resize-none rounded-md border border-gray-300 bg-white p-3 ${!isEditing ? "cursor-not-allowed" : ""}`}
-                        value={formData.other_accessories || ""}
-                        onChange={(e) => handleInputChange("other_accessories", e.target.value)}
-                        readOnly={!isEditing}
-                      />
-                    </div>
+                  {/* 3. Worktop Specifications - Orange Section */}
+                  <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
+                    <h3 className="mb-4 text-xl font-bold text-orange-900">3. Worktop Specifications (Ordering)</h3>
+                    
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Material Type</label>
+                          {isEditing ? (
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white p-2"
+                              value={formData.worktop_material_type || ""}
+                              onChange={(e) => handleInputChange("worktop_material_type", e.target.value)}
+                            >
+                              <option value="">Select material type</option>
+                              <option value="stone">Stone</option>
+                              <option value="laminate">Laminate</option>
+                            </select>
+                          ) : (
+                            <Input value={formData.worktop_material_type || ""} readOnly className="bg-white" />
+                          )}
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Material Color</label>
+                          <Input 
+                            value={formData.worktop_material_color || ""} 
+                            onChange={(e) => handleInputChange("worktop_material_color", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Size/Thickness</label>
+                          {isEditing ? (
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white p-2"
+                              value={formData.worktop_size || ""}
+                              onChange={(e) => handleInputChange("worktop_size", e.target.value)}
+                            >
+                              <option value="">Select thickness</option>
+                              <option value="12mm">12mm</option>
+                              <option value="18mm">18mm</option>
+                              <option value="20mm">20mm</option>
+                              <option value="25mm">25mm</option>
+                              <option value="30mm">30mm</option>
+                              <option value="38mm">38mm</option>
+                              <option value="N/A">N/A</option>
+                            </select>
+                          ) : (
+                            <Input value={formData.worktop_size || ""} readOnly className="bg-white" />
+                          )}
+                        </div>
+                      </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-bold text-gray-700">Floor Protection</label>
-                      <div className="space-y-2">
-                        {["Carpet Protection", "Floor Tile Protection", "No Floor Protection Required"].map((item) => (
-                          <label key={item} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              className="rounded"
-                              checked={formData.floor_protection?.includes(item) || false}
-                              onChange={(e) => handleCheckboxChange("floor_protection", item, e.target.checked)}
-                              disabled={!isEditing}
-                            />
-                            <span>{item}</span>
-                          </label>
-                        ))}
+                      <div>
+                        <label className="mb-2 block text-sm font-bold text-gray-700">Worktop Further Info</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            "Upstand",
+                            "Splashback",
+                            "Wall Cladding",
+                            "Sink Cut Out",
+                            "Drainer Grooves",
+                            "Hob Cut Out",
+                            "Window Cill",
+                            "LED Grooves",
+                          ].map((item) => (
+                            <label key={item} className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                className="rounded"
+                                checked={formData.worktop_features?.includes(item) || false}
+                                onChange={(e) => handleCheckboxChange("worktop_features", item, e.target.checked)}
+                                disabled={!isEditing}
+                              />
+                              <span className="text-sm">{item}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <Input 
+                          placeholder="Other worktop details"
+                          className="mt-3 w-full bg-white"
+                          value={formData.worktop_other_details || ""}
+                          onChange={(e) => handleInputChange("worktop_other_details", e.target.value)}
+                          readOnly={!isEditing}
+                        />
                       </div>
                     </div>
                   </div>
                 </div>
-              </>
+
+                {/* RIGHT COLUMN */}
+                <div className="space-y-6">
+                  {/* 4. Appliance and Sink & Tap - Yellow Section */}
+                  <div className="rounded-lg border-2 border-yellow-200 bg-yellow-50 p-6">
+                    <h3 className="mb-4 text-xl font-bold text-yellow-900">4. Appliance and Sink & Tap Information</h3>
+                    
+                    {/* Appliances */}
+                    <div className="mb-6">
+                      <label className="mb-2 block text-sm font-bold text-gray-700">Appliances Customer Owned</label>
+                      {isEditing ? (
+                        <select
+                          className="w-full rounded-md border border-gray-300 bg-white p-2"
+                          value={formData.appliances_customer_owned || ""}
+                          onChange={(e) => handleInputChange("appliances_customer_owned", e.target.value)}
+                        >
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                          <option value="N/A">N/A</option>
+                        </select>
+                      ) : (
+                        <Input value={formData.appliances_customer_owned || ""} readOnly className="bg-white" />
+                      )}
+                    </div>
+
+                    {formData.appliances_customer_owned && formData.appliances && formData.appliances.length > 0 && (
+                      <div className="mb-6">
+                        <label className="mb-2 block text-sm font-bold text-gray-700">
+                          {formData.appliances_customer_owned === "yes"
+                            ? "Customer Owned Appliances Details"
+                            : "Client Supplied Appliances Details"}
+                        </label>
+                        <div className="space-y-3">
+                          {standardAppliances.map((appliance, idx) => {
+                            const appData = formData.appliances[idx] || { make: "", model: "", order_date: "" };
+                            
+                            // Skip if completely empty in view mode
+                            if (!isEditing && !appData.make && !appData.model && !appData.order_date) return null;
+
+                            return (
+                              <div key={appliance} className="rounded border border-yellow-300 bg-white p-3">
+                                <label className="mb-2 block text-sm font-bold text-gray-700">{appliance}</label>
+                                <div className={`grid ${standardApplianceGridTemplate} gap-3`}>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
+                                    <Input
+                                      value={appData.make || ""}
+                                      onChange={(e) => handleApplianceChange(idx, "make", e.target.value)}
+                                      readOnly={!isEditing}
+                                      className="w-full"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
+                                    <Input
+                                      value={appData.model || ""}
+                                      onChange={(e) => handleApplianceChange(idx, "model", e.target.value)}
+                                      readOnly={!isEditing}
+                                      className="w-full"
+                                    />
+                                  </div>
+                                  {showOrderDate && (
+                                    <div>
+                                      <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
+                                      <input
+                                        type="date"
+                                        className={`w-full rounded-md border border-gray-300 p-2 ${!isEditing ? "cursor-not-allowed" : ""}`}
+                                        value={appData.order_date || ""}
+                                        onChange={(e) => handleApplianceChange(idx, "order_date", e.target.value)}
+                                        readOnly={!isEditing}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Integrated Units */}
+                          <div className="space-y-3 border-t border-yellow-300 pt-3">
+                            {(isEditing || formData.integ_fridge_make || formData.integ_fridge_model) && (
+                              <div className="rounded border border-yellow-300 bg-white p-3">
+                                <label className="mb-2 block text-sm font-bold text-gray-700">INTG Fridge</label>
+                                <div className={`grid ${integUnitGridTemplate} gap-3`}>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">QTY</label>
+                                    <Input
+                                      placeholder="QTY"
+                                      type="text"
+                                      className="w-full"
+                                      value={formData.integ_fridge_qty || ""}
+                                      onChange={(e) => handleInputChange("integ_fridge_qty", e.target.value)}
+                                      readOnly={!isEditing}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
+                                    <Input
+                                      placeholder="Make"
+                                      className="w-full"
+                                      value={formData.integ_fridge_make || ""}
+                                      onChange={(e) => handleInputChange("integ_fridge_make", e.target.value)}
+                                      readOnly={!isEditing}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
+                                    <Input
+                                      placeholder="Model"
+                                      className="w-full"
+                                      value={formData.integ_fridge_model || ""}
+                                      onChange={(e) => handleInputChange("integ_fridge_model", e.target.value)}
+                                      readOnly={!isEditing}
+                                    />
+                                  </div>
+                                  {showOrderDate && (
+                                    <div>
+                                      <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
+                                      <input
+                                        type="date"
+                                        className={`w-full rounded-md border border-gray-300 p-2 ${!isEditing ? "cursor-not-allowed" : ""}`}
+                                        value={formData.integ_fridge_order_date || ""}
+                                        onChange={(e) => handleInputChange("integ_fridge_order_date", e.target.value)}
+                                        readOnly={!isEditing}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {(isEditing || formData.integ_freezer_make || formData.integ_freezer_model) && (
+                              <div className="rounded border border-yellow-300 bg-white p-3">
+                                <label className="mb-2 block text-sm font-bold text-gray-700">INTG Freezer</label>
+                                <div className={`grid ${integUnitGridTemplate} gap-3`}>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">QTY</label>
+                                    <Input
+                                      placeholder="QTY"
+                                      type="text"
+                                      className="w-full"
+                                      value={formData.integ_freezer_qty || ""}
+                                      onChange={(e) => handleInputChange("integ_freezer_qty", e.target.value)}
+                                      readOnly={!isEditing}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
+                                    <Input
+                                      placeholder="Make"
+                                      className="w-full"
+                                      value={formData.integ_freezer_make || ""}
+                                      onChange={(e) => handleInputChange("integ_freezer_make", e.target.value)}
+                                      readOnly={!isEditing}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
+                                    <Input
+                                      placeholder="Model"
+                                      className="w-full"
+                                      value={formData.integ_freezer_model || ""}
+                                      onChange={(e) => handleInputChange("integ_freezer_model", e.target.value)}
+                                      readOnly={!isEditing}
+                                    />
+                                  </div>
+                                  {showOrderDate && (
+                                    <div>
+                                      <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
+                                      <input
+                                        type="date"
+                                        className={`w-full rounded-md border border-gray-300 p-2 ${!isEditing ? "cursor-not-allowed" : ""}`}
+                                        value={formData.integ_freezer_order_date || ""}
+                                        onChange={(e) => handleInputChange("integ_freezer_order_date", e.target.value)}
+                                        readOnly={!isEditing}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {(isEditing || formData.other_appliances) && (
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Other / Misc Appliances</label>
+                              <Input
+                                placeholder="Enter any additional appliances"
+                                value={formData.other_appliances || ""}
+                                onChange={(e) => handleInputChange("other_appliances", e.target.value)}
+                                readOnly={!isEditing}
+                                className="w-full"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sink & Tap */}
+                    <div>
+                      <label className="mb-2 block text-sm font-bold text-gray-700">Sink & Tap Customer Owned</label>
+                      {isEditing ? (
+                        <select
+                          className="w-full rounded-md border border-gray-300 bg-white p-2"
+                          value={formData.sink_tap_customer_owned || ""}
+                          onChange={(e) => handleInputChange("sink_tap_customer_owned", e.target.value)}
+                        >
+                          <option value="">Select</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                          <option value="N/A">N/A</option>
+                        </select>
+                      ) : (
+                        <Input value={formData.sink_tap_customer_owned || ""} readOnly className="bg-white" />
+                      )}
+                    </div>
+
+                    {formData.sink_tap_customer_owned && (
+                      <div className="mt-4 space-y-4">
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Sink Details</label>
+                          <Input 
+                            placeholder="Sink details (e.g., Make/Size)"
+                            className="mb-2 w-full bg-white"
+                            value={formData.sink_details || ""}
+                            onChange={(e) => handleInputChange("sink_details", e.target.value)}
+                            readOnly={!isEditing}
+                          />
+                          <Input 
+                            placeholder="Sink model code"
+                            className="w-full bg-white"
+                            value={formData.sink_model || ""}
+                            onChange={(e) => handleInputChange("sink_model", e.target.value)}
+                            readOnly={!isEditing}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Tap Details</label>
+                          <Input 
+                            placeholder="Tap details (e.g., Make)"
+                            className="mb-2 w-full bg-white"
+                            value={formData.tap_details || ""}
+                            onChange={(e) => handleInputChange("tap_details", e.target.value)}
+                            readOnly={!isEditing}
+                          />
+                          <Input 
+                            placeholder="Tap model code"
+                            className="w-full bg-white"
+                            value={formData.tap_model || ""}
+                            onChange={(e) => handleInputChange("tap_model", e.target.value)}
+                            readOnly={!isEditing}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
 
-            {/* Terms and Conditions - Gray Section */}
+            {/* BEDROOM SPECIFIC SECTIONS */}
+            {formType === "bedroom" && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* LEFT COLUMN */}
+                <div className="space-y-6">
+                  {/* 1. Material Specifications - Green Section */}
+                  <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
+                    <h3 className="mb-4 text-xl font-bold text-green-900">1. Material Specifications</h3>
+                    <div className="space-y-4">
+                      {/* Dynamic Grid based on door style */}
+                      <div className="grid gap-4 grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
+                          {isEditing ? (
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white p-2"
+                              value={formData.door_style || ""}
+                              onChange={(e) => handleInputChange("door_style", e.target.value)}
+                            >
+                              <option value="">Select door style</option>
+                              <option value="vinyl">Vinyl</option>
+                              <option value="slab">Slab</option>
+                              <option value="shaker">Shaker</option>
+                              <option value="N/A">N/A</option>
+                            </select>
+                          ) : (
+                            <Input value={formData.door_style || ""} readOnly className="bg-white" />
+                          )}
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Door Color</label>
+                          <Input 
+                            value={formData.door_color || ""} 
+                            onChange={(e) => handleInputChange("door_color", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+
+                        {/* Conditional: Door Manufacturer and Door Name - if Vinyl */}
+                        {formData.door_style === "vinyl" && (
+                          <>
+                            <div>
+                              <label className="mb-1 block text-sm font-bold text-gray-700">Door Manufacturer</label>
+                              {isEditing ? (
+                                <select
+                                  className="w-full rounded-md border border-gray-300 bg-white p-2"
+                                  value={formData.door_manufacturer || ""}
+                                  onChange={(e) => handleInputChange("door_manufacturer", e.target.value)}
+                                >
+                                  <option value="">Select manufacturer</option>
+                                  <option value="Integral">Integral</option>
+                                  <option value="Trade mouldings">Trade mouldings</option>
+                                  <option value="Hpp">Hpp</option>
+                                  <option value="Uform">Uform</option>
+                                  <option value="Other">Other</option>
+                                </select>
+                              ) : (
+                                <Input value={formData.door_manufacturer || ""} readOnly className="bg-white" />
+                              )}
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-sm font-bold text-gray-700">Door Name</label>
+                              <Input 
+                                value={formData.door_name || ""} 
+                                onChange={(e) => handleInputChange("door_name", e.target.value)}
+                                readOnly={!isEditing} 
+                                className="bg-white" 
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Panel Color and Plinth/Filler Color */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Panel Color</label>
+                          <Input 
+                            value={formData.end_panel_color || ""} 
+                            onChange={(e) => handleInputChange("end_panel_color", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Plinth/Filler Color</label>
+                          <Input 
+                            value={formData.plinth_filler_color || ""} 
+                            onChange={(e) => handleInputChange("plinth_filler_color", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Cabinet Color and Worktop Color */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Cabinet Color</label>
+                          <Input 
+                            value={formData.cabinet_color || ""} 
+                            onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Color</label>
+                          <Input 
+                            value={formData.worktop_material_color || ""} 
+                            onChange={(e) => handleInputChange("worktop_material_color", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Additional Doors */}
+                      <div className="border-t pt-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <label className="text-sm font-bold text-gray-700">Door Details (Additional Doors)</label>
+                          {isEditing && (
+                            <Button type="button" size="sm" onClick={addAdditionalDoor} className="bg-green-600">
+                              + Add Additional Door
+                            </Button>
+                          )}
+                        </div>
+                        {formData.additional_doors && formData.additional_doors.map((door, idx) => (
+                          <div key={idx} className="mb-3 space-y-3 rounded border-2 border-green-300 bg-white p-4">
+                            {/* Door Style and Door Color + Conditional Fields */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Door Style</label>
+                                {isEditing ? (
+                                  <select
+                                    className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                    value={door.door_style || ""}
+                                    onChange={(e) => handleAdditionalDoorChange(idx, "door_style", e.target.value)}
+                                  >
+                                    <option value="">Select</option>
+                                    <option value="vinyl">Vinyl</option>
+                                    <option value="slab">Slab</option>
+                                    <option value="shaker">Shaker</option>
+                                    <option value="N/A">N/A</option>
+                                  </select>
+                                ) : (
+                                  <Input value={door.door_style || ""} readOnly className="text-sm" />
+                                )}
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Door Color</label>
+                                <Input 
+                                  value={door.door_color || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "door_color", e.target.value)}
+                                  readOnly={!isEditing}
+                                  className="text-sm" 
+                                />
+                              </div>
+
+                              {/* Show Door Manufacturer and Door Name if Vinyl */}
+                              {door.door_style === "vinyl" && (
+                                <>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Door Manufacturer</label>
+                                    {isEditing ? (
+                                      <select
+                                        className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                        value={door.door_manufacturer || ""}
+                                        onChange={(e) => handleAdditionalDoorChange(idx, "door_manufacturer", e.target.value)}
+                                      >
+                                        <option value="">Select manufacturer</option>
+                                        <option value="Integral">Integral</option>
+                                        <option value="Trade mouldings">Trade mouldings</option>
+                                        <option value="Hpp">Hpp</option>
+                                        <option value="Uform">Uform</option>
+                                        <option value="Other">Other</option>
+                                      </select>
+                                    ) : (
+                                      <Input value={door.door_manufacturer || ""} readOnly className="text-sm" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Door Name</label>
+                                    <Input 
+                                      value={door.door_name || ""} 
+                                      onChange={(e) => handleAdditionalDoorChange(idx, "door_name", e.target.value)}
+                                      readOnly={!isEditing}
+                                      className="text-sm" 
+                                    />
+                                  </div>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Panel Color and Plinth/Filler Color */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Panel Color</label>
+                                <Input 
+                                  value={door.panel_color || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "panel_color", e.target.value)}
+                                  readOnly={!isEditing}
+                                  className="text-sm" 
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Plinth/Filler Color</label>
+                                <Input 
+                                  value={door.plinth_color || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "plinth_color", e.target.value)}
+                                  readOnly={!isEditing}
+                                  className="text-sm" 
+                                />
+                              </div>
+                            </div>
+
+                            {/* Cabinet Color and Worktop Color */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Cabinet Color</label>
+                                <Input 
+                                  value={door.cabinet_color || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "cabinet_color", e.target.value)}
+                                  readOnly={!isEditing}
+                                  className="text-sm" 
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Worktop Color</label>
+                                <Input 
+                                  value={door.worktop_color || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "worktop_color", e.target.value)}
+                                  readOnly={!isEditing}
+                                  className="text-sm" 
+                                />
+                              </div>
+                            </div>
+
+                            {/* Quantity and Remove Button */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
+                                <Input 
+                                  value={door.quantity || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "quantity", e.target.value)}
+                                  readOnly={!isEditing}
+                                  type="text"
+                                  className="text-sm" 
+                                />
+                              </div>
+                              {isEditing && (
+                                <div className="flex items-end">
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => removeAdditionalDoor(idx)}
+                                    className="w-full"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Hardware Specifications - Purple Section */}
+                  <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-6">
+                    <h3 className="mb-4 text-xl font-bold text-purple-900">2. Hardware Specifications</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
+                        <Input 
+                          value={formData.handles_code || ""} 
+                          onChange={(e) => handleInputChange("handles_code", e.target.value)}
+                          readOnly={!isEditing} 
+                          className="bg-white" 
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Quantity</label>
+                        <Input 
+                          value={formData.handles_quantity || ""} 
+                          onChange={(e) => handleInputChange("handles_quantity", e.target.value)}
+                          readOnly={!isEditing} 
+                          className="bg-white" 
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Size</label>
+                        <Input 
+                          value={formData.handles_size || ""} 
+                          onChange={(e) => handleInputChange("handles_size", e.target.value)}
+                          readOnly={!isEditing} 
+                          className="bg-white" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Bedroom Furniture - Orange Section */}
+                  <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
+                    <h3 className="mb-4 text-xl font-bold text-orange-900">3. Bedroom Furniture Specifications</h3>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Bedside Cabinets</label>
+                          {isEditing ? (
+                            <>
+                              <select
+                                className="w-full rounded-md border border-gray-300 bg-white p-2"
+                                value={formData.bedside_cabinets_type || ""}
+                                onChange={(e) => handleInputChange("bedside_cabinets_type", e.target.value)}
+                              >
+                                <option value="">Select option</option>
+                                <option value="floating">Floating</option>
+                                <option value="fitted">Fitted</option>
+                                <option value="freestand">Freestand</option>
+                                <option value="N/A">N/A</option>
+                              </select>
+                              <Input
+                                placeholder="Quantity"
+                                className="mt-2 w-full bg-white"
+                                type="text"
+                                value={formData.bedside_cabinets_qty || ""}
+                                onChange={(e) => handleInputChange("bedside_cabinets_qty", e.target.value)}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <Input value={formData.bedside_cabinets_type || ""} readOnly className="bg-white" />
+                              <Input value={formData.bedside_cabinets_qty || ""} readOnly className="mt-2 bg-white" placeholder="Quantity" />
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Dresser/Desk</label>
+                          {isEditing ? (
+                            <>
+                              <select
+                                className="w-full rounded-md border border-gray-300 bg-white p-2"
+                                value={formData.dresser_desk || ""}
+                                onChange={(e) => handleInputChange("dresser_desk", e.target.value)}
+                              >
+                                <option value="">Select option</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                                <option value="N/A">N/A</option>
+                              </select>
+                              <Input
+                                placeholder="QTY/Size"
+                                className="mt-2 w-full bg-white"
+                                value={formData.dresser_desk_details || ""}
+                                onChange={(e) => handleInputChange("dresser_desk_details", e.target.value)}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <Input value={formData.dresser_desk || ""} readOnly className="bg-white" />
+                              <Input value={formData.dresser_desk_details || ""} readOnly className="mt-2 bg-white" placeholder="Details" />
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Internal Mirror</label>
+                          {isEditing ? (
+                            <>
+                              <select
+                                className="w-full rounded-md border border-gray-300 bg-white p-2"
+                                value={formData.internal_mirror || ""}
+                                onChange={(e) => handleInputChange("internal_mirror", e.target.value)}
+                              >
+                                <option value="">Select option</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                                <option value="N/A">N/A</option>
+                              </select>
+                              <Input
+                                placeholder="QTY/Size"
+                                className="mt-2 w-full bg-white"
+                                value={formData.internal_mirror_details || ""}
+                                onChange={(e) => handleInputChange("internal_mirror_details", e.target.value)}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <Input value={formData.internal_mirror || ""} readOnly className="bg-white" />
+                              <Input value={formData.internal_mirror_details || ""} readOnly className="mt-2 bg-white" placeholder="Details" />
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Mirror</label>
+                          {isEditing ? (
+                            <>
+                              <select
+                                className="w-full rounded-md border border-gray-300 bg-white p-2"
+                                value={formData.mirror_type || ""}
+                                onChange={(e) => handleInputChange("mirror_type", e.target.value)}
+                              >
+                                <option value="">Select option</option>
+                                <option value="silver">Silver</option>
+                                <option value="bronze">Bronze</option>
+                                <option value="grey">Grey</option>
+                                <option value="N/A">N/A</option>
+                              </select>
+                              <Input
+                                placeholder="Quantity"
+                                className="mt-2 w-full bg-white"
+                                type="text"
+                                value={formData.mirror_qty || ""}
+                                onChange={(e) => handleInputChange("mirror_qty", e.target.value)}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <Input value={formData.mirror_type || ""} readOnly className="bg-white" />
+                              <Input value={formData.mirror_qty || ""} readOnly className="mt-2 bg-white" placeholder="Quantity" />
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RIGHT COLUMN */}
+                <div className="space-y-6">
+                  {/* 4. Lighting - Yellow Section */}
+                  <div className="rounded-lg border-2 border-yellow-200 bg-yellow-50 p-6">
+                    <h3 className="mb-4 text-xl font-bold text-yellow-900">4. Lighting Specifications</h3>
+                    <div className="space-y-4">
+                      {/* Soffit Lights */}
+                      <div>
+                        <label className="mb-2 block text-sm font-bold text-gray-700">Soffit Lights</label>
+                        {isEditing ? (
+                          <div className="grid grid-cols-2 gap-4">
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white p-2"
+                              value={formData.soffit_lights_type || ""}
+                              onChange={(e) => handleInputChange("soffit_lights_type", e.target.value)}
+                            >
+                              <option value="">Select type</option>
+                              <option value="spot">Spot</option>
+                              <option value="strip">Strip</option>
+                              <option value="N/A">N/A</option>
+                            </select>
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white p-2"
+                              value={formData.soffit_lights_color || ""}
+                              onChange={(e) => handleInputChange("soffit_lights_color", e.target.value)}
+                            >
+                              <option value="">Colour</option>
+                              <option value="cool-white">Cool White</option>
+                              <option value="warm-white">Warm White</option>
+                              <option value="N/A">N/A</option>
+                            </select>
+                          </div>
+                        ) : (
+                          <Input value={`${formData.soffit_lights_type || ""} - ${formData.soffit_lights_color || ""}`} readOnly className="bg-white" />
+                        )}
+                      </div>
+
+                      {/* Gable Lights */}
+                      <div>
+                        <label className="mb-2 block text-sm font-bold text-gray-700">Gable Lights</label>
+                        {isEditing ? (
+                          <div className="space-y-2">
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white p-2"
+                              value={formData.gable_lights_type || ""}
+                              onChange={(e) => handleInputChange("gable_lights_type", e.target.value)}
+                            >
+                              <option value="">Select type</option>
+                              <option value="rocker">Rocker</option>
+                              <option value="sensor">Sensor</option>
+                              <option value="N/A">N/A</option>
+                            </select>
+                            <div className="grid grid-cols-2 gap-2">
+                              <select
+                                className="w-full rounded-md border border-gray-300 bg-white p-2"
+                                value={formData.gable_lights_main_color || ""}
+                                onChange={(e) => handleInputChange("gable_lights_main_color", e.target.value)}
+                              >
+                                <option value="">Main Colour</option>
+                                <option value="cool-white">Cool White</option>
+                                <option value="warm-white">Warm White</option>
+                                <option value="N/A">N/A</option>
+                              </select>
+                              <select
+                                className="w-full rounded-md border border-gray-300 bg-white p-2"
+                                value={formData.gable_lights_profile_color || ""}
+                                onChange={(e) => handleInputChange("gable_lights_profile_color", e.target.value)}
+                              >
+                                <option value="">Profile Colour</option>
+                                <option value="black">Black</option>
+                                <option value="white">White</option>
+                                <option value="N/A">N/A</option>
+                              </select>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <Input value={formData.gable_lights_type || ""} readOnly className="mb-2 bg-white" placeholder="Type" />
+                            <Input value={`${formData.gable_lights_main_color || ""} / ${formData.gable_lights_profile_color || ""}`} readOnly className="bg-white" placeholder="Colors" />
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5. Accessories & Floor Protection - Pink Section */}
+                  <div className="rounded-lg border-2 border-pink-200 bg-pink-50 p-6">
+                    <h3 className="mb-4 text-xl font-bold text-pink-900">5. Accessories & Floor Protection</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Other/Misc/Accessories</label>
+                        <textarea
+                          className={`h-20 w-full resize-none rounded-md border border-gray-300 bg-white p-3 ${!isEditing ? "cursor-not-allowed" : ""}`}
+                          value={formData.other_accessories || ""}
+                          onChange={(e) => handleInputChange("other_accessories", e.target.value)}
+                          readOnly={!isEditing}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-bold text-gray-700">Floor Protection</label>
+                        <div className="space-y-2">
+                          {["Carpet Protection", "Floor Tile Protection", "No Floor Protection Required"].map((item) => (
+                            <label key={item} className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                className="rounded"
+                                checked={formData.floor_protection?.includes(item) || false}
+                                onChange={(e) => handleCheckboxChange("floor_protection", item, e.target.checked)}
+                                disabled={!isEditing}
+                              />
+                              <span>{item}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Terms and Conditions - Gray Section (for both kitchen and bedroom) */}
             <div className="mb-6 rounded-lg border-2 border-gray-300 bg-gray-100 p-6">
               <h3 className="mb-4 text-xl font-bold text-gray-900">Terms & Information</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-sm font-bold text-gray-700">Date Terms and Conditions Given</label>
                   <Input
@@ -1593,7 +2026,7 @@ export default function ChecklistViewPage() {
                   )}
                 </div>
                 {formType === "kitchen" && (
-                  <div>
+                  <div className="md:col-span-2">
                     <label className="mb-1 block text-sm font-bold text-gray-700">
                       Appliance Promotion Information Given
                     </label>
@@ -1721,7 +2154,8 @@ export default function ChecklistViewPage() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
+

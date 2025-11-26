@@ -5,12 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar, PenTool, Upload } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { 
-  Home, BarChart3, Users, Briefcase, Package, CalendarDays, 
-  FileText, Wrench, MessageSquare, CheckSquare, Bell, Settings, 
-  Menu, X as CloseIcon 
-} from "lucide-react";
 import Link from "next/link";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
 
 interface Appliance {
   make: string;
@@ -44,8 +54,8 @@ interface FormData {
   deposit_date: string;
   door_style: string;
   door_color: string;
-  door_manufacturer: string;  // ADD THIS
-  door_name: string;  // ADD THIS
+  door_manufacturer: string;
+  door_name: string;
   glazing_material: string;
   plinth_filler_color: string;
   end_panel_color: string;
@@ -106,22 +116,9 @@ export default function FormPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const typeParam = searchParams.get("type");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const navItems = [
-  { icon: Home, label: "Dashboard", href: "/dashboard" },
-  { icon: BarChart3, label: "Sales Pipeline", href: "/dashboard/sales-pipeline" },
-  { icon: Users, label: "Customers", href: "/dashboard/customers" },
-  { icon: Briefcase, label: "Jobs", href: "/dashboard/jobs" },
-  { icon: Package, label: "Materials", href: "/dashboard/materials" },
-  { icon: CalendarDays, label: "Schedule", href: "/dashboard/schedule" },
-  { icon: FileText, label: "Forms/Checklists", href: "/dashboard/forms", active: true },
-  { icon: Wrench, label: "Appliances", href: "/dashboard/appliances" },
-  { icon: MessageSquare, label: "Chatbot", href: "/dashboard/chatbot" },
-  { icon: CheckSquare, label: "Approvals", href: "/dashboard/approvals" },
-  { icon: Bell, label: "Notifications", href: "/dashboard/notifications" },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
-];
-
+  
+  const [userRole, setUserRole] = useState<string>("manager");
+  const sidebarItems = getSidebarItems(userRole);
 
   const [formType, setFormType] = useState<"bedroom" | "kitchen">("bedroom");
   const [valid, setValid] = useState(true);
@@ -319,7 +316,18 @@ export default function FormPage() {
     setFormData((prev) => {
       const additional_doors = [...prev.additional_doors];
       if (!additional_doors[index]) {
-        additional_doors[index] = { door_style: "", door_color: "", quantity: "" };
+        additional_doors[index] = { 
+          door_style: "", 
+          door_color: "", 
+          door_manufacturer: "",
+          door_name: "",
+          glazing_material: "",
+          panel_color: "", 
+          plinth_color: "", 
+          cabinet_color: "",
+          worktop_color: "",
+          quantity: "" 
+        };
       }
       additional_doors[index] = { ...additional_doors[index], [field]: value };
       return { ...prev, additional_doors };
@@ -545,101 +553,68 @@ export default function FormPage() {
   const standardAppliances = ["Oven", "Microwave", "Washing Machine", "Dryer", "HOB", "Extractor", "INTG Dishwasher"];
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r bg-white transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex h-full flex-col">
-          {/* Logo */}
-          <div className="flex items-center justify-between border-b p-4">
-            <div className="flex items-center space-x-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-900 text-white">
-                <span className="text-sm font-bold">AI</span>
-              </div>
-              <span className="text-lg font-semibold">Aztec Interiors</span>
+    <SidebarProvider>
+      <Sidebar>
+        <SidebarHeader>
+          <div className="flex items-center space-x-2 px-4 py-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-900 text-white">
+              <span className="text-sm font-bold">AI</span>
             </div>
-            <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
-              <CloseIcon className="h-6 w-6" />
-            </button>
+            <span className="text-lg font-semibold">Aztec Interiors</span>
           </div>
+        </SidebarHeader>
+        <SidebarContent>
+          {sidebarItems.map((group) => (
+            <SidebarGroup key={group.id}>
+              {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {group.items.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild isActive={item.url === "/dashboard/forms"}>
+                        <Link href={item.url}>
+                          {item.icon && <item.icon />}
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
+        </SidebarContent>
+      </Sidebar>
 
-          {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto p-4">
-            <div className="mb-4 text-xs font-semibold uppercase text-gray-500">Dashboard</div>
-            <div className="space-y-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={`flex items-center space-x-3 rounded-lg px-3 py-2 text-sm ${
-                    item.active
-                      ? "bg-blue-50 text-blue-600 font-medium"
-                      : "text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          </nav>
-
-          {/* User Info */}
-          <div className="border-t p-4">
-            <div className="flex items-center space-x-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-semibold">
-                MM
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium">manager manager</div>
-                <div className="text-xs text-gray-500">manager@gmail.com</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      <div className="flex-1">
-      {/* Mobile menu button */}
-      <div className="border-b bg-white p-4 lg:hidden">
-        <button onClick={() => setSidebarOpen(true)}>
-          <Menu className="h-6 w-6" />
-        </button>
-      </div>
-
-      {/* Header - Full Width */}
-      <div className="border-b bg-white shadow-sm">
-        <div className="mx-auto max-w-[1800px] px-8 py-4">
-          <div className="flex items-center justify-between">
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
+          <div className="flex flex-1 items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Installation Checklist</h1>
-              <p className="mt-1 text-gray-600">Complete installation verification form</p>
+              <p className="text-sm text-gray-600">Complete installation verification form</p>
             </div>
           </div>
-        </div>
-      </div>
+        </header>
 
-      {/* Form Container - Full Width */}
-      <div className="mx-auto max-w-[1800px] px-8 py-6">
-        <form className="space-y-6">
-          <h2 className="mb-2 text-center text-xl font-semibold">
-            {formType === "kitchen" ? "Kitchen Installation Checklist" : "Bedroom Installation Checklist"}
-          </h2>
-          <p className="mb-6 text-center text-sm text-gray-600">All fields are mandatory</p>
+        <div className="flex flex-1 flex-col gap-4 p-4">
+          <form className="rounded-lg border bg-white p-8 shadow-sm">
+            <h2 className="mb-2 text-center text-xl font-semibold">
+              {formType === "kitchen" ? "Kitchen Installation Checklist" : "Bedroom Installation Checklist"}
+            </h2>
+            <p className="mb-6 text-center text-sm text-gray-600">All fields are mandatory</p>
 
-          {submitStatus.type && (
-            <div
-              className={`mb-6 rounded-lg p-4 ${
-                submitStatus.type === "success"
-                  ? "border border-green-200 bg-green-50 text-green-700"
-                  : "border border-red-200 bg-red-50 text-red-700"
-              }`}
-            >
-              {submitStatus.message}
-            </div>
-          )}
+            {submitStatus.type && (
+              <div
+                className={`mb-6 rounded-lg p-4 ${
+                  submitStatus.type === "success"
+                    ? "border border-green-200 bg-green-50 text-green-700"
+                    : "border border-red-200 bg-red-50 text-red-700"
+                }`}
+              >
+                {submitStatus.message}
+              </div>
+            )}
 
           {/* Customer Information - Blue Section */}
           <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-6">
@@ -1986,7 +1961,7 @@ export default function FormPage() {
           </div>
         </form>
       </div>
-    </div>
-  </div>
+    </SidebarInset>
+  </SidebarProvider>
   );
 }
