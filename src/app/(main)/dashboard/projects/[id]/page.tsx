@@ -524,109 +524,245 @@ export default function ProjectDetailsPage() {
       setGenerating(false);
     }
   };
-  
-  // Replace the generateToken function with this:
+
+  // Add ALL these handler functions after your useEffect and loadProjectData:
   const handleCreateKitchenChecklist = async () => {
     if (generating || !canEdit()) return;
 
-    // ✅ Validate we have customer data
     if (!customer?.id) {
-        alert("Error: No customer associated with this project");
-        return;
+      alert("Error: No customer associated with this project");
+      return;
     }
 
     setGenerating(true);
     try {
-        const response = await fetch(
+      const response = await fetch(
         `https://aztec-interiors.onrender.com/customers/${customer.id}/generate-form-link`,
         {
-            method: "POST",
-            headers: {
+          method: "POST",
+          headers: {
             "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ formType: "kitchen" }),
+          },
+          body: JSON.stringify({ formType: "kitchen" }),
         }
-        );
+      );
 
-        if (response.ok) {
+      if (response.ok) {
         const data = await response.json();
         if (data.success) {
-            const params = new URLSearchParams({
+          const params = new URLSearchParams({
             type: "kitchen",
             customerId: customer.id,
             customerName: customer.name || "",
             customerAddress: customer.address || "",
             customerPhone: customer.phone || "",
-            });
-            // Open in current window instead of new tab
-            router.push(`/form/${data.token}?${params.toString()}`);
+          });
+          router.push(`/form/${data.token}?${params.toString()}`);
         } else {
-            alert(`Failed to generate kitchen form: ${data.error}`);
+          alert(`Failed to generate kitchen form: ${data.error}`);
         }
-        } else {
+      } else {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        console.error("API Error Response:", errorData);
-        console.error("Response Status:", response.status);
-        alert(`Failed to generate kitchen form: ${errorData.error || errorData.message || "Unknown error"}`);
-        }
+        alert(`Failed to generate kitchen form: ${errorData.error || "Unknown error"}`);
+      }
     } catch (error) {
-        console.error("Network error generating kitchen form:", error);
-        alert("Network error: Please check your connection and try again.");
+      console.error("Network error generating kitchen form:", error);
+      alert("Network error: Please check your connection and try again.");
     } finally {
-        setGenerating(false);
+      setGenerating(false);
     }
-    };
+  };
 
-    const handleCreateBedroomChecklist = async () => {
+  const handleCreateBedroomChecklist = async () => {
     if (generating || !canEdit()) return;
 
-    // ✅ Validate we have customer data
     if (!customer?.id) {
-        alert("Error: No customer associated with this project");
-        return;
+      alert("Error: No customer associated with this project");
+      return;
     }
 
     setGenerating(true);
     try {
-        const response = await fetch(
+      const response = await fetch(
         `https://aztec-interiors.onrender.com/customers/${customer.id}/generate-form-link`,
         {
-            method: "POST",
-            headers: {
+          method: "POST",
+          headers: {
             "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ formType: "bedroom" }),
+          },
+          body: JSON.stringify({ formType: "bedroom" }),
         }
-        );
+      );
 
-        if (response.ok) {
+      if (response.ok) {
         const data = await response.json();
         if (data.success) {
-            const params = new URLSearchParams({
+          const params = new URLSearchParams({
             type: "bedroom",
             customerId: customer.id,
             customerName: customer.name || "",
             customerAddress: customer.address || "",
             customerPhone: customer.phone || "",
-            });
-            // Open in current window instead of new tab
-            router.push(`/form/${data.token}?${params.toString()}`);
+          });
+          router.push(`/form/${data.token}?${params.toString()}`);
         } else {
-            alert(`Failed to generate bedroom form: ${data.error}`);
+          alert(`Failed to generate bedroom form: ${data.error}`);
         }
-        } else {
+      } else {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        console.error("API Error Response:", errorData);
-        console.error("Response Status:", response.status);
-        alert(`Failed to generate bedroom form: ${errorData.error || errorData.message || "Unknown error"}`);
-        }
+        alert(`Failed to generate bedroom form: ${errorData.error || "Unknown error"}`);
+      }
     } catch (error) {
-        console.error("Network error generating bedroom form:", error);
-        alert("Network error: Please check your connection and try again.");
+      console.error("Network error generating bedroom form:", error);
+      alert("Network error: Please check your connection and try again.");
     } finally {
-        setGenerating(false);
+      setGenerating(false);
     }
-    };
+  };
+
+  const handleCreateRemedialChecklist = () => {
+    if (!customer?.id) {
+      alert("Error: No customer associated with this project");
+      return;
+    }
+    const params = new URLSearchParams({
+      customerId: customer.id,
+      customerName: customer.name || "",
+      customerAddress: customer.address || "",
+      customerPhone: customer.phone || "",
+    });
+    router.push(`/dashboard/checklists/remedial?${params.toString()}`);
+  };
+
+  const handleCreateChecklist = () => {
+    if (!customer?.id) {
+      alert("Error: No customer associated with this project");
+      return;
+    }
+    router.push(`/dashboard/checklists/create?customerId=${customer.id}`);
+  };
+
+  const handleCreateQuote = () => {
+    if (!customer?.id) {
+      alert("Error: No customer associated with this project");
+      return;
+    }
+    const params = new URLSearchParams({
+      customerId: customer.id,
+      customerName: customer.name || "",
+      customerAddress: customer.address || "",
+      customerPhone: customer.phone || "",
+      customerEmail: customer.email || "",
+    });
+    router.push(`/dashboard/quotes/create?${params.toString()}`);
+  };
+
+  const handleCreateInvoice = () => {
+    if (!customer?.id) {
+      alert("Error: No customer associated with this project");
+      return;
+    }
+    const params = new URLSearchParams({
+      customerId: customer.id,
+      customerName: customer.name || "",
+      customerAddress: customer.address || "",
+      customerPhone: customer.phone || "",
+      customerEmail: customer.email || "",
+    });
+    router.push(`/dashboard/invoices/create?${params.toString()}`);
+  };
+
+  const handleCreateProformaInvoice = () => {
+    if (!customer?.id) {
+      alert("Error: No customer associated with this project");
+      return;
+    }
+    const params = new URLSearchParams({
+      customerId: customer.id,
+      customerName: customer.name || "",
+      customerAddress: customer.address || "",
+      customerPhone: customer.phone || "",
+      customerEmail: customer.email || "",
+    });
+    router.push(`/dashboard/invoices/create?type=proforma&${params.toString()}`);
+  };
+
+  const handleCreateReceipt = () => {
+    if (!customer?.id) {
+      alert("Error: No customer associated with this project");
+      return;
+    }
+    const params = new URLSearchParams({
+      customerId: customer.id,
+      customerName: customer.name || "",
+      customerAddress: customer.address || "",
+      customerPhone: customer.phone || "",
+      type: "receipt",
+      paidAmount: "0.00",
+      totalPaidToDate: "0.00",
+      balanceToPay: "0.00",
+      receiptDate: new Date().toISOString().split("T")[0],
+      paymentMethod: "BACS",
+      paymentDescription: "Payment received for your Kitchen/Bedroom Cabinetry.",
+    });
+    router.push(`/dashboard/checklists/receipt?${params.toString()}`);
+  };
+
+  const handleCreateDepositReceipt = () => {
+    if (!customer?.id) {
+      alert("Error: No customer associated with this project");
+      return;
+    }
+    const params = new URLSearchParams({
+      customerId: customer.id,
+      customerName: customer.name || "",
+      customerAddress: customer.address || "",
+      customerPhone: customer.phone || "",
+      type: "deposit",
+      paidAmount: "0.00",
+      totalPaidToDate: "0.00",
+      balanceToPay: "0.00",
+      receiptDate: new Date().toISOString().split("T")[0],
+      paymentMethod: "BACS",
+      paymentDescription: "Deposit payment received for your Kitchen/Bedroom Cabinetry.",
+    });
+    router.push(`/dashboard/checklists/receipt?${params.toString()}`);
+  };
+
+  const handleCreateFinalReceipt = () => {
+    if (!customer?.id) {
+      alert("Error: No customer associated with this project");
+      return;
+    }
+    const params = new URLSearchParams({
+      customerId: customer.id,
+      customerName: customer.name || "",
+      customerAddress: customer.address || "",
+      customerPhone: customer.phone || "",
+      type: "final",
+      paidAmount: "0.00",
+      totalPaidToDate: "0.00",
+      balanceToPay: "0.00",
+      receiptDate: new Date().toISOString().split("T")[0],
+      paymentMethod: "BACS",
+      paymentDescription: "Final payment received for your Kitchen/Bedroom Cabinetry.",
+    });
+    router.push(`/dashboard/checklists/receipt?${params.toString()}`);
+  };
+
+  const handleCreatePaymentTerms = () => {
+    if (!customer?.id) {
+      alert("Error: No customer associated with this project");
+      return;
+    }
+    const params = new URLSearchParams({
+      customerId: customer.id,
+      customerName: customer.name || "",
+      customerAddress: customer.address || "",
+      customerPhone: customer.phone || "",
+    });
+    router.push(`/dashboard/payment-terms/create?${params.toString()}`);
+  };
 
   const handleViewChecklist = (submission: FormSubmission) => {
     window.open(`/checklist-view?id=${submission.id}`, "_blank");
