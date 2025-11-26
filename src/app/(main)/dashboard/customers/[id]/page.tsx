@@ -346,7 +346,7 @@ export default function CustomerDetailsPage() {
     loadCustomerData();
   }, [id, user]);
 
-  const loadCustomerData = () => {
+  const loadCustomerData = async () => {
     setLoading(true);
 
     const token = localStorage.getItem("auth_token");
@@ -358,186 +358,67 @@ export default function CustomerDetailsPage() {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    // Fetch customer data
-    const customerPromise = fetch(`https://aztec-interiors.onrender.com/customers/${id}`, { headers })
-      .then(res => res.json())
-      .then((data) => {
-        // Normalize post_code → postcode
-        const normalizedCustomer = {
-          ...data,
-          postcode: data.post_code ?? data.postcode ?? "",
-        };
+    try {
+      // ✅ FETCH EVERYTHING IN PARALLEL
+      const [customerRes, drawingsRes, formDocsRes] = await Promise.all([
+        fetch(`https://aztec-interiors.onrender.com/customers/${id}`, { headers }),
+        fetch(`https://aztec-interiors.onrender.com/files/drawings?customer_id=${id}`, { headers }).catch(() => null),
+        fetch(`https://aztec-interiors.onrender.com/files/forms?customer_id=${id}`, { headers }).catch(() => null),
+      ]);
 
-        if (user?.role === "Sales" && data.created_by !== user.id && data.salesperson !== user.name) {
-          setHasAccess(true);
-        } else if (user?.role === "Staff") {
-          const hasPermission = data.created_by === user.id || data.salesperson === user.name;
-          setHasAccess(hasPermission);
-          if (!hasPermission) {
-            return;
-          }
-        } else {
-          setHasAccess(true);
+      // Process customer data
+      const customerData = await customerRes.json();
+      
+      // Normalize postcode
+      const normalizedCustomer = {
+        ...customerData,
+        postcode: customerData.post_code ?? customerData.postcode ?? "",
+      };
+
+      // Check permissions
+      if (user?.role === "Sales" && customerData.created_by !== user.id && customerData.salesperson !== user.name) {
+        setHasAccess(true);
+      } else if (user?.role === "Staff") {
+        const hasPermission = customerData.created_by === user.id || customerData.salesperson === user.name;
+        setHasAccess(hasPermission);
+        if (!hasPermission) {
+          setLoading(false);
+          return;
         }
-
-        setCustomer(normalizedCustomer);
-      })
-      .catch((err) => console.error("Error loading customer:", err));
-
-    // Fetch jobs
-    const jobsPromise = fetch(`https://aztec-interiors.onrender.com/jobs?customer_id=${id}`, { headers })
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch jobs");
-        return res.json();
-      })
-      .then((data) => {
-        if (user?.role === "Sales") {
-          const salesStages = ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted"];
-          const filteredJobs = data.filter((job: any) => salesStages.includes(job.stage));
-          setJobs(filteredJobs);
-        } else {
-          setJobs(data);
-        }
-      })
-      .catch((err) => console.error("Error loading jobs:", err));
-
-    // Load documents (don't need to wait for these)
-    loadFinancialDocuments(headers);
-    loadDrawingDocuments(headers);
-    loadFormDocuments(headers);
-
-    // Wait for both critical fetches, then stop loading
-    Promise.all([customerPromise, jobsPromise])
-      .finally(() => setLoading(false));
-  };
-
-  const loadFinancialDocuments = (headers: HeadersInit) => {
-    console.log("Fetching financial documents for customer:", id);
-
-    Promise.all([
-      fetch(`https://aztec-interiors.onrender.com/invoices?customer_id=${id}`, { headers }).catch(() => [] as any[]),
-      fetch(`https://aztec-interiors.onrender.com/quotations?customer_id=${id}`, { headers }).catch(() => [] as any[]),
-    ])
-      .then(async ([invoicesRes, quotesRes]) => {
-        let invoices: any[] = [];
-        let quotes: any[] = [];
-
-        if (invoicesRes && "ok" in invoicesRes && invoicesRes.ok) {
-          try {
-            invoices = await invoicesRes.json();
-          } catch (e) {
-            console.error("Failed to parse invoices JSON", e);
-          }
-        }
-        if (quotesRes && "ok" in quotesRes && quotesRes.ok) {
-          try {
-            quotes = await quotesRes.json();
-          } catch (e) {
-            console.error("Failed to parse quotes JSON", e);
-          }
-        }
-
-        const docs: FinancialDocument[] = [
-          ...invoices.map((inv: any) => ({
-            id: inv.id,
-            type: "invoice" as const,
-            title: `Invoice #${inv.id}`,
-            total: parseFloat(inv.total) || undefined,
-            amount_paid: parseFloat(inv.amount_paid) || undefined,
-            balance: parseFloat(inv.balance) || undefined,
-            created_at: inv.created_at,
-            created_by: inv.created_by,
-            project_id: inv.project_id,
-          })),
-          ...quotes.map((quote: any) => ({
-            id: quote.id,
-            type: "proforma" as const,
-            title: `Quote #${quote.id}`,
-            total: parseFloat(quote.total) || undefined,
-            amount_paid: 0,
-            balance: parseFloat(quote.total) || undefined,
-            created_at: quote.created_at,
-            created_by: quote.created_by,
-            project_id: quote.project_id,
-          })),
-        ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-        setFinancialDocs(docs);
-      })
-      .catch((err) => console.error("Error loading financial documents:", err));
-  };
-
-  const loadDrawingDocuments = (headers: HeadersInit) => {
-    const url = `https://aztec-interiors.onrender.com/files/drawings?customer_id=${id}`;
-
-    fetch(url, { headers })
-      .then((res) => {
-        if (!res.ok) {
-          if (res.status === 404 || res.status === 204) {
-            setDrawingDocuments([]);
-            return null;
-          }
-          console.error(`Failed to fetch drawings, status: ${res.status}`);
-          throw new Error(`Failed to fetch drawings (status: ${res.status})`);
-        }
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-          return res.json();
-        } else {
-          return null;
-        }
-      })
-      .then((data) => {
-        if (data === null) return;
-
-        if (Array.isArray(data)) {
-          setDrawingDocuments(data);
-        } else {
-          console.warn("Unexpected data format from drawings endpoint:", data);
-          setDrawingDocuments([]);
-        }
-      })
-      .catch((err) => {
-        console.error("Error loading drawings:", err);
-        setDrawingDocuments([]);
-      });
-  };
-
-  const loadFormDocuments = (headers: HeadersInit) => {
-  const url = `https://aztec-interiors.onrender.com/files/forms?customer_id=${id}`;
-
-  fetch(url, { headers })
-    .then((res) => {
-      if (!res.ok) {
-        if (res.status === 404 || res.status === 204) {
-          setFormDocuments([]);
-          return null;
-        }
-        console.error(`Failed to fetch form documents, status: ${res.status}`);
-        throw new Error(`Failed to fetch form documents (status: ${res.status})`);
-      }
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        return res.json();
       } else {
-        return null;
+        setHasAccess(true);
       }
-    })
-    .then((data) => {
-      if (data === null) return;
 
-      if (Array.isArray(data)) {
-        setFormDocuments(data);
-      } else {
-        console.warn("Unexpected data format from form documents endpoint:", data);
-        setFormDocuments([]);
+      setCustomer(normalizedCustomer);
+
+      // Process drawings
+      if (drawingsRes && drawingsRes.ok) {
+        const contentType = drawingsRes.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const drawingsData = await drawingsRes.json();
+          if (Array.isArray(drawingsData)) {
+            setDrawingDocuments(drawingsData);
+          }
+        }
       }
-    })
-    .catch((err) => {
-      console.error("Error loading form documents:", err);
-      setFormDocuments([]);
-    });
-};
+
+      // Process form documents
+      if (formDocsRes && formDocsRes.ok) {
+        const contentType = formDocsRes.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const formDocsData = await formDocsRes.json();
+          if (Array.isArray(formDocsData)) {
+            setFormDocuments(formDocsData);
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error("Error loading customer data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
 const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
   const files = event.target.files;
@@ -546,6 +427,8 @@ const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) 
   const token = localStorage.getItem("auth_token");
   const headers: HeadersInit = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const uploadedDocs: FormDocument[] = [];
 
   for (const file of Array.from(files)) {
     try {
@@ -571,18 +454,20 @@ const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) 
             customer_id: id,
           };
 
-          setFormDocuments((prev) => {
-            const updated = [...prev, newDoc];
-            return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-          });
+          uploadedDocs.push(newDoc);
         }
-      } else {
-        const errorData = await response.json().catch(() => ({ error: `Server returned status ${response.status}` }));
-        console.error(`Failed to upload ${file.name}: ${errorData.error || "Server error"}`);
       }
     } catch (error) {
-      console.error(`Network error:`, error);
+      console.error(`Upload error:`, error);
     }
+  }
+
+  // ✅ UPDATE STATE IN ONE GO
+  if (uploadedDocs.length > 0) {
+    setFormDocuments(prev => {
+      const updated = [...uploadedDocs, ...prev];
+      return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    });
   }
 
   if (event.target) event.target.value = "";
@@ -635,14 +520,34 @@ const handleDrop = async (e: React.DragEvent, projectId: string) => {
     }
 
     const response = await fetch(endpoint, {
-      method: "PATCH",  // ← This is critical
+      method: "PATCH",
       headers: headers,
       body: JSON.stringify({ project_id: projectId }),
     });
 
     if (response.ok) {
-      // Reload customer data to reflect changes
-      loadCustomerData();
+      // ✅ UPDATE STATE LOCALLY - NO RELOAD
+      if (draggedItem.type === "drawing") {
+        setDrawingDocuments(prev => 
+          prev.map(doc => 
+            doc.id === draggedItem.id 
+              ? { ...doc, project_id: projectId }
+              : doc
+          )
+        );
+      } else if (draggedItem.type === "form") {
+        setCustomer(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            form_submissions: prev.form_submissions.map(form =>
+              String(form.id) === draggedItem.id
+                ? { ...form, project_id: projectId }
+                : form
+            )
+          };
+        });
+      }
     } else {
       const error = await response.json().catch(() => ({ error: "Failed to assign" }));
       alert(`Error: ${error.error || error.message || "Failed to assign to project"}`);
@@ -849,13 +754,14 @@ const handleConfirmDeleteFormDocument = async () => {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
+    const uploadedDocs: DrawingDocument[] = [];
+
     for (const file of Array.from(files)) {
       try {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("customer_id", id);
         
-        // Add project_id if a project was selected
         if (selectedProjectForUpload) {
           formData.append("project_id", selectedProjectForUpload);
         }
@@ -879,20 +785,20 @@ const handleConfirmDeleteFormDocument = async () => {
               project_id: data.drawing.project_id,
             };
 
-            setDrawingDocuments((prev) => {
-              const updated = [...prev, newDoc];
-              return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            });
+            uploadedDocs.push(newDoc);
           }
-        } else {
-          const errorData = await response.json().catch(() => ({
-            error: `Server returned status ${response.status}`,
-          }));
-          console.error(`Upload failed:`, errorData);
         }
       } catch (error) {
         console.error(`Network error:`, error);
       }
+    }
+
+    // ✅ UPDATE STATE IN ONE GO
+    if (uploadedDocs.length > 0) {
+      setDrawingDocuments(prev => {
+        const updated = [...uploadedDocs, ...prev];
+        return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      });
     }
 
     // Clean up
@@ -3029,7 +2935,7 @@ const handleConfirmDeleteFormDocument = async () => {
               </div>
             </div>
           )}
-        </div> */} 
+        </div> */}
       </div>
 
       {/* Dialogs remain the same as in your original code */}

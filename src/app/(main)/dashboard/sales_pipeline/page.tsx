@@ -375,16 +375,13 @@ export default function EnhancedPipelinePage() {
   };
 
   // Function to map PipelineItem to Kanban features
-  const mapPipelineToFeatures = (items: PipelineItem[]) => {
+  const mapPipelineToFeatures = useCallback((items: PipelineItem[]) => {
     return items.map((item) => {
-      // DESTRUCTURE the customer/job objects to explicitly REMOVE the 'notes' field
       const { notes: customerNotes, ...customerWithoutNotes } = item.customer;
-      // The item.job could be a Job model or a Project model (from the backend fix)
       const jobWithoutNotes = item.job ? (({ notes: jobNotes, ...rest }) => rest)(item.job) : undefined;
 
       const isProjectItem = item.id.startsWith("project-");
       
-      // ✅ FIX: Create truly unique display names for projects
       const jobName = isProjectItem 
         ? `${item.customer.name} - ${item.job?.job_name || "Project"}` 
         : item.customer.name;
@@ -393,10 +390,8 @@ export default function EnhancedPipelinePage() {
         ? item.job?.job_reference || `PROJ-${item.job?.id?.slice(-4).toUpperCase() || "NEW"}`
         : item.job?.job_reference || `JOB-${item.job?.id?.slice(-4).toUpperCase() || "NEW"}`;
 
-      // ✅ CRITICAL FIX: Use item.id directly as the unique feature ID
-      // This ensures each project gets its own card, even if same customer
       return {
-        id: item.id, // This is already unique: "project-uuid" or "customer-uuid"
+        id: item.id,
         name: `${jobReference} — ${jobName}`,
         column: stageToColumnId(item.stage),
         itemId: item.id,
@@ -419,111 +414,95 @@ export default function EnhancedPipelinePage() {
         project_count: item.project_count || 0,
       };
     });
-  };
+  }, []); // Empty deps - function doesn't need to change
 
   // Fetch data from backend
   useEffect(() => {
     if (authLoading) {
-      console.log("⏳ Auth still loading, skipping fetch...");
       return;
     }
 
     if (!user || !token) {
-      console.warn("⚠️ No user or token available, skipping fetch.");
       setError("User not authenticated.");
       setLoading(false);
       return;
     }
+
+    let isCancelled = false;
 
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        console.log("🚀 Fetching pipeline data from /pipeline...");
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-        const pipelineResponse = await fetchWithAuth("pipeline");
+        const pipelineResponse = await fetch(
+          "https://aztec-interiors.onrender.com/pipeline",
+          {
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            signal: controller.signal,
+          }
+        );
+
+        clearTimeout(timeoutId);
 
         if (!pipelineResponse.ok) {
-          // If we get a timeout or auth error, retry once after a short delay
-          if (pipelineResponse.status === 401 || pipelineResponse.status === 408) {
-            console.log("⚠️ Auth/timeout error, retrying in 1 second...");
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            const retryResponse = await fetchWithAuth("pipeline");
-            if (!retryResponse.ok) {
-              throw new Error(`Failed to fetch pipeline: ${retryResponse.status} ${retryResponse.statusText}`);
-            }
-            
-            const retryData = await retryResponse.json();
-            processPipelineData(retryData);
-            return;
-          }
-          
-          throw new Error(`Failed to fetch pipeline: ${pipelineResponse.status} ${pipelineResponse.statusText}`);
+          throw new Error(`Failed to fetch: ${pipelineResponse.status}`);
         }
 
         const rawPipelineData = await pipelineResponse.json();
+        
+        if (isCancelled) return;
+        
         processPipelineData(rawPipelineData);
 
-      } catch (err) {
-        console.error("❌ Error fetching pipeline data:", err);
-        setError(err instanceof Error ? err.message : "Failed to load pipeline data. Please refresh.");
+      } catch (err: any) {
+        if (isCancelled) return;
+        
+        if (err.name === 'AbortError') {
+          setError("Request timeout. Please refresh the page.");
+        } else {
+          setError(err instanceof Error ? err.message : "Failed to load data");
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [authLoading, token, user]);
 
   // Extract the data processing logic into a separate function
-  const processPipelineData = (rawPipelineData: any[]) => {
-    console.log(`✅ Pipeline data loaded: ${rawPipelineData.length} total items from API`);
+  const processPipelineData = useCallback((rawPipelineData: any[]) => {
+    // Use requestAnimationFrame for non-blocking UI updates
+    requestAnimationFrame(() => {
+      const pipelineItemsRetrieved = rawPipelineData
+        .map((item: any) => {
+          const isProjectItem = item.id.startsWith("project-");
+          const backendStage = item.stage?.trim() || "Lead";
+          const validStage = STAGES.includes(backendStage as Stage) ? backendStage : "Lead" as Stage;
 
-    let malformedCount = 0;
-    const pipelineItemsRetrieved = rawPipelineData
-      .map((item: any) => {
-        const isProjectItem = item.id.startsWith("project-");
-
-        const backendStage = item.stage ? item.stage.trim() : "Lead";
-
-        const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
-
-        if (backendStage !== "Lead" && validStage === "Lead") {
-          console.error("⚠️ Stage mismatch detected:", {
-            itemId: item.id,
-            received: backendStage,
-            fallback: validStage,
-          });
-        }
-
-        const commonItem = {
-          id: item.id,
-          customer: item.customer,
-          name: item.customer.name,
-          salesperson: item.job?.salesperson_name || item.customer.salesperson,
-          measureDate: item.job?.measure_date || item.customer.date_of_measure,
-          stage: validStage,
-        };
-
-        if (item.type === "customer") {
-          return {
-            ...commonItem,
-            type: "customer" as const,
-            reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
-            jobType: item.customer.project_types?.join(", "),
-            project_count: item.project_count || 0,
+          const commonItem = {
+            id: item.id,
+            customer: item.customer,
+            name: item.customer.name,
+            salesperson: item.job?.salesperson_name || item.customer.salesperson,
+            measureDate: item.job?.measure_date || item.customer.date_of_measure,
+            stage: validStage,
           };
-        } else {
-          // ✅ Handle project items (which come with a 'project' field from backend)
-          const projectData = item.project || item.job;
-          
-          if (!projectData) {
-            console.warn(
-              `⚠️ COMPROMISE: Malformed item (${item.id}) of type ${item.type} forced to 'customer' view.`
-            );
-            malformedCount++;
+
+          if (item.type === "customer") {
             return {
               ...commonItem,
               type: "customer" as const,
@@ -531,56 +510,59 @@ export default function EnhancedPipelinePage() {
               jobType: item.customer.project_types?.join(", "),
               project_count: item.project_count || 0,
             };
+          } else {
+            const projectData = item.project || item.job;
+            
+            if (!projectData) {
+              return {
+                ...commonItem,
+                type: "customer" as const,
+                reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
+                jobType: item.customer.project_types?.join(", "),
+                project_count: item.project_count || 0,
+              };
+            }
+
+            const jobReference = isProjectItem
+              ? projectData.job_reference || `PROJ-${projectData.id?.slice(-4).toUpperCase() || "NEW"}`
+              : projectData.job_reference || `JOB-${projectData.id?.slice(-4).toUpperCase() || "NEW"}`;
+
+            const jobName = isProjectItem 
+              ? `${item.customer.name} - ${projectData.project_name || projectData.job_name || "Project"}` 
+              : item.customer.name;
+
+            return {
+              ...commonItem,
+              type: isProjectItem ? ("project" as const) : ("job" as const),
+              job: projectData,
+              name: jobName,
+              reference: jobReference,
+              stage: validStage as Stage,
+              jobType: projectData.project_type || projectData.job_type,
+              quotePrice: projectData.quote_price,
+              agreedPrice: projectData.agreed_price,
+              soldAmount: projectData.sold_amount,
+              deposit1: projectData.deposit1,
+              deposit2: projectData.deposit2,
+              deposit1Paid: projectData.deposit1_paid || false,
+              deposit2Paid: projectData.deposit2_paid || false,
+              deliveryDate: projectData.delivery_date,
+              measureDate: projectData.date_of_measure || projectData.measure_date,
+              salesperson: projectData.salesperson_name || item.customer.salesperson,
+            };
           }
+        })
+        .filter(Boolean);
 
-          const jobStage = validStage;
-
-          const jobReference = isProjectItem
-            ? projectData.job_reference || `PROJ-${projectData.id?.slice(-4).toUpperCase() || "NEW"}`
-            : projectData.job_reference || `JOB-${projectData.id?.slice(-4).toUpperCase() || "NEW"}`;
-
-          const jobName = isProjectItem 
-            ? `${item.customer.name} - ${projectData.project_name || projectData.job_name || "Project"}` 
-            : item.customer.name;
-
-          return {
-            ...commonItem,
-            type: isProjectItem ? ("project" as const) : ("job" as const),
-            job: projectData,
-            name: jobName,
-            reference: jobReference,
-            stage: jobStage as Stage,
-            jobType: projectData.project_type || projectData.job_type,
-            quotePrice: projectData.quote_price,
-            agreedPrice: projectData.agreed_price,
-            soldAmount: projectData.sold_amount,
-            deposit1: projectData.deposit1,
-            deposit2: projectData.deposit2,
-            deposit1Paid: projectData.deposit1_paid || false,
-            deposit2Paid: projectData.deposit2_paid || false,
-            deliveryDate: projectData.delivery_date,
-            measureDate: projectData.date_of_measure || projectData.measure_date,
-            salesperson: projectData.salesperson_name || item.customer.salesperson,
-          };
-        }
-      })
-      .filter(Boolean);
-
-    if (malformedCount > 0) {
-      console.warn(
-        `⚠️ ${malformedCount} malformed items were found and promoted to 'customer' records to ensure all 78 total records are displayed.`
-      );
-    }
-
-    const filteredItems = pipelineItemsRetrieved.filter((item: PipelineItem) => canUserAccessItem(item));
-    const finalCount = filteredItems.length;
-
-    console.log(`✅ Final count after role filtering: ${finalCount}`);
-
-    setPipelineItems(filteredItems);
-    setFeatures(mapPipelineToFeatures(filteredItems));
-    prevFeaturesRef.current = mapPipelineToFeatures(filteredItems);
-  };
+      const filteredItems = pipelineItemsRetrieved.filter((item: PipelineItem) => canUserAccessItem(item));
+      
+      setPipelineItems(filteredItems);
+      
+      const mappedFeatures = mapPipelineToFeatures(filteredItems);
+      setFeatures(mappedFeatures);
+      prevFeaturesRef.current = mappedFeatures;
+    });
+  }, [mapPipelineToFeatures]);
 
 
   const handleDataChange = async (next: any[]) => {
@@ -705,77 +687,35 @@ export default function EnhancedPipelinePage() {
           updated_by: user?.email || "current_user",
         };
 
-        let response;
-        let retryCount = 0;
-        const maxRetries = 2;
-
-        while (retryCount <= maxRetries) {
-          try {
-            response = await fetchWithAuth(endpoint, {
-              method: "PATCH",
-              body: JSON.stringify(bodyData),
-            });
-            
-            if (response.ok) {
-              break; // Success, exit retry loop
-            }
-            
-            // If we get a timeout or server error, retry
-            if (response.status === 408 || response.status >= 500) {
-              retryCount++;
-              if (retryCount <= maxRetries) {
-                console.log(`⏳ Retry ${retryCount}/${maxRetries} for ${item.itemType} ${entityId}`);
-                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
-                continue;
-              }
-            }
-            
-            // Non-retryable error
-            const errorText = await response.text();
-            throw new Error(`Failed to update ${item.itemType} ${entityId}: ${errorText}`);
-            
-          } catch (error: any) {
-            if (error.name === 'AbortError' && retryCount < maxRetries) {
-              retryCount++;
-              console.log(`⏳ Timeout - Retry ${retryCount}/${maxRetries} for ${item.itemType} ${entityId}`);
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              continue;
-            }
-            throw error;
-          }
-        }
-
-        if (!response || !response.ok) {
-          throw new Error(`Failed to update ${item.itemType} ${entityId} after ${maxRetries} retries`);
+        const response = await fetchWithAuth(endpoint, {
+          method: "PATCH",
+          body: JSON.stringify(bodyData),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to update ${item.itemType} ${entityId}`);
         }
 
         return await response.json();
       });
 
-      console.log(`⏳ Waiting for ${updatePromises.length} API calls to complete...`);
       await Promise.all(updatePromises);
       
-      console.log("🔄 Refreshing pipeline data...");
-      await refetchPipelineData();
-      console.log("✅ Pipeline data refreshed successfully");
-      console.log("=".repeat(60));
+      // ✅ DON'T REFETCH - Optimistic update is enough
+      // await refetchPipelineData();
+      
+      console.log("✅ Stage updates completed");
 
     } catch (error) {
-      console.error("=".repeat(60));
-      console.error("❌ DRAG-AND-DROP ERROR");
-      console.error("Error details:", error);
+      console.error("❌ Error updating stages:", error);
       
-      console.log("🔙 Reverting optimistic updates...");
+      // Only revert on error
       setFeatures(previousFeaturesSnapshot);
       prevFeaturesRef.current = previousFeaturesSnapshot;
       setPipelineItems(previousPipelineSnapshot);
-      console.log("✅ Reverted to previous state");
       
-      alert(
-        `Failed to update stage: ${error instanceof Error ? error.message : "Unknown error"}. Changes have been reverted.`,
-      );
+      alert(`Failed to update stage. Changes reverted.`);
     }
-  };
 
   const refetchPipelineData = async () => {
     try {
@@ -1129,13 +1069,17 @@ export default function EnhancedPipelinePage() {
       return;
     }
 
-    // ✅ Open in new tab
     let url = '';
+    
     if (itemType === "customer") {
+      // For customers, go to customer details page
       url = `/dashboard/customers/${item.customer.id}`;
     } else if (itemType === "project") {
-      url = `/dashboard/customers/${item.customer.id}`;
-    } else {
+      // ✅ For projects, extract the project UUID and go to project details page
+      const projectId = itemId.replace("project-", "");
+      url = `/dashboard/projects/${projectId}`;
+    } else if (itemType === "job") {
+      // For jobs, go to job details page
       const jobId = itemId.replace("job-", "");
       url = `/dashboard/jobs/${jobId}`;
     }
@@ -1217,12 +1161,32 @@ export default function EnhancedPipelinePage() {
     }
   };
 
-  // Loading state
+  // Loading state with skeleton
   if (loading) {
     return (
       <div className="space-y-6 p-6">
-        <div className="flex h-64 items-center justify-center">
-          <div className="text-lg">Loading pipeline data...</div>
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="h-9 w-48 bg-gray-200 rounded animate-pulse" />
+          <div className="h-9 w-32 bg-gray-200 rounded animate-pulse" />
+        </div>
+
+        {/* Filters Skeleton */}
+        <div className="flex gap-4">
+          <div className="h-10 w-64 bg-gray-200 rounded animate-pulse" />
+          <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
+        </div>
+
+        {/* Kanban Skeleton */}
+        <div className="flex gap-4 overflow-x-auto">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="w-[300px] flex-shrink-0 space-y-3">
+              <div className="h-12 bg-gray-200 rounded animate-pulse" />
+              <div className="h-32 bg-gray-100 rounded animate-pulse" />
+              <div className="h-32 bg-gray-100 rounded animate-pulse" />
+              <div className="h-32 bg-gray-100 rounded animate-pulse" />
+            </div>
+          ))}
         </div>
       </div>
     );
