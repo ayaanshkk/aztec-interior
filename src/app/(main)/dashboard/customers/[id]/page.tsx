@@ -338,6 +338,8 @@ export default function CustomerDetailsPage() {
   const [isSavingForm, setIsSavingForm] = useState(false);
   const [selectedProjectForUpload, setSelectedProjectForUpload] = useState<string | null>(null);
   const [showProjectSelectDialog, setShowProjectSelectDialog] = useState(false);
+  const [draggedItem, setDraggedItem] = useState<{type: 'form' | 'drawing', id: string} | null>(null);
+  const [dragOverProject, setDragOverProject] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -589,6 +591,70 @@ const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) 
 const handleUploadFormDocument = () => {
   if (formFileInputRef.current) {
     formFileInputRef.current.click();
+  }
+};
+
+// NEW: Drag and drop handlers
+const handleDragStart = (type: 'form' | 'drawing', id: string) => {
+  setDraggedItem({ type, id });
+};
+
+const handleDragEnd = () => {
+  setDraggedItem(null);
+  setDragOverProject(null);
+};
+
+const handleDragOver = (e: React.DragEvent, projectId: string) => {
+  e.preventDefault();
+  setDragOverProject(projectId);
+};
+
+const handleDragLeave = () => {
+  setDragOverProject(null);
+};
+
+const handleDrop = async (e: React.DragEvent, projectId: string) => {
+  e.preventDefault();
+  setDragOverProject(null);
+  
+  if (!draggedItem) return;
+
+  const token = localStorage.getItem("auth_token");
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  try {
+    let endpoint = '';
+    let body = {};
+
+    if (draggedItem.type === 'form') {
+      endpoint = `https://aztec-interiors.onrender.com/form-submissions/${draggedItem.id}`;
+      body = { project_id: projectId };
+    } else if (draggedItem.type === 'drawing') {
+      endpoint = `https://aztec-interiors.onrender.com/files/drawings/${draggedItem.id}`;
+      body = { project_id: projectId };
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (response.ok) {
+      alert(`${draggedItem.type === 'form' ? 'Form' : 'Drawing'} assigned to project successfully!`);
+      loadCustomerData(); // Reload to show updated data
+    } else {
+      const error = await response.json();
+      alert(`Failed to assign: ${error.message || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error('Error assigning to project:', error);
+    alert('Network error');
+  } finally {
+    setDraggedItem(null);
   }
 };
 
@@ -1839,14 +1905,51 @@ const handleConfirmDeleteFormDocument = async () => {
   const renderFormSubmission = (submission: FormSubmission) => {
     const formType = getFormType(submission);
     const isChecklist = formType === "bedroom" || formType === "kitchen";
+    const isAssignedToProject = !!submission.project_id;
     
     return (
-      <div className="flex items-center justify-between rounded-lg border bg-gray-50 p-4 transition hover:bg-gray-100">
-        <div className="flex flex-col">
-          <h3 className="text-lg font-semibold text-gray-900">{getFormTitle(submission)}</h3>
-          <span className="text-sm text-gray-500">Submitted: {formatDate(submission.submitted_at)}</span>
+      <div
+        draggable={!isAssignedToProject && canEdit()}
+        onDragStart={() => !isAssignedToProject && canEdit() && handleDragStart('form', String(submission.id))}
+        onDragEnd={handleDragEnd}
+        className={`flex items-center justify-between rounded-lg border bg-gray-50 p-4 transition hover:bg-gray-100 ${
+          !isAssignedToProject && canEdit() ? 'cursor-move hover:border-blue-400' : ''
+        } ${draggedItem?.type === 'form' && draggedItem?.id === String(submission.id) ? 'opacity-50' : ''}`}
+      >
+        <div className="flex items-center space-x-3 flex-1">
+          {!isAssignedToProject && canEdit() && (
+            <div className="flex flex-col items-center">
+              <svg 
+                className="h-5 w-5 text-gray-400" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+              </svg>
+            </div>
+          )}
+          
+          <div className="flex flex-col flex-1">
+            <h3 className="text-lg font-semibold text-gray-900">{getFormTitle(submission)}</h3>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-500">
+                Submitted: {formatDate(submission.submitted_at)}
+              </span>
+              {isAssignedToProject && (
+                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                  <Package className="mr-1 h-3 w-3" />
+                  Assigned to project
+                </span>
+              )}
+              {!isAssignedToProject && canEdit() && (
+                <span className="text-xs text-blue-600 font-medium">← Drag to assign</span>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
+        
+        <div className="flex items-center space-x-2 ml-4">
           <Button
             variant="outline"
             size="sm"
@@ -1854,7 +1957,7 @@ const handleConfirmDeleteFormDocument = async () => {
             className="flex items-center space-x-1"
           >
             <Eye className="h-4 w-4" />
-            <span>View{isChecklist ? " Checklist" : ""}</span>  {/* ← CHANGED: Dynamic text */}
+            <span>View{isChecklist ? " Checklist" : ""}</span>
           </Button>
           
           {canEditForm(submission) && (
@@ -2336,8 +2439,14 @@ const handleConfirmDeleteFormDocument = async () => {
                 .map((project) => (
                   <div
                     key={project.id}
-                    className="rounded-lg border bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+                    className={`rounded-lg border bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
+                      dragOverProject === project.id ? 'ring-2 ring-blue-500 bg-blue-100/50' : ''
+                    }`}
+                    onDragOver={(e) => handleDragOver(e, project.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, project.id)}
                   >
+                    {/* Rest of your project card code stays the same */}
                     <div className="flex items-start justify-between">
                       <div className="min-w-0 flex-1 pr-4">
                         <div className="mb-2 flex items-center space-x-2">
@@ -2367,9 +2476,11 @@ const handleConfirmDeleteFormDocument = async () => {
                           </p>
                         </div>
                         {project.notes && <p className="mt-3 line-clamp-2 text-sm text-gray-500">{project.notes}</p>}
+                        {dragOverProject === project.id && (
+                          <p className="mt-2 text-xs text-blue-600 font-medium">Drop here to assign</p>
+                        )}
                       </div>
                       <div className="ml-4 flex flex-shrink-0 flex-col space-y-2">
-                        {/* Project Edit Button now uses the permissive canManageProjects() */}
                         {canManageProjects() && (
                           <>
                             <Button
@@ -2382,7 +2493,7 @@ const handleConfirmDeleteFormDocument = async () => {
                               <span>Edit Project</span>
                             </Button>
                             <Button
-                              onClick={(e) => { // Corrected syntax here
+                              onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteProject(project);
                               }}
@@ -2418,7 +2529,7 @@ const handleConfirmDeleteFormDocument = async () => {
           )}
         </div>
 
-        {/* DRAWINGS & LAYOUTS SECTION - GROUPED BY PROJECT */}
+        {/* DRAWINGS & LAYOUTS SECTION - GROUPED BY PROJECT WITH DRAG & DROP */}
         <div className="mb-8 border-t border-gray-200 pt-8">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">Drawings & Layouts</h2>
@@ -2502,7 +2613,10 @@ const handleConfirmDeleteFormDocument = async () => {
                               const docType = doc.type || (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
 
                               return (
-                                <div key={doc.id} className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
+                                <div 
+                                  key={doc.id} 
+                                  className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+                                >
                                   <div className="flex items-start justify-between">
                                     {canEdit() && (
                                       <Checkbox
@@ -2546,13 +2660,14 @@ const handleConfirmDeleteFormDocument = async () => {
                       );
                     })}
 
-                    {/* Unassigned drawings */}
+                    {/* Unassigned drawings - DRAGGABLE */}
                     {unassignedDrawings.length > 0 && (
                       <div className="rounded-lg border-2 border-gray-200 bg-gray-50/30 p-6">
                         <div className="mb-4 flex items-center space-x-3">
                           <Image className="h-5 w-5 text-gray-600" />
                           <h3 className="text-lg font-semibold text-gray-900">General Documents</h3>
                           <span className="text-sm text-gray-600">({unassignedDrawings.length} file{unassignedDrawings.length !== 1 ? 's' : ''})</span>
+                          <span className="text-xs text-blue-600 font-medium">← Drag to assign to a project</span>
                         </div>
                         
                         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -2561,14 +2676,32 @@ const handleConfirmDeleteFormDocument = async () => {
                             const docType = doc.type || (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
 
                             return (
-                              <div key={doc.id} className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
+                              <div 
+                                key={doc.id}
+                                draggable={canEdit()}
+                                onDragStart={() => canEdit() && handleDragStart('drawing', doc.id)}
+                                onDragEnd={handleDragEnd}
+                                className={`rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
+                                  canEdit() ? 'cursor-move hover:border-blue-400' : ''
+                                } ${draggedItem?.type === 'drawing' && draggedItem?.id === doc.id ? 'opacity-50' : ''}`}
+                              >
                                 <div className="flex items-start justify-between">
                                   {canEdit() && (
-                                    <Checkbox
-                                      checked={selectedDrawings.has(doc.id)}
-                                      onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
-                                      className="mr-4 mt-1"
-                                    />
+                                    <div className="mr-3 flex flex-col items-center">
+                                      <Checkbox
+                                        checked={selectedDrawings.has(doc.id)}
+                                        onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
+                                        className="mb-2"
+                                      />
+                                      <svg 
+                                        className="h-5 w-5 text-gray-400" 
+                                        fill="none" 
+                                        stroke="currentColor" 
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                      </svg>
+                                    </div>
                                   )}
                                   <div className="flex flex-1 items-start space-x-4">
                                     <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
@@ -2577,6 +2710,9 @@ const handleConfirmDeleteFormDocument = async () => {
                                     <div className="min-w-0 flex-1">
                                       <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
                                       <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
+                                      {canEdit() && (
+                                        <p className="mt-1 text-xs text-blue-600">Drag to assign to project</p>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="ml-6 flex items-center space-x-2">
@@ -2619,7 +2755,7 @@ const handleConfirmDeleteFormDocument = async () => {
         {/* FORM SUBMISSIONS SECTION */}
         <div className="mb-8 border-t border-gray-200 pt-8">
           <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Form Submissions</h2>
+            <h2 className="text-xl font-semibold text-gray-900">Checklist Submissions</h2>
             {canEdit() && (
               <Button
                 onClick={handleUploadFormDocument}
@@ -2897,7 +3033,7 @@ const handleConfirmDeleteFormDocument = async () => {
 
         {/* JOBS SECTION */}
         <div className="mb-8 border-t border-gray-200 pt-8">
-          <h2 className="mb-6 text-xl font-semibold text-gray-900">Jobs</h2>
+          <h2 className="mb-6 text-xl font-semibold text-gray-900">Tasks</h2>
           {jobs.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {jobs.map((job) => (

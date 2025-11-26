@@ -10,6 +10,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +32,11 @@ import {
   Clock,
   Plus,
   X,
+  ChevronDown,
+  CheckSquare,
+  Receipt,
+  DollarSign,
+  Edit,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -120,6 +131,46 @@ const getStageColor = (stage: string) => {
   }
 };
 
+const getFormType = (submission: FormSubmission): string => {
+  const token = submission.token_used || "";
+  if (token.includes("bedroom")) return "bedroom";
+  if (token.includes("kitchen")) return "kitchen";
+  if (token.includes("remedial")) return "remedial";
+  if (token.includes("checklist")) return "checklist";
+  if (token.includes("quote")) return "quotation";
+  if (token.includes("invoice")) return "invoice";
+  if (token.includes("proforma")) return "proforma";
+  if (token.includes("receipt")) return "receipt";
+  if (token.includes("payment")) return "payment";
+  return "other";
+};
+
+const getFormTitle = (submission: FormSubmission): string => {
+  const formType = getFormType(submission);
+  switch (formType) {
+    case "bedroom":
+      return "Bedroom Checklist";
+    case "kitchen":
+      return "Kitchen Checklist";
+    case "remedial":
+      return "Remedial Action Checklist";
+    case "checklist":
+      return "General Checklist";
+    case "quotation":
+      return "Quotation";
+    case "invoice":
+      return "Invoice";
+    case "proforma":
+      return "Proforma Invoice";
+    case "receipt":
+      return "Receipt";
+    case "payment":
+      return "Payment Terms";
+    default:
+      return `Form #${submission.id}`;
+  }
+};
+
 export default function ProjectDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -137,6 +188,7 @@ export default function ProjectDetailsPage() {
   const [showDeleteDrawingDialog, setShowDeleteDrawingDialog] = useState(false);
   const [drawingToDelete, setDrawingToDelete] = useState<DrawingDocument | null>(null);
   const [isDeletingDrawing, setIsDeletingDrawing] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   // Task form state
   const [taskData, setTaskData] = useState({
@@ -149,6 +201,28 @@ export default function ProjectDetailsPage() {
     jobTask: "",
     notes: "",
   });
+
+  // Permission functions
+  const canEdit = () => {
+    return ["Manager", "HR", "Production", "Sales"].includes(user?.role || "");
+  };
+
+  const canDelete = () => {
+    return ["Manager", "HR", "Sales"].includes(user?.role || "");
+  };
+
+  const canCreateFinancialDocs = () => {
+    return ["Manager", "Sales"].includes(user?.role || "");
+  };
+
+  const canEditForm = (submission: FormSubmission) => {
+    if (user?.role === "Manager" || user?.role === "HR") return true;
+    if (user?.role === "Sales") {
+      const formType = getFormType(submission);
+      return ["quotation", "invoice", "proforma", "receipt", "payment"].includes(formType);
+    }
+    return false;
+  };
 
   useEffect(() => {
     if (!projectId) return;
@@ -319,9 +393,6 @@ export default function ProjectDetailsPage() {
   };
 
   const handleAddTask = async () => {
-    // TODO: Implement API call to create task/assignment
-    console.log("Creating task:", taskData);
-    
     const token = localStorage.getItem("auth_token");
     const headers: HeadersInit = {
       "Content-Type": "application/json",
@@ -329,7 +400,6 @@ export default function ProjectDetailsPage() {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      // Adjust this endpoint based on your actual API
       const response = await fetch("https://aztec-interiors.onrender.com/tasks", {
         method: "POST",
         headers: headers,
@@ -361,6 +431,111 @@ export default function ProjectDetailsPage() {
     } catch (error) {
       console.error("Error creating task:", error);
       alert("Network error: Could not create task");
+    }
+  };
+
+  // Checklist creation handlers
+  const generateToken = async (type: string) => {
+    const token = localStorage.getItem("auth_token");
+    const headers: HeadersInit = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    setGenerating(true);
+    try {
+      const res = await fetch("https://aztec-interiors.onrender.com/form-tokens", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          form_type: type,
+          customer_id: customer?.id,
+          project_id: projectId,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const newToken = data.token;
+        let formUrl = "";
+
+        if (type === "kitchen") {
+          formUrl = `https://aztec-interiors.onrender.com/kitchen-checklist?token=${newToken}`;
+        } else if (type === "bedroom") {
+          formUrl = `https://aztec-interiors.onrender.com/bedroom-checklist?token=${newToken}`;
+        } else if (type === "remedial") {
+          formUrl = `https://aztec-interiors.onrender.com/remedial-checklist?token=${newToken}`;
+        } else if (type === "checklist") {
+          formUrl = `https://aztec-interiors.onrender.com/checklist-form?token=${newToken}`;
+        } else if (type === "quotation") {
+          formUrl = `https://aztec-interiors.onrender.com/quotation?token=${newToken}`;
+        } else if (type === "invoice") {
+          formUrl = `https://aztec-interiors.onrender.com/invoice?token=${newToken}`;
+        } else if (type === "proforma") {
+          formUrl = `https://aztec-interiors.onrender.com/proforma-invoice?token=${newToken}`;
+        } else if (type === "receipt") {
+          formUrl = `https://aztec-interiors.onrender.com/receipt?token=${newToken}`;
+        } else if (type === "deposit") {
+          formUrl = `https://aztec-interiors.onrender.com/deposit-receipt?token=${newToken}`;
+        } else if (type === "final") {
+          formUrl = `https://aztec-interiors.onrender.com/final-receipt?token=${newToken}`;
+        } else if (type === "payment") {
+          formUrl = `https://aztec-interiors.onrender.com/payment-terms?token=${newToken}`;
+        }
+
+        window.open(formUrl, "_blank");
+      } else {
+        const err = await res.json().catch(() => ({ error: "Failed" }));
+        alert(`Error: ${err.error}`);
+      }
+    } catch (error) {
+      console.error("Error generating token:", error);
+      alert("Network error");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleCreateKitchenChecklist = () => generateToken("kitchen");
+  const handleCreateBedroomChecklist = () => generateToken("bedroom");
+  const handleCreateRemedialChecklist = () => generateToken("remedial");
+  const handleCreateChecklist = () => generateToken("checklist");
+  const handleCreateQuote = () => generateToken("quotation");
+  const handleCreateInvoice = () => generateToken("invoice");
+  const handleCreateProformaInvoice = () => generateToken("proforma");
+  const handleCreateReceipt = () => generateToken("receipt");
+  const handleCreateDepositReceipt = () => generateToken("deposit");
+  const handleCreateFinalReceipt = () => generateToken("final");
+  const handleCreatePaymentTerms = () => generateToken("payment");
+
+  const handleViewChecklist = (submission: FormSubmission) => {
+    window.open(`/checklist-view?id=${submission.id}`, "_blank");
+  };
+
+  const handleEditForm = (submission: FormSubmission) => {
+    const formType = getFormType(submission);
+    let editUrl = "";
+
+    if (formType === "kitchen") {
+      editUrl = `/kitchen-checklist?token=${submission.token_used}&edit=true`;
+    } else if (formType === "bedroom") {
+      editUrl = `/bedroom-checklist?token=${submission.token_used}&edit=true`;
+    } else if (formType === "remedial") {
+      editUrl = `/remedial-checklist?token=${submission.token_used}&edit=true`;
+    } else if (formType === "checklist") {
+      editUrl = `/checklist-form?token=${submission.token_used}&edit=true`;
+    } else if (formType === "quotation") {
+      editUrl = `/quotation?token=${submission.token_used}&edit=true`;
+    } else if (formType === "invoice") {
+      editUrl = `/invoice?token=${submission.token_used}&edit=true`;
+    } else if (formType === "proforma") {
+      editUrl = `/proforma-invoice?token=${submission.token_used}&edit=true`;
+    } else if (formType === "receipt") {
+      editUrl = `/receipt?token=${submission.token_used}&edit=true`;
+    } else if (formType === "payment") {
+      editUrl = `/payment-terms?token=${submission.token_used}&edit=true`;
+    }
+
+    if (editUrl) {
+      window.open(editUrl, "_blank");
     }
   };
 
@@ -402,10 +577,83 @@ export default function ProjectDetailsPage() {
               )}
             </div>
           </div>
-          <Button onClick={() => setShowAddTaskDialog(true)} className="flex items-center space-x-2">
-            <Calendar className="h-4 w-4" />
-            <span>Schedule Task</span>
-          </Button>
+          <div className="flex items-center space-x-3">
+            {canEdit() && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center space-x-2">
+                    <Plus className="h-4 w-4" />
+                    <span>Create</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {user?.role !== "Sales" && (
+                    <DropdownMenuItem onClick={handleCreateRemedialChecklist} className="flex items-center space-x-2" disabled={generating}>
+                      <CheckSquare className="h-4 w-4" />
+                      <span>Remedial Action Checklist</span>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={handleCreateChecklist} className="flex items-center space-x-2" disabled={generating}>
+                    <CheckSquare className="h-4 w-4" />
+                    <span>Checklist</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCreateQuote} className="flex items-center space-x-2" disabled={generating}>
+                    <FileText className="h-4 w-4" />
+                    <span>Quotation</span>
+                  </DropdownMenuItem>
+                  {canCreateFinancialDocs() && (
+                    <>
+                      <DropdownMenuItem onClick={handleCreateInvoice} className="flex items-center space-x-2" disabled={generating}>
+                        <FileText className="h-4 w-4" />
+                        <span>Invoice</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleCreateProformaInvoice} className="flex items-center space-x-2" disabled={generating}>
+                        <FileText className="h-4 w-4" />
+                        <span>Proforma Invoice</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleCreateReceipt} className="flex items-center space-x-2" disabled={generating}>
+                        <Receipt className="h-4 w-4" />
+                        <span>Receipt</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleCreateDepositReceipt} className="flex items-center space-x-2" disabled={generating}>
+                        <Receipt className="h-4 w-4" />
+                        <span>Deposit Receipt</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleCreateFinalReceipt} className="flex items-center space-x-2" disabled={generating}>
+                        <Receipt className="h-4 w-4" />
+                        <span>Final Receipt</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleCreatePaymentTerms} className="flex items-center space-x-2" disabled={generating}>
+                        <DollarSign className="h-4 w-4" />
+                        <span>Payment Terms</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuItem
+                    onClick={handleCreateKitchenChecklist}
+                    className="flex items-center space-x-2"
+                    disabled={generating}
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    <span>Kitchen Checklist Form</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleCreateBedroomChecklist}
+                    className="flex items-center space-x-2"
+                    disabled={generating}
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    <span>Bedroom Checklist Form</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <Button onClick={() => setShowAddTaskDialog(true)} className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4" />
+              <span>Schedule Task</span>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -475,6 +723,62 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
         )}
+
+        {/* Checklists Section */}
+        <div className="mb-8 border-t border-gray-200 pt-8">
+          <h2 className="mb-6 text-xl font-semibold text-gray-900">
+            Checklists ({forms.length})
+          </h2>
+          {forms.length > 0 ? (
+            <div className="space-y-4">
+              {forms.map((form) => {
+                const formType = getFormType(form);
+                const isChecklist = formType === "bedroom" || formType === "kitchen";
+
+                return (
+                  <div
+                    key={form.id}
+                    className="flex items-center justify-between rounded-lg border bg-gray-50 p-4 transition hover:bg-gray-100"
+                  >
+                    <div className="flex flex-col">
+                      <h3 className="text-lg font-semibold text-gray-900">{getFormTitle(form)}</h3>
+                      <span className="text-sm text-gray-500">Submitted: {formatDate(form.submitted_at)}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewChecklist(form)}
+                        className="flex items-center space-x-1"
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span>View{isChecklist ? " Checklist" : ""}</span>
+                      </Button>
+
+                      {canEditForm(form) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditForm(form)}
+                          className="flex items-center space-x-1"
+                        >
+                          <Edit className="h-4 w-4" />
+                          <span>Edit</span>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+              <CheckSquare className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+              <h3 className="mb-2 text-lg font-medium text-gray-900">No Checklists Yet</h3>
+              <p className="text-sm text-gray-600">Create checklists for this project using the Create dropdown above.</p>
+            </div>
+          )}
+        </div>
 
         {/* Drawings & Layouts */}
         <div className="mb-8 border-t border-gray-200 pt-8">
@@ -558,29 +862,6 @@ export default function ProjectDetailsPage() {
             </div>
           )}
         </div>
-
-        {/* Forms Section */}
-        {forms.length > 0 && (
-          <div className="border-t border-gray-200 pt-8">
-            <h2 className="mb-6 text-xl font-semibold text-gray-900">Forms ({forms.length})</h2>
-            <div className="space-y-4">
-              {forms.map((form) => (
-                <div key={form.id} className="rounded-lg border bg-white p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium text-gray-900">Form #{form.id}</h3>
-                      <p className="text-sm text-gray-500">Submitted: {formatDate(form.submitted_at)}</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      <Eye className="mr-2 h-4 w-4" />
-                      View
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ADD TASK DIALOG */}
