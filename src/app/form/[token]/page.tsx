@@ -1464,6 +1464,144 @@ export default function FormPage() {
                     </div>
                   </div>
                 </div>
+                {/* Additional Doors */}
+                <div className="border-t pt-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <label className="text-sm font-bold text-gray-700">Door Details (Additional Doors)</label>
+                    <Button type="button" size="sm" onClick={addAdditionalDoor} className="bg-green-600">
+                      + Add Additional Door
+                    </Button>
+                  </div>
+                  {formData.additional_doors.map((door, idx) => (
+                    <div key={idx} className="mb-3 space-y-3 rounded border-2 border-green-300 bg-white p-4">
+                      {/* Door Style and Door Color + Conditional Fields */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-gray-600">Door Style</label>
+                          <select
+                          className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                          value={door.door_style}
+                          onChange={(e) => handleAdditionalDoorChange(idx, "door_style", e.target.value)}
+                          >
+                            <option value="">Select</option>
+                            <option value="vinyl">Vinyl</option>
+                            <option value="slab">Slab</option>
+                            <option value="shaker">Shaker</option>
+                            <option value="N/A">N/A</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-gray-600">Door Color</label>
+                          <Input
+                            placeholder="Enter door color"
+                            className="text-sm"
+                            value={door.door_color}
+                            onChange={(e) => handleAdditionalDoorChange(idx, "door_color", e.target.value)}
+                            />
+                          </div>
+                          
+                          {/* Show Door Manufacturer and Door Name if Vinyl */}
+                          {door.door_style === "vinyl" && (
+                            <>
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Door Manufacturer</label>
+                              <select
+                                className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                value={door.door_manufacturer || ""}
+                                onChange={(e) => handleAdditionalDoorChange(idx, "door_manufacturer", e.target.value)}
+                              >
+                                <option value="">Select manufacturer</option>
+                                <option value="Integral">Integral</option>
+                                <option value="Trade mouldings">Trade mouldings</option>
+                                <option value="Hpp">Hpp</option>
+                                <option value="Uform">Uform</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Door Name</label>
+                              <Input
+                                placeholder="Enter door name"
+                                className="text-sm"
+                                value={door.door_name || ""}
+                                onChange={(e) => handleAdditionalDoorChange(idx, "door_name", e.target.value)}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Panel Color and Plinth/Filler Color */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-gray-600">Panel Color</label>
+                          <Input
+                            placeholder="Enter panel color"
+                            className="text-sm"
+                            value={door.panel_color || ""}
+                            onChange={(e) => handleAdditionalDoorChange(idx, "panel_color", e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-gray-600">Plinth/Filler Color</label>
+                          <Input
+                            placeholder="Enter plinth/filler color"
+                            className="text-sm"
+                            value={door.plinth_color || ""}
+                            onChange={(e) => handleAdditionalDoorChange(idx, "plinth_color", e.target.value)}
+                          />
+                        </div>
+                     </div>
+                     
+                     {/* Cabinet Color and Worktop Color */}
+                     <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-600">Cabinet Color</label>
+                        <Input
+                          placeholder="Enter cabinet color"
+                          className="text-sm"
+                          value={door.cabinet_color || ""}
+                          onChange={(e) => handleAdditionalDoorChange(idx, "cabinet_color", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-600">Worktop Color</label>
+                        <Input
+                          placeholder="Enter worktop color"
+                          className="text-sm"
+                          value={door.worktop_color || ""}
+                          onChange={(e) => handleAdditionalDoorChange(idx, "worktop_color", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Quantity and Remove Button */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
+                        <Input
+                          placeholder="Enter quantity"
+                          type="text"
+                          className="text-sm"
+                          value={door.quantity}
+                          onChange={(e) => handleAdditionalDoorChange(idx, "quantity", e.target.value)}
+                        />
+                        </div>
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => removeAdditionalDoor(idx)}
+                            className="w-full"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
                 {/* 2. Hardware Specifications - Purple Section */}
                 <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-6">
