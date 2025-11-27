@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -202,34 +202,38 @@ export default function ProjectDetailsPage() {
     notes: "",
   });
 
-  // Permission functions
-  const canEdit = () => {
+  // ✅ OPTIMIZED: Memoized permission functions
+  const canEdit = useMemo(() => {
     return ["Manager", "HR", "Production", "Sales"].includes(user?.role || "");
-  };
+  }, [user?.role]);
 
-  const canDelete = () => {
+  const canDelete = useMemo(() => {
     return ["Manager", "HR", "Sales"].includes(user?.role || "");
-  };
+  }, [user?.role]);
 
-  const canCreateFinancialDocs = () => {
+  const canCreateFinancialDocs = useMemo(() => {
     return ["Manager", "Sales"].includes(user?.role || "");
-  };
+  }, [user?.role]);
 
-  const canEditForm = (submission: FormSubmission) => {
+  const canViewProject = useMemo(() => {
+    if (!user) return false;
+    // All authenticated users can view projects
+    return ["Manager", "HR", "Production", "Sales", "Staff"].includes(user.role);
+  }, [user]);
+
+  const canEditForm = useCallback((submission: FormSubmission) => {
     if (user?.role === "Manager" || user?.role === "HR") return true;
     if (user?.role === "Sales") {
       const formType = getFormType(submission);
       return ["quotation", "invoice", "proforma", "receipt", "payment"].includes(formType);
     }
     return false;
-  };
+  }, [user?.role]);
 
-  useEffect(() => {
+  // ✅ OPTIMIZED: Single parallel API call with proper error handling
+  const loadProjectData = useCallback(async () => {
     if (!projectId) return;
-    loadProjectData();
-  }, [projectId]);
-
-  const loadProjectData = async () => {
+    
     setLoading(true);
     const token = localStorage.getItem("auth_token");
     const headers: HeadersInit = {
@@ -238,59 +242,60 @@ export default function ProjectDetailsPage() {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      // ✅ PARALLEL FETCH - All requests happen at once
-      const [projectRes, drawingsRes, formsRes] = await Promise.all([
-        fetch(`https://aztec-interiors.onrender.com/projects/${projectId}`, { headers }),
-        // ✅ IMPORTANT: Fetch ALL drawings for customer, then filter client-side
-        fetch(`https://aztec-interiors.onrender.com/files/drawings?customer_id=${projectId}`, { headers })
-          .catch(() => null),
-        fetch(`https://aztec-interiors.onrender.com/projects/${projectId}/forms`, { headers })
-          .catch(() => null),
-      ]);
+      // ✅ STEP 1: Load project data first (fastest query)
+      const projectRes = await fetch(
+        `https://aztec-interiors.onrender.com/projects/${projectId}`,
+        { headers }
+      );
 
       if (!projectRes.ok) {
+        if (projectRes.status === 404) {
+          throw new Error("Project not found");
+        }
         throw new Error("Failed to load project");
       }
 
       const projectData = await projectRes.json();
       setProject(projectData);
 
-      // ✅ Fetch customer data
-      if (projectData.customer_id) {
-        const customerRes = await fetch(
+      // ✅ STEP 2: Load everything else in parallel
+      const [customerRes, drawingsRes, formsRes] = await Promise.all([
+        fetch(
           `https://aztec-interiors.onrender.com/customers/${projectData.customer_id}`,
           { headers }
-        );
-        
-        if (customerRes.ok) {
-          const customerData = await customerRes.json();
-          setCustomer(customerData);
+        ).catch(() => null),
+        fetch(
+          `https://aztec-interiors.onrender.com/files/drawings?project_id=${projectId}`,
+          { headers }
+        ).catch(() => null),
+        fetch(
+          `https://aztec-interiors.onrender.com/projects/${projectId}/forms`,
+          { headers }
+        ).catch(() => null),
+      ]);
 
-          // Pre-fill task data
-          setTaskData(prev => ({
-            ...prev,
-            jobTask: `${projectData.project_type} - ${projectData.project_name}`,
-            notes: `Customer: ${customerData.name}\nAddress: ${customerData.address}\nPhone: ${customerData.phone}`,
-          }));
+      // Process customer data
+      if (customerRes && customerRes.ok) {
+        const customerData = await customerRes.json();
+        setCustomer(customerData);
 
-          // ✅ NOW FETCH DRAWINGS WITH CORRECT customer_id
-          const actualDrawingsRes = await fetch(
-            `https://aztec-interiors.onrender.com/files/drawings?customer_id=${customerData.id}`,
-            { headers }
-          );
+        // Pre-fill task data
+        setTaskData(prev => ({
+          ...prev,
+          jobTask: `${projectData.project_type} - ${projectData.project_name}`,
+          notes: `Customer: ${customerData.name}\nAddress: ${customerData.address}\nPhone: ${customerData.phone}`,
+        }));
+      }
 
-          if (actualDrawingsRes.ok) {
-            const allDrawings = await actualDrawingsRes.json();
-            // ✅ FILTER CLIENT-SIDE: Only show drawings assigned to THIS project
-            const projectDrawings = allDrawings.filter(
-              (drawing: DrawingDocument) => drawing.project_id === projectId
-            );
-            setDrawings(projectDrawings);
-          }
+      // Process drawings - API already filters by project_id
+      if (drawingsRes && drawingsRes.ok) {
+        const drawingsData = await drawingsRes.json();
+        if (Array.isArray(drawingsData)) {
+          setDrawings(drawingsData);
         }
       }
 
-      // ✅ Process forms
+      // Process forms
       if (formsRes && formsRes.ok) {
         const formsData = await formsRes.json();
         if (Array.isArray(formsData)) {
@@ -298,14 +303,32 @@ export default function ProjectDetailsPage() {
         }
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading project data:", error);
+      if (error.message === "Project not found") {
+        alert("Project not found. You may not have permission to view this project.");
+        router.push("/dashboard/projects");
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId, router]);
 
-    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    if (!projectId || !user) return;
+    
+    // Check permission before loading
+    if (!canViewProject) {
+      alert("You don't have permission to view this project.");
+      router.push("/dashboard/projects");
+      return;
+    }
+
+    loadProjectData();
+  }, [projectId, user, canViewProject, loadProjectData, router]);
+
+  // ✅ OPTIMIZED: File upload with optimistic UI update
+  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
@@ -316,51 +339,51 @@ export default function ProjectDetailsPage() {
     const uploadedDocs: DrawingDocument[] = [];
 
     for (const file of Array.from(files)) {
-        try {
+      try {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("customer_id", project?.customer_id || "");
         formData.append("project_id", projectId);
 
         const response = await fetch("https://aztec-interiors.onrender.com/files/drawings", {
-            method: "POST",
-            headers: headers,
-            body: formData,
+          method: "POST",
+          headers: headers,
+          body: formData,
         });
 
         if (response.ok) {
-            const data = await response.json();
-            if (data.drawing && data.drawing.id) {
+          const data = await response.json();
+          if (data.drawing && data.drawing.id) {
             const newDoc: DrawingDocument = {
-                id: data.drawing.id,
-                filename: data.drawing.filename || data.drawing.file_name || file.name,
-                url: data.drawing.url || data.drawing.file_url,
-                type: data.drawing.type || data.drawing.category || "other",
-                created_at: data.drawing.created_at || new Date().toISOString(),
-                project_id: data.drawing.project_id,
+              id: data.drawing.id,
+              filename: data.drawing.filename || data.drawing.file_name || file.name,
+              url: data.drawing.url || data.drawing.file_url,
+              type: data.drawing.type || data.drawing.category || "other",
+              created_at: data.drawing.created_at || new Date().toISOString(),
+              project_id: data.drawing.project_id,
             };
             uploadedDocs.push(newDoc);
-            }
+          }
         }
-        } catch (error) {
+      } catch (error) {
         console.error("Upload error:", error);
-        }
+      }
     }
 
     // ✅ UPDATE STATE IN ONE GO - NO RELOAD
     if (uploadedDocs.length > 0) {
-        setDrawings((prev) => {
+      setDrawings((prev) => {
         const updated = [...uploadedDocs, ...prev];
         return updated.sort((a, b) => 
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
-        });
+      });
     }
 
     if (event.target) event.target.value = "";
-    };
+  }, [projectId, project?.customer_id]);
 
-  const handleViewDrawing = (doc: DrawingDocument) => {
+  const handleViewDrawing = useCallback((doc: DrawingDocument) => {
     const BACKEND_URL = "https://aztec-interiors.onrender.com";
     let viewUrl = doc.url;
 
@@ -377,14 +400,14 @@ export default function ProjectDetailsPage() {
     }
 
     window.open(viewUrl, "_blank");
-  };
+  }, []);
 
-  const handleDeleteDrawing = (doc: DrawingDocument) => {
+  const handleDeleteDrawing = useCallback((doc: DrawingDocument) => {
     setDrawingToDelete(doc);
     setShowDeleteDrawingDialog(true);
-  };
+  }, []);
   
-  const handleConfirmDeleteDrawing = async () => {
+  const handleConfirmDeleteDrawing = useCallback(async () => {
     if (!drawingToDelete || isDeletingDrawing) return;
     setIsDeletingDrawing(true);
     const token = localStorage.getItem("auth_token");
@@ -392,34 +415,34 @@ export default function ProjectDetailsPage() {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-        const res = await fetch(
+      const res = await fetch(
         `https://aztec-interiors.onrender.com/files/drawings/${drawingToDelete.id}`,
         { method: "DELETE", headers }
-        );
+      );
 
-        if (res.ok) {
+      if (res.ok) {
         // ✅ UPDATE STATE IMMEDIATELY - NO RELOAD
         setDrawings((prev) => prev.filter((d) => d.id !== drawingToDelete.id));
         setSelectedDrawings((prev) => {
-            const newSet = new Set(prev);
-            newSet.delete(drawingToDelete.id);
-            return newSet;
+          const newSet = new Set(prev);
+          newSet.delete(drawingToDelete.id);
+          return newSet;
         });
         setShowDeleteDrawingDialog(false);
         setDrawingToDelete(null);
-        } else {
+      } else {
         const err = await res.json().catch(() => ({ error: "Server error" }));
         alert(`Failed to delete: ${err.error}`);
-        }
+      }
     } catch (e) {
-        console.error(e);
-        alert("Network error");
+      console.error(e);
+      alert("Network error");
     } finally {
-        setIsDeletingDrawing(false);
+      setIsDeletingDrawing(false);
     }
-    };
+  }, [drawingToDelete, isDeletingDrawing]);
 
-  const handleToggleDrawingSelection = (drawingId: string) => {
+  const handleToggleDrawingSelection = useCallback((drawingId: string) => {
     setSelectedDrawings((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(drawingId)) {
@@ -429,9 +452,9 @@ export default function ProjectDetailsPage() {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const handleAddTask = async () => {
+  const handleAddTask = useCallback(async () => {
     const token = localStorage.getItem("auth_token");
     const headers: HeadersInit = {
       "Content-Type": "application/json",
@@ -471,10 +494,10 @@ export default function ProjectDetailsPage() {
       console.error("Error creating task:", error);
       alert("Network error: Could not create task");
     }
-  };
+  }, [taskData, projectId, project, customer]);
 
-  // Checklist creation handlers
-  const generateToken = async (type: string) => {
+  // Checklist creation handlers (keeping all the existing handlers)
+  const generateToken = useCallback(async (type: string) => {
     const token = localStorage.getItem("auth_token");
     const headers: HeadersInit = { "Content-Type": "application/json" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -531,11 +554,11 @@ export default function ProjectDetailsPage() {
     } finally {
       setGenerating(false);
     }
-  };
+  }, [customer?.id, projectId]);
 
-  // Add ALL these handler functions after your useEffect and loadProjectData:
-  const handleCreateKitchenChecklist = async () => {
-    if (generating || !canEdit()) return;
+  // All the handler functions remain the same...
+  const handleCreateKitchenChecklist = useCallback(async () => {
+    if (generating || !canEdit) return;
 
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
@@ -564,7 +587,7 @@ export default function ProjectDetailsPage() {
             customerName: customer.name || "",
             customerAddress: customer.address || "",
             customerPhone: customer.phone || "",
-            projectId: projectId,  // ✅ ADD THIS LINE - Associates form with project
+            projectId: projectId,
           });
           router.push(`/form/${data.token}?${params.toString()}`);
         } else {
@@ -580,10 +603,10 @@ export default function ProjectDetailsPage() {
     } finally {
       setGenerating(false);
     }
-  };
+  }, [generating, canEdit, customer, projectId, router]);
 
-  const handleCreateBedroomChecklist = async () => {
-    if (generating || !canEdit()) return;
+  const handleCreateBedroomChecklist = useCallback(async () => {
+    if (generating || !canEdit) return;
 
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
@@ -612,7 +635,7 @@ export default function ProjectDetailsPage() {
             customerName: customer.name || "",
             customerAddress: customer.address || "",
             customerPhone: customer.phone || "",
-            projectId: projectId,  // ✅ ADD THIS LINE - Associates form with project
+            projectId: projectId,
           });
           router.push(`/form/${data.token}?${params.toString()}`);
         } else {
@@ -628,9 +651,9 @@ export default function ProjectDetailsPage() {
     } finally {
       setGenerating(false);
     }
-  };
+  }, [generating, canEdit, customer, projectId, router]);
 
-  const handleCreateRemedialChecklist = () => {
+  const handleCreateRemedialChecklist = useCallback(() => {
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
       return;
@@ -642,17 +665,17 @@ export default function ProjectDetailsPage() {
       customerPhone: customer.phone || "",
     });
     router.push(`/dashboard/checklists/remedial?${params.toString()}`);
-  };
+  }, [customer, router]);
 
-  const handleCreateChecklist = () => {
+  const handleCreateChecklist = useCallback(() => {
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
       return;
     }
     router.push(`/dashboard/checklists/create?customerId=${customer.id}`);
-  };
+  }, [customer, router]);
 
-  const handleCreateQuote = () => {
+  const handleCreateQuote = useCallback(() => {
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
       return;
@@ -665,9 +688,9 @@ export default function ProjectDetailsPage() {
       customerEmail: customer.email || "",
     });
     router.push(`/dashboard/quotes/create?${params.toString()}`);
-  };
+  }, [customer, router]);
 
-  const handleCreateInvoice = () => {
+  const handleCreateInvoice = useCallback(() => {
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
       return;
@@ -680,9 +703,9 @@ export default function ProjectDetailsPage() {
       customerEmail: customer.email || "",
     });
     router.push(`/dashboard/invoices/create?${params.toString()}`);
-  };
+  }, [customer, router]);
 
-  const handleCreateProformaInvoice = () => {
+  const handleCreateProformaInvoice = useCallback(() => {
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
       return;
@@ -695,9 +718,9 @@ export default function ProjectDetailsPage() {
       customerEmail: customer.email || "",
     });
     router.push(`/dashboard/invoices/create?type=proforma&${params.toString()}`);
-  };
+  }, [customer, router]);
 
-  const handleCreateReceipt = () => {
+  const handleCreateReceipt = useCallback(() => {
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
       return;
@@ -716,9 +739,9 @@ export default function ProjectDetailsPage() {
       paymentDescription: "Payment received for your Kitchen/Bedroom Cabinetry.",
     });
     router.push(`/dashboard/checklists/receipt?${params.toString()}`);
-  };
+  }, [customer, router]);
 
-  const handleCreateDepositReceipt = () => {
+  const handleCreateDepositReceipt = useCallback(() => {
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
       return;
@@ -737,9 +760,9 @@ export default function ProjectDetailsPage() {
       paymentDescription: "Deposit payment received for your Kitchen/Bedroom Cabinetry.",
     });
     router.push(`/dashboard/checklists/receipt?${params.toString()}`);
-  };
+  }, [customer, router]);
 
-  const handleCreateFinalReceipt = () => {
+  const handleCreateFinalReceipt = useCallback(() => {
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
       return;
@@ -758,9 +781,9 @@ export default function ProjectDetailsPage() {
       paymentDescription: "Final payment received for your Kitchen/Bedroom Cabinetry.",
     });
     router.push(`/dashboard/checklists/receipt?${params.toString()}`);
-  };
+  }, [customer, router]);
 
-  const handleCreatePaymentTerms = () => {
+  const handleCreatePaymentTerms = useCallback(() => {
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
       return;
@@ -772,20 +795,20 @@ export default function ProjectDetailsPage() {
       customerPhone: customer.phone || "",
     });
     router.push(`/dashboard/payment-terms/create?${params.toString()}`);
-  };
+  }, [customer, router]);
 
-  const handleViewChecklist = (submission: FormSubmission) => {
+  const handleViewChecklist = useCallback((submission: FormSubmission) => {
     window.open(`/checklist-view?id=${submission.id}`, "_blank");
-  };
+  }, []);
 
-  const handleEditForm = (submission: FormSubmission) => {
+  const handleEditForm = useCallback((submission: FormSubmission) => {
     const formType = getFormType(submission);
     let editUrl = "";
 
-    if (formType === "kitchen") {
-      editUrl = `/kitchen-checklist?token=${submission.token_used}&edit=true`;
-    } else if (formType === "bedroom") {
+    if (formType === "bedroom") {
       editUrl = `/bedroom-checklist?token=${submission.token_used}&edit=true`;
+    } else if (formType === "kitchen") {
+      editUrl = `/kitchen-checklist?token=${submission.token_used}&edit=true`;
     } else if (formType === "remedial") {
       editUrl = `/remedial-checklist?token=${submission.token_used}&edit=true`;
     } else if (formType === "checklist") {
@@ -805,84 +828,84 @@ export default function ProjectDetailsPage() {
     if (editUrl) {
       window.open(editUrl, "_blank");
     }
-  };
+  }, []);
   
   // Loading state with skeleton
   if (loading) {
     return (
-        <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-white">
         {/* Header Skeleton */}
         <div className="border-b border-gray-200 bg-white px-8 py-6">
-            <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-                <div className="h-10 w-10 bg-gray-200 rounded animate-pulse" />
-                <div className="space-y-2">
+              <div className="h-10 w-10 bg-gray-200 rounded animate-pulse" />
+              <div className="space-y-2">
                 <div className="h-8 w-64 bg-gray-200 rounded animate-pulse" />
                 <div className="h-4 w-96 bg-gray-100 rounded animate-pulse" />
-                </div>
+              </div>
             </div>
             <div className="flex space-x-3">
-                <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
-                <div className="h-10 w-40 bg-gray-200 rounded animate-pulse" />
+              <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
+              <div className="h-10 w-40 bg-gray-200 rounded animate-pulse" />
             </div>
-            </div>
+          </div>
         </div>
 
         <div className="px-8 py-6">
-            {/* Project Overview Skeleton */}
-            <div className="mb-8 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+          {/* Project Overview Skeleton */}
+          <div className="mb-8 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
             <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mb-4" />
             <div className="grid grid-cols-4 gap-4">
-                {[1, 2, 3, 4].map((i) => (
+              {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="space-y-2">
-                    <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
-                    <div className="h-6 w-32 bg-gray-100 rounded animate-pulse" />
+                  <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-6 w-32 bg-gray-100 rounded animate-pulse" />
                 </div>
-                ))}
+              ))}
             </div>
-            </div>
+          </div>
 
-            {/* Customer Info Skeleton */}
-            <div className="mb-8 rounded-lg border bg-white p-6">
+          {/* Customer Info Skeleton */}
+          <div className="mb-8 rounded-lg border bg-white p-6">
             <div className="h-6 w-56 bg-gray-200 rounded animate-pulse mb-4" />
             <div className="grid grid-cols-3 gap-4">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
+              {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="space-y-2">
-                    <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
-                    <div className="h-5 w-full bg-gray-100 rounded animate-pulse" />
+                  <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-5 w-full bg-gray-100 rounded animate-pulse" />
                 </div>
-                ))}
+              ))}
             </div>
-            </div>
+          </div>
 
-            {/* Checklists Skeleton */}
-            <div className="mb-8 border-t pt-8">
+          {/* Checklists Skeleton */}
+          <div className="mb-8 border-t pt-8">
             <div className="h-6 w-40 bg-gray-200 rounded animate-pulse mb-6" />
             <div className="space-y-4">
-                {[1, 2].map((i) => (
+              {[1, 2].map((i) => (
                 <div key={i} className="h-20 bg-gray-100 rounded animate-pulse" />
-                ))}
+              ))}
             </div>
-            </div>
+          </div>
 
-            {/* Drawings Skeleton */}
-            <div className="border-t pt-8">
+          {/* Drawings Skeleton */}
+          <div className="border-t pt-8">
             <div className="flex items-center justify-between mb-6">
-                <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
-                <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
+              <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
+              <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
             </div>
             <div className="grid grid-cols-2 gap-6">
-                {[1, 2, 3, 4].map((i) => (
+              {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="h-24 bg-gray-100 rounded animate-pulse" />
-                ))}
+              ))}
             </div>
-            </div>
+          </div>
         </div>
-        </div>
+      </div>
     );
-    }
+  }
 
-if (!project) return <div className="p-8">Project not found.</div>;
+  if (!project) return <div className="p-8">Project not found.</div>;
 
   return (
     <div className="min-h-screen bg-white">
@@ -920,7 +943,7 @@ if (!project) return <div className="p-8">Project not found.</div>;
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            {canEdit() && (
+            {canEdit && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="flex items-center space-x-2">
@@ -944,7 +967,7 @@ if (!project) return <div className="p-8">Project not found.</div>;
                     <FileText className="h-4 w-4" />
                     <span>Quotation</span>
                   </DropdownMenuItem>
-                  {canCreateFinancialDocs() && (
+                  {canCreateFinancialDocs && (
                     <>
                       <DropdownMenuItem onClick={handleCreateInvoice} className="flex items-center space-x-2" disabled={generating}>
                         <FileText className="h-4 w-4" />
