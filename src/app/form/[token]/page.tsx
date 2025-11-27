@@ -46,7 +46,8 @@ interface FormData {
   customer_name: string;
   customer_phone: string;
   customer_address: string;
-  postcode?: string;
+  customer_postcode: string;
+  postcode: string;
   room: string;
   survey_date: string;
   appointment_date: string;
@@ -460,6 +461,7 @@ export default function FormPage() {
     customer_phone: "",
     customer_address: "",
     customer_postcode: "",
+    postcode: "",
     room: "",
     survey_date: "",
     appointment_date: "",
