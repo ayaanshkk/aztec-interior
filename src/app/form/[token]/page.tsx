@@ -557,6 +557,7 @@ export default function FormPage() {
       const custName = urlParams.get("customerName");
       const custAddress = urlParams.get("customerAddress");
       const custPhone = urlParams.get("customerPhone");
+      const custPostcode = urlParams.get("customerPostcode");
       const formTypeParam = urlParams.get("type");
 
       if (formTypeParam === "kitchen" || formTypeParam === "bedroom") {
@@ -660,6 +661,7 @@ export default function FormPage() {
     if (!formData.customer_postcode?.trim()) errors.push("Postcode");  
 
     if (formType === "kitchen") {
+      if (!formData.postcode?.trim()) errors.push("Postcode");
       if (!formData.door_style?.trim()) errors.push("Door Style");
       if (!formData.door_color?.trim()) errors.push("Door Color");
       if (formData.door_style === "glazed" && !formData.glazing_material?.trim()) errors.push("Glazing Material");
@@ -915,7 +917,7 @@ export default function FormPage() {
             {/* Customer Information - Blue Section */}
             <div className="mb-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-6 print:mb-2 print:p-3">
               <h3 className="mb-4 text-xl font-bold text-blue-900 print:mb-2">Customer Information</h3>
-              <div className={`grid grid-cols-1 gap-4 ${formType === "bedroom" ? "md:grid-cols-5" : "md:grid-cols-3"} print:gap-2`}>
+              <div className={`grid grid-cols-1 gap-4 ${formType === "bedroom" ? "md:grid-cols-5" : "md:grid-cols-4"} print:gap-2`}>
                 <div>
                   <label className="mb-1 block text-sm font-bold text-gray-700">Customer Name</label>
                   <Input 
@@ -941,6 +943,16 @@ export default function FormPage() {
                     onChange={(e) => handleInputChange("customer_address", e.target.value)}
                     readOnly={!isEditing} 
                     className="bg-white" 
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-bold text-gray-700">Postcode</label>
+                  <Input 
+                    value={formData.postcode || ""} 
+                    onChange={(e) => handleInputChange("postcode", e.target.value)}
+                    readOnly={!isEditing} 
+                    className="bg-white" 
+                    placeholder="Enter postcode"
                   />
                 </div>
                 {formType === "bedroom" && (

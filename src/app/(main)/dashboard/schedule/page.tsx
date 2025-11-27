@@ -61,16 +61,20 @@ interface Customer {
   name: string;
   address?: string;
   phone?: string;
+  postcode?: string;
   stage: string;
 }
 
-interface Assignment {
+interface Task {
   id: string;
   type: "job" | "off" | "delivery" | "note";
   title: string;
   date: string;
+  start_date?: string;
+  end_date?: string;
   job_id?: string;
   customer_id?: string;
+  customer_name?: string;
   start_time?: string;
   end_time?: string;
   estimated_hours?: number | string;
@@ -95,6 +99,20 @@ const formatDateKey = (date: Date | string) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+// ✅ Color coding for job types
+const getTaskColorByType = (jobType?: string) => {
+  switch (jobType?.toLowerCase()) {
+    case "survey":
+      return "bg-blue-100 text-blue-800 border-blue-300";
+    case "delivery":
+      return "bg-purple-100 text-purple-800 border-purple-300";
+    case "installation":
+      return "bg-green-100 text-green-800 border-green-300";
+    default:
+      return "bg-gray-100 text-gray-800 border-gray-300";
+  }
+};
+
 // Constants
 const START_HOUR_WEEK = 7;
 const HOUR_HEIGHT_PX = 60;
@@ -116,15 +134,15 @@ export default function SchedulePage() {
   const [showOwnCalendar, setShowOwnCalendar] = useState(true);
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
-  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
-  const [originalAssignment, setOriginalAssignment] = useState<Assignment | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [originalTask, setOriginalTask] = useState<Task | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
-  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
+  const [showTaskDialog, setShowTaskDialog] = useState(false);
+  const [isEditingTask, setIsEditingTask] = useState(false);
 
   // ✅ Custom assignees and tasks state
   const [customAssignees, setCustomAssignees] = useState<string[]>([]);
@@ -135,12 +153,13 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [draggedAssignment, setDraggedAssignment] = useState<Assignment | null>(null);
+  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   
-  // ✅ FIXED: Pre-fill date and time with defaults
-  const [newAssignment, setNewAssignment] = useState<Partial<Assignment>>({
+  // ✅ FIXED: Pre-fill with defaults including start/end dates
+  const [newTask, setNewTask] = useState<Partial<Task>>({
     type: "job",
-    date: formatDateKey(new Date()),
+    start_date: formatDateKey(new Date()),
+    end_date: formatDateKey(new Date()),
     start_time: "09:00",
     end_time: "17:00",
     priority: "Medium",
@@ -196,30 +215,47 @@ export default function SchedulePage() {
     return days;
   }, [currentDate]);
 
-  // ✅ FIXED: Handle assignments without dates
-  const assignmentsByDate = useMemo(() => {
-    return assignments.reduce(
-      (acc, assignment) => {
-        // Skip assignments without a date
-        if (!assignment || !assignment.date) {
-          console.warn("Assignment without date found:", assignment);
-          return acc;
-        }
-        const dateKey = assignment.date;
-        if (!acc[dateKey]) {
-          acc[dateKey] = [];
-        }
-        acc[dateKey].push(assignment);
-        return acc;
-      },
-      {} as Record<string, Assignment[]>,
-    );
-  }, [assignments]);
+  // ✅ FIXED: Handle tasks with start_date and end_date, show on both dates
+  const tasksByDate = useMemo(() => {
+    const dateMap: Record<string, Task[]> = {};
+    
+    tasks.forEach((task) => {
+      if (!task || (!task.date && !task.start_date)) {
+        console.warn("Task without date found:", task);
+        return;
+      }
 
-  const declinedAssignments = useMemo(() => {
+      // ✅ Handle tasks with start_date and end_date (show on both dates)
+      if (task.start_date && task.end_date) {
+        const startDate = new Date(task.start_date);
+        const endDate = new Date(task.end_date);
+        
+        // Add task to start date
+        const startKey = formatDateKey(startDate);
+        if (!dateMap[startKey]) dateMap[startKey] = [];
+        dateMap[startKey].push(task);
+        
+        // Add task to end date if different from start date
+        const endKey = formatDateKey(endDate);
+        if (startKey !== endKey) {
+          if (!dateMap[endKey]) dateMap[endKey] = [];
+          dateMap[endKey].push(task);
+        }
+      } else if (task.date) {
+        // Legacy support for old 'date' field
+        const dateKey = task.date;
+        if (!dateMap[dateKey]) dateMap[dateKey] = [];
+        dateMap[dateKey].push(task);
+      }
+    });
+    
+    return dateMap;
+  }, [tasks]);
+
+  const declinedTasks = useMemo(() => {
     if (user?.role === "Manager") return [];
-    return assignments.filter((a) => a.user_id === user?.id && a.status === "Declined");
-  }, [assignments, user]);
+    return tasks.filter((a) => a.user_id === user?.id && a.status === "Declined");
+  }, [tasks, user]);
 
   // ✅ Load custom values from localStorage on mount
   useEffect(() => {
@@ -312,7 +348,7 @@ export default function SchedulePage() {
     return hours * 60 + (minutes || 0);
   };
 
-  const getAssignmentWeekStyle = (start?: string, end?: string): React.CSSProperties => {
+  const getTaskWeekStyle = (start?: string, end?: string): React.CSSProperties => {
     if (!start || !end) {
       return { top: 0, height: `${HOUR_HEIGHT_PX}px` };
     }
@@ -346,17 +382,18 @@ export default function SchedulePage() {
       
       console.log("🔄 Starting data fetch...");
 
-      const [assignmentsData, jobsData, customersData] = await Promise.all([
+      const [tasksData, jobsData, customersData] = await Promise.all([
         api.getAssignments().catch(() => []),
         api.getAvailableJobs().catch(() => []),
         api.getActiveCustomers().catch(() => [])
       ]);
 
-      setAssignments(assignmentsData);
+      setTasks(tasksData);
       setAvailableJobs(jobsData);
       setCustomers(customersData);
 
       console.log("✅ Data loaded successfully");
+      console.log("📊 Tasks loaded:", tasksData.length);
     } catch (err) {
       console.error("❌ Error in fetchData:", err);
       setError("Failed to load schedule data");
@@ -366,69 +403,82 @@ export default function SchedulePage() {
   };
 
   // CRUD operations
-  const createAssignment = async (assignmentData: Partial<Assignment>) => {
+  const createTask = async (taskData: Partial<Task>) => {
     if (!token) throw new Error("Not authenticated");
     
-    // ✅ VALIDATE: Ensure date is provided
-    if (!assignmentData.date) {
-      throw new Error("Date is required for assignment");
+    // ✅ VALIDATE: Customer is required
+    if (!taskData.customer_id) {
+      throw new Error("Customer is required");
+    }
+
+    // ✅ VALIDATE: Ensure start_date is provided
+    if (!taskData.start_date) {
+      throw new Error("Start date is required");
+    }
+
+    // ✅ VALIDATE: Ensure end_date is provided
+    if (!taskData.end_date) {
+      throw new Error("End date is required");
     }
 
     try {
       setSaving(true);
 
-      let title = assignmentData.title || "";
+      // ✅ Get customer name from customer_id
+      const customer = customers.find((c) => c.id === taskData.customer_id);
+      const customerName = customer?.name || "Unknown Customer";
 
-      if (!title) {
-        switch (assignmentData.type) {
+      // ✅ Build title with customer name and task type
+      let title = "";
+      if (taskData.job_type) {
+        title = `${customerName} - ${taskData.job_type}`;
+      } else if (taskData.title) {
+        title = `${customerName} - ${taskData.title}`;
+      } else {
+        switch (taskData.type) {
           case "job":
-            if (assignmentData.job_id) {
-              const job = availableJobs.find((j) => j.id === assignmentData.job_id);
-              title = job ? `${job.job_reference} - ${job.customer_name}` : "Job Assignment";
-            } else if (assignmentData.customer_id) {
-              const customer = customers.find((c) => c.id === assignmentData.customer_id);
-              title = customer ? `Job - ${customer.name}` : "Job Assignment";
-            } else {
-              title = "Job Assignment";
-            }
+            title = `${customerName} - Job`;
             break;
           case "off":
             title = "Day Off";
             break;
           case "delivery":
-            title = "Deliveries";
+            title = `${customerName} - Deliveries`;
             break;
           case "note":
-            title = assignmentData.notes || "Note";
+            title = taskData.notes || "Note";
             break;
           default:
-            title = "Assignment";
+            title = customerName;
         }
       }
 
       // ✅ Calculate estimated hours if start and end time are provided
-      let estimatedHours = assignmentData.estimated_hours;
-      if (assignmentData.start_time && assignmentData.end_time && !estimatedHours) {
-        const hours = calculateHours(assignmentData.start_time, assignmentData.end_time);
+      let estimatedHours = taskData.estimated_hours;
+      if (taskData.start_time && taskData.end_time && !estimatedHours) {
+        const hours = calculateHours(taskData.start_time, taskData.end_time);
         estimatedHours = hours ? parseFloat(hours) : 8;
       }
 
       // ✅ CLEAN THE DATA - Remove any invalid fields
       const cleanedData = {
-        type: assignmentData.type,
+        type: taskData.type,
         title: title,
-        date: assignmentData.date,
-        start_time: assignmentData.start_time,
-        end_time: assignmentData.end_time,
+        date: taskData.start_date, // Use start_date as primary date for backend compatibility
+        start_date: taskData.start_date,
+        end_date: taskData.end_date,
+        start_time: taskData.start_time,
+        end_time: taskData.end_time,
         estimated_hours: estimatedHours,
-        notes: assignmentData.notes,
-        priority: assignmentData.priority,
-        status: user?.role === "Manager" || assignmentData.user_id === user?.id ? "Accepted" : "Scheduled",
-        user_id: assignmentData.user_id || user?.id,
-        team_member: assignmentData.team_member,
-        job_id: assignmentData.job_id,
-        customer_id: assignmentData.customer_id,
-        job_type: assignmentData.job_type,
+        notes: taskData.notes,
+        priority: taskData.priority,
+        status: user?.role === "Manager" || taskData.user_id === user?.id ? "Accepted" : "Scheduled",
+        user_id: taskData.user_id || user?.id,
+        team_member: taskData.team_member,
+        job_id: taskData.job_id,
+        customer_id: taskData.customer_id,
+        customer_name: customerName,
+        job_type: taskData.job_type,
       };
 
       // Remove undefined values
@@ -438,36 +488,37 @@ export default function SchedulePage() {
         }
       });
 
-      console.log("📤 Creating assignment with data:", cleanedData);
+      console.log("📤 Creating task with data:", cleanedData);
 
-      const newAssignment = await api.createAssignment(cleanedData);
-      setAssignments((prev) => [...prev, newAssignment]);
-      return newAssignment;
+      const newTask = await api.createAssignment(cleanedData);
+      setTasks((prev) => [...prev, newTask]);
+      console.log("✅ Task created successfully:", newTask);
+      return newTask;
     } finally {
       setSaving(false);
     }
   };
 
-  const updateAssignment = async (id: string, assignmentData: Partial<Assignment>) => {
+  const updateTask = async (id: string, taskData: Partial<Task>) => {
     if (!token) throw new Error("Not authenticated");
 
     try {
       setSaving(true);
-      const updatedAssignment = await api.updateAssignment(id, assignmentData);
-      setAssignments((prev) => prev.map((a) => (a.id === id ? updatedAssignment : a)));
-      return updatedAssignment;
+      const updatedTask = await api.updateAssignment(id, taskData);
+      setTasks((prev) => prev.map((a) => (a.id === id ? updatedTask : a)));
+      return updatedTask;
     } finally {
       setSaving(false);
     }
   };
 
-  const deleteAssignment = async (id: string) => {
+  const deleteTask = async (id: string) => {
     if (!token) throw new Error("Not authenticated");
 
     try {
       setSaving(true);
       await api.deleteAssignment(id);
-      setAssignments((prev) => prev.filter((a) => a.id !== id));
+      setTasks((prev) => prev.filter((a) => a.id !== id));
     } finally {
       setSaving(false);
     }
@@ -507,46 +558,68 @@ export default function SchedulePage() {
     setVisibleCalendars((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
   };
 
-  const getAssignmentsForDate = (date: Date) => {
+  const getTasksForDate = (date: Date) => {
     const dateKey = formatDateKey(date);
-    const allDayAssignments = assignments.filter((a) => a && a.date && a.date === dateKey);
+    const allDayTasks = tasks.filter((t) => {
+      if (!t) return false;
+      
+      // Check if task has start_date and end_date
+      if (t.start_date && t.end_date) {
+        const taskStart = new Date(t.start_date);
+        const taskEnd = new Date(t.end_date);
+        const checkDate = new Date(date);
+        
+        // Include if date matches start or end
+        return formatDateKey(taskStart) === dateKey || formatDateKey(taskEnd) === dateKey;
+      }
+      
+      // Fallback to old date field
+      return t.date === dateKey;
+    });
 
     if (user?.role === "Manager") {
-      return allDayAssignments.filter((a) => visibleCalendars.includes(a.team_member ?? ""));
+      return allDayTasks.filter((t) => visibleCalendars.includes(t.team_member ?? ""));
     }
 
-    return allDayAssignments.filter((a) => a.status !== "Declined");
+    return allDayTasks.filter((t) => t.status !== "Declined");
   };
 
   const getDailyHours = (date: Date) => {
-    const dayAssignments = getAssignmentsForDate(date);
-    return dayAssignments.reduce((total, a) => {
-      if (!a || !a.estimated_hours) return total;
-      const h = typeof a.estimated_hours === "string" ? parseFloat(a.estimated_hours) : a.estimated_hours || 0;
+    const dayTasks = getTasksForDate(date);
+    return dayTasks.reduce((total, t) => {
+      if (!t || !t.estimated_hours) return total;
+      const h = typeof t.estimated_hours === "string" ? parseFloat(t.estimated_hours) : t.estimated_hours || 0;
       return total + (isNaN(h) ? 0 : h);
     }, 0);
   };
 
   const isOverbooked = (date: Date) => getDailyHours(date) > 8;
 
-  const getAssignmentColor = (assignment: Assignment) => {
-    switch (assignment.type) {
+  // ✅ Updated to use color coding by job type
+  const getTaskColor = (task: Task) => {
+    switch (task.type) {
       case "off":
         return "bg-gray-200 text-gray-800 border-gray-300";
       case "delivery":
-        return "bg-blue-100 text-blue-800 border-blue-300";
+        return getTaskColorByType("Delivery");
       case "note":
         return "bg-yellow-100 text-yellow-800 border-yellow-300";
       case "job":
-        return "bg-green-100 text-green-800 border-green-300";
+        return getTaskColorByType(task.job_type);
       default:
         return "bg-gray-100 text-gray-800 border-gray-300";
     }
   };
 
-  const handleAddAssignment = async () => {
-    if (!newAssignment.date || !newAssignment.type) {
-      alert("Please fill in required fields (Type and Date)");
+  const handleAddTask = async () => {
+    // ✅ Validation
+    if (!newTask.start_date || !newTask.end_date || !newTask.type) {
+      alert("Please fill in required fields (Type, Start Date, and End Date)");
+      return;
+    }
+
+    if (!newTask.customer_id) {
+      alert("Please select a customer");
       return;
     }
 
@@ -554,12 +627,13 @@ export default function SchedulePage() {
     if (customTaskInput.trim()) saveCustomJobTask(customTaskInput);
 
     try {
-      await createAssignment(newAssignment);
+      await createTask(newTask);
       setShowAddDialog(false);
       // ✅ Reset with default values including today's date
-      setNewAssignment({
+      setNewTask({
         type: "job",
-        date: formatDateKey(new Date()),
+        start_date: formatDateKey(new Date()),
+        end_date: formatDateKey(new Date()),
         start_time: "09:00",
         end_time: "17:00",
         priority: "Medium",
@@ -568,45 +642,48 @@ export default function SchedulePage() {
       });
       setCustomAssigneeInput("");
       setCustomTaskInput("");
+      
+      // ✅ Refresh data to show new task
+      await fetchData();
     } catch (err) {
-      console.error("Error creating assignment:", err);
-      alert(err instanceof Error ? err.message : "Failed to create assignment");
+      console.error("Error creating task:", err);
+      alert(err instanceof Error ? err.message : "Failed to create task");
     }
   };
 
-  const handleEditAssignment = async () => {
-    if (!selectedAssignment) return;
+  const handleEditTask = async () => {
+    if (!selectedTask) return;
     
     if (customAssigneeInput.trim()) saveCustomAssignee(customAssigneeInput);
     if (customTaskInput.trim()) saveCustomJobTask(customTaskInput);
     
     try {
-      await updateAssignment(selectedAssignment.id, selectedAssignment);
-      setShowAssignmentDialog(false);
-      setSelectedAssignment(null);
-      setIsEditingAssignment(false);
+      await updateTask(selectedTask.id, selectedTask);
+      setShowTaskDialog(false);
+      setSelectedTask(null);
+      setIsEditingTask(false);
       setCustomAssigneeInput("");
       setCustomTaskInput("");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update assignment");
+      alert(err instanceof Error ? err.message : "Failed to update task");
     }
   };
 
-  const handleDeleteAssignment = async (assignmentId: string) => {
-    if (!confirm("Are you sure you want to delete this assignment?")) return;
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm("Are you sure you want to delete this task?")) return;
 
     try {
-      await deleteAssignment(assignmentId);
-      setShowAssignmentDialog(false);
-      setSelectedAssignment(null);
-      setIsEditingAssignment(false);
+      await deleteTask(taskId);
+      setShowTaskDialog(false);
+      setSelectedTask(null);
+      setIsEditingTask(false);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete assignment");
+      alert(err instanceof Error ? err.message : "Failed to delete task");
     }
   };
 
-  const handleDragStart = (assignment: Assignment) => {
-    setDraggedAssignment(assignment);
+  const handleDragStart = (task: Task) => {
+    setDraggedTask(task);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -615,15 +692,15 @@ export default function SchedulePage() {
 
   const handleDrop = async (e: React.DragEvent, date: Date) => {
     e.preventDefault();
-    if (!draggedAssignment) return;
+    if (!draggedTask) return;
 
     const dateKey = formatDateKey(date);
     try {
-      await updateAssignment(draggedAssignment.id, { date: dateKey });
-      setDraggedAssignment(null);
+      await updateTask(draggedTask.id, { start_date: dateKey, date: dateKey });
+      setDraggedTask(null);
     } catch (err) {
-      alert("Failed to move assignment");
-      setDraggedAssignment(null);
+      alert("Failed to move task");
+      setDraggedTask(null);
     }
   };
 
@@ -724,10 +801,11 @@ export default function SchedulePage() {
           </Select>
           <Button onClick={() => {
             // ✅ FIXED: Keep existing defaults, only update date to today if needed
-            setNewAssignment(prev => ({
+            setNewTask(prev => ({
               ...prev,
               type: prev.type || "job",
-              date: formatDateKey(new Date()),
+              start_date: formatDateKey(new Date()),
+              end_date: formatDateKey(new Date()),
               start_time: prev.start_time || "09:00",
               end_time: prev.end_time || "17:00",
               priority: prev.priority || "Medium",
@@ -736,7 +814,7 @@ export default function SchedulePage() {
             }));
             setShowAddDialog(true);
           }}>
-            Add Assignment
+            Add Task
           </Button>
         </div>
       </div>
@@ -755,7 +833,7 @@ export default function SchedulePage() {
             {calendarDays.map((day, idx) => {
               const isCurrentMonth = day.getMonth() === currentDate.getMonth();
               const isToday = day.toDateString() === new Date().toDateString();
-              const dayAssignments = getAssignmentsForDate(day);
+              const dayTasks = getTasksForDate(day);
               const overbooked = isOverbooked(day);
 
               return (
@@ -768,9 +846,10 @@ export default function SchedulePage() {
                   onDrop={(e) => handleDrop(e, day)}
                   onClick={() => {
                     // ✅ FIXED: Set clicked date but keep default times
-                    setNewAssignment({
+                    setNewTask({
                       type: "job",
-                      date: formatDateKey(day),
+                      start_date: formatDateKey(day),
+                      end_date: formatDateKey(day),
                       start_time: "09:00",
                       end_time: "17:00",
                       priority: "Medium",
@@ -789,26 +868,26 @@ export default function SchedulePage() {
                     )}
                   </div>
                   <div className="space-y-1">
-                    {dayAssignments.slice(0, 3).map((assignment) => 
-                      assignment && assignment.id ? (
+                    {dayTasks.slice(0, 3).map((task) => 
+                      task && task.id ? (
                         <div
-                          key={assignment.id}
+                          key={task.id}
                           draggable
-                          onDragStart={() => handleDragStart(assignment)}
+                          onDragStart={() => handleDragStart(task)}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedAssignment(assignment);
-                            setShowAssignmentDialog(true);
+                            setSelectedTask(task);
+                            setShowTaskDialog(true);
                           }}
-                          className={`cursor-pointer rounded border px-2 py-1 text-xs ${getAssignmentColor(assignment)}`}
+                          className={`cursor-pointer rounded border px-2 py-1 text-xs ${getTaskColor(task)}`}
                         >
-                          {assignment.title}
+                          {task.title}
                         </div>
                       ) : null
                     )}
-                    {dayAssignments.length > 3 && (
+                    {dayTasks.length > 3 && (
                       <div className="text-xs text-gray-500">
-                        +{dayAssignments.length - 3} more
+                        +{dayTasks.length - 3} more
                       </div>
                     )}
                   </div>
@@ -839,7 +918,7 @@ export default function SchedulePage() {
               ))}
             </div>
             {daysOfWeek.map((day) => {
-              const dayAssignments = getAssignmentsForDate(day);
+              const dayTasks = getTasksForDate(day);
               return (
                 <div
                   key={day.toISOString()}
@@ -854,21 +933,21 @@ export default function SchedulePage() {
                       style={{ height: `${HOUR_HEIGHT_PX}px` }}
                     />
                   ))}
-                  {dayAssignments.map((assignment) => (
+                  {dayTasks.map((task) => (
                     <div
-                      key={assignment.id}
+                      key={task.id}
                       draggable
-                      onDragStart={() => handleDragStart(assignment)}
+                      onDragStart={() => handleDragStart(task)}
                       onClick={() => {
-                        setSelectedAssignment(assignment);
-                        setShowAssignmentDialog(true);
+                        setSelectedTask(task);
+                        setShowTaskDialog(true);
                       }}
-                      className={`cursor-pointer rounded border p-1 text-xs ${getAssignmentColor(assignment)}`}
-                      style={getAssignmentWeekStyle(assignment.start_time, assignment.end_time)}
+                      className={`cursor-pointer rounded border p-1 text-xs ${getTaskColor(task)}`}
+                      style={getTaskWeekStyle(task.start_time, task.end_time)}
                     >
-                      <div className="font-medium">{assignment.title}</div>
+                      <div className="font-medium">{task.title}</div>
                       <div className="text-xs opacity-75">
-                        {assignment.start_time} - {assignment.end_time}
+                        {task.start_time} - {task.end_time}
                       </div>
                     </div>
                   ))}
@@ -883,16 +962,16 @@ export default function SchedulePage() {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Assignment</DialogTitle>
+            <DialogTitle>Add New Task</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {/* Type */}
             <div className="space-y-2">
               <Label>Type</Label>
               <Select
-                value={newAssignment.type}
+                value={newTask.type}
                 onValueChange={(value: "job" | "off" | "delivery" | "note") => {
-                  setNewAssignment({ ...newAssignment, type: value });
+                  setNewTask({ ...newTask, type: value });
                 }}
               >
                 <SelectTrigger>
@@ -907,34 +986,44 @@ export default function SchedulePage() {
               </Select>
             </div>
 
-            {/* Date */}
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={newAssignment.date}
-                onChange={(e) => setNewAssignment({ ...newAssignment, date: e.target.value })}
-              />
+            {/* ✅ Start Date and End Date */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date *</Label>
+                <Input
+                  type="date"
+                  value={newTask.start_date}
+                  onChange={(e) => setNewTask({ ...newTask, start_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Date *</Label>
+                <Input
+                  type="date"
+                  value={newTask.end_date}
+                  onChange={(e) => setNewTask({ ...newTask, end_date: e.target.value })}
+                />
+              </div>
             </div>
 
             {/* Time fields - only for Job and Off */}
-            {(newAssignment.type === "job" || newAssignment.type === "off") && (
+            {(newTask.type === "job" || newTask.type === "off") && (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Start Time</Label>
                     <Input
                       type="time"
-                      value={newAssignment.start_time || ""}
-                      onChange={(e) => setNewAssignment({ ...newAssignment, start_time: e.target.value })}
+                      value={newTask.start_time || ""}
+                      onChange={(e) => setNewTask({ ...newTask, start_time: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>End Time</Label>
                     <Input
                       type="time"
-                      value={newAssignment.end_time || ""}
-                      onChange={(e) => setNewAssignment({ ...newAssignment, end_time: e.target.value })}
+                      value={newTask.end_time || ""}
+                      onChange={(e) => setNewTask({ ...newTask, end_time: e.target.value })}
                     />
                   </div>
                 </div>
@@ -950,7 +1039,7 @@ export default function SchedulePage() {
                 value={customAssigneeInput}
                 onChange={(e) => {
                   setCustomAssigneeInput(e.target.value);
-                  setNewAssignment({ ...newAssignment, team_member: e.target.value });
+                  setNewTask({ ...newTask, team_member: e.target.value });
                 }}
               />
               <datalist id="assignee-suggestions">
@@ -961,25 +1050,25 @@ export default function SchedulePage() {
             </div>
 
             {/* Job/Task - only for Job type */}
-            {newAssignment.type === "job" && (
+            {newTask.type === "job" && (
               <div className="space-y-2">
                 <Label>Job/Task</Label>
                 <Select
-                  value={newAssignment.job_type || newAssignment.title || ""}
+                  value={newTask.job_type || newTask.title || ""}
                   onValueChange={(value) => {
                     if (value.includes(" - ")) {
                       const jobId = availableJobs.find(
                         (j) => `${j.job_reference} - ${j.customer_name}` === value
                       )?.id;
-                      setNewAssignment({
-                        ...newAssignment,
+                      setNewTask({
+                        ...newTask,
                         title: value,
                         job_id: jobId,
                         job_type: undefined,
                       });
                     } else {
-                      setNewAssignment({
-                        ...newAssignment,
+                      setNewTask({
+                        ...newTask,
                         title: value,
                         job_type: value,
                         job_id: undefined,
@@ -1027,15 +1116,15 @@ export default function SchedulePage() {
               </div>
             )}
 
-            {/* Customer Dropdown */}
+            {/* ✅ Customer Dropdown - REQUIRED */}
             <div className="space-y-2">
-              <Label>Customer (Optional)</Label>
+              <Label>Customer *</Label>
               <Select
-                value={newAssignment.customer_id || "none"}
+                value={newTask.customer_id || ""}
                 onValueChange={(value) => {
-                  setNewAssignment({
-                    ...newAssignment,
-                    customer_id: value === "none" ? undefined : value,
+                  setNewTask({
+                    ...newTask,
+                    customer_id: value,
                   });
                 }}
               >
@@ -1043,7 +1132,6 @@ export default function SchedulePage() {
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
                   {customers.map((customer) => (
                     <SelectItem key={customer.id} value={customer.id}>
                       {customer.name}
@@ -1058,8 +1146,8 @@ export default function SchedulePage() {
               <Label>Notes</Label>
               <textarea
                 className="w-full min-h-[100px] p-2 border rounded-md"
-                value={newAssignment.notes || ""}
-                onChange={(e) => setNewAssignment({ ...newAssignment, notes: e.target.value })}
+                value={newTask.notes || ""}
+                onChange={(e) => setNewTask({ ...newTask, notes: e.target.value })}
                 placeholder="Add any additional notes..."
               />
             </div>
@@ -1069,8 +1157,8 @@ export default function SchedulePage() {
               <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAddAssignment} disabled={saving}>
-                {saving ? "Adding..." : "Add Assignment"}
+              <Button onClick={handleAddTask} disabled={saving}>
+                {saving ? "Adding..." : "Add Task"}
               </Button>
             </div>
           </div>
@@ -1078,36 +1166,44 @@ export default function SchedulePage() {
       </Dialog>
 
       {/* View/Edit Dialog */}
-      <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
+      <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {isEditingAssignment ? "Edit Assignment" : "Assignment Details"}
+              {isEditingTask ? "Edit Task" : "Task Details"}
             </DialogTitle>
           </DialogHeader>
 
-          {selectedAssignment && (
+          {selectedTask && (
             <div className="space-y-4">
               <div>
                 <Label>Title</Label>
-                <p className="text-sm">{selectedAssignment.title}</p>
+                <p className="text-sm">{selectedTask.title}</p>
               </div>
-              <div>
-                <Label>Date</Label>
-                <p className="text-sm">{selectedAssignment.date}</p>
-              </div>
-              {selectedAssignment.start_time && (
+              {selectedTask.start_date && (
+                <div>
+                  <Label>Start Date</Label>
+                  <p className="text-sm">{selectedTask.start_date}</p>
+                </div>
+              )}
+              {selectedTask.end_date && (
+                <div>
+                  <Label>End Date</Label>
+                  <p className="text-sm">{selectedTask.end_date}</p>
+                </div>
+              )}
+              {selectedTask.start_time && (
                 <div>
                   <Label>Time</Label>
                   <p className="text-sm">
-                    {selectedAssignment.start_time} - {selectedAssignment.end_time}
+                    {selectedTask.start_time} - {selectedTask.end_time}
                   </p>
                 </div>
               )}
-              {selectedAssignment.notes && (
+              {selectedTask.notes && (
                 <div>
                   <Label>Notes</Label>
-                  <p className="text-sm">{selectedAssignment.notes}</p>
+                  <p className="text-sm">{selectedTask.notes}</p>
                 </div>
               )}
 
@@ -1115,8 +1211,8 @@ export default function SchedulePage() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setShowAssignmentDialog(false);
-                    setSelectedAssignment(null);
+                    setShowTaskDialog(false);
+                    setSelectedTask(null);
                   }}
                 >
                   Close
@@ -1124,7 +1220,7 @@ export default function SchedulePage() {
                 {user?.role === "Manager" && (
                   <Button
                     variant="destructive"
-                    onClick={() => selectedAssignment && handleDeleteAssignment(selectedAssignment.id)}
+                    onClick={() => selectedTask && handleDeleteTask(selectedTask.id)}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Delete
