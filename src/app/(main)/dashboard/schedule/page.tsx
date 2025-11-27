@@ -433,7 +433,7 @@ export default function SchedulePage() {
       console.log("👤 User:", user?.full_name, user?.role);
       console.log("🌐 Backend URL:", "https://aztec-interiors.onrender.com");
 
-      // ✅ Add timeout to prevent infinite loading
+      // ✅ Reduced timeout to 5 seconds for faster feedback
       const fetchWithTimeout = (promise: Promise<any>, timeoutMs: number) => {
         return Promise.race([
           promise,
@@ -477,7 +477,7 @@ export default function SchedulePage() {
               console.log("🔄 Falling back to direct fetch for assignments...");
               return directFetch('assignments');
             }),
-            15000 // 15 second timeout
+            5000 // ✅ 5 second timeout
           ),
           fetchWithTimeout(
             api.getAvailableJobs().catch((err) => {
@@ -485,7 +485,7 @@ export default function SchedulePage() {
               console.log("🔄 Falling back to direct fetch for jobs...");
               return directFetch('jobs');
             }),
-            15000
+            5000
           ),
           fetchWithTimeout(
             api.getActiveCustomers().catch((err) => {
@@ -493,7 +493,7 @@ export default function SchedulePage() {
               console.log("🔄 Falling back to direct fetch for customers...");
               return directFetch('customers');
             }),
-            15000
+            5000
           )
         ]);
       } catch (apiError) {
@@ -502,9 +502,9 @@ export default function SchedulePage() {
         console.log("🔄 Using direct fetch for all endpoints...");
         
         [tasksData, jobsData, customersData] = await Promise.all([
-          fetchWithTimeout(directFetch('assignments'), 15000).catch(() => []),
-          fetchWithTimeout(directFetch('jobs'), 15000).catch(() => []),
-          fetchWithTimeout(directFetch('customers'), 15000).catch(() => [])
+          fetchWithTimeout(directFetch('assignments'), 5000).catch(() => []),
+          fetchWithTimeout(directFetch('jobs'), 5000).catch(() => []),
+          fetchWithTimeout(directFetch('customers'), 5000).catch(() => [])
         ]);
       }
 
@@ -698,17 +698,6 @@ export default function SchedulePage() {
     if (user && token && !hasLoadedData.current) {
       console.log("🎯 Initial data load triggered");
       fetchData();
-      
-      // ✅ SAFETY: Force exit loading state after 20 seconds
-      const safetyTimeout = setTimeout(() => {
-        if (loading) {
-          console.warn("⚠️ SAFETY TIMEOUT: Force exiting loading state after 20 seconds");
-          setLoading(false);
-          setError("Loading timed out. Please try refreshing the page.");
-        }
-      }, 20000);
-      
-      return () => clearTimeout(safetyTimeout);
     }
   }, [user, token]);
 
@@ -949,25 +938,8 @@ export default function SchedulePage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="flex flex-col items-center space-y-4">
-          <div className="flex items-center space-x-2">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span>Loading schedule...</span>
-          </div>
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              console.log("🛑 User manually stopped loading");
-              setLoading(false);
-              setTasks([]);
-              setAvailableJobs([]);
-              setCustomers([]);
-            }}
-          >
-            Skip Loading
-          </Button>
-          <p className="text-xs text-gray-500">
-            If this takes more than 10 seconds, click "Skip Loading"
-          </p>
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <span className="text-lg font-medium">Loading schedule...</span>
         </div>
       </div>
     );
@@ -980,35 +952,13 @@ export default function SchedulePage() {
           <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-500" />
           <h3 className="mb-2 text-lg font-medium text-red-900">Error Loading Schedule</h3>
           <p className="mb-4 text-red-600">{error}</p>
-          <div className="space-y-2">
-            <Button onClick={() => {
-              hasLoadedData.current = false;
-              setError(null);
-              fetchData();
-            }}>
-              Try Again
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                console.log("🛑 User chose to continue with empty data");
-                setError(null);
-                setTasks([]);
-                setAvailableJobs([]);
-                setCustomers([]);
-              }}
-            >
-              Continue Anyway
-            </Button>
-          </div>
-          <details className="mt-4 text-left">
-            <summary className="cursor-pointer text-sm text-gray-600">Show technical details</summary>
-            <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">
-              User: {user?.full_name} ({user?.role})
-              Token: {token ? 'Present' : 'Missing'}
-              Error: {error}
-            </pre>
-          </details>
+          <Button onClick={() => {
+            hasLoadedData.current = false;
+            setError(null);
+            fetchData();
+          }}>
+            Try Again
+          </Button>
         </div>
       </div>
     );

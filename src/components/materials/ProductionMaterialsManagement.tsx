@@ -386,50 +386,45 @@ export function ProductionMaterialsManagement() {
     setIsDetailsDialogOpen(true);
   };
 
-  // ✅ FIXED: Parse material specifications - handle actual format from backend
+  // ✅ FIXED: Parse material specifications - handle newline-separated format
   const parseMaterialSpecs = useCallback((description: string) => {
-    if (!description || !description.includes(':')) {
-      return [{ label: '', value: description }];
+    if (!description) {
+      return [{ label: '', value: 'No description' }];
     }
     
-    // The description comes in format like:
-    // "Material Specifications Door Style: slab Door Color: Cashmere Perfect Matt Panel Color: ..."
+    // The description comes with each spec on a new line like:
+    // "Door Style: slab\nDoor Color: a\nPanel Color: a\n..."
     
-    // First, remove "Material Specifications" prefix if present
-    let cleanDesc = description.replace(/^Material Specifications\s*/i, '').trim();
-    
-    // Split by looking for capital letter followed by text and colon
-    // This regex matches: "Door Style:", "Panel Color:", "Handle Code:", etc.
-    const regex = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*:\s*/g;
+    // Split by newlines first
+    const lines = description.split('\n').filter(line => line.trim());
     
     const parts: Array<{label: string, value: string}> = [];
-    let lastIndex = 0;
-    let match;
-    const labels: Array<{label: string, index: number}> = [];
     
-    // Find all labels and their positions
-    while ((match = regex.exec(cleanDesc)) !== null) {
-      labels.push({
-        label: match[1],
-        index: match.index
-      });
-    }
-    
-    // Extract label-value pairs
-    for (let i = 0; i < labels.length; i++) {
-      const currentLabel = labels[i];
-      const nextLabel = labels[i + 1];
+    for (const line of lines) {
+      // Check if line contains a colon (label: value format)
+      const colonIndex = line.indexOf(':');
       
-      // Value is from after the colon to the start of next label (or end of string)
-      const valueStart = currentLabel.index + currentLabel.label.length + 1; // +1 for the colon
-      const valueEnd = nextLabel ? nextLabel.index : cleanDesc.length;
-      const value = cleanDesc.substring(valueStart, valueEnd).trim();
-      
-      if (value) {
+      if (colonIndex > 0) {
+        const label = line.substring(0, colonIndex).trim();
+        const value = line.substring(colonIndex + 1).trim();
+        
+        // Skip section headers like "--- Additional Door 1 ---"
+        if (label.startsWith('---') || !value) {
+          continue;
+        }
+        
         parts.push({
-          label: currentLabel.label,
+          label: label,
           value: value
         });
+      } else {
+        // No colon, treat as plain text (like section headers)
+        if (line.includes('---')) {
+          parts.push({
+            label: '',
+            value: line
+          });
+        }
       }
     }
     
