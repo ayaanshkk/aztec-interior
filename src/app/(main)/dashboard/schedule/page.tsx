@@ -37,6 +37,7 @@ import {
   Check,
   X,
   Archive,
+  Edit,
 } from "lucide-react";
 import { fetchWithAuth, api } from "@/lib/api";
 
@@ -215,7 +216,7 @@ export default function SchedulePage() {
     return days;
   }, [currentDate]);
 
-  // ✅ FIXED: Handle tasks with start_date and end_date, show on both dates
+  // ✅ FIX #1: FIXED - Show tasks on ALL dates in range (not just start/end)
   const tasksByDate = useMemo(() => {
     console.log("🔍 Building tasksByDate map from tasks:", tasks.length);
     
@@ -235,23 +236,21 @@ export default function SchedulePage() {
         return;
       }
 
-      // ✅ Handle tasks with start_date and end_date (show on both dates)
+      // ✅ FIXED: Show task on EVERY date between start and end (inclusive)
       if (task.start_date && task.end_date) {
         const startDate = new Date(task.start_date);
         const endDate = new Date(task.end_date);
         
-        // Add task to start date
-        const startKey = formatDateKey(startDate);
-        if (!dateMap[startKey]) dateMap[startKey] = [];
-        dateMap[startKey].push(task);
-        console.log(`✅ Added task to start date ${startKey}`);
-        
-        // Add task to end date if different from start date
-        const endKey = formatDateKey(endDate);
-        if (startKey !== endKey) {
-          if (!dateMap[endKey]) dateMap[endKey] = [];
-          dateMap[endKey].push(task);
-          console.log(`✅ Added task to end date ${endKey}`);
+        // Add task to EVERY date between start and end (inclusive)
+        const currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+          const dateKey = formatDateKey(currentDate);
+          if (!dateMap[dateKey]) dateMap[dateKey] = [];
+          dateMap[dateKey].push(task);
+          console.log(`✅ Added task to date ${dateKey}`);
+          
+          // Move to next day
+          currentDate.setDate(currentDate.getDate() + 1);
         }
       } else if (task.date) {
         // Legacy support for old 'date' field
@@ -577,30 +576,21 @@ export default function SchedulePage() {
     setVisibleCalendars((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
   };
 
+  // ✅ FIX #2: FIXED - Allow Manager/HR/Sales to see ALL tasks
   const getTasksForDate = (date: Date) => {
     const dateKey = formatDateKey(date);
-    const allDayTasks = tasks.filter((t) => {
-      if (!t) return false;
-      
-      // Check if task has start_date and end_date
-      if (t.start_date && t.end_date) {
-        const taskStart = new Date(t.start_date);
-        const taskEnd = new Date(t.end_date);
-        const checkDate = new Date(date);
-        
-        // Include if date matches start or end
-        return formatDateKey(taskStart) === dateKey || formatDateKey(taskEnd) === dateKey;
-      }
-      
-      // Fallback to old date field
-      return t.date === dateKey;
-    });
-
-    if (user?.role === "Manager") {
-      return allDayTasks.filter((t) => visibleCalendars.includes(t.team_member ?? ""));
+    
+    // ✅ FIXED: Use tasksByDate which already handles date ranges correctly
+    const dayTasks = tasksByDate[dateKey] || [];
+    
+    // ✅ FIXED: Show ALL tasks to Manager, HR, and Sales
+    const role = user?.role?.toLowerCase();
+    if (role === "manager" || role === "hr" || role === "sales") {
+      return dayTasks; // Show all tasks
     }
 
-    return allDayTasks.filter((t) => t.status !== "Declined");
+    // For other roles, filter out declined tasks
+    return dayTasks.filter((t) => t.status !== "Declined");
   };
 
   const getDailyHours = (date: Date) => {
@@ -709,15 +699,23 @@ export default function SchedulePage() {
     e.preventDefault();
   };
 
+  // ✅ FIX #4: FIXED - Update both start_date and end_date when dragging
   const handleDrop = async (e: React.DragEvent, date: Date) => {
     e.preventDefault();
     if (!draggedTask) return;
 
     const dateKey = formatDateKey(date);
     try {
-      await updateTask(draggedTask.id, { start_date: dateKey, date: dateKey });
+      // ✅ FIXED: Update both start_date and end_date when dragging
+      await updateTask(draggedTask.id, { 
+        start_date: dateKey, 
+        end_date: dateKey,
+        date: dateKey 
+      });
       setDraggedTask(null);
+      await fetchData(); // Refresh to show updated position
     } catch (err) {
+      console.error("Failed to move task:", err);
       alert("Failed to move task");
       setDraggedTask(null);
     }
@@ -1242,14 +1240,30 @@ export default function SchedulePage() {
                 >
                   Close
                 </Button>
-                {user?.role === "Manager" && (
-                  <Button
-                    variant="destructive"
-                    onClick={() => selectedTask && handleDeleteTask(selectedTask.id)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </Button>
+                
+                {/* ✅ FIX #3: FIXED - Allow Manager, HR, and Sales to edit/delete */}
+                {(user?.role?.toLowerCase() === "manager" || 
+                  user?.role?.toLowerCase() === "hr" || 
+                  user?.role?.toLowerCase() === "sales") && (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsEditingTask(true);
+                        setOriginalTask(selectedTask);
+                      }}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => selectedTask && handleDeleteTask(selectedTask.id)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  </>
                 )}
               </div>
             </div>

@@ -218,9 +218,6 @@ export default function ProjectDetailsPage() {
     return ["manager", "sales"].includes(role);
   }, [user?.role]);
 
-  // Note: Backend handles project access permissions
-  // We just check if user is authenticated
-
   const canEditForm = useCallback((submission: FormSubmission) => {
     if (!user?.role) return false;
     const role = user.role.toLowerCase();
@@ -233,7 +230,7 @@ export default function ProjectDetailsPage() {
     return false;
   }, [user?.role]);
 
-  // ✅ OPTIMIZED: Single parallel API call with proper error handling
+  // ✅ FIXED: Removed the blocking error handling
   const loadProjectData = useCallback(async () => {
     if (!projectId) return;
     
@@ -245,7 +242,7 @@ export default function ProjectDetailsPage() {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      // ✅ STEP 1: Load project data first (fastest query)
+      // ✅ Load project data
       const projectRes = await fetch(
         `https://aztec-interiors.onrender.com/projects/${projectId}`,
         { headers }
@@ -253,22 +250,22 @@ export default function ProjectDetailsPage() {
 
       if (!projectRes.ok) {
         const errorText = await projectRes.text();
-        console.error("Project fetch error:", projectRes.status, errorText);
+        console.error("Project fetch failed:", projectRes.status, errorText);
         
+        // ✅ FIXED: Just show error, don't block based on status code
         if (projectRes.status === 404) {
-          throw new Error("Project not found - The project may have been deleted or you may not have access");
+          alert("Project not found. It may have been deleted.");
+        } else {
+          alert(`Unable to load project. Please try again or contact support.`);
         }
-        if (projectRes.status === 403) {
-          throw new Error("Access denied - You don't have permission to view this project");
-        }
-        throw new Error(`Failed to load project: ${projectRes.status}`);
+        return; // Stop loading but don't throw error
       }
 
       const projectData = await projectRes.json();
-      console.log("Project loaded successfully:", projectData);
+      console.log("✅ Project loaded:", projectData);
       setProject(projectData);
 
-      // ✅ STEP 2: Load everything else in parallel
+      // ✅ Load everything else in parallel
       const [customerRes, drawingsRes, formsRes] = await Promise.all([
         fetch(
           `https://aztec-interiors.onrender.com/customers/${projectData.customer_id}`,
@@ -310,7 +307,6 @@ export default function ProjectDetailsPage() {
       if (drawingsRes && drawingsRes.ok) {
         const drawingsData = await drawingsRes.json();
         if (Array.isArray(drawingsData)) {
-          // Filter to only show drawings assigned to THIS project
           const projectDrawings = drawingsData.filter(
             (drawing: DrawingDocument) => drawing.project_id === projectId
           );
@@ -328,8 +324,7 @@ export default function ProjectDetailsPage() {
 
     } catch (error: any) {
       console.error("Error loading project data:", error);
-      alert(error.message || "Failed to load project");
-      // Don't redirect immediately - let user see the error
+      alert("Network error. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
