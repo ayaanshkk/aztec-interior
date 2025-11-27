@@ -81,13 +81,13 @@ const allSidebarItems: NavGroup[] = [
       },
       {
         title: "Tasks",
-        url: "/dashboard/tasks",
+        url: "/dashboard/jobs",
         icon: Briefcase,
         roles: ["manager", "hr", "production"],
       },
       {
         title: "Orders",
-        url: "/dashboard/orders",
+        url: "/dashboard/materials",
         icon: Package,
         roles: ["manager", "hr", "production"],
       },
