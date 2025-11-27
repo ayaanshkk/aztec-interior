@@ -3,7 +3,7 @@ import * as React from "react";
 import { useEffect, useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Calendar, PenTool, Upload } from "lucide-react";
+import { Calendar, PenTool, Upload, Download } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -46,6 +46,7 @@ interface FormData {
   customer_name: string;
   customer_phone: string;
   customer_address: string;
+  customer_postcode: string;
   room: string;
   survey_date: string;
   appointment_date: string;
@@ -101,6 +102,7 @@ interface FormData {
   terms_date: string;
   gas_electric_info: string;
   appliance_promotion_info: string;
+  signature_name: string;
   signature_date: string;
   integ_fridge_qty: string;
   integ_fridge_make: string;
@@ -118,6 +120,7 @@ export default function FormPage() {
   const typeParam = searchParams.get("type");
   
   const [userRole, setUserRole] = useState<string>("manager");
+  const formRef = useRef<HTMLDivElement>(null);
   const sidebarItems = getSidebarItems(userRole);
 
   const [formType, setFormType] = useState<"bedroom" | "kitchen">("bedroom");
@@ -133,6 +136,7 @@ export default function FormPage() {
     customer_name: "",
     customer_phone: "",
     customer_address: "",
+    customer_postcode: "",
     room: "",
     survey_date: "",
     appointment_date: "",
@@ -196,6 +200,7 @@ export default function FormPage() {
     terms_date: "",
     gas_electric_info: "",
     appliance_promotion_info: "",
+    signature_name: "",
     signature_date: "",
     integ_fridge_qty: "",
     integ_fridge_make: "",
@@ -227,59 +232,6 @@ export default function FormPage() {
       }));
     }
   }, []);
-
-  const [signatureMode, setSignatureMode] = useState("upload");
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [signatureData, setSignatureData] = useState("");
-
-  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
-  type Point = { x: number; y: number } | null;
-  const [lastPoint, setLastPoint] = useState<Point>(null);
-
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current) return;
-    setIsDrawing(true);
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setLastPoint({ x, y });
-  };
-
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-    if (lastPoint) {
-      ctx.beginPath();
-      ctx.moveTo(lastPoint.x, lastPoint.y);
-      ctx.lineTo(x, y);
-      ctx.stroke();
-    }
-    setLastPoint({ x, y });
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
-    setLastPoint(null);
-    if (canvasRef.current) {
-      setSignatureData(canvasRef.current.toDataURL());
-    }
-  };
-
-  const clearSignature = () => {
-    if (!canvasRef.current) return;
-    const ctx = canvasRef.current.getContext("2d");
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    setSignatureData("");
-  };
 
   type SingleField = keyof Omit<FormData, "floor_protection" | "worktop_features" | "appliances" | "additional_doors">;
 
@@ -359,17 +311,6 @@ export default function FormPage() {
     }));
   };
 
-  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSignatureData(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const validateForm = () => {
     const errors: string[] = [];
     const isClientOwned = formData.appliances_customer_owned === "no";
@@ -377,6 +318,7 @@ export default function FormPage() {
     if (!formData.customer_name?.trim()) errors.push("Customer Name");
     if (!formData.customer_phone?.trim()) errors.push("Tel/Mobile Number");
     if (!formData.customer_address?.trim()) errors.push("Address");
+    if (!formData.customer_postcode?.trim()) errors.push("Postcode");  
 
     if (formType === "kitchen") {
       if (!formData.door_style?.trim()) errors.push("Door Style");
@@ -425,7 +367,7 @@ export default function FormPage() {
       errors.push("Appliance Promotion Information");
     }
 
-    if (!signatureData) errors.push("Customer Signature");
+    if (!formData.signature_name?.trim()) errors.push("Customer Signature");
     if (!formData.signature_date?.trim()) errors.push("Signature Date");
 
     if (errors.length > 0) {
@@ -439,6 +381,11 @@ export default function FormPage() {
     return true;
   };
 
+  const handleSavePDF = () => {
+    if (typeof window === "undefined") return;
+    window.print();
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) {
       return;
@@ -450,6 +397,7 @@ export default function FormPage() {
     const redirectUrl = searchParams.get("redirect");
     const token = searchParams.get("token") || "";
     const customerIdFromUrl = searchParams.get("customerId") || "";
+    const projectIdFromUrl = searchParams.get("projectId") || "";  // ✅ ADD THIS LINE
     const isClientOwned = formData.appliances_customer_owned === "no";
 
     const finalAppliances = [...formData.appliances];
@@ -483,7 +431,7 @@ export default function FormPage() {
     const finalFormData = {
       ...formData,
       appliances: finalAppliances,
-      signature_data: signatureData,
+      signature_data: formData.signature_name,
       form_type: formType,
       customer_id: customerIdFromUrl || formData.customer_id || "",
       integ_fridge_qty: undefined,
@@ -506,6 +454,7 @@ export default function FormPage() {
         body: JSON.stringify({
           token: token || undefined,
           formData: finalFormData,
+          projectId: projectIdFromUrl || undefined,  // ✅ ADD THIS LINE - Pass projectId at top level
         }),
       });
 
@@ -520,7 +469,10 @@ export default function FormPage() {
         setTimeout(() => {
           const targetCustomerId = result.customer_id || customerIdFromUrl;
 
-          if (redirectUrl) {
+          // ✅ ADD THIS IF BLOCK
+          if (projectIdFromUrl) {
+            router.push(`/dashboard/projects/${projectIdFromUrl}`);
+          } else if (redirectUrl) {
             router.push(redirectUrl);
           } else if (targetCustomerId) {
             router.push(`/dashboard/customers/${targetCustomerId}`);
@@ -587,19 +539,24 @@ export default function FormPage() {
       </Sidebar>
 
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 print:hidden">
           <SidebarTrigger className="-ml-1" />
           <div className="flex flex-1 items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Installation Checklist</h1>
               <p className="text-sm text-gray-600">Complete installation verification form</p>
             </div>
+            {/* ✅ ADD THIS BUTTON */}
+            <Button onClick={handleSavePDF} variant="outline" className="flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              Save as PDF
+            </Button>
           </div>
         </header>
 
-        <div className="flex flex-1 flex-col gap-4 p-4">
-          <form className="rounded-lg border bg-white p-8 shadow-sm">
-            <h2 className="mb-2 text-center text-xl font-semibold">
+        <div className="flex flex-1 flex-col gap-2 p-2" ref={formRef}>
+          <form className="rounded-lg border bg-white p-4 shadow-sm print:shadow-none print:border-0">
+            <h2 className="mb-1 text-center text-lg font-semibold">
               {formType === "kitchen" ? "Kitchen Installation Checklist" : "Bedroom Installation Checklist"}
             </h2>
             <p className="mb-6 text-center text-sm text-gray-600">All fields are mandatory</p>
@@ -617,43 +574,52 @@ export default function FormPage() {
             )}
 
           {/* Customer Information - Blue Section */}
-          <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-6">
-            <h3 className="mb-4 text-xl font-bold text-blue-900">Customer Information</h3>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-3 mb-3">
+            <h3 className="mb-2 text-base font-bold text-blue-900">Customer Information</h3>
+            <div className="grid grid-cols-4 gap-2">
               <div>
-                <label className="mb-1 block text-sm font-bold text-gray-700">Customer Name</label>
+                <label className="mb-1 block text-xs font-bold text-gray-700">Customer Name</label>
                 <Input
                   placeholder="Enter customer name"
-                  className="w-full bg-white"
+                  className="w-full bg-white h-8 text-sm"
                   value={formData.customer_name}
                   onChange={(e) => handleInputChange("customer_name", e.target.value)}
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-bold text-gray-700">Tel/Mobile Number</label>
+                <label className="mb-1 block text-xs font-bold text-gray-700">Tel/Mobile Number</label>
                 <Input
                   placeholder="Enter phone number"
                   type="tel"
-                  className="w-full bg-white"
+                  className="w-full bg-white h-8 text-sm"
                   value={formData.customer_phone}
                   onChange={(e) => handleInputChange("customer_phone", e.target.value)}
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-bold text-gray-700">Address</label>
+                <label className="mb-1 block text-xs font-bold text-gray-700">Address</label>
                 <Input
                   placeholder="Enter full address"
-                  className="w-full bg-white"
+                  className="w-full bg-white h-8 text-sm"
                   value={formData.customer_address}
                   onChange={(e) => handleInputChange("customer_address", e.target.value)}
                 />
               </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-gray-700">Postcode</label>
+                <Input
+                  placeholder="Enter postcode"
+                  className="w-full bg-white h-8 text-sm"
+                  value={formData.customer_postcode}
+                  onChange={(e) => handleInputChange("customer_postcode", e.target.value)}
+                />
+              </div>
               {formType === "bedroom" && (
-                <div>
-                  <label className="mb-1 block text-sm font-bold text-gray-700">Room</label>
+                <div className="col-span-4">
+                  <label className="mb-1 block text-xs font-bold text-gray-700">Room</label>
                   <Input
                     placeholder="Enter room details"
-                    className="w-full bg-white"
+                    className="w-full bg-white h-8 text-sm"
                     value={formData.room}
                     onChange={(e) => handleInputChange("room", e.target.value)}
                   />
@@ -1126,7 +1092,7 @@ export default function FormPage() {
                     </select>
                   </div>
 
-                  {!!formData.appliances_customer_owned && (
+                  {formData.appliances_customer_owned && formData.appliances_customer_owned !== "N/A" && (
                     <div className="mb-6">
                       <label className="mb-2 block text-sm font-bold text-gray-700">
                         {formData.appliances_customer_owned === "yes"
@@ -1292,7 +1258,7 @@ export default function FormPage() {
                     </select>
                   </div>
 
-                  {!!formData.sink_tap_customer_owned && (
+                  {formData.sink_tap_customer_owned && formData.sink_tap_customer_owned !== "N/A" && (
                     <div className="mt-4 space-y-4">
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Sink Details</label>
@@ -1333,12 +1299,12 @@ export default function FormPage() {
 
           {/* BEDROOM SPECIFIC SECTIONS */}
           {formType === "bedroom" && (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               {/* LEFT COLUMN */}
               <div className="space-y-6">
                 {/* 1. Material Specifications - Green Section */}
-                <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-green-900">1. Material Specifications</h3>
+                <div className="rounded-lg border-2 border-green-200 bg-green-50 p-3">
+                  <h3 className="mb-2 text-base font-bold text-green-900">1. Material Specifications</h3>
                   <div className="space-y-4">
                     {/* Dynamic Grid based on door style */}
                     <div className={`grid gap-4 ${formData.door_style === "vinyl" ? "grid-cols-2" : "grid-cols-2"}`}>
@@ -1617,7 +1583,7 @@ export default function FormPage() {
 
                 {/* 3. Bedroom Furniture - Orange Section */}
                 <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-orange-900">3. Bedroom Furniture Specifications</h3>
+                  <h3 className="mb-2 text-base font-bold text-orange-900">4. Bedroom Furniture Specifications</h3>
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -1625,7 +1591,12 @@ export default function FormPage() {
                         <select
                           className="w-full rounded-md border border-gray-300 bg-white p-2"
                           value={formData.bedside_cabinets_type}
-                          onChange={(e) => handleInputChange("bedside_cabinets_type", e.target.value)}
+                          onChange={(e) => {
+                            handleInputChange("bedside_cabinets_type", e.target.value);
+                            if (e.target.value === "N/A") {
+                              handleInputChange("bedside_cabinets_qty", "0");
+                            }
+                          }}
                         >
                           <option value="">Select option</option>
                           <option value="floating">Floating</option>
@@ -1646,7 +1617,12 @@ export default function FormPage() {
                         <select
                           className="w-full rounded-md border border-gray-300 bg-white p-2"
                           value={formData.dresser_desk}
-                          onChange={(e) => handleInputChange("dresser_desk", e.target.value)}
+                          onChange={(e) => {
+                            handleInputChange("dresser_desk", e.target.value);
+                            if (e.target.value === "N/A" || e.target.value === "no") {
+                              handleInputChange("dresser_desk_details", "0");
+                            }
+                          }}
                         >
                           <option value="">Select option</option>
                           <option value="yes">Yes</option>
@@ -1665,7 +1641,12 @@ export default function FormPage() {
                         <select
                           className="w-full rounded-md border border-gray-300 bg-white p-2"
                           value={formData.internal_mirror}
-                          onChange={(e) => handleInputChange("internal_mirror", e.target.value)}
+                          onChange={(e) => {
+                            handleInputChange("internal_mirror", e.target.value);
+                            if (e.target.value === "N/A" || e.target.value === "no") {
+                              handleInputChange("internal_mirror_details", "0");
+                            }
+                          }}
                         >
                           <option value="">Select option</option>
                           <option value="yes">Yes</option>
@@ -1684,7 +1665,12 @@ export default function FormPage() {
                         <select
                           className="w-full rounded-md border border-gray-300 bg-white p-2"
                           value={formData.mirror_type}
-                          onChange={(e) => handleInputChange("mirror_type", e.target.value)}
+                          onChange={(e) => {
+                            handleInputChange("mirror_type", e.target.value);
+                            if (e.target.value === "N/A") {
+                              handleInputChange("mirror_qty", "0");
+                            }
+                          }}
                         >
                           <option value="">Select option</option>
                           <option value="silver">Silver</option>
@@ -1709,7 +1695,7 @@ export default function FormPage() {
               <div className="space-y-6">
                 {/* 4. Lighting - Yellow Section */}
                 <div className="rounded-lg border-2 border-yellow-200 bg-yellow-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-yellow-900">4. Lighting Specifications</h3>
+                  <h3 className="mb-2 text-base font-bold text-yellow-900">5. Lighting Specifications</h3>
                   <div className="space-y-4">
                     {/* Soffit Lights */}
                     <div>
@@ -1781,7 +1767,7 @@ export default function FormPage() {
 
                 {/* 5. Accessories & Floor Protection - Pink Section */}
                 <div className="rounded-lg border-2 border-pink-200 bg-pink-50 p-6">
-                  <h3 className="mb-4 text-xl font-bold text-pink-900">5. Accessories & Floor Protection</h3>
+                  <h3 className="mb-2 text-base font-bold text-pink-900">3. Accessories & Floor Protection</h3>
                   <div className="space-y-4">
                     <div>
                       <label className="mb-1 block text-sm font-bold text-gray-700">Other/Misc/Accessories</label>
@@ -1865,88 +1851,32 @@ export default function FormPage() {
           </div>
 
           {/* Confirmation Statement */}
-          <div className="rounded-lg bg-gray-50 p-4">
-            <p className="mb-3 text-sm font-bold text-gray-700">
+          <div className="rounded-lg bg-gray-50 p-3 mt-3">
+            <p className="mb-2 text-sm font-bold text-gray-700">
               I confirm that the above specification and all annotated plans and elevations with this pack are correct.
             </p>
-            <p className="mb-4 text-sm text-gray-600">Please sign below to confirm.</p>
+            <p className="mb-2 text-xs text-gray-600">Please sign below to confirm.</p>
           </div>
 
           {/* Signature Section */}
-          <div className="rounded-lg border-2 border-indigo-200 bg-indigo-50 p-6">
-            <h3 className="mb-4 text-xl font-bold text-indigo-900">Customer Signature</h3>
-
-            <div className="mb-4">
-              <div className="mb-3 flex gap-4">
-                <Button
-                  type="button"
-                  variant={signatureMode === "upload" ? "default" : "outline"}
-                  onClick={() => setSignatureMode("upload")}
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <Upload className="h-4 w-4" />
-                  Upload Signature
-                </Button>
-                <Button
-                  type="button"
-                  variant={signatureMode === "draw" ? "default" : "outline"}
-                  onClick={() => setSignatureMode("draw")}
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <PenTool className="h-4 w-4" />
-                  Draw Signature
-                </Button>
-              </div>
-
-              {signatureMode === "upload" ? (
-                <div className="rounded-lg border-2 border-dashed border-gray-300 bg-white p-6 text-center">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    id="signature-upload"
-                    onChange={handleSignatureUpload}
-                  />
-                  <label htmlFor="signature-upload" className="cursor-pointer">
-                    <Upload className="mx-auto mb-2 h-8 w-8 text-gray-400" />
-                    <p className="text-sm text-gray-600">Click to upload signature image</p>
-                    <p className="mt-1 text-xs text-gray-400">PNG, JPG up to 10MB</p>
-                  </label>
-                  {signatureData && (
-                    <div className="mt-4">
-                      <img src={signatureData} alt="Signature" className="mx-auto max-h-32 rounded border" />
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-gray-300 bg-white">
-                  <canvas
-                    ref={canvasRef}
-                    width={400}
-                    height={150}
-                    className="w-full cursor-crosshair rounded-lg"
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    style={{ touchAction: "none" }}
-                  />
-                  <div className="flex justify-end border-t bg-gray-50 p-2">
-                    <Button type="button" variant="outline" size="sm" onClick={clearSignature}>
-                      Clear
-                    </Button>
-                  </div>
-                </div>
-              )}
+          <div className="rounded-lg border-2 border-indigo-200 bg-indigo-50 p-3 mt-3">
+            <h3 className="mb-2 text-base font-bold text-indigo-900">Customer Signature</h3>
+            
+            <div className="mb-3">
+              <label className="mb-1 block text-sm font-bold text-gray-700">Full Name</label>
+              <Input
+                placeholder="Type your full name"
+                className="w-full bg-white h-10 text-base"
+                value={formData.signature_name}
+                onChange={(e) => handleInputChange("signature_name", e.target.value)}
+              />
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-bold text-gray-700">Date</label>
               <Input
                 type="date"
-                className="w-full bg-white"
+                className="w-full bg-white h-10"
                 value={formData.signature_date}
                 onChange={(e) => handleInputChange("signature_date", e.target.value)}
               />
@@ -1954,14 +1884,41 @@ export default function FormPage() {
           </div>
 
           {/* Submit Button */}
-          <div className="border-t pt-6 text-center">
-            <Button className="px-8 py-3 text-lg font-bold" onClick={handleSubmit} disabled={isSubmitting} type="button">
+          <div className="border-t pt-3 text-center print:hidden">
+            <Button className="px-6 py-2 text-base font-bold" onClick={handleSubmit} disabled={isSubmitting} type="button">
               {isSubmitting ? "Submitting..." : "Submit Form"}
             </Button>
           </div>
         </form>
       </div>
     </SidebarInset>
+
+    {/* Print Styles */}
+    <style jsx global>{`
+      @media print {
+        @page {
+          size: A4;
+          margin: 10mm;
+        }
+        
+        body {
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
+        }
+        
+        .print\\:hidden {
+          display: none !important;
+        }
+        
+        .print\\:shadow-none {
+          box-shadow: none !important;
+        }
+        
+        .print\\:border-0 {
+          border: 0 !important;
+        }
+      }
+    `}</style>
   </SidebarProvider>
   );
 }

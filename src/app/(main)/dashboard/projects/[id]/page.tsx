@@ -556,6 +556,7 @@ export default function ProjectDetailsPage() {
             customerName: customer.name || "",
             customerAddress: customer.address || "",
             customerPhone: customer.phone || "",
+            projectId: projectId,  // ✅ ADD THIS LINE - Associates form with project
           });
           router.push(`/form/${data.token}?${params.toString()}`);
         } else {
@@ -603,6 +604,7 @@ export default function ProjectDetailsPage() {
             customerName: customer.name || "",
             customerAddress: customer.address || "",
             customerPhone: customer.phone || "",
+            projectId: projectId,  // ✅ ADD THIS LINE - Associates form with project
           });
           router.push(`/form/${data.token}?${params.toString()}`);
         } else {
