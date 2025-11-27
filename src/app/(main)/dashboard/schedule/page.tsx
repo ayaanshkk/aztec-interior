@@ -37,7 +37,6 @@ import {
   Check,
   X,
   Archive,
-  Edit,
 } from "lucide-react";
 import { fetchWithAuth, api } from "@/lib/api";
 
@@ -144,6 +143,10 @@ export default function SchedulePage() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [isEditingTask, setIsEditingTask] = useState(false);
+  
+  // ✅ NEW: State for day view dialog
+  const [showDayViewDialog, setShowDayViewDialog] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   // ✅ Custom assignees and tasks state
   const [customAssignees, setCustomAssignees] = useState<string[]>([]);
@@ -216,7 +219,7 @@ export default function SchedulePage() {
     return days;
   }, [currentDate]);
 
-  // ✅ FIX #1: FIXED - Show tasks on ALL dates in range (not just start/end)
+  // ✅ FIXED: Handle tasks with BOTH new (start_date/end_date) and old (date) formats
   const tasksByDate = useMemo(() => {
     console.log("🔍 Building tasksByDate map from tasks:", tasks.length);
     
@@ -231,33 +234,46 @@ export default function SchedulePage() {
         end_date: task.end_date,
       });
       
-      if (!task || (!task.date && !task.start_date)) {
-        console.warn("⚠️ Task without date found:", task);
+      if (!task) {
+        console.warn("⚠️ Null task found");
         return;
       }
 
-      // ✅ FIXED: Show task on EVERY date between start and end (inclusive)
+      // ✅ PRIORITY 1: Try new format (start_date/end_date)
       if (task.start_date && task.end_date) {
         const startDate = new Date(task.start_date);
         const endDate = new Date(task.end_date);
         
-        // Add task to EVERY date between start and end (inclusive)
-        const currentDate = new Date(startDate);
-        while (currentDate <= endDate) {
-          const dateKey = formatDateKey(currentDate);
-          if (!dateMap[dateKey]) dateMap[dateKey] = [];
-          dateMap[dateKey].push(task);
-          console.log(`✅ Added task to date ${dateKey}`);
-          
-          // Move to next day
-          currentDate.setDate(currentDate.getDate() + 1);
+        // Add task to start date
+        const startKey = formatDateKey(startDate);
+        if (!dateMap[startKey]) dateMap[startKey] = [];
+        dateMap[startKey].push(task);
+        console.log(`✅ Added task to start date ${startKey}`);
+        
+        // Add task to end date if different from start date
+        const endKey = formatDateKey(endDate);
+        if (startKey !== endKey) {
+          if (!dateMap[endKey]) dateMap[endKey] = [];
+          dateMap[endKey].push(task);
+          console.log(`✅ Added task to end date ${endKey}`);
         }
-      } else if (task.date) {
-        // Legacy support for old 'date' field
+      } 
+      // ✅ PRIORITY 2: Fall back to legacy 'date' field
+      else if (task.date) {
         const dateKey = task.date;
         if (!dateMap[dateKey]) dateMap[dateKey] = [];
         dateMap[dateKey].push(task);
         console.log(`✅ Added task to legacy date ${dateKey}`);
+      }
+      // ✅ PRIORITY 3: Try start_date only
+      else if (task.start_date) {
+        const dateKey = formatDateKey(new Date(task.start_date));
+        if (!dateMap[dateKey]) dateMap[dateKey] = [];
+        dateMap[dateKey].push(task);
+        console.log(`✅ Added task to start_date only ${dateKey}`);
+      }
+      else {
+        console.warn("⚠️ Task without any date found:", task);
       }
     });
     
@@ -478,13 +494,13 @@ export default function SchedulePage() {
         estimatedHours = hours ? parseFloat(hours) : 8;
       }
 
-      // ✅ CLEAN THE DATA - Remove any invalid fields
+      // ✅ BACKWARD COMPATIBLE: Send BOTH new format (start_date/end_date) AND old format (date)
       const cleanedData = {
         type: taskData.type,
         title: title,
-        date: taskData.start_date, // Use start_date as primary date for backend compatibility
-        start_date: taskData.start_date,
-        end_date: taskData.end_date,
+        date: taskData.start_date, // ✅ CRITICAL: Use start_date as primary date for backward compatibility
+        start_date: taskData.start_date, // ✅ NEW: Also send start_date for new backend
+        end_date: taskData.end_date, // ✅ NEW: Also send end_date for new backend
         start_time: taskData.start_time,
         end_time: taskData.end_time,
         estimated_hours: estimatedHours,
@@ -495,7 +511,7 @@ export default function SchedulePage() {
         team_member: taskData.team_member,
         job_id: taskData.job_id,
         customer_id: taskData.customer_id,
-        customer_name: customerName,
+        customer_name: customerName, // ✅ NEW: Also send customer_name
         job_type: taskData.job_type,
       };
 
@@ -509,6 +525,18 @@ export default function SchedulePage() {
       console.log("📤 Creating task with data:", cleanedData);
 
       const newTask = await api.createAssignment(cleanedData);
+      
+      // ✅ CRITICAL: If backend doesn't return start_date/end_date, add them from our request
+      if (!newTask.start_date && cleanedData.start_date) {
+        newTask.start_date = cleanedData.start_date;
+      }
+      if (!newTask.end_date && cleanedData.end_date) {
+        newTask.end_date = cleanedData.end_date;
+      }
+      if (!newTask.customer_name && cleanedData.customer_name) {
+        newTask.customer_name = cleanedData.customer_name;
+      }
+      
       setTasks((prev) => [...prev, newTask]);
       console.log("✅ Task created successfully:", newTask);
       return newTask;
@@ -576,21 +604,41 @@ export default function SchedulePage() {
     setVisibleCalendars((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
   };
 
-  // ✅ FIX #2: FIXED - Allow Manager/HR/Sales to see ALL tasks
   const getTasksForDate = (date: Date) => {
     const dateKey = formatDateKey(date);
-    
-    // ✅ FIXED: Use tasksByDate which already handles date ranges correctly
-    const dayTasks = tasksByDate[dateKey] || [];
-    
-    // ✅ FIXED: Show ALL tasks to Manager, HR, and Sales
-    const role = user?.role?.toLowerCase();
-    if (role === "manager" || role === "hr" || role === "sales") {
-      return dayTasks; // Show all tasks
-    }
+    const allDayTasks = tasks.filter((t) => {
+      if (!t) return false;
+      
+      // ✅ PRIORITY 1: Check if task has start_date and end_date
+      if (t.start_date && t.end_date) {
+        const taskStart = new Date(t.start_date);
+        const taskEnd = new Date(t.end_date);
+        const checkDate = new Date(date);
+        
+        // ✅ CRITICAL: Include task if date is BETWEEN start and end (inclusive)
+        const startKey = formatDateKey(taskStart);
+        const endKey = formatDateKey(taskEnd);
+        
+        // Task should appear on start date, end date, AND all dates in between
+        return dateKey >= startKey && dateKey <= endKey;
+      }
+      
+      // ✅ PRIORITY 2: Fallback to old date field
+      if (t.date) {
+        return t.date === dateKey;
+      }
+      
+      // ✅ PRIORITY 3: Try start_date only
+      if (t.start_date) {
+        return formatDateKey(new Date(t.start_date)) === dateKey;
+      }
+      
+      return false;
+    });
 
-    // For other roles, filter out declined tasks
-    return dayTasks.filter((t) => t.status !== "Declined");
+    // ✅ FIXED: NO ROLE RESTRICTIONS - Everyone sees all tasks
+    // Only filter out declined tasks
+    return allDayTasks.filter((t) => t.status !== "Declined");
   };
 
   const getDailyHours = (date: Date) => {
@@ -636,7 +684,26 @@ export default function SchedulePage() {
     if (customTaskInput.trim()) saveCustomJobTask(customTaskInput);
 
     try {
-      await createTask(newTask);
+      const createdTask = await createTask(newTask);
+      
+      // ✅ WORKAROUND: If backend doesn't support date ranges, simulate them on frontend
+      if (createdTask && newTask.start_date !== newTask.end_date) {
+        console.log("📅 Simulating date range on frontend");
+        
+        // Add the task with both start_date and end_date to state
+        const taskWithDateRange = {
+          ...createdTask,
+          start_date: newTask.start_date,
+          end_date: newTask.end_date,
+          customer_name: createdTask.customer_name || customers.find(c => c.id === createdTask.customer_id)?.name
+        };
+        
+        // Update the task in state with the date range
+        setTasks((prev) => 
+          prev.map(t => t.id === createdTask.id ? taskWithDateRange : t)
+        );
+      }
+      
       setShowAddDialog(false);
       // ✅ Reset with default values including today's date
       setNewTask({
@@ -682,12 +749,47 @@ export default function SchedulePage() {
     if (!confirm("Are you sure you want to delete this task?")) return;
 
     try {
-      await deleteTask(taskId);
+      setSaving(true);
+      
+      console.log(`🗑️ Deleting task: ${taskId}`);
+      
+      // ✅ FIX: Better error handling for delete
+      const response = await fetch(`https://aztec-interiors.onrender.com/assignments/${taskId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // ✅ Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ Non-JSON response:', text);
+        throw new Error('Server returned an error. Please check if the task exists.');
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || `Failed to delete task: ${response.status}`);
+      }
+
+      // ✅ Remove from local state
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      
       setShowTaskDialog(false);
       setSelectedTask(null);
       setIsEditingTask(false);
+      
+      console.log(`✅ Task ${taskId} deleted successfully`);
+      
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to delete task");
+      console.error('❌ Error deleting task:', err);
+      alert(err instanceof Error ? err.message : 'Failed to delete task');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -699,23 +801,29 @@ export default function SchedulePage() {
     e.preventDefault();
   };
 
-  // ✅ FIX #4: FIXED - Update both start_date and end_date when dragging
   const handleDrop = async (e: React.DragEvent, date: Date) => {
     e.preventDefault();
     if (!draggedTask) return;
 
     const dateKey = formatDateKey(date);
     try {
-      // ✅ FIXED: Update both start_date and end_date when dragging
+      console.log(`📦 Dropping task ${draggedTask.id} on ${dateKey}`);
+      
+      // ✅ Send both date formats for backward compatibility
       await updateTask(draggedTask.id, { 
         start_date: dateKey, 
-        end_date: dateKey,
-        date: dateKey 
+        date: dateKey,
+        end_date: dateKey // Keep end_date same as start for now
       });
+      
+      console.log(`✅ Task moved successfully to ${dateKey}`);
+      
+      // ✅ Refresh to show updated task
+      await fetchData();
+      
       setDraggedTask(null);
-      await fetchData(); // Refresh to show updated position
     } catch (err) {
-      console.error("Failed to move task:", err);
+      console.error("❌ Failed to move task:", err);
       alert("Failed to move task");
       setDraggedTask(null);
     }
@@ -868,18 +976,9 @@ export default function SchedulePage() {
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, day)}
                   onClick={() => {
-                    // ✅ FIXED: Set clicked date but keep default times
-                    setNewTask({
-                      type: "job",
-                      start_date: formatDateKey(day),
-                      end_date: formatDateKey(day),
-                      start_time: "09:00",
-                      end_time: "17:00",
-                      priority: "Medium",
-                      status: "Scheduled",
-                      estimated_hours: 8,
-                    });
-                    setShowAddDialog(true);
+                    // ✅ FIXED: Open day view dialog to show all tasks for this date
+                    setSelectedDate(day);
+                    setShowDayViewDialog(true);
                   }}
                 >
                   <div className="mb-1 flex items-center justify-between">
@@ -1240,34 +1339,158 @@ export default function SchedulePage() {
                 >
                   Close
                 </Button>
-                
-                {/* ✅ FIX #3: FIXED - Allow Manager, HR, and Sales to edit/delete */}
-                {(user?.role?.toLowerCase() === "manager" || 
-                  user?.role?.toLowerCase() === "hr" || 
-                  user?.role?.toLowerCase() === "sales") && (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsEditingTask(true);
-                        setOriginalTask(selectedTask);
-                      }}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => selectedTask && handleDeleteTask(selectedTask.id)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </Button>
-                  </>
+                {user?.role === "Manager" && (
+                  <Button
+                    variant="destructive"
+                    onClick={() => selectedTask && handleDeleteTask(selectedTask.id)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </Button>
                 )}
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ✅ NEW: Day View Dialog - Shows all tasks for selected date */}
+      <Dialog open={showDayViewDialog} onOpenChange={setShowDayViewDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Tasks for {selectedDate && selectedDate.toLocaleDateString('en-GB', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedDate && getTasksForDate(selectedDate).length > 0 ? (
+              <div className="space-y-3">
+                {getTasksForDate(selectedDate).map((task) => (
+                  <div
+                    key={task.id}
+                    className={`cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-md ${getTaskColor(task)}`}
+                    onClick={() => {
+                      setSelectedTask(task);
+                      setShowDayViewDialog(false);
+                      setShowTaskDialog(true);
+                    }}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-base mb-1">{task.title}</h3>
+                        {task.customer_name && (
+                          <p className="text-sm text-gray-600 mb-1">
+                            Customer: {task.customer_name}
+                          </p>
+                        )}
+                        {task.start_time && (
+                          <p className="text-sm text-gray-600 mb-1">
+                            Time: {task.start_time} - {task.end_time}
+                          </p>
+                        )}
+                        {task.team_member && (
+                          <p className="text-sm text-gray-600 mb-1">
+                            Assigned: {task.team_member}
+                          </p>
+                        )}
+                        {task.notes && (
+                          <p className="text-sm text-gray-500 mt-2 line-clamp-2">
+                            {task.notes}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        {task.priority && (
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            task.priority === 'High' 
+                              ? 'bg-red-100 text-red-700' 
+                              : task.priority === 'Medium'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-green-100 text-green-700'
+                          }`}>
+                            {task.priority}
+                          </span>
+                        )}
+                        {task.status && (
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            task.status === 'Completed'
+                              ? 'bg-green-100 text-green-700'
+                              : task.status === 'In Progress'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {task.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No tasks scheduled for this date.
+                <div className="mt-4">
+                  <Button
+                    onClick={() => {
+                      if (selectedDate) {
+                        setNewTask({
+                          type: "job",
+                          start_date: formatDateKey(selectedDate),
+                          end_date: formatDateKey(selectedDate),
+                          start_time: "09:00",
+                          end_time: "17:00",
+                          priority: "Medium",
+                          status: "Scheduled",
+                          estimated_hours: 8,
+                        });
+                        setShowDayViewDialog(false);
+                        setShowAddDialog(true);
+                      }
+                    }}
+                  >
+                    Add Task for This Date
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {selectedDate && getTasksForDate(selectedDate).length > 0 && (
+              <div className="flex justify-between items-center pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDayViewDialog(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (selectedDate) {
+                      setNewTask({
+                        type: "job",
+                        start_date: formatDateKey(selectedDate),
+                        end_date: formatDateKey(selectedDate),
+                        start_time: "09:00",
+                        end_time: "17:00",
+                        priority: "Medium",
+                        status: "Scheduled",
+                        estimated_hours: 8,
+                      });
+                      setShowDayViewDialog(false);
+                      setShowAddDialog(true);
+                    }
+                  }}
+                >
+                  Add New Task
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
