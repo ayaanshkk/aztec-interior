@@ -131,22 +131,32 @@ const getStageColor = (stage: string) => {
   }
 };
 
+// ✅ FIXED: Better form type detection
 const getFormType = (submission: FormSubmission): string => {
-  const token = submission.token_used || "";
+  // First check form_data if it has form_type
+  if (submission.form_data && submission.form_data.form_type) {
+    return submission.form_data.form_type.toLowerCase();
+  }
+  
+  // Then check token
+  const token = (submission.token_used || "").toLowerCase();
   if (token.includes("bedroom")) return "bedroom";
   if (token.includes("kitchen")) return "kitchen";
   if (token.includes("remedial")) return "remedial";
   if (token.includes("checklist")) return "checklist";
-  if (token.includes("quote")) return "quotation";
-  if (token.includes("invoice")) return "invoice";
+  if (token.includes("quote") || token.includes("quotation")) return "quotation";
+  if (token.includes("invoice") && !token.includes("proforma")) return "invoice";
   if (token.includes("proforma")) return "proforma";
   if (token.includes("receipt")) return "receipt";
   if (token.includes("payment")) return "payment";
+  
   return "other";
 };
 
+// ✅ FIXED: Better form title generation
 const getFormTitle = (submission: FormSubmission): string => {
   const formType = getFormType(submission);
+  
   switch (formType) {
     case "bedroom":
       return "Bedroom Checklist";
@@ -167,6 +177,12 @@ const getFormTitle = (submission: FormSubmission): string => {
     case "payment":
       return "Payment Terms";
     default:
+      // If we still don't know, check if form_data has customer info
+      if (submission.form_data) {
+        if (submission.form_data.customer_name) {
+          return `Form - ${submission.form_data.customer_name}`;
+        }
+      }
       return `Form #${submission.id}`;
   }
 };
@@ -190,6 +206,11 @@ export default function ProjectDetailsPage() {
   const [isDeletingDrawing, setIsDeletingDrawing] = useState(false);
   const [generating, setGenerating] = useState(false);
 
+  // ✅ NEW: Delete form dialog state
+  const [showDeleteFormDialog, setShowDeleteFormDialog] = useState(false);
+  const [formToDelete, setFormToDelete] = useState<FormSubmission | null>(null);
+  const [isDeletingForm, setIsDeletingForm] = useState(false);
+
   // Task form state
   const [taskData, setTaskData] = useState({
     type: "Job",
@@ -202,7 +223,6 @@ export default function ProjectDetailsPage() {
     notes: "",
   });
 
-  // ✅ OPTIMIZED: Memoized permission functions (case-insensitive)
   const canEdit = useMemo(() => {
     const role = (user?.role || "").toLowerCase();
     return ["manager", "hr", "production", "sales"].includes(role);
@@ -218,19 +238,6 @@ export default function ProjectDetailsPage() {
     return ["manager", "sales"].includes(role);
   }, [user?.role]);
 
-  const canEditForm = useCallback((submission: FormSubmission) => {
-    if (!user?.role) return false;
-    const role = user.role.toLowerCase();
-    
-    if (role === "manager" || role === "hr") return true;
-    if (role === "sales") {
-      const formType = getFormType(submission);
-      return ["quotation", "invoice", "proforma", "receipt", "payment"].includes(formType);
-    }
-    return false;
-  }, [user?.role]);
-
-  // ✅ FIXED: Removed the blocking error handling
   const loadProjectData = useCallback(async () => {
     if (!projectId) return;
     
@@ -242,7 +249,6 @@ export default function ProjectDetailsPage() {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      // ✅ Load project data
       const projectRes = await fetch(
         `https://aztec-interiors.onrender.com/projects/${projectId}`,
         { headers }
@@ -252,20 +258,18 @@ export default function ProjectDetailsPage() {
         const errorText = await projectRes.text();
         console.error("Project fetch failed:", projectRes.status, errorText);
         
-        // ✅ FIXED: Just show error, don't block based on status code
         if (projectRes.status === 404) {
           alert("Project not found. It may have been deleted.");
         } else {
           alert(`Unable to load project. Please try again or contact support.`);
         }
-        return; // Stop loading but don't throw error
+        return;
       }
 
       const projectData = await projectRes.json();
       console.log("✅ Project loaded:", projectData);
       setProject(projectData);
 
-      // ✅ Load everything else in parallel
       const [customerRes, drawingsRes, formsRes] = await Promise.all([
         fetch(
           `https://aztec-interiors.onrender.com/customers/${projectData.customer_id}`,
@@ -290,12 +294,10 @@ export default function ProjectDetailsPage() {
         }),
       ]);
 
-      // Process customer data
       if (customerRes && customerRes.ok) {
         const customerData = await customerRes.json();
         setCustomer(customerData);
 
-        // Pre-fill task data
         setTaskData(prev => ({
           ...prev,
           jobTask: `${projectData.project_type} - ${projectData.project_name}`,
@@ -303,7 +305,6 @@ export default function ProjectDetailsPage() {
         }));
       }
 
-      // Process drawings - Filter by project_id client-side
       if (drawingsRes && drawingsRes.ok) {
         const drawingsData = await drawingsRes.json();
         if (Array.isArray(drawingsData)) {
@@ -314,9 +315,9 @@ export default function ProjectDetailsPage() {
         }
       }
 
-      // Process forms
       if (formsRes && formsRes.ok) {
         const formsData = await formsRes.json();
+        console.log("📋 Forms loaded:", formsData);
         if (Array.isArray(formsData)) {
           setForms(formsData);
         }
@@ -345,7 +346,6 @@ export default function ProjectDetailsPage() {
     loadProjectData();
   }, [projectId, user, loadProjectData]);
 
-  // ✅ OPTIMIZED: File upload with optimistic UI update
   const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -388,7 +388,6 @@ export default function ProjectDetailsPage() {
       }
     }
 
-    // ✅ UPDATE STATE IN ONE GO - NO RELOAD
     if (uploadedDocs.length > 0) {
       setDrawings((prev) => {
         const updated = [...uploadedDocs, ...prev];
@@ -439,7 +438,6 @@ export default function ProjectDetailsPage() {
       );
 
       if (res.ok) {
-        // ✅ UPDATE STATE IMMEDIATELY - NO RELOAD
         setDrawings((prev) => prev.filter((d) => d.id !== drawingToDelete.id));
         setSelectedDrawings((prev) => {
           const newSet = new Set(prev);
@@ -493,7 +491,6 @@ export default function ProjectDetailsPage() {
       if (response.ok) {
         alert("Task scheduled successfully!");
         setShowAddTaskDialog(false);
-        // Reset form
         setTaskData({
           type: "Job",
           date: new Date().toISOString().split("T")[0],
@@ -514,7 +511,6 @@ export default function ProjectDetailsPage() {
     }
   }, [taskData, projectId, project, customer]);
 
-  // Checklist creation handlers (keeping all the existing handlers)
   const generateToken = useCallback(async (type: string) => {
     const token = localStorage.getItem("auth_token");
     const headers: HeadersInit = { "Content-Type": "application/json" };
@@ -574,7 +570,6 @@ export default function ProjectDetailsPage() {
     }
   }, [customer?.id, projectId]);
 
-  // All the handler functions remain the same...
   const handleCreateKitchenChecklist = useCallback(async () => {
     if (generating || !canEdit) return;
 
@@ -819,40 +814,96 @@ export default function ProjectDetailsPage() {
     window.open(`/checklist-view?id=${submission.id}`, "_blank");
   }, []);
 
+  // ✅ FIXED: Edit form handler - construct proper URL with token
   const handleEditForm = useCallback((submission: FormSubmission) => {
+    console.log("🔧 Editing form:", submission);
+    
     const formType = getFormType(submission);
+    const token = submission.token_used;
+    
+    if (!token) {
+      alert("Error: No token found for this form");
+      return;
+    }
+    
     let editUrl = "";
-
+    
+    // Construct the proper edit URL based on form type
     if (formType === "bedroom") {
-      editUrl = `/bedroom-checklist?token=${submission.token_used}&edit=true`;
+      editUrl = `/form/${token}?type=bedroom&edit=true`;
     } else if (formType === "kitchen") {
-      editUrl = `/kitchen-checklist?token=${submission.token_used}&edit=true`;
+      editUrl = `/form/${token}?type=kitchen&edit=true`;
     } else if (formType === "remedial") {
-      editUrl = `/remedial-checklist?token=${submission.token_used}&edit=true`;
+      editUrl = `/remedial-checklist?token=${token}&edit=true`;
     } else if (formType === "checklist") {
-      editUrl = `/checklist-form?token=${submission.token_used}&edit=true`;
+      editUrl = `/checklist-form?token=${token}&edit=true`;
     } else if (formType === "quotation") {
-      editUrl = `/quotation?token=${submission.token_used}&edit=true`;
+      editUrl = `/quotation?token=${token}&edit=true`;
     } else if (formType === "invoice") {
-      editUrl = `/invoice?token=${submission.token_used}&edit=true`;
+      editUrl = `/invoice?token=${token}&edit=true`;
     } else if (formType === "proforma") {
-      editUrl = `/proforma-invoice?token=${submission.token_used}&edit=true`;
+      editUrl = `/proforma-invoice?token=${token}&edit=true`;
     } else if (formType === "receipt") {
-      editUrl = `/receipt?token=${submission.token_used}&edit=true`;
+      editUrl = `/receipt?token=${token}&edit=true`;
     } else if (formType === "payment") {
-      editUrl = `/payment-terms?token=${submission.token_used}&edit=true`;
+      editUrl = `/payment-terms?token=${token}&edit=true`;
+    } else {
+      // Generic fallback
+      editUrl = `/checklist-view?id=${submission.id}`;
     }
-
-    if (editUrl) {
-      window.open(editUrl, "_blank");
-    }
+    
+    console.log("🔗 Opening edit URL:", editUrl);
+    window.open(editUrl, "_blank");
   }, []);
-  
+
+  // ✅ NEW: Delete form handler
+  const handleDeleteForm = useCallback((submission: FormSubmission) => {
+    setFormToDelete(submission);
+    setShowDeleteFormDialog(true);
+  }, []);
+
+  // ✅ NEW: Confirm delete form
+  const handleConfirmDeleteForm = useCallback(async () => {
+    if (!formToDelete || isDeletingForm) return;
+    
+    setIsDeletingForm(true);
+    const token = localStorage.getItem("auth_token");
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    try {
+      const res = await fetch(
+        `https://aztec-interiors.onrender.com/form-submissions/${formToDelete.id}`,
+        { 
+          method: "DELETE", 
+          headers 
+        }
+      );
+
+      if (res.ok) {
+        // Remove from state immediately
+        setForms((prev) => prev.filter((f) => f.id !== formToDelete.id));
+        setShowDeleteFormDialog(false);
+        setFormToDelete(null);
+        alert("Form deleted successfully!");
+      } else {
+        const err = await res.json().catch(() => ({ error: "Server error" }));
+        alert(`Failed to delete form: ${err.error}`);
+      }
+    } catch (e) {
+      console.error("Delete form error:", e);
+      alert("Network error: Could not delete form");
+    } finally {
+      setIsDeletingForm(false);
+    }
+  }, [formToDelete, isDeletingForm]);
+
   // Loading state with skeleton
   if (loading) {
     return (
       <div className="min-h-screen bg-white">
-        {/* Header Skeleton */}
         <div className="border-b border-gray-200 bg-white px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -870,7 +921,6 @@ export default function ProjectDetailsPage() {
         </div>
 
         <div className="px-8 py-6">
-          {/* Project Overview Skeleton */}
           <div className="mb-8 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
             <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mb-4" />
             <div className="grid grid-cols-4 gap-4">
@@ -883,7 +933,6 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
 
-          {/* Customer Info Skeleton */}
           <div className="mb-8 rounded-lg border bg-white p-6">
             <div className="h-6 w-56 bg-gray-200 rounded animate-pulse mb-4" />
             <div className="grid grid-cols-3 gap-4">
@@ -896,7 +945,6 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
 
-          {/* Checklists Skeleton */}
           <div className="mb-8 border-t pt-8">
             <div className="h-6 w-40 bg-gray-200 rounded animate-pulse mb-6" />
             <div className="space-y-4">
@@ -906,7 +954,6 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
 
-          {/* Drawings Skeleton */}
           <div className="border-t pt-8">
             <div className="flex items-center justify-between mb-6">
               <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
@@ -1107,7 +1154,7 @@ export default function ProjectDetailsPage() {
           </div>
         )}
 
-        {/* Checklists Section */}
+        {/* ✅ FIXED: Checklists Section with proper display, edit, and delete */}
         <div className="mb-8 border-t border-gray-200 pt-8">
           <h2 className="mb-6 text-xl font-semibold text-gray-900">
             Checklists ({forms.length})
@@ -1115,16 +1162,15 @@ export default function ProjectDetailsPage() {
           {forms.length > 0 ? (
             <div className="space-y-4">
               {forms.map((form) => {
-                const formType = getFormType(form);
-                const isChecklist = formType === "bedroom" || formType === "kitchen";
-
+                const formTitle = getFormTitle(form);
+                
                 return (
                   <div
                     key={form.id}
                     className="flex items-center justify-between rounded-lg border bg-gray-50 p-4 transition hover:bg-gray-100"
                   >
                     <div className="flex flex-col">
-                      <h3 className="text-lg font-semibold text-gray-900">{getFormTitle(form)}</h3>
+                      <h3 className="text-lg font-semibold text-gray-900">{formTitle}</h3>
                       <span className="text-sm text-gray-500">Submitted: {formatDate(form.submitted_at)}</span>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -1135,20 +1181,30 @@ export default function ProjectDetailsPage() {
                         className="flex items-center space-x-1"
                       >
                         <Eye className="h-4 w-4" />
-                        <span>View{isChecklist ? " Checklist" : ""}</span>
+                        <span>View</span>
                       </Button>
 
-                      {canEditForm(form) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditForm(form)}
-                          className="flex items-center space-x-1"
-                        >
-                          <Edit className="h-4 w-4" />
-                          <span>Edit</span>
-                        </Button>
-                      )}
+                      {/* ✅ FIXED: Edit button - accessible to all roles */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditForm(form)}
+                        className="flex items-center space-x-1"
+                      >
+                        <Edit className="h-4 w-4" />
+                        <span>Edit</span>
+                      </Button>
+
+                      {/* ✅ NEW: Delete button - accessible to all roles */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteForm(form)}
+                        className="flex items-center space-x-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>Delete</span>
+                      </Button>
                     </div>
                   </div>
                 );
@@ -1384,6 +1440,34 @@ export default function ProjectDetailsPage() {
               className="bg-red-600 text-white hover:bg-red-700"
             >
               {isDeletingDrawing ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ✅ NEW: DELETE FORM DIALOG */}
+      <Dialog open={showDeleteFormDialog} onOpenChange={setShowDeleteFormDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Form</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{formToDelete && getFormTitle(formToDelete)}</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteFormDialog(false)} 
+              disabled={isDeletingForm}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDeleteForm}
+              disabled={isDeletingForm}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isDeletingForm ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

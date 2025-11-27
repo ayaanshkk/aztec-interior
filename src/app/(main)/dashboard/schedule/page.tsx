@@ -144,9 +144,11 @@ export default function SchedulePage() {
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [isEditingTask, setIsEditingTask] = useState(false);
   
+  // ✅ NEW: State for day view dialog
   const [showDayViewDialog, setShowDayViewDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+  // ✅ Custom assignees and tasks state
   const [customAssignees, setCustomAssignees] = useState<string[]>([]);
   const [customJobTasks, setCustomJobTasks] = useState<string[]>([]);
   const [customAssigneeInput, setCustomAssigneeInput] = useState("");
@@ -157,6 +159,7 @@ export default function SchedulePage() {
   const [error, setError] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   
+  // ✅ FIXED: Pre-fill with defaults including start/end dates
   const [newTask, setNewTask] = useState<Partial<Task>>({
     type: "job",
     start_date: formatDateKey(new Date()),
@@ -216,6 +219,7 @@ export default function SchedulePage() {
     return days;
   }, [currentDate]);
 
+  // ✅ FIXED: Handle tasks with BOTH new (start_date/end_date) and old (date) formats
   const tasksByDate = useMemo(() => {
     console.log("🔍 Building tasksByDate map from tasks:", tasks.length);
     
@@ -235,15 +239,18 @@ export default function SchedulePage() {
         return;
       }
 
+      // ✅ PRIORITY 1: Try new format (start_date/end_date)
       if (task.start_date && task.end_date) {
         const startDate = new Date(task.start_date);
         const endDate = new Date(task.end_date);
         
+        // Add task to start date
         const startKey = formatDateKey(startDate);
         if (!dateMap[startKey]) dateMap[startKey] = [];
         dateMap[startKey].push(task);
         console.log(`✅ Added task to start date ${startKey}`);
         
+        // Add task to end date if different from start date
         const endKey = formatDateKey(endDate);
         if (startKey !== endKey) {
           if (!dateMap[endKey]) dateMap[endKey] = [];
@@ -251,12 +258,14 @@ export default function SchedulePage() {
           console.log(`✅ Added task to end date ${endKey}`);
         }
       } 
+      // ✅ PRIORITY 2: Fall back to legacy 'date' field
       else if (task.date) {
         const dateKey = task.date;
         if (!dateMap[dateKey]) dateMap[dateKey] = [];
         dateMap[dateKey].push(task);
         console.log(`✅ Added task to legacy date ${dateKey}`);
       }
+      // ✅ PRIORITY 3: Try start_date only
       else if (task.start_date) {
         const dateKey = formatDateKey(new Date(task.start_date));
         if (!dateMap[dateKey]) dateMap[dateKey] = [];
@@ -279,6 +288,7 @@ export default function SchedulePage() {
     return tasks.filter((a) => a.user_id === user?.id && a.status === "Declined");
   }, [tasks, user]);
 
+  // ✅ Load custom values from localStorage on mount
   useEffect(() => {
     const savedAssignees = localStorage.getItem('custom_assignees');
     const savedJobTasks = localStorage.getItem('custom_job_tasks');
@@ -299,6 +309,7 @@ export default function SchedulePage() {
     }
   }, []);
 
+  // ✅ Function to save custom assignee
   const saveCustomAssignee = (name: string) => {
     const trimmedName = name.trim();
     if (trimmedName && !customAssignees.includes(trimmedName)) {
@@ -308,6 +319,7 @@ export default function SchedulePage() {
     }
   };
 
+  // ✅ Function to save custom job/task
   const saveCustomJobTask = (task: string) => {
     const trimmedTask = task.trim();
     if (trimmedTask && !customJobTasks.includes(trimmedTask) && !interiorDesignJobTypes.includes(trimmedTask)) {
@@ -428,14 +440,17 @@ export default function SchedulePage() {
   const createTask = async (taskData: Partial<Task>) => {
     if (!token) throw new Error("Not authenticated");
     
+    // ✅ VALIDATE: Customer is required
     if (!taskData.customer_id) {
       throw new Error("Customer is required");
     }
 
+    // ✅ VALIDATE: Ensure start_date is provided
     if (!taskData.start_date) {
       throw new Error("Start date is required");
     }
 
+    // ✅ VALIDATE: Ensure end_date is provided
     if (!taskData.end_date) {
       throw new Error("End date is required");
     }
@@ -443,9 +458,11 @@ export default function SchedulePage() {
     try {
       setSaving(true);
 
+      // ✅ Get customer name from customer_id
       const customer = customers.find((c) => c.id === taskData.customer_id);
       const customerName = customer?.name || "Unknown Customer";
 
+      // ✅ Build title with customer name and task type
       let title = "";
       if (taskData.job_type) {
         title = `${customerName} - ${taskData.job_type}`;
@@ -470,18 +487,20 @@ export default function SchedulePage() {
         }
       }
 
+      // ✅ Calculate estimated hours if start and end time are provided
       let estimatedHours = taskData.estimated_hours;
       if (taskData.start_time && taskData.end_time && !estimatedHours) {
         const hours = calculateHours(taskData.start_time, taskData.end_time);
         estimatedHours = hours ? parseFloat(hours) : 8;
       }
 
+      // ✅ BACKWARD COMPATIBLE: Send BOTH new format (start_date/end_date) AND old format (date)
       const cleanedData = {
         type: taskData.type,
         title: title,
-        date: taskData.start_date,
-        start_date: taskData.start_date,
-        end_date: taskData.end_date,
+        date: taskData.start_date, // ✅ CRITICAL: Use start_date as primary date for backward compatibility
+        start_date: taskData.start_date, // ✅ NEW: Also send start_date for new backend
+        end_date: taskData.end_date, // ✅ NEW: Also send end_date for new backend
         start_time: taskData.start_time,
         end_time: taskData.end_time,
         estimated_hours: estimatedHours,
@@ -492,10 +511,11 @@ export default function SchedulePage() {
         team_member: taskData.team_member,
         job_id: taskData.job_id,
         customer_id: taskData.customer_id,
-        customer_name: customerName,
+        customer_name: customerName, // ✅ NEW: Also send customer_name
         job_type: taskData.job_type,
       };
 
+      // Remove undefined values
       Object.keys(cleanedData).forEach(key => {
         if (cleanedData[key as keyof typeof cleanedData] === undefined) {
           delete cleanedData[key as keyof typeof cleanedData];
@@ -506,6 +526,7 @@ export default function SchedulePage() {
 
       const newTask = await api.createAssignment(cleanedData);
       
+      // ✅ CRITICAL: If backend doesn't return start_date/end_date, add them from our request
       if (!newTask.start_date && cleanedData.start_date) {
         newTask.start_date = cleanedData.start_date;
       }
@@ -588,21 +609,26 @@ export default function SchedulePage() {
     const allDayTasks = tasks.filter((t) => {
       if (!t) return false;
       
+      // ✅ PRIORITY 1: Check if task has start_date and end_date
       if (t.start_date && t.end_date) {
         const taskStart = new Date(t.start_date);
         const taskEnd = new Date(t.end_date);
         const checkDate = new Date(date);
         
+        // ✅ CRITICAL: Include task if date is BETWEEN start and end (inclusive)
         const startKey = formatDateKey(taskStart);
         const endKey = formatDateKey(taskEnd);
         
+        // Task should appear on start date, end date, AND all dates in between
         return dateKey >= startKey && dateKey <= endKey;
       }
       
+      // ✅ PRIORITY 2: Fallback to old date field
       if (t.date) {
         return t.date === dateKey;
       }
       
+      // ✅ PRIORITY 3: Try start_date only
       if (t.start_date) {
         return formatDateKey(new Date(t.start_date)) === dateKey;
       }
@@ -610,6 +636,8 @@ export default function SchedulePage() {
       return false;
     });
 
+    // ✅ FIXED: NO ROLE RESTRICTIONS - Everyone sees all tasks
+    // Only filter out declined tasks
     return allDayTasks.filter((t) => t.status !== "Declined");
   };
 
@@ -624,6 +652,7 @@ export default function SchedulePage() {
 
   const isOverbooked = (date: Date) => getDailyHours(date) > 8;
 
+  // ✅ Updated to use color coding by job type
   const getTaskColor = (task: Task) => {
     switch (task.type) {
       case "off":
@@ -640,6 +669,7 @@ export default function SchedulePage() {
   };
 
   const handleAddTask = async () => {
+    // ✅ Validation
     if (!newTask.start_date || !newTask.end_date || !newTask.type) {
       alert("Please fill in required fields (Type, Start Date, and End Date)");
       return;
@@ -656,7 +686,10 @@ export default function SchedulePage() {
     try {
       const createdTask = await createTask(newTask);
       
+      // ✅ Task already added to state by createTask() - no fetch needed!
       setShowAddDialog(false);
+      
+      // ✅ Reset with default values including today's date
       setNewTask({
         type: "job",
         start_date: formatDateKey(new Date()),
@@ -703,6 +736,7 @@ export default function SchedulePage() {
       
       console.log(`🗑️ Deleting task: ${taskId}`);
       
+      // ✅ FIX: Better error handling for delete
       const response = await fetch(`https://aztec-interiors.onrender.com/assignments/${taskId}`, {
         method: 'DELETE',
         headers: {
@@ -711,6 +745,7 @@ export default function SchedulePage() {
         },
       });
 
+      // ✅ Check if response is JSON
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
@@ -724,6 +759,7 @@ export default function SchedulePage() {
         throw new Error(result.error || `Failed to delete task: ${response.status}`);
       }
 
+      // ✅ Remove from local state
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
       
       setShowTaskDialog(false);
@@ -885,6 +921,7 @@ export default function SchedulePage() {
             </SelectContent>
           </Select>
           <Button onClick={() => {
+            // ✅ FIXED: Keep existing defaults, only update date to today if needed
             setNewTask(prev => ({
               ...prev,
               type: prev.type || "job",
@@ -929,6 +966,7 @@ export default function SchedulePage() {
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, day)}
                   onClick={() => {
+                    // ✅ FIXED: Open day view dialog to show all tasks for this date
                     setSelectedDate(day);
                     setShowDayViewDialog(true);
                   }}
@@ -1060,7 +1098,7 @@ export default function SchedulePage() {
               </Select>
             </div>
 
-            {/* Start Date and End Date */}
+            {/* ✅ Start Date and End Date */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Date *</Label>
@@ -1190,7 +1228,7 @@ export default function SchedulePage() {
               </div>
             )}
 
-            {/* Customer Dropdown - REQUIRED */}
+            {/* ✅ Customer Dropdown - REQUIRED */}
             <div className="space-y-2">
               <Label>Customer *</Label>
               <Select
@@ -1291,7 +1329,6 @@ export default function SchedulePage() {
                 >
                   Close
                 </Button>
-                {/* ✅ FIXED: Allow Sales role to delete */}
                 {(user?.role === "Manager" || user?.role === "Sales") && (
                   <Button
                     variant="destructive"
@@ -1308,7 +1345,7 @@ export default function SchedulePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Day View Dialog */}
+      {/* ✅ NEW: Day View Dialog - Shows all tasks for selected date */}
       <Dialog open={showDayViewDialog} onOpenChange={setShowDayViewDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
