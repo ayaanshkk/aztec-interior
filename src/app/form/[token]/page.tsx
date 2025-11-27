@@ -46,7 +46,7 @@ interface FormData {
   customer_name: string;
   customer_phone: string;
   customer_address: string;
-  customer_postcode: string;
+  postcode?: string;
   room: string;
   survey_date: string;
   appointment_date: string;
