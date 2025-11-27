@@ -452,6 +452,7 @@ export default function FormPage() {
 
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [orderDialogSection, setOrderDialogSection] = useState('');
+  const [isEditing, setIsEditing] = useState(true);
 
   const [formData, setFormData] = useState<FormData>({
     customer_id: "",
