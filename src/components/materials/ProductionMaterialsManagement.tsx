@@ -386,29 +386,54 @@ export function ProductionMaterialsManagement() {
     setIsDetailsDialogOpen(true);
   };
 
-  // ✅ PERFORMANCE: Memoize parsing function
+  // ✅ FIXED: Parse material specifications - handle actual format from backend
   const parseMaterialSpecs = useCallback((description: string) => {
-    if (!description.includes(':')) {
+    if (!description || !description.includes(':')) {
       return [{ label: '', value: description }];
     }
     
-    // Split by looking for pattern: Word(s) followed by colon
-    // This regex finds positions right before a capital letter that starts a label
-    const parts = description.split(/(?=[A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)*:)/);
+    // The description comes in format like:
+    // "Material Specifications Door Style: slab Door Color: Cashmere Perfect Matt Panel Color: ..."
     
-    return parts
-      .map(part => part.trim())
-      .filter(part => part.length > 0)
-      .map(part => {
-        const colonIndex = part.indexOf(':');
-        if (colonIndex > 0) {
-          return {
-            label: part.substring(0, colonIndex).trim(),
-            value: part.substring(colonIndex + 1).trim()
-          };
-        }
-        return { label: '', value: part };
+    // First, remove "Material Specifications" prefix if present
+    let cleanDesc = description.replace(/^Material Specifications\s*/i, '').trim();
+    
+    // Split by looking for capital letter followed by text and colon
+    // This regex matches: "Door Style:", "Panel Color:", "Handle Code:", etc.
+    const regex = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s*:\s*/g;
+    
+    const parts: Array<{label: string, value: string}> = [];
+    let lastIndex = 0;
+    let match;
+    const labels: Array<{label: string, index: number}> = [];
+    
+    // Find all labels and their positions
+    while ((match = regex.exec(cleanDesc)) !== null) {
+      labels.push({
+        label: match[1],
+        index: match.index
       });
+    }
+    
+    // Extract label-value pairs
+    for (let i = 0; i < labels.length; i++) {
+      const currentLabel = labels[i];
+      const nextLabel = labels[i + 1];
+      
+      // Value is from after the colon to the start of next label (or end of string)
+      const valueStart = currentLabel.index + currentLabel.label.length + 1; // +1 for the colon
+      const valueEnd = nextLabel ? nextLabel.index : cleanDesc.length;
+      const value = cleanDesc.substring(valueStart, valueEnd).trim();
+      
+      if (value) {
+        parts.push({
+          label: currentLabel.label,
+          value: value
+        });
+      }
+    }
+    
+    return parts.length > 0 ? parts : [{ label: '', value: description }];
   }, []);
 
   const getStatusBadge = (status: string) => {
@@ -813,15 +838,15 @@ export function ProductionMaterialsManagement() {
                       {getStatusBadge(material.status)}
                     </div>
                     
-                    {/* ✅ FIXED: Display specifications as formatted list - labels on ONE line */}
+                    {/* ✅ FIXED: Display specifications - label and value on SAME line */}
                     <div className="mb-4 space-y-1.5">
                       {parseMaterialSpecs(material.material_description).map((spec, idx) => (
                         spec.label ? (
-                          <div key={idx} className="flex items-start gap-3">
-                            <span className="font-medium text-gray-600 whitespace-nowrap min-w-[160px]">
+                          <div key={idx} className="flex items-baseline gap-2">
+                            <span className="font-medium text-gray-600 whitespace-nowrap">
                               {spec.label}:
                             </span>
-                            <span className="text-gray-900">{spec.value}</span>
+                            <span className="text-gray-900 flex-1">{spec.value}</span>
                           </div>
                         ) : (
                           <p key={idx} className="text-gray-900">{spec.value}</p>

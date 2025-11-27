@@ -569,6 +569,10 @@ export default function FormPage() {
         ...(custName ? { customer_name: custName } : {}),
         ...(custAddress ? { customer_address: custAddress } : {}),
         ...(custPhone ? { customer_phone: custPhone } : {}),
+        ...(custPostcode ? {
+          customer_postcode: custPostcode,
+          postcode: custPostcode 
+        } : {}),
       }));
     }
   }, []);
@@ -658,10 +662,11 @@ export default function FormPage() {
     if (!formData.customer_name?.trim()) errors.push("Customer Name");
     if (!formData.customer_phone?.trim()) errors.push("Tel/Mobile Number");
     if (!formData.customer_address?.trim()) errors.push("Address");
-    if (!formData.customer_postcode?.trim()) errors.push("Postcode");  
+    if (!formData.customer_postcode?.trim() && !formData.postcode?.trim()) {
+      errors.push("Postcode");
+    }
 
     if (formType === "kitchen") {
-      if (!formData.postcode?.trim()) errors.push("Postcode");
       if (!formData.door_style?.trim()) errors.push("Door Style");
       if (!formData.door_color?.trim()) errors.push("Door Color");
       if (formData.door_style === "glazed" && !formData.glazing_material?.trim()) errors.push("Glazing Material");
@@ -948,35 +953,27 @@ export default function FormPage() {
                 <div>
                   <label className="mb-1 block text-sm font-bold text-gray-700">Postcode</label>
                   <Input 
-                    value={formData.postcode || ""} 
-                    onChange={(e) => handleInputChange("postcode", e.target.value)}
+                    value={formData.customer_postcode || formData.postcode || ""} 
+                    onChange={(e) => {
+                      // Update BOTH fields to ensure validation passes
+                      handleInputChange("customer_postcode", e.target.value);
+                      handleInputChange("postcode", e.target.value);
+                    }}
                     readOnly={!isEditing} 
                     className="bg-white" 
                     placeholder="Enter postcode"
                   />
                 </div>
                 {formType === "bedroom" && (
-                  <>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Postcode</label>
-                      <Input 
-                        value={formData.postcode || ""} 
-                        onChange={(e) => handleInputChange("postcode", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                        placeholder="Enter postcode"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Room</label>
-                      <Input 
-                        value={formData.room || ""} 
-                        onChange={(e) => handleInputChange("room", e.target.value)}
-                        readOnly={!isEditing} 
-                        className="bg-white" 
-                      />
-                    </div>
-                  </>
+                  <div>
+                    <label className="mb-1 block text-sm font-bold text-gray-700">Room</label>
+                    <Input 
+                      value={formData.room || ""} 
+                      onChange={(e) => handleInputChange("room", e.target.value)}
+                      readOnly={!isEditing} 
+                      className="bg-white" 
+                    />
+                  </div>
                 )}
               </div>
             </div>
