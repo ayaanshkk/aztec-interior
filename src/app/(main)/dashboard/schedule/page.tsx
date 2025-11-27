@@ -217,11 +217,21 @@ export default function SchedulePage() {
 
   // ✅ FIXED: Handle tasks with start_date and end_date, show on both dates
   const tasksByDate = useMemo(() => {
+    console.log("🔍 Building tasksByDate map from tasks:", tasks.length);
+    
     const dateMap: Record<string, Task[]> = {};
     
-    tasks.forEach((task) => {
+    tasks.forEach((task, index) => {
+      console.log(`📝 Processing task ${index}:`, {
+        id: task.id,
+        title: task.title,
+        date: task.date,
+        start_date: task.start_date,
+        end_date: task.end_date,
+      });
+      
       if (!task || (!task.date && !task.start_date)) {
-        console.warn("Task without date found:", task);
+        console.warn("⚠️ Task without date found:", task);
         return;
       }
 
@@ -234,20 +244,26 @@ export default function SchedulePage() {
         const startKey = formatDateKey(startDate);
         if (!dateMap[startKey]) dateMap[startKey] = [];
         dateMap[startKey].push(task);
+        console.log(`✅ Added task to start date ${startKey}`);
         
         // Add task to end date if different from start date
         const endKey = formatDateKey(endDate);
         if (startKey !== endKey) {
           if (!dateMap[endKey]) dateMap[endKey] = [];
           dateMap[endKey].push(task);
+          console.log(`✅ Added task to end date ${endKey}`);
         }
       } else if (task.date) {
         // Legacy support for old 'date' field
         const dateKey = task.date;
         if (!dateMap[dateKey]) dateMap[dateKey] = [];
         dateMap[dateKey].push(task);
+        console.log(`✅ Added task to legacy date ${dateKey}`);
       }
     });
+    
+    console.log("📊 Final dateMap:", dateMap);
+    console.log("📊 Dates with tasks:", Object.keys(dateMap));
     
     return dateMap;
   }, [tasks]);
@@ -388,6 +404,9 @@ export default function SchedulePage() {
         api.getActiveCustomers().catch(() => [])
       ]);
 
+      console.log("📊 Raw tasks data from API:", tasksData);
+      console.log("📊 First task structure:", tasksData[0]);
+      
       setTasks(tasksData);
       setAvailableJobs(jobsData);
       setCustomers(customersData);
@@ -742,7 +761,13 @@ export default function SchedulePage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchData}
+            onClick={() => {
+              console.log("🔍 MANUAL DEBUG CHECK");
+              console.log("📊 Current tasks state:", tasks);
+              console.log("📊 Tasks count:", tasks.length);
+              console.log("📊 TasksByDate:", tasksByDate);
+              fetchData();
+            }}
             disabled={loading}
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
