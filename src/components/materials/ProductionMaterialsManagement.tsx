@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Package, 
   Plus, 
@@ -98,6 +98,7 @@ export function ProductionMaterialsManagement() {
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialOrder | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false); // ✅ NEW: Track edit mode
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersLoading, setCustomersLoading] = useState(false);
 
@@ -325,9 +326,7 @@ export function ProductionMaterialsManagement() {
       console.log('✅ Material updated successfully');
 
       await fetchMaterials();
-      setIsDetailsDialogOpen(false);
-      setSelectedMaterial(null);
-      setEditForm(null);
+      setIsEditing(false); // ✅ Exit edit mode after save
       
       alert('Material updated successfully!');
       
@@ -358,6 +357,8 @@ export function ProductionMaterialsManagement() {
       setMaterialToDelete(null);
       setIsDetailsDialogOpen(false);
       setSelectedMaterial(null);
+      setEditForm(null);
+      setIsEditing(false);
       
       await fetchMaterials();
       
@@ -369,7 +370,7 @@ export function ProductionMaterialsManagement() {
     }
   };
 
-  // ✅ NEW: Open details dialog with material data
+  // ✅ UPDATED: Open details dialog in VIEW mode
   const handleMaterialClick = (material: MaterialOrder) => {
     setSelectedMaterial(material);
     setEditForm({
@@ -381,31 +382,34 @@ export function ProductionMaterialsManagement() {
       notes: material.notes || '',
       status: material.status,
     });
+    setIsEditing(false); // ✅ Start in VIEW mode
     setIsDetailsDialogOpen(true);
   };
 
-  // ✅ FIXED: Parse material specifications - keep labels on ONE line
-  const parseMaterialSpecs = (description: string) => {
-    if (description.includes(':')) {
-      // Split on capital letter patterns but be smarter about it
-      const lines = description.split(/(?=(?:Door|Panel|Cabinet|Plinth|Filler|Handle|Material|Finish|Color|Style|Type|Size|Width|Height|Depth|Quantity)\s*(?:Style|Color|Type|Code|Material|Finish|Size)?:)/);
-      
-      return lines
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-        .map(line => {
-          const colonIndex = line.indexOf(':');
-          if (colonIndex > 0) {
-            return {
-              label: line.substring(0, colonIndex).trim(),
-              value: line.substring(colonIndex + 1).trim()
-            };
-          }
-          return { label: '', value: line };
-        });
+  // ✅ PERFORMANCE: Memoize parsing function
+  const parseMaterialSpecs = useCallback((description: string) => {
+    if (!description.includes(':')) {
+      return [{ label: '', value: description }];
     }
-    return [{ label: '', value: description }];
-  };
+    
+    // Split by looking for pattern: Word(s) followed by colon
+    // This regex finds positions right before a capital letter that starts a label
+    const parts = description.split(/(?=[A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)*:)/);
+    
+    return parts
+      .map(part => part.trim())
+      .filter(part => part.length > 0)
+      .map(part => {
+        const colonIndex = part.indexOf(':');
+        if (colonIndex > 0) {
+          return {
+            label: part.substring(0, colonIndex).trim(),
+            value: part.substring(colonIndex + 1).trim()
+          };
+        }
+        return { label: '', value: part };
+      });
+  }, []);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { className: string; icon: React.ReactNode; text: string }> = {
@@ -460,19 +464,23 @@ export function ProductionMaterialsManagement() {
     }).format(amount);
   };
 
-  const filteredMaterials = materials.filter(material => {
-    const matchesFilter = filter === 'all' || material.status === filter;
-    const matchesSearch = material.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          material.material_description.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  // ✅ PERFORMANCE: Memoize filtered materials to avoid re-filtering on every render
+  const filteredMaterials = useMemo(() => {
+    return materials.filter(material => {
+      const matchesFilter = filter === 'all' || material.status === filter;
+      const matchesSearch = material.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            material.material_description.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesFilter && matchesSearch;
+    });
+  }, [materials, filter, searchTerm]);
 
-  const stats = {
+  // ✅ PERFORMANCE: Memoize stats calculation
+  const stats = useMemo(() => ({
     ordered: materials.filter(m => m.status === 'ordered').length,
     in_transit: materials.filter(m => m.status === 'in_transit').length,
     delivered: materials.filter(m => m.status === 'delivered').length,
     delayed: materials.filter(m => m.status === 'delayed').length,
-  };
+  }), [materials]);
 
   if (loading) {
     return (
@@ -910,13 +918,22 @@ export function ProductionMaterialsManagement() {
         )}
       </div>
 
-      {/* ✅ NEW: Material Details Dialog with View/Edit/Delete */}
-      <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+      {/* ✅ UPDATED: Material Details Dialog with VIEW and EDIT modes */}
+      <Dialog open={isDetailsDialogOpen} onOpenChange={(open) => {
+        setIsDetailsDialogOpen(open);
+        if (!open) {
+          setIsEditing(false);
+          setSelectedMaterial(null);
+          setEditForm(null);
+        }
+      }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Material Order Details</DialogTitle>
+            <DialogTitle>
+              {isEditing ? 'Edit Material Order' : 'Material Order Details'}
+            </DialogTitle>
             <DialogDescription>
-              View and edit material order information
+              {isEditing ? 'Update material order information' : 'View material order information'}
             </DialogDescription>
           </DialogHeader>
 
@@ -928,91 +945,150 @@ export function ProductionMaterialsManagement() {
                 <p className="text-lg font-semibold text-gray-900">{selectedMaterial.customer_name}</p>
               </div>
 
-              {/* Editable Fields */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-description">Material Description *</Label>
-                  <Textarea
-                    id="edit-description"
-                    value={editForm.material_description}
-                    onChange={(e) => setEditForm({ ...editForm, material_description: e.target.value })}
-                    rows={4}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+              {/* ✅ VIEW MODE: Display formatted specifications */}
+              {!isEditing && (
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="edit-supplier">Supplier</Label>
-                    <Input
-                      id="edit-supplier"
-                      value={editForm.supplier_name}
-                      onChange={(e) => setEditForm({ ...editForm, supplier_name: e.target.value })}
+                    <Label>Material Description</Label>
+                    <div className="p-4 bg-gray-50 rounded-lg space-y-1.5">
+                      {parseMaterialSpecs(selectedMaterial.material_description).map((spec, idx) => (
+                        spec.label ? (
+                          <div key={idx} className="flex items-start gap-3">
+                            <span className="font-medium text-gray-700 whitespace-nowrap min-w-[160px]">
+                              {spec.label}:
+                            </span>
+                            <span className="text-gray-900">{spec.value}</span>
+                          </div>
+                        ) : (
+                          <p key={idx} className="text-gray-900">{spec.value}</p>
+                        )
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Supplier</Label>
+                      <p className="mt-1 text-gray-900">{selectedMaterial.supplier_name || '-'}</p>
+                    </div>
+                    <div>
+                      <Label>Estimated Cost</Label>
+                      <p className="mt-1 text-gray-900">{formatCurrency(selectedMaterial.estimated_cost)}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Order Date</Label>
+                      <p className="mt-1 text-gray-900">{formatDate(selectedMaterial.order_date)}</p>
+                    </div>
+                    <div>
+                      <Label>Expected Delivery</Label>
+                      <p className="mt-1 text-gray-900">{formatDate(selectedMaterial.expected_delivery_date)}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Status</Label>
+                    <div className="mt-1">{getStatusBadge(selectedMaterial.status)}</div>
+                  </div>
+
+                  {selectedMaterial.notes && (
+                    <div>
+                      <Label>Notes</Label>
+                      <p className="mt-1 p-3 bg-gray-50 rounded-lg text-gray-900">{selectedMaterial.notes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ✅ EDIT MODE: Editable Fields */}
+              {isEditing && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-description">Material Description *</Label>
+                    <Textarea
+                      id="edit-description"
+                      value={editForm.material_description}
+                      onChange={(e) => setEditForm({ ...editForm, material_description: e.target.value })}
+                      rows={6}
                     />
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-supplier">Supplier</Label>
+                      <Input
+                        id="edit-supplier"
+                        value={editForm.supplier_name}
+                        onChange={(e) => setEditForm({ ...editForm, supplier_name: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-cost">Estimated Cost (£)</Label>
+                      <Input
+                        id="edit-cost"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editForm.estimated_cost}
+                        onChange={(e) => setEditForm({ ...editForm, estimated_cost: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-order-date">Order Date</Label>
+                      <Input
+                        id="edit-order-date"
+                        type="date"
+                        value={editForm.order_date}
+                        onChange={(e) => setEditForm({ ...editForm, order_date: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-delivery">Expected Delivery</Label>
+                      <Input
+                        id="edit-delivery"
+                        type="date"
+                        value={editForm.expected_delivery_date}
+                        onChange={(e) => setEditForm({ ...editForm, expected_delivery_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="edit-cost">Estimated Cost (£)</Label>
-                    <Input
-                      id="edit-cost"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={editForm.estimated_cost}
-                      onChange={(e) => setEditForm({ ...editForm, estimated_cost: e.target.value })}
+                    <Label htmlFor="edit-status">Status</Label>
+                    <Select
+                      value={editForm.status}
+                      onValueChange={(value) => setEditForm({ ...editForm, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ordered">Ordered</SelectItem>
+                        <SelectItem value="in_transit">In Transit</SelectItem>
+                        <SelectItem value="delivered">Delivered</SelectItem>
+                        <SelectItem value="delayed">Delayed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-notes">Notes</Label>
+                    <Textarea
+                      id="edit-notes"
+                      value={editForm.notes}
+                      onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                      rows={3}
                     />
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-order-date">Order Date</Label>
-                    <Input
-                      id="edit-order-date"
-                      type="date"
-                      value={editForm.order_date}
-                      onChange={(e) => setEditForm({ ...editForm, order_date: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-delivery">Expected Delivery</Label>
-                    <Input
-                      id="edit-delivery"
-                      type="date"
-                      value={editForm.expected_delivery_date}
-                      onChange={(e) => setEditForm({ ...editForm, expected_delivery_date: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="edit-status">Status</Label>
-                  <Select
-                    value={editForm.status}
-                    onValueChange={(value) => setEditForm({ ...editForm, status: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ordered">Ordered</SelectItem>
-                      <SelectItem value="in_transit">In Transit</SelectItem>
-                      <SelectItem value="delivered">Delivered</SelectItem>
-                      <SelectItem value="delayed">Delayed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="edit-notes">Notes</Label>
-                  <Textarea
-                    id="edit-notes"
-                    value={editForm.notes}
-                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                    rows={3}
-                  />
-                </div>
-              </div>
+              )}
 
               {/* Created/Updated Info */}
               <div className="text-xs text-gray-500 space-y-1 pt-4 border-t">
@@ -1038,19 +1114,36 @@ export function ProductionMaterialsManagement() {
             </Button>
             
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsDetailsDialogOpen(false);
-                  setSelectedMaterial(null);
-                  setEditForm(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleUpdateMaterial}>
-                Save Changes
-              </Button>
+              {!isEditing ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsDetailsDialogOpen(false);
+                      setSelectedMaterial(null);
+                      setEditForm(null);
+                    }}
+                  >
+                    Close
+                  </Button>
+                  <Button onClick={() => setIsEditing(true)}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEditing(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleUpdateMaterial}>
+                    Save Changes
+                  </Button>
+                </>
+              )}
             </div>
           </DialogFooter>
         </DialogContent>

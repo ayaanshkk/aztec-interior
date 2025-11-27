@@ -104,7 +104,7 @@ const allSidebarItems: NavGroup[] = [
         roles: ["manager", "hr", "sales", "production"],
       },
       {
-        title: "Appliances",
+        title: "Appliances Catalogue",
         url: "/dashboard/appliances",
         icon: Forklift,
         roles: ["manager", "hr", "production"],
