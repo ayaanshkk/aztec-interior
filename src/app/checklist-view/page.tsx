@@ -12,6 +12,8 @@ import {
   Edit, 
   PenTool, 
   Upload,
+  Package,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -158,6 +160,15 @@ export default function ChecklistViewPage() {
   const [signatureMode, setSignatureMode] = useState("existing");
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPoint, setLastPoint] = useState<{ x: number; y: number } | null>(null);
+  const [showOrderDialog, setShowOrderDialog] = useState(false);
+  const [orderDialogSection, setOrderDialogSection] = useState("");
+  const [orderMaterials, setOrderMaterials] = useState<string[]>([]);
+  const [orderSupplier, setOrderSupplier] = useState("");
+  const [orderEstimatedCost, setOrderEstimatedCost] = useState("");
+  const [orderDate, setOrderDate] = useState(new Date().toISOString().split("T")[0]);
+  const [orderExpectedDelivery, setOrderExpectedDelivery] = useState("");
+  const [orderNotes, setOrderNotes] = useState("");
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
   const canEdit = () => {
     if (!user) return false;
@@ -467,6 +478,156 @@ export default function ChecklistViewPage() {
     }
   };
 
+  const extractMaterialsFromSection = (sectionTitle: string): string[] => {
+    if (!formData) return [];
+    
+    const materials: string[] = [];
+
+    switch (sectionTitle) {
+      case "Material Specifications":
+        if (formData.door_style) materials.push(`Door Style: ${formData.door_style}`);
+        if (formData.door_color) materials.push(`Door Color: ${formData.door_color}`);
+        if (formData.door_manufacturer) materials.push(`Door Manufacturer: ${formData.door_manufacturer}`);
+        if (formData.door_name) materials.push(`Door Name: ${formData.door_name}`);
+        if (formData.glazing_material) materials.push(`Glazing Material: ${formData.glazing_material}`);
+        if (formData.end_panel_color) materials.push(`Panel Color: ${formData.end_panel_color}`);
+        if (formData.plinth_filler_color) materials.push(`Plinth/Filler Color: ${formData.plinth_filler_color}`);
+        if (formData.cabinet_color) materials.push(`Cabinet Color: ${formData.cabinet_color}`);
+        if (formData.worktop_material_color) materials.push(`Worktop Color: ${formData.worktop_material_color}`);
+        
+        // Additional doors
+        formData.additional_doors?.forEach((door, idx) => {
+          if (door.door_style || door.door_color || door.quantity) {
+            materials.push(`Additional Door ${idx + 1}: ${door.door_style} - ${door.door_color} (Qty: ${door.quantity})`);
+          }
+        });
+        break;
+
+      case "Hardware Specifications":
+        if (formData.handles_code) materials.push(`Handle Code: ${formData.handles_code} (Qty: ${formData.handles_quantity || "N/A"}, Size: ${formData.handles_size || "N/A"})`);
+        if (formData.accessories) materials.push(`Accessories: ${formData.accessories}`);
+        if (formData.lighting_spec) materials.push(`Lighting: ${formData.lighting_spec}`);
+        if (formData.under_wall_unit_lights_color) materials.push(`Under Wall Unit Lights: ${formData.under_wall_unit_lights_color} - ${formData.under_wall_unit_lights_profile || ""}`);
+        if (formData.under_worktop_lights_color) materials.push(`Under Worktop Lights: ${formData.under_worktop_lights_color}`);
+        break;
+
+      case "Worktop Specifications":
+        if (formData.worktop_material_type) materials.push(`Worktop Material: ${formData.worktop_material_type}`);
+        if (formData.worktop_material_color) materials.push(`Worktop Color: ${formData.worktop_material_color}`);
+        if (formData.worktop_size) materials.push(`Worktop Size: ${formData.worktop_size}`);
+        formData.worktop_features?.forEach(feature => materials.push(`Worktop Feature: ${feature}`));
+        if (formData.worktop_other_details) materials.push(`Other Details: ${formData.worktop_other_details}`);
+        break;
+
+      case "Appliances":
+        formData.appliances?.forEach((app, idx) => {
+          if (app.make || app.model) {
+            const appName = standardAppliances[idx] || `Appliance ${idx + 1}`;
+            materials.push(`${appName}: ${app.make} ${app.model}`.trim());
+          }
+        });
+        
+        if (formData.integ_fridge_make || formData.integ_fridge_model) {
+          materials.push(`INTG Fridge: ${formData.integ_fridge_make} ${formData.integ_fridge_model} (Qty: ${formData.integ_fridge_qty || "1"})`.trim());
+        }
+        if (formData.integ_freezer_make || formData.integ_freezer_model) {
+          materials.push(`INTG Freezer: ${formData.integ_freezer_make} ${formData.integ_freezer_model} (Qty: ${formData.integ_freezer_qty || "1"})`.trim());
+        }
+        
+        if (formData.sink_details) materials.push(`Sink: ${formData.sink_details} (Model: ${formData.sink_model || "N/A"})`);
+        if (formData.tap_details) materials.push(`Tap: ${formData.tap_details} (Model: ${formData.tap_model || "N/A"})`);
+        break;
+
+      case "Bedroom Furniture":
+        if (formData.bedside_cabinets_type) materials.push(`Bedside Cabinets: ${formData.bedside_cabinets_type} (Qty: ${formData.bedside_cabinets_qty || "N/A"})`);
+        if (formData.dresser_desk === "yes") materials.push(`Dresser/Desk: ${formData.dresser_desk_details || "Yes"}`);
+        if (formData.internal_mirror === "yes") materials.push(`Internal Mirror: ${formData.internal_mirror_details || "Yes"}`);
+        if (formData.mirror_type) materials.push(`Mirror: ${formData.mirror_type} (Qty: ${formData.mirror_qty || "N/A"})`);
+        break;
+
+      case "Lighting":
+        if (formData.soffit_lights_type) materials.push(`Soffit Lights: ${formData.soffit_lights_type} - ${formData.soffit_lights_color || ""}`);
+        if (formData.gable_lights_type) materials.push(`Gable Lights: ${formData.gable_lights_type} - ${formData.gable_lights_main_color || ""} / ${formData.gable_lights_profile_color || ""}`);
+        break;
+
+      case "Accessories":
+        if (formData.other_accessories) materials.push(`Accessories: ${formData.other_accessories}`);
+        formData.floor_protection?.forEach(item => materials.push(`Floor Protection: ${item}`));
+        break;
+    }
+
+    return materials.filter(m => m.trim().length > 0);
+  };
+
+  const handleOpenOrderDialog = (sectionTitle: string) => {
+    const materials = extractMaterialsFromSection(sectionTitle);
+    setOrderDialogSection(sectionTitle);
+    setOrderMaterials(materials);
+    setShowOrderDialog(true);
+  };
+
+  const handleRemoveMaterial = (index: number) => {
+    setOrderMaterials(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmitOrder = async () => {
+    if (orderMaterials.length === 0 || !formData) {
+      alert("No materials to order");
+      return;
+    }
+
+  const handlePrintPDF = () => {
+    window.print();
+  };
+
+    setIsSubmittingOrder(true);
+    try {
+      const token = localStorage.getItem("auth_token");
+      const materialDescription = `${orderDialogSection}\n${orderMaterials.join('\n')}`;
+      
+      const payload = {
+        customer_id: formData.customer_id,
+        material_description: materialDescription,
+        supplier_name: orderSupplier.trim() || null,
+        estimated_cost: orderEstimatedCost ? parseFloat(orderEstimatedCost) : null,
+        order_date: orderDate,
+        expected_delivery_date: orderExpectedDelivery || null,
+        notes: orderNotes.trim() || null,
+        status: 'ordered',
+      };
+
+      const response = await fetch('https://aztec-interiors.onrender.com/materials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create material order');
+      }
+
+      alert('Material order created successfully!');
+      
+      // Reset form
+      setShowOrderDialog(false);
+      setOrderMaterials([]);
+      setOrderSupplier('');
+      setOrderEstimatedCost('');
+      setOrderDate(new Date().toISOString().split('T')[0]);
+      setOrderExpectedDelivery('');
+      setOrderNotes('');
+      
+    } catch (error) {
+      console.error('Error creating material order:', error);
+      alert('Failed to create material order. Please try again.');
+    } finally {
+      setIsSubmittingOrder(false);
+    }
+  };
+
   const clearSignature = () => {
     if (!canvasRef.current || !formData) return;
     const ctx = canvasRef.current.getContext("2d");
@@ -507,6 +668,23 @@ export default function ChecklistViewPage() {
   const standardApplianceGridTemplate = showOrderDate ? "grid-cols-[1fr_1fr_1fr]" : "grid-cols-[1fr_1fr]";
   const integUnitGridTemplate = showOrderDate ? "grid-cols-[0.5fr_1fr_1fr_1fr]" : "grid-cols-[0.5fr_1fr_1fr]";
   const standardAppliances = ["Oven", "Microwave", "Washing Machine", "Dryer", "HOB", "Extractor", "INTG Dishwasher"];
+
+  const OrderButton = ({ sectionTitle, onClick }: { sectionTitle: string; onClick: () => void }) => {
+  if (!canEdit() || isEditing) return null;
+  
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onClick={onClick}
+      className="flex items-center gap-1 text-xs print:hidden"
+    >
+      <Package className="h-3 w-3" />
+      Order
+    </Button>
+  );
+};
 
   return (
     <SidebarProvider>
@@ -588,6 +766,16 @@ export default function ChecklistViewPage() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
+              {/* Print/Save PDF Button - Always visible */}
+              <Button
+                onClick={handlePrintPDF}
+                variant="outline"
+                className="flex items-center space-x-2 print:hidden"
+              >
+                <Download className="h-4 w-4" />
+                <span>Print / Save as PDF</span>
+              </Button>
+
               {isEditing ? (
                 <>
                   <Button
@@ -696,7 +884,13 @@ export default function ChecklistViewPage() {
                 <div className="space-y-6">
                   {/* 1. Material Specifications - Green Section */}
                   <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-green-900">1. Material Specifications (Ordering)</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-green-900">1. Material Specifications (Ordering)</h3>
+                      <OrderButton
+                        sectionTitle="Material Specifications"
+                        onClick={() => handleOpenOrderDialog("Material Specifications")}
+                      />
+                    </div>
                     <div className="space-y-4">
                       {/* Dynamic Grid based on door style */}
                       <div className="grid gap-4 grid-cols-2">
@@ -984,7 +1178,13 @@ export default function ChecklistViewPage() {
 
                   {/* 2. Hardware Specifications - Purple Section */}
                   <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-purple-900">2. Hardware Specifications</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-purple-900">2. Hardware Specifications</h3>
+                      <OrderButton
+                        sectionTitle="Hardware Specifications"
+                        onClick={() => handleOpenOrderDialog("Hardware Specifications")}
+                      />
+                    </div>
                     <div className="space-y-3">
                       <div className="grid grid-cols-3 gap-3">
                         <div>
@@ -1089,7 +1289,13 @@ export default function ChecklistViewPage() {
 
                   {/* 3. Worktop Specifications - Orange Section */}
                   <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-orange-900">3. Worktop Specifications (Ordering)</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-orange-900">3. Worktop Specifications (Ordering)</h3>
+                      <OrderButton
+                        sectionTitle="Worktop Specifications"
+                        onClick={() => handleOpenOrderDialog("Worktop Specifications")}
+                      />
+                    </div>
                     
                     <div className="space-y-4">
                       <div className="grid grid-cols-3 gap-4">
@@ -1182,7 +1388,13 @@ export default function ChecklistViewPage() {
                 <div className="space-y-6">
                   {/* 4. Appliance and Sink & Tap - Yellow Section */}
                   <div className="rounded-lg border-2 border-yellow-200 bg-yellow-50 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-yellow-900">4. Appliance and Sink & Tap Information</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-yellow-900">4. Appliance and Sink & Tap Information</h3>
+                      <OrderButton
+                        sectionTitle="Appliances"
+                        onClick={() => handleOpenOrderDialog("Appliances")}
+                      />
+                    </div>
                     
                     {/* Appliances */}
                     <div className="mb-6">
@@ -1446,7 +1658,13 @@ export default function ChecklistViewPage() {
                 <div className="space-y-6">
                   {/* 1. Material Specifications - Green Section */}
                   <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-green-900">1. Material Specifications</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-green-900">1. Material Specifications</h3>
+                      <OrderButton
+                        sectionTitle="Material Specifications"
+                        onClick={() => handleOpenOrderDialog("Material Specifications")}
+                      />
+                    </div>
                     <div className="space-y-4">
                       {/* Dynamic Grid based on door style */}
                       <div className="grid gap-4 grid-cols-2">
@@ -1712,7 +1930,13 @@ export default function ChecklistViewPage() {
 
                   {/* 2. Hardware Specifications - Purple Section */}
                   <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-purple-900">2. Hardware Specifications</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-purple-900">2. Hardware Specifications</h3>
+                      <OrderButton
+                        sectionTitle="Hardware Specifications"
+                        onClick={() => handleOpenOrderDialog("Hardware Specifications")}
+                      />
+                    </div>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
@@ -1746,7 +1970,13 @@ export default function ChecklistViewPage() {
 
                   {/* 3. Bedroom Furniture - Orange Section */}
                   <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-orange-900">3. Bedroom Furniture Specifications</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-orange-900">3. Bedroom Furniture Specifications</h3>
+                      <OrderButton
+                        sectionTitle="Bedroom Furniture"
+                        onClick={() => handleOpenOrderDialog("Bedroom Furniture")}
+                      />
+                    </div>
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -1874,7 +2104,13 @@ export default function ChecklistViewPage() {
                 <div className="space-y-6">
                   {/* 4. Lighting - Yellow Section */}
                   <div className="rounded-lg border-2 border-yellow-200 bg-yellow-50 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-yellow-900">4. Lighting Specifications</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-yellow-900">4. Lighting Specifications</h3>
+                      <OrderButton
+                        sectionTitle="Lighting"
+                        onClick={() => handleOpenOrderDialog("Lighting")}
+                      />
+                    </div>
                     <div className="space-y-4">
                       {/* Soffit Lights */}
                       <div>
@@ -1957,7 +2193,13 @@ export default function ChecklistViewPage() {
 
                   {/* 5. Accessories & Floor Protection - Pink Section */}
                   <div className="rounded-lg border-2 border-pink-200 bg-pink-50 p-6">
-                    <h3 className="mb-4 text-xl font-bold text-pink-900">5. Accessories & Floor Protection</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-pink-900">5. Accessories & Floor Protection</h3>
+                      <OrderButton
+                        sectionTitle="Accessories"
+                        onClick={() => handleOpenOrderDialog("Accessories")}
+                      />
+                    </div>
                     <div className="space-y-4">
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Other/Misc/Accessories</label>
