@@ -11,7 +11,8 @@ import {
   Calendar,
   DollarSign,
   FileText,
-  Trash2
+  Trash2,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -66,7 +67,7 @@ interface Customer {
   address?: string;
   stage: string;
   customer_stage?: string;
-  project_count?: number; // ✅ ADD THIS LINE
+  project_count?: number;
   projects_at_stage?: number;
   project_details?: Array<{
     id: string;
@@ -96,13 +97,24 @@ export function ProductionMaterialsManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialOrder | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersLoading, setCustomersLoading] = useState(false);
 
   // Delete confirmation dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [materialToDelete, setMaterialToDelete] = useState<MaterialOrder | null>(null);
+
+  // Edit form state
+  const [editForm, setEditForm] = useState<{
+    material_description: string;
+    supplier_name: string;
+    estimated_cost: string;
+    order_date: string;
+    expected_delivery_date: string;
+    notes: string;
+    status: string;
+  } | null>(null);
 
   // Form states
   const [newMaterialForm, setNewMaterialForm] = useState<NewMaterialForm>({
@@ -115,18 +127,15 @@ export function ProductionMaterialsManagement() {
     notes: ''
   });
 
-  // ✅ FIXED: Initial load on mount - only fetch materials
   useEffect(() => {
     console.log('🚀 Component mounted - loading materials...');
     fetchMaterials();
-  }, []); // Empty dependency array = run once on mount
+  }, []);
 
-  // ✅ OPTIMIZED: Fetch materials with cache busting
   const fetchMaterials = async () => {
     setLoading(true);
     try {
       console.log('📦 Fetching materials...');
-      // ✅ Add cache-busting timestamp to prevent stale data
       const timestamp = new Date().getTime();
       const response = await fetchWithAuth(`materials?_t=${timestamp}`);
       if (!response.ok) throw new Error('Failed to fetch materials');
@@ -141,13 +150,11 @@ export function ProductionMaterialsManagement() {
     }
   };
 
-  // ✅ OPTIMIZED: Only fetch customers when the dialog is opened
   const fetchCustomers = async () => {
     setCustomersLoading(true);
     try {
       console.log('🔄 Fetching all customers, then filtering for Accepted stage...');
       
-      // ✅ Use main customers endpoint (we know this works!)
       const timestamp = new Date().getTime();
       const response = await fetchWithAuth(`customers?_t=${timestamp}`);
       
@@ -156,7 +163,6 @@ export function ProductionMaterialsManagement() {
 
       console.log('📊 Total customers fetched:', data.length);
       
-      // ✅ Filter for Accepted stage on client side
       const acceptedCustomers = data.filter((c: any) => 
         c.stage && c.stage.toLowerCase() === 'accepted'
       );
@@ -240,7 +246,6 @@ export function ProductionMaterialsManagement() {
       });
       setIsCreateDialogOpen(false);
       
-      // ✅ Immediately reload materials
       await fetchMaterials();
       alert('Material order created successfully!');
       
@@ -250,43 +255,44 @@ export function ProductionMaterialsManagement() {
     }
   };
 
-  const handleUpdateMaterialStatus = async (
-    materialId: string,
-    newStatus: string,
-    deliveryDate?: string
-  ) => {
+  const handleUpdateMaterial = async () => {
+    if (!selectedMaterial || !editForm) return;
+
     try {
-      const payload: any = { status: newStatus };
-      
-      if (newStatus === 'delivered' && deliveryDate) {
-        payload.actual_delivery_date = deliveryDate;
-      }
+      const payload = {
+        material_description: editForm.material_description.trim(),
+        supplier_name: editForm.supplier_name.trim() || null,
+        estimated_cost: editForm.estimated_cost ? parseFloat(editForm.estimated_cost) : null,
+        order_date: editForm.order_date,
+        expected_delivery_date: editForm.expected_delivery_date || null,
+        notes: editForm.notes.trim() || null,
+        status: editForm.status,
+      };
 
-      console.log('📤 Updating material status:', { materialId, payload });
+      console.log('📤 Updating material:', { id: selectedMaterial.id, payload });
 
-      const response = await fetchWithAuth(`materials/${materialId}`, {
+      const response = await fetchWithAuth(`materials/${selectedMaterial.id}`, {
         method: 'PATCH',
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('❌ Update failed:', errorData);
-        throw new Error(errorData.error || 'Failed to update material status');
+        throw new Error(errorData.error || 'Failed to update material');
       }
 
-      console.log('✅ Material status updated successfully');
+      console.log('✅ Material updated successfully');
 
-      // ✅ Immediately reload materials
       await fetchMaterials();
-      setIsUpdateDialogOpen(false);
+      setIsDetailsDialogOpen(false);
       setSelectedMaterial(null);
+      setEditForm(null);
       
-      alert('Material status updated successfully!');
+      alert('Material updated successfully!');
       
     } catch (error) {
-      console.error('❌ Error updating material status:', error);
-      alert(error instanceof Error ? error.message : 'Failed to update material status. Please try again.');
+      console.error('❌ Error updating material:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update material. Please try again.');
     }
   };
 
@@ -309,8 +315,9 @@ export function ProductionMaterialsManagement() {
 
       setDeleteDialogOpen(false);
       setMaterialToDelete(null);
+      setIsDetailsDialogOpen(false);
+      setSelectedMaterial(null);
       
-      // ✅ Immediately reload materials
       await fetchMaterials();
       
       alert('Material order deleted successfully!');
@@ -321,13 +328,44 @@ export function ProductionMaterialsManagement() {
     }
   };
 
+  // ✅ NEW: Open details dialog with material data
+  const handleMaterialClick = (material: MaterialOrder) => {
+    setSelectedMaterial(material);
+    setEditForm({
+      material_description: material.material_description,
+      supplier_name: material.supplier_name || '',
+      estimated_cost: material.estimated_cost?.toString() || '',
+      order_date: material.order_date || new Date().toISOString().split('T')[0],
+      expected_delivery_date: material.expected_delivery_date || '',
+      notes: material.notes || '',
+      status: material.status,
+    });
+    setIsDetailsDialogOpen(true);
+  };
+
+  // ✅ NEW: Parse material specifications for formatted display
+  const parseMaterialSpecs = (description: string) => {
+    if (description.includes(':')) {
+      const specs = description.split(/(?=[A-Z][a-z]+ [A-Z][a-z]+:|[A-Z][a-z]+:)/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      
+      return specs.map(spec => {
+        const colonIndex = spec.indexOf(':');
+        if (colonIndex > 0) {
+          return {
+            label: spec.substring(0, colonIndex).trim(),
+            value: spec.substring(colonIndex + 1).trim()
+          };
+        }
+        return { label: '', value: spec };
+      });
+    }
+    return [{ label: '', value: description }];
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { className: string; icon: React.ReactNode; text: string }> = {
-      not_ordered: { 
-        className: 'bg-gray-100 text-gray-700 border-gray-300', 
-        icon: <Package className="h-3 w-3" />,
-        text: 'Not Ordered' 
-      },
       ordered: { 
         className: 'bg-blue-100 text-blue-700 border-blue-300', 
         icon: <FileText className="h-3 w-3" />,
@@ -350,7 +388,7 @@ export function ProductionMaterialsManagement() {
       },
     };
 
-    const variant = variants[status] || variants.not_ordered;
+    const variant = variants[status] || variants.ordered;
     return (
       <Badge className={`flex items-center gap-1 ${variant.className}`} variant="outline">
         {variant.icon}
@@ -387,7 +425,6 @@ export function ProductionMaterialsManagement() {
   });
 
   const stats = {
-    not_ordered: materials.filter(m => m.status === 'not_ordered').length,
     ordered: materials.filter(m => m.status === 'ordered').length,
     in_transit: materials.filter(m => m.status === 'in_transit').length,
     delivered: materials.filter(m => m.status === 'delivered').length,
@@ -418,10 +455,7 @@ export function ProductionMaterialsManagement() {
           <DialogTrigger asChild>
             <Button 
               className="flex items-center gap-2"
-              onClick={() => {
-                // ✅ Only fetch customers when opening the dialog
-                fetchCustomers();
-              }}
+              onClick={() => fetchCustomers()}
             >
               <Plus className="h-4 w-4" />
               Order New Materials
@@ -620,22 +654,8 @@ export function ProductionMaterialsManagement() {
         </Dialog>
       </div>
 
-      {/* ✅ REMOVED: Yellow alert bar - customers are now lazy-loaded only when needed */}
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Not Ordered</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.not_ordered}</p>
-              </div>
-              <Package className="h-8 w-8 text-gray-400" />
-            </div>
-          </CardContent>
-        </Card>
-
+      {/* Statistics Cards - ✅ REMOVED "Not Ordered" */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -702,7 +722,6 @@ export function ProductionMaterialsManagement() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="not_ordered">Not Ordered</SelectItem>
                 <SelectItem value="ordered">Ordered</SelectItem>
                 <SelectItem value="in_transit">In Transit</SelectItem>
                 <SelectItem value="delivered">Delivered</SelectItem>
@@ -713,7 +732,7 @@ export function ProductionMaterialsManagement() {
         </CardContent>
       </Card>
 
-      {/* Materials List */}
+      {/* Materials List - ✅ CLICKABLE CARDS */}
       <div className="space-y-4">
         {filteredMaterials.length === 0 ? (
           <Card>
@@ -729,18 +748,34 @@ export function ProductionMaterialsManagement() {
           </Card>
         ) : (
           filteredMaterials.map((material) => (
-            <Card key={material.id} className="hover:shadow-lg transition-shadow">
+            <Card 
+              key={material.id} 
+              className="hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => handleMaterialClick(material)}
+            >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 mb-3">
                       <h3 className="text-lg font-semibold text-gray-900">
                         {material.customer_name}
                       </h3>
                       {getStatusBadge(material.status)}
                     </div>
                     
-                    <p className="text-gray-700 mb-4">{material.material_description}</p>
+                    {/* ✅ FIXED: Display specifications as formatted list */}
+                    <div className="mb-4 space-y-1">
+                      {parseMaterialSpecs(material.material_description).map((spec, idx) => (
+                        spec.label ? (
+                          <div key={idx} className="flex items-start gap-2">
+                            <span className="font-medium text-gray-600 min-w-[140px]">{spec.label}:</span>
+                            <span className="text-gray-900">{spec.value}</span>
+                          </div>
+                        ) : (
+                          <p key={idx} className="text-gray-900">{spec.value}</p>
+                        )
+                      ))}
+                    </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
@@ -769,33 +804,6 @@ export function ProductionMaterialsManagement() {
                       </div>
                     )}
                   </div>
-
-                  <div className="ml-4 flex flex-col gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedMaterial(material);
-                        setIsUpdateDialogOpen(true);
-                      }}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Update
-                    </Button>
-                    
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => {
-                        setMaterialToDelete(material);
-                        setDeleteDialogOpen(true);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -803,72 +811,148 @@ export function ProductionMaterialsManagement() {
         )}
       </div>
 
-      {/* Update Status Dialog */}
-      <Dialog open={isUpdateDialogOpen} onOpenChange={setIsUpdateDialogOpen}>
-        <DialogContent>
+      {/* ✅ NEW: Material Details Dialog with View/Edit/Delete */}
+      <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Update Material Status</DialogTitle>
+            <DialogTitle>Material Order Details</DialogTitle>
             <DialogDescription>
-              Change the status of this material order
+              View and edit material order information
             </DialogDescription>
           </DialogHeader>
 
-          {selectedMaterial && (
-            <div className="space-y-4 py-4">
-              <div>
-                <p className="text-sm text-gray-600">Customer</p>
-                <p className="font-medium">{selectedMaterial.customer_name}</p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-600">Material</p>
-                <p className="font-medium">{selectedMaterial.material_description}</p>
+          {selectedMaterial && editForm && (
+            <div className="space-y-6 py-4">
+              {/* Customer Info */}
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">Customer</p>
+                <p className="text-lg font-semibold text-gray-900">{selectedMaterial.customer_name}</p>
               </div>
 
-              <div className="space-y-2">
-                <Label>New Status</Label>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => handleUpdateMaterialStatus(selectedMaterial.id, 'ordered')}
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Mark as Ordered
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => handleUpdateMaterialStatus(selectedMaterial.id, 'in_transit')}
-                  >
-                    <Truck className="h-4 w-4 mr-2" />
-                    Mark as In Transit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => handleUpdateMaterialStatus(selectedMaterial.id, 'delivered', new Date().toISOString())}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Mark as Delivered
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start text-red-600"
-                    onClick={() => handleUpdateMaterialStatus(selectedMaterial.id, 'delayed')}
-                  >
-                    <AlertTriangle className="h-4 w-4 mr-2" />
-                    Mark as Delayed
-                  </Button>
+              {/* Editable Fields */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-description">Material Description *</Label>
+                  <Textarea
+                    id="edit-description"
+                    value={editForm.material_description}
+                    onChange={(e) => setEditForm({ ...editForm, material_description: e.target.value })}
+                    rows={4}
+                  />
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-supplier">Supplier</Label>
+                    <Input
+                      id="edit-supplier"
+                      value={editForm.supplier_name}
+                      onChange={(e) => setEditForm({ ...editForm, supplier_name: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-cost">Estimated Cost (£)</Label>
+                    <Input
+                      id="edit-cost"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editForm.estimated_cost}
+                      onChange={(e) => setEditForm({ ...editForm, estimated_cost: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-order-date">Order Date</Label>
+                    <Input
+                      id="edit-order-date"
+                      type="date"
+                      value={editForm.order_date}
+                      onChange={(e) => setEditForm({ ...editForm, order_date: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-delivery">Expected Delivery</Label>
+                    <Input
+                      id="edit-delivery"
+                      type="date"
+                      value={editForm.expected_delivery_date}
+                      onChange={(e) => setEditForm({ ...editForm, expected_delivery_date: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-status">Status</Label>
+                  <Select
+                    value={editForm.status}
+                    onValueChange={(value) => setEditForm({ ...editForm, status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ordered">Ordered</SelectItem>
+                      <SelectItem value="in_transit">In Transit</SelectItem>
+                      <SelectItem value="delivered">Delivered</SelectItem>
+                      <SelectItem value="delayed">Delayed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-notes">Notes</Label>
+                  <Textarea
+                    id="edit-notes"
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Created/Updated Info */}
+              <div className="text-xs text-gray-500 space-y-1 pt-4 border-t">
+                <p>Created: {formatDate(selectedMaterial.created_at)}</p>
+                {selectedMaterial.ordered_by && (
+                  <p>Ordered by: {selectedMaterial.ordered_by}</p>
+                )}
               </div>
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>
-              Cancel
+          <DialogFooter className="flex justify-between items-center">
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setMaterialToDelete(selectedMaterial);
+                setDeleteDialogOpen(true);
+              }}
+              className="mr-auto"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
             </Button>
+            
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDetailsDialogOpen(false);
+                  setSelectedMaterial(null);
+                  setEditForm(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateMaterial}>
+                Save Changes
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -886,7 +970,7 @@ export function ProductionMaterialsManagement() {
                   </p>
                   <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
                     <p><strong>Customer:</strong> {materialToDelete.customer_name}</p>
-                    <p><strong>Material:</strong> {materialToDelete.material_description}</p>
+                    <p><strong>Material:</strong> {materialToDelete.material_description.substring(0, 100)}...</p>
                     <p><strong>Status:</strong> {materialToDelete.status.replace('_', ' ').toUpperCase()}</p>
                   </div>
                   <p className="mt-3 text-red-600 font-medium">
