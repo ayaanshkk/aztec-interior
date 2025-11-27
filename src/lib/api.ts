@@ -25,8 +25,28 @@ function redirectToLogin() {
   }
 }
 
-// ✅ Helper to add timeout to fetch calls
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 15000) { // ✅ Increased from 5s to 15s
+// ✅ REQUEST DEDUPLICATION: Prevent duplicate requests
+const pendingRequests = new Map<string, Promise<any>>();
+
+function deduplicateRequest<T>(key: string, requestFn: () => Promise<T>): Promise<T> {
+  // If request is already pending, return existing promise
+  if (pendingRequests.has(key)) {
+    console.log(`♻️ Reusing pending request: ${key}`);
+    return pendingRequests.get(key)!;
+  }
+
+  // Create new request
+  const promise = requestFn().finally(() => {
+    // Clean up after request completes
+    pendingRequests.delete(key);
+  });
+
+  pendingRequests.set(key, promise);
+  return promise;
+}
+
+// ✅ OPTIMISTIC TIMEOUT: Reduced from 15s to 8s for better UX
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 8000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   
@@ -37,8 +57,11 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout 
     });
     clearTimeout(id);
     return response;
-  } catch (error) {
+  } catch (error: any) {
     clearTimeout(id);
+    if (error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeout}ms`);
+    }
     throw error;
   }
 }
@@ -78,7 +101,6 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
 
   if (!token) {
     console.error("No auth token found");
-    // redirectToLogin();
     throw new Error("Not authenticated");
   }
 
@@ -89,23 +111,22 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
   };
 
   try {
-    // ✅ Increased timeout to 15 seconds for backend operations
+    // ✅ Reduced timeout to 8s for faster feedback
     const response = await fetchWithTimeout(url, {
       ...options,
       headers,
-    }, 15000);
+    }, 8000);
 
     // ✅ DON'T logout on 401 - mock auth setup
     if (response.status === 401) {
       console.warn("⚠️ Got 401 from backend - continuing with mock auth");
-      // Don't clear localStorage or redirect - let user stay logged in
     }
 
     return response;
   } catch (error: any) {
     if (error.name === 'AbortError') {
       console.error("⏱️ Request timeout - backend not responding");
-      throw new Error("Request timeout");
+      throw new Error("Request timeout - please try again");
     }
     throw error;
   }
@@ -166,33 +187,39 @@ export const api = {
 
   // DATA ENDPOINTS (use fetchWithAuth - calls Render backend)
   async getCustomers() {
-    try {
-      const response = await fetchWithAuth("/customers");
-      return await handleApiResponse(response);
-    } catch (error) {
-      console.warn("⚠️ getCustomers failed, returning empty data");
-      return { customers: [] };
-    }
+    return deduplicateRequest('getCustomers', async () => {
+      try {
+        const response = await fetchWithAuth("/customers");
+        return await handleApiResponse(response);
+      } catch (error) {
+        console.warn("⚠️ getCustomers failed, returning empty data");
+        return { customers: [] };
+      }
+    });
   },
 
   async getJobs() {
-    try {
-      const response = await fetchWithAuth("/jobs");
-      return await handleApiResponse(response);
-    } catch (error) {
-      console.warn("⚠️ getJobs failed, returning empty data");
-      return { jobs: [] };
-    }
+    return deduplicateRequest('getJobs', async () => {
+      try {
+        const response = await fetchWithAuth("/jobs");
+        return await handleApiResponse(response);
+      } catch (error) {
+        console.warn("⚠️ getJobs failed, returning empty data");
+        return { jobs: [] };
+      }
+    });
   },
 
   async getPipeline() {
-    try {
-      const response = await fetchWithAuth("/pipeline");
-      return await handleApiResponse(response);
-    } catch (error) {
-      console.warn("⚠️ getPipeline failed, returning empty data");
-      return { pipeline: [] };
-    }
+    return deduplicateRequest('getPipeline', async () => {
+      try {
+        const response = await fetchWithAuth("/pipeline");
+        return await handleApiResponse(response);
+      } catch (error) {
+        console.warn("⚠️ getPipeline failed, returning empty data");
+        return { pipeline: [] };
+      }
+    });
   },
 
   async updateCustomerStage(customerId: string, stage: string, reason: string, updatedBy: string) {
@@ -211,62 +238,68 @@ export const api = {
     return handleApiResponse(response);
   },
 
-  // ✅ ASSIGNMENT ENDPOINTS (Schedule Page)
+  // ✅ ASSIGNMENT ENDPOINTS (Schedule Page) - WITH DEDUPLICATION
   async getAssignments() {
-    try {
-      console.log("📋 Fetching assignments...");
-      const response = await fetchWithAuth("/assignments");
-      
-      if (!response.ok) {
-        console.error(`❌ Assignments API returned ${response.status}`);
-        throw new Error(`Failed to fetch assignments: ${response.status}`);
+    return deduplicateRequest('getAssignments', async () => {
+      try {
+        console.log("📋 Fetching assignments...");
+        const response = await fetchWithAuth("/assignments");
+        
+        if (!response.ok) {
+          console.error(`❌ Assignments API returned ${response.status}`);
+          throw new Error(`Failed to fetch assignments: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`✅ Got ${data.length} assignments`);
+        return data;
+      } catch (error) {
+        console.error("❌ getAssignments failed:", error);
+        throw error;
       }
-      
-      const data = await response.json();
-      console.log(`✅ Got ${data.length} assignments`);
-      return data;
-    } catch (error) {
-      console.error("❌ getAssignments failed:", error);
-      throw error;
-    }
+    });
   },
 
   async getAvailableJobs() {
-    try {
-      console.log("🔨 Fetching available jobs...");
-      const response = await fetchWithAuth("/jobs/available");
-      
-      if (!response.ok) {
-        console.warn(`⚠️ Jobs API returned ${response.status}`);
-        return []; // Return empty array instead of throwing
+    return deduplicateRequest('getAvailableJobs', async () => {
+      try {
+        console.log("🔨 Fetching available jobs...");
+        const response = await fetchWithAuth("/jobs/available");
+        
+        if (!response.ok) {
+          console.warn(`⚠️ Jobs API returned ${response.status}`);
+          return []; // Return empty array instead of throwing
+        }
+        
+        const data = await response.json();
+        console.log(`✅ Got ${data.length} jobs`);
+        return data;
+      } catch (error) {
+        console.warn("⚠️ getAvailableJobs failed (non-critical):", error);
+        return []; // Return empty array for graceful degradation
       }
-      
-      const data = await response.json();
-      console.log(`✅ Got ${data.length} jobs`);
-      return data;
-    } catch (error) {
-      console.warn("⚠️ getAvailableJobs failed (non-critical):", error);
-      return []; // Return empty array for graceful degradation
-    }
+    });
   },
 
   async getActiveCustomers() {
-    try {
-      console.log("👥 Fetching active customers...");
-      const response = await fetchWithAuth("/customers/active");
-      
-      if (!response.ok) {
-        console.warn(`⚠️ Customers API returned ${response.status}`);
-        return []; // Return empty array instead of throwing
+    return deduplicateRequest('getActiveCustomers', async () => {
+      try {
+        console.log("👥 Fetching active customers...");
+        const response = await fetchWithAuth("/customers/active");
+        
+        if (!response.ok) {
+          console.warn(`⚠️ Customers API returned ${response.status}`);
+          return []; // Return empty array instead of throwing
+        }
+        
+        const data = await response.json();
+        console.log(`✅ Got ${data.length} customers`);
+        return data;
+      } catch (error) {
+        console.warn("⚠️ getActiveCustomers failed (non-critical):", error);
+        return []; // Return empty array for graceful degradation
       }
-      
-      const data = await response.json();
-      console.log(`✅ Got ${data.length} customers`);
-      return data;
-    } catch (error) {
-      console.warn("⚠️ getActiveCustomers failed (non-critical):", error);
-      return []; // Return empty array for graceful degradation
-    }
+    });
   },
 
   async createAssignment(assignmentData: any) {
@@ -334,22 +367,24 @@ export const api = {
   },
 
   async getAssignmentsByDateRange(startDate: string, endDate: string) {
-    try {
-      console.log(`📅 Fetching assignments from ${startDate} to ${endDate}`);
-      const response = await fetchWithAuth(
-        `/assignments/by-date-range?start_date=${startDate}&end_date=${endDate}`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch assignments by date range: ${response.status}`);
+    return deduplicateRequest(`getAssignmentsByDateRange-${startDate}-${endDate}`, async () => {
+      try {
+        console.log(`📅 Fetching assignments from ${startDate} to ${endDate}`);
+        const response = await fetchWithAuth(
+          `/assignments/by-date-range?start_date=${startDate}&end_date=${endDate}`
+        );
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch assignments by date range: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`✅ Got ${data.length} assignments in range`);
+        return data;
+      } catch (error) {
+        console.error("❌ getAssignmentsByDateRange failed:", error);
+        throw error;
       }
-      
-      const data = await response.json();
-      console.log(`✅ Got ${data.length} assignments in range`);
-      return data;
-    } catch (error) {
-      console.error("❌ getAssignmentsByDateRange failed:", error);
-      throw error;
-    }
+    });
   },
 };

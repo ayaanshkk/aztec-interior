@@ -129,6 +129,12 @@ const interiorDesignJobTypes = [
 
 export default function SchedulePage() {
   const { user, token } = useAuth();
+  
+  // ✅ IMMEDIATE DEBUG: Log on component mount
+  console.log("🎬 SchedulePage component mounted");
+  console.log("👤 User on mount:", user);
+  console.log("🔑 Token on mount:", token ? "Present" : "Missing");
+  
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [visibleCalendars, setVisibleCalendars] = useState<string[]>([]);
   const [showOwnCalendar, setShowOwnCalendar] = useState(true);
@@ -404,10 +410,11 @@ export default function SchedulePage() {
     };
   };
 
-  // Data fetching with loading guard to prevent race conditions
+  // Data fetching with loading guard, timeout, and better error handling
   const fetchData = async () => {
     if (!token || !user) {
       console.warn("⚠️ No token or user found");
+      setLoading(false);
       return;
     }
 
@@ -422,30 +429,111 @@ export default function SchedulePage() {
       setError(null);
       
       console.log("🔄 Starting data fetch...");
+      console.log("🔑 Token present:", !!token);
+      console.log("👤 User:", user?.full_name, user?.role);
+      console.log("🌐 Backend URL:", "https://aztec-interiors.onrender.com");
 
-      const [tasksData, jobsData, customersData] = await Promise.all([
-        api.getAssignments().catch(() => []),
-        api.getAvailableJobs().catch(() => []),
-        api.getActiveCustomers().catch(() => [])
-      ]);
+      // ✅ Add timeout to prevent infinite loading
+      const fetchWithTimeout = (promise: Promise<any>, timeoutMs: number) => {
+        return Promise.race([
+          promise,
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timeout after ' + timeoutMs + 'ms')), timeoutMs)
+          )
+        ]);
+      };
+
+      // ✅ Direct fetch as fallback in case api module has issues
+      const directFetch = async (endpoint: string) => {
+        console.log(`📡 Fetching ${endpoint}...`);
+        const response = await fetch(`https://aztec-interiors.onrender.com/${endpoint}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        console.log(`📡 Response from ${endpoint}:`, response.status, response.statusText);
+        
+        if (!response.ok) {
+          throw new Error(`${endpoint} failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log(`✅ ${endpoint} returned:`, data?.length || 'unknown', 'items');
+        return data;
+      };
+
+      let tasksData, jobsData, customersData;
+
+      try {
+        // Try using api module first
+        console.log("🔧 Attempting to use api module...");
+        [tasksData, jobsData, customersData] = await Promise.all([
+          fetchWithTimeout(
+            api.getAssignments().catch((err) => {
+              console.error("❌ Error fetching assignments via api module:", err);
+              console.log("🔄 Falling back to direct fetch for assignments...");
+              return directFetch('assignments');
+            }),
+            15000 // 15 second timeout
+          ),
+          fetchWithTimeout(
+            api.getAvailableJobs().catch((err) => {
+              console.error("❌ Error fetching jobs via api module:", err);
+              console.log("🔄 Falling back to direct fetch for jobs...");
+              return directFetch('jobs');
+            }),
+            15000
+          ),
+          fetchWithTimeout(
+            api.getActiveCustomers().catch((err) => {
+              console.error("❌ Error fetching customers via api module:", err);
+              console.log("🔄 Falling back to direct fetch for customers...");
+              return directFetch('customers');
+            }),
+            15000
+          )
+        ]);
+      } catch (apiError) {
+        // If api module completely fails, use direct fetch
+        console.error("❌ API module failed completely:", apiError);
+        console.log("🔄 Using direct fetch for all endpoints...");
+        
+        [tasksData, jobsData, customersData] = await Promise.all([
+          fetchWithTimeout(directFetch('assignments'), 15000).catch(() => []),
+          fetchWithTimeout(directFetch('jobs'), 15000).catch(() => []),
+          fetchWithTimeout(directFetch('customers'), 15000).catch(() => [])
+        ]);
+      }
 
       console.log("📊 Raw tasks data from API:", tasksData);
-      console.log("📊 First task structure:", tasksData[0]);
+      console.log("📊 Tasks count:", Array.isArray(tasksData) ? tasksData.length : 'Not an array');
+      console.log("📊 Jobs count:", Array.isArray(jobsData) ? jobsData.length : 'Not an array');
+      console.log("📊 Customers count:", Array.isArray(customersData) ? customersData.length : 'Not an array');
       
-      setTasks(tasksData);
-      setAvailableJobs(jobsData);
-      setCustomers(customersData);
+      // ✅ Ensure we have arrays
+      setTasks(Array.isArray(tasksData) ? tasksData : []);
+      setAvailableJobs(Array.isArray(jobsData) ? jobsData : []);
+      setCustomers(Array.isArray(customersData) ? customersData : []);
       
       // ✅ Mark as loaded
       hasLoadedData.current = true;
 
       console.log("✅ Data loaded successfully");
-      console.log("📊 Tasks loaded:", tasksData.length);
     } catch (err) {
       console.error("❌ Error in fetchData:", err);
-      setError("Failed to load schedule data");
+      console.error("❌ Error stack:", err instanceof Error ? err.stack : 'No stack trace');
+      setError(err instanceof Error ? err.message : "Failed to load schedule data");
+      
+      // ✅ Set empty arrays so page still renders
+      setTasks([]);
+      setAvailableJobs([]);
+      setCustomers([]);
     } finally {
       setLoading(false);
+      console.log("🏁 Loading complete, loading state set to false");
     }
   };
 
@@ -610,6 +698,17 @@ export default function SchedulePage() {
     if (user && token && !hasLoadedData.current) {
       console.log("🎯 Initial data load triggered");
       fetchData();
+      
+      // ✅ SAFETY: Force exit loading state after 20 seconds
+      const safetyTimeout = setTimeout(() => {
+        if (loading) {
+          console.warn("⚠️ SAFETY TIMEOUT: Force exiting loading state after 20 seconds");
+          setLoading(false);
+          setError("Loading timed out. Please try refreshing the page.");
+        }
+      }, 20000);
+      
+      return () => clearTimeout(safetyTimeout);
     }
   }, [user, token]);
 
@@ -849,9 +948,26 @@ export default function SchedulePage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
-        <div className="flex items-center space-x-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading schedule...</span>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="flex items-center space-x-2">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading schedule...</span>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              console.log("🛑 User manually stopped loading");
+              setLoading(false);
+              setTasks([]);
+              setAvailableJobs([]);
+              setCustomers([]);
+            }}
+          >
+            Skip Loading
+          </Button>
+          <p className="text-xs text-gray-500">
+            If this takes more than 10 seconds, click "Skip Loading"
+          </p>
         </div>
       </div>
     );
@@ -860,11 +976,39 @@ export default function SchedulePage() {
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-500" />
           <h3 className="mb-2 text-lg font-medium text-red-900">Error Loading Schedule</h3>
           <p className="mb-4 text-red-600">{error}</p>
-          <Button onClick={fetchData}>Try Again</Button>
+          <div className="space-y-2">
+            <Button onClick={() => {
+              hasLoadedData.current = false;
+              setError(null);
+              fetchData();
+            }}>
+              Try Again
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                console.log("🛑 User chose to continue with empty data");
+                setError(null);
+                setTasks([]);
+                setAvailableJobs([]);
+                setCustomers([]);
+              }}
+            >
+              Continue Anyway
+            </Button>
+          </div>
+          <details className="mt-4 text-left">
+            <summary className="cursor-pointer text-sm text-gray-600">Show technical details</summary>
+            <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-auto">
+              User: {user?.full_name} ({user?.role})
+              Token: {token ? 'Present' : 'Missing'}
+              Error: {error}
+            </pre>
+          </details>
         </div>
       </div>
     );

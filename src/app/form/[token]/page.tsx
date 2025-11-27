@@ -41,6 +41,12 @@ interface AdditionalDoor {
   quantity: string;
 }
 
+interface AdditionalHandle {
+  handles_code: string;
+  handles_quantity: string;
+  handles_size: string;
+}
+
 interface FormData {
   customer_id: string;
   customer_name: string;
@@ -63,6 +69,7 @@ interface FormData {
   end_panel_color: string;
   cabinet_color: string;
   additional_doors: AdditionalDoor[];
+  additional_handles: AdditionalHandle[];
   handles_code: string;
   handles_quantity: string;
   handles_size: string;
@@ -166,18 +173,49 @@ function OrderMaterialsDialog({
         if (data.cabinet_color) items.push(`Cabinet Color: ${data.cabinet_color}`);
         if (data.worktop_material_color) items.push(`Worktop Color: ${data.worktop_material_color}`);
         
-        // Additional doors
+        // Additional doors with proper formatting
         if (data.additional_doors && data.additional_doors.length > 0) {
           data.additional_doors.forEach((door: any, idx: number) => {
-            if (door.door_style || door.door_color) {
-              items.push(`Additional Door ${idx + 1}: ${door.door_style} - ${door.door_color} (Qty: ${door.quantity})`);
+            const hasValues = door.door_style || door.door_color || door.panel_color || 
+                            door.plinth_color || door.cabinet_color || door.worktop_color ||
+                            door.door_manufacturer || door.door_name || door.glazing_material;
+            
+            if (hasValues) {
+              items.push(`\n--- Additional Door ${idx + 1} ---`);
+              if (door.door_style) items.push(`Door Style: ${door.door_style}`);
+              if (door.door_color) items.push(`Door Color: ${door.door_color}`);
+              if (door.door_manufacturer) items.push(`Door Manufacturer: ${door.door_manufacturer}`);
+              if (door.door_name) items.push(`Door Name: ${door.door_name}`);
+              if (door.glazing_material) items.push(`Glazing Material: ${door.glazing_material}`);
+              if (door.panel_color) items.push(`Panel Color: ${door.panel_color}`);
+              if (door.plinth_color) items.push(`Plinth/Filler Color: ${door.plinth_color}`);
+              if (door.cabinet_color) items.push(`Cabinet Color: ${door.cabinet_color}`);
+              if (door.worktop_color) items.push(`Worktop Color: ${door.worktop_color}`);
+              if (door.quantity) items.push(`Quantity: ${door.quantity}`);
             }
           });
         }
         break;
         
       case "Hardware Specifications":
-        if (data.handles_code) items.push(`Handle Code: ${data.handles_code} (Qty: ${data.handles_quantity || 'N/A'}, Size: ${data.handles_size || 'N/A'})`);
+        if (data.handles_code) items.push(`Handle Code: ${data.handles_code}`);
+        if (data.handles_quantity) items.push(`Handle Quantity: ${data.handles_quantity}`);
+        if (data.handles_size) items.push(`Handle Size: ${data.handles_size}`);
+        
+        // Additional handles with proper formatting
+        if (data.additional_handles && data.additional_handles.length > 0) {
+          data.additional_handles.forEach((handle: any, idx: number) => {
+            const hasValues = handle.handles_code || handle.handles_quantity || handle.handles_size;
+            
+            if (hasValues) {
+              items.push(`\n--- Additional Handle ${idx + 1} ---`);
+              if (handle.handles_code) items.push(`Handle Code: ${handle.handles_code}`);
+              if (handle.handles_quantity) items.push(`Handle Quantity: ${handle.handles_quantity}`);
+              if (handle.handles_size) items.push(`Handle Size: ${handle.handles_size}`);
+            }
+          });
+        }
+        
         if (data.accessories) items.push(`Accessories: ${data.accessories}`);
         if (data.lighting_spec) items.push(`Lighting: ${data.lighting_spec}`);
         if (data.under_wall_unit_lights_color) items.push(`Under Wall Unit Lights: ${data.under_wall_unit_lights_color} - ${data.under_wall_unit_lights_profile}`);
@@ -477,6 +515,7 @@ export default function FormPage() {
     end_panel_color: "",
     cabinet_color: "",
     additional_doors: [],
+    additional_handles: [],
     handles_code: "",
     handles_quantity: "",
     handles_size: "",
@@ -652,6 +691,39 @@ export default function FormPage() {
     setFormData((prev) => ({
       ...prev,
       additional_doors: prev.additional_doors.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleAdditionalHandleChange = (index: number, field: keyof AdditionalHandle, value: string) => {
+  setFormData((prev) => {
+    const additional_handles = [...prev.additional_handles];
+    if (!additional_handles[index]) {
+      additional_handles[index] = { 
+        handles_code: "", 
+        handles_quantity: "", 
+        handles_size: "" 
+      };
+    }
+    additional_handles[index] = { ...additional_handles[index], [field]: value };
+    return { ...prev, additional_handles };
+  });
+};
+
+  const addAdditionalHandle = () => {
+    setFormData((prev) => ({
+      ...prev,
+      additional_handles: [...prev.additional_handles, { 
+        handles_code: "", 
+        handles_quantity: "", 
+        handles_size: "" 
+      }],
+    }));
+  };
+
+  const removeAdditionalHandle = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      additional_handles: prev.additional_handles.filter((_, i) => i !== index),
     }));
   };
 
@@ -1294,6 +1366,61 @@ export default function FormPage() {
                           onChange={(e) => handleInputChange("handles_size", e.target.value)}
                         />
                       </div>
+                    </div>
+
+                    {/* ✅ ADD THIS ENTIRE SECTION - Additional Handles */}
+                    <div className="border-t pt-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <label className="text-sm font-bold text-gray-700">Handle Details (Additional Handles)</label>
+                        <Button type="button" size="sm" onClick={addAdditionalHandle} className="bg-purple-600">
+                          + Add Additional Handle
+                        </Button>
+                      </div>
+                      {formData.additional_handles.map((handle, idx) => (
+                        <div key={idx} className="mb-3 space-y-3 rounded border-2 border-purple-300 bg-white p-4">
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Handle Code</label>
+                              <Input
+                                placeholder="Enter handle code"
+                                className="text-sm"
+                                value={handle.handles_code}
+                                onChange={(e) => handleAdditionalHandleChange(idx, "handles_code", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Handle Quantity</label>
+                              <Input
+                                placeholder="Enter quantity"
+                                type="text"
+                                className="text-sm"
+                                value={handle.handles_quantity}
+                                onChange={(e) => handleAdditionalHandleChange(idx, "handles_quantity", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Handle Size</label>
+                              <Input
+                                placeholder="Size (e.g., 128mm)"
+                                className="text-sm"
+                                value={handle.handles_size}
+                                onChange={(e) => handleAdditionalHandleChange(idx, "handles_size", e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => removeAdditionalHandle(idx)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
 
                     <div>

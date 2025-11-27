@@ -76,7 +76,7 @@ export default function JobsPage() {
         return;
       }
 
-      console.log("🔄 Fetching jobs...");
+      console.log("🔄 Fetching tasks...");
       
       const headers: HeadersInit = { 
         Authorization: `Bearer ${token}`,
@@ -103,19 +103,19 @@ export default function JobsPage() {
           if (response.status === 408 || response.status >= 500) {
             retryCount++;
             if (retryCount <= maxRetries) {
-              console.log(`⏳ Retry ${retryCount}/${maxRetries} for jobs...`);
+              console.log(`⏳ Retry ${retryCount}/${maxRetries} for tasks...`);
               await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
               continue;
             }
           }
 
-          throw new Error(`Failed to fetch jobs: ${response.status}`);
+          throw new Error(`Failed to fetch tasks: ${response.status}`);
           
         } catch (error: any) {
           if (error.name === 'AbortError' || error.name === 'TimeoutError') {
             if (retryCount < maxRetries) {
               retryCount++;
-              console.log(`⏳ Timeout - Retry ${retryCount}/${maxRetries} for jobs...`);
+              console.log(`⏳ Timeout - Retry ${retryCount}/${maxRetries} for tasks...`);
               await new Promise(resolve => setTimeout(resolve, 2000));
               continue;
             }
@@ -125,19 +125,19 @@ export default function JobsPage() {
       }
 
       if (!response || !response.ok) {
-        throw new Error(`Failed to fetch jobs after ${maxRetries} retries`);
+        throw new Error(`Failed to fetch tasks after ${maxRetries} retries`);
       }
 
       const data = await response.json();
-      console.log(`✅ Jobs received: ${data.length} jobs`);
+      console.log(`✅ Tasks received: ${data.length} jobs`);
       
       setJobs(data);
 
       const endTime = performance.now();
-      console.log(`⏱️ Jobs page loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+      console.log(`⏱️ Tasks page loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
     } catch (error) {
-      console.error("❌ Error loading jobs:", error);
+      console.error("❌ Error loading tasks:", error);
       setJobs([]); // Set empty array instead of leaving undefined
     } finally {
       setLoading(false);
@@ -188,7 +188,7 @@ export default function JobsPage() {
         prev.map((j) => (j.id === jobId ? { ...j, work_stage: updatedJob.work_stage } : j))
       );
       
-      console.log(`✅ Updated job ${jobId} work stage to ${newWorkStage}`);
+      console.log(`✅ Updated task ${jobId} work stage to ${newWorkStage}`);
     } catch (error) {
       console.error("Error updating work stage:", error);
       alert(`Failed to update work stage: ${error instanceof Error ? error.message : 'Please try again'}`);
@@ -206,7 +206,7 @@ export default function JobsPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to delete job");
+        throw new Error(errorData.error || "Failed to delete task");
       }
 
       // Remove from state
@@ -214,8 +214,8 @@ export default function JobsPage() {
       setDeleteDialogOpen(false);
       setJobToDelete(null);
     } catch (error) {
-      console.error("Error deleting job:", error);
-      alert(`Failed to delete job: ${error instanceof Error ? error.message : 'Please try again'}`);
+      console.error("Error deleting task:", error);
+      alert(`Failed to delete task: ${error instanceof Error ? error.message : 'Please try again'}`);
     }
   };
 
@@ -251,7 +251,7 @@ export default function JobsPage() {
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading jobs...</p>
+          <p className="text-gray-600">Loading tasks...</p>
         </div>
       </div>
     );
@@ -262,14 +262,14 @@ export default function JobsPage() {
       <header className="border-b bg-white px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-gray-900">Jobs</h1>
+            <h1 className="text-3xl font-semibold text-gray-900">Tasks</h1>
             <p className="mt-1 text-sm text-gray-600">
-              Manage and track all your jobs in one place
+              Manage and track all your tasks in one place
             </p>
           </div>
           <Button onClick={() => router.push("/dashboard/jobs/create")} className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
-            Create New Job
+            Create New Task
           </Button>
         </div>
       </header>
@@ -343,7 +343,7 @@ export default function JobsPage() {
       <div className="border-b bg-white px-8 py-4">
         <div className="flex gap-8">
           <div>
-            <p className="text-sm text-gray-600">Total Jobs</p>
+            <p className="text-sm text-gray-600">Total Tasks</p>
             <p className="text-2xl font-semibold">{jobs.length}</p>
           </div>
           <div>
@@ -377,7 +377,7 @@ export default function JobsPage() {
             {jobs.length === 0 && (
               <Button onClick={() => router.push("/dashboard/jobs/create")} className="mt-4">
                 <Plus className="mr-2 h-4 w-4" />
-                Create Your First Job
+                Create Your First Task
               </Button>
             )}
           </div>
@@ -388,10 +388,10 @@ export default function JobsPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
-                      Job Reference
+                      Task Reference
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
-                      Job Name
+                      Task Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
                       Customer
@@ -501,15 +501,15 @@ export default function JobsPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Job?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Task?</AlertDialogTitle>
             <AlertDialogDescription>
               {jobToDelete && (
                 <>
                   <p className="mb-2">
-                    Are you sure you want to delete this job?
+                    Are you sure you want to delete this task?
                   </p>
                   <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
-                    <p><strong>Job Reference:</strong> {jobToDelete.job_reference}</p>
+                    <p><strong>Task Reference:</strong> {jobToDelete.job_reference}</p>
                     <p><strong>Customer:</strong> {jobToDelete.customer_name}</p>
                     <p><strong>Type:</strong> {jobToDelete.job_type}</p>
                   </div>

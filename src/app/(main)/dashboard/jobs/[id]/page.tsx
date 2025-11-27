@@ -115,7 +115,7 @@ export default function JobDetailsPage() {
 
       // Load job details
       const jobRes = await fetchWithAuth(`jobs/${jobId}`);
-      if (!jobRes.ok) throw new Error("Failed to fetch job");
+      if (!jobRes.ok) throw new Error("Failed to fetch task");
       const jobData = await jobRes.json();
       setJob(jobData);
 
@@ -167,7 +167,7 @@ export default function JobDetailsPage() {
       }
 
     } catch (error) {
-      console.error("Error loading job data:", error);
+      console.error("Error loading task data:", error);
     } finally {
       setLoading(false);
     }
@@ -194,8 +194,8 @@ export default function JobDetailsPage() {
 
       router.push("/dashboard/jobs?deleted=true");
     } catch (error) {
-      console.error("Error deleting job:", error);
-      alert("Failed to delete job. Please try again.");
+      console.error("Error deleting task:", error);
+      alert("Failed to delete task. Please try again.");
     }
   };
 
@@ -204,7 +204,7 @@ export default function JobDetailsPage() {
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading job details...</p>
+          <p className="text-gray-600">Loading task details...</p>
         </div>
       </div>
     );
@@ -214,9 +214,9 @@ export default function JobDetailsPage() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
-          <p className="text-lg text-gray-600">Job not found</p>
+          <p className="text-lg text-gray-600">Task not found</p>
           <Button onClick={() => router.push("/dashboard/jobs")} className="mt-4">
-            Back to Jobs
+            Back to Tasks
           </Button>
         </div>
       </div>
@@ -232,7 +232,7 @@ export default function JobDetailsPage() {
             <Alert className="border-green-200 bg-green-50">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                Job {job.job_reference} created successfully!
+                Task {job.job_reference} created successfully!
               </AlertDescription>
             </Alert>
           </div>
@@ -272,12 +272,12 @@ export default function JobDetailsPage() {
                 onClick={() => setDeleteDialogOpen(true)}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete Job
+                Delete Task
               </Button>
               
               <Button variant="outline" onClick={handleEdit}>
                 <Edit className="mr-2 h-4 w-4" />
-                Edit Job
+                Edit Task
               </Button>
             </div>
           </div>
@@ -351,13 +351,13 @@ export default function JobDetailsPage() {
               {/* Job Information */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Job Information</CardTitle>
+                  <CardTitle>Task Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm font-medium text-gray-500">Job Reference</p>
-                      <p className="text-base">{job.job_reference || `Job #${job.id}`}</p>
+                      <p className="text-sm font-medium text-gray-500">Task Reference</p>
+                      <p className="text-base">{job.job_reference || `Task #${job.id}`}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-500">Type</p>
@@ -724,13 +724,13 @@ export default function JobDetailsPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Job?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Task?</AlertDialogTitle>
             <AlertDialogDescription>
               <p className="mb-2">
-                Are you sure you want to delete this job?
+                Are you sure you want to delete this task?
               </p>
               <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
-                <p><strong>Job Reference:</strong> {job.job_reference}</p>
+                <p><strong>Task Reference:</strong> {job.job_reference}</p>
                 <p><strong>Customer:</strong> {customer?.name}</p>
                 <p><strong>Type:</strong> {job.job_type}</p>
               </div>
@@ -747,7 +747,7 @@ export default function JobDetailsPage() {
               onClick={handleDeleteJob}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete Job
+              Delete Task
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

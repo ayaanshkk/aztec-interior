@@ -68,7 +68,7 @@ export default function CreateJobPage() {
         }
 
         // Fetch team members from existing jobs
-        const jobsRes = await fetchWithAuth("jobs");
+        const jobsRes = await fetchWithAuth("tasks");
         if (jobsRes.ok) {
           const jobsData = await jobsRes.json();
           
@@ -118,7 +118,7 @@ export default function CreateJobPage() {
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    if (!formData.job_type) newErrors.job_type = "Job type is required";
+    if (!formData.job_type) newErrors.job_type = "Task type is required";
     if (!formData.customer_id) newErrors.customer_id = "Customer is required";
     if (!formData.measure_date) newErrors.measure_date = "Measure date is required";
     if (!formData.completion_date) newErrors.completion_date = "Completion date is required";
@@ -146,16 +146,16 @@ export default function CreateJobPage() {
         attached_forms: attachedForms.map((f) => f.id),
       };
 
-      console.log("📤 Submitting job data:", submitData);
+      console.log("📤 Submitting task data:", submitData);
 
-      const response = await fetchWithAuth("jobs", {
+      const response = await fetchWithAuth("tasks", {
         method: "POST",
         body: JSON.stringify(submitData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create job");
+        throw new Error(errorData.error || "Failed to create task");
       }
 
       const newJob = await response.json();
@@ -163,9 +163,9 @@ export default function CreateJobPage() {
       router.push(`/dashboard/jobs?success=created`);
       
     } catch (error) {
-      console.error("❌ Error creating job:", error);
+      console.error("❌ Error creating task:", error);
       setErrors({
-        submit: error instanceof Error ? error.message : "Error creating job",
+        submit: error instanceof Error ? error.message : "Error creating task",
       });
     } finally {
       setLoading(false);
@@ -178,7 +178,7 @@ export default function CreateJobPage() {
         <button onClick={() => router.back()} className="flex items-center text-gray-500 hover:text-gray-700">
           <ArrowLeft className="mr-1 h-5 w-5" />
         </button>
-        <h1 className="text-3xl font-semibold text-gray-900">Create Job</h1>
+        <h1 className="text-3xl font-semibold text-gray-900">Create Task</h1>
       </header>
 
       <main className="mx-auto max-w-3xl px-8 py-10">
@@ -189,10 +189,10 @@ export default function CreateJobPage() {
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
-                <Label>Job Type *</Label>
+                <Label>Task Type *</Label>
                 <Select value={formData.job_type} onValueChange={(v) => handleInputChange("job_type", v)}>
                   <SelectTrigger className={errors.job_type ? "border-red-500" : ""}>
-                    <SelectValue placeholder="Select job type" />
+                    <SelectValue placeholder="Select task type" />
                   </SelectTrigger>
                   <SelectContent>
                     {JOB_TYPES.map((type) => (
@@ -206,7 +206,7 @@ export default function CreateJobPage() {
               </div>
 
               <div>
-                <Label>Job Name</Label>
+                <Label>Task Name</Label>
                 <Input
                   placeholder="e.g., Kitchen Installation"
                   value={formData.job_name}
@@ -251,7 +251,7 @@ export default function CreateJobPage() {
                   </SelectContent>
                 </Select>
                 <p className="mt-1 text-xs text-gray-500">
-                  Track job execution progress (default: Survey)
+                  Track task execution progress (default: Survey)
                 </p>
               </div>
             </div>
@@ -459,7 +459,7 @@ export default function CreateJobPage() {
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create Job"}
+              {loading ? "Creating..." : "Create Task"}
             </Button>
           </div>
         </form>
