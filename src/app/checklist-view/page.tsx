@@ -576,10 +576,6 @@ export default function ChecklistViewPage() {
       return;
     }
 
-  const handlePrintPDF = () => {
-    window.print();
-  };
-
     setIsSubmittingOrder(true);
     try {
       const token = localStorage.getItem("auth_token");
@@ -627,6 +623,10 @@ export default function ChecklistViewPage() {
       setIsSubmittingOrder(false);
     }
   };
+
+  const handlePrintPDF = () => {
+  window.print();
+};
 
   const clearSignature = () => {
     if (!canvasRef.current || !formData) return;
@@ -2396,7 +2396,153 @@ export default function ChecklistViewPage() {
             </div>
           </div>
         </div>
+
+        {/* Order Materials Dialog */}
+        {showOrderDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+              <div className="mb-4">
+                <h2 className="text-2xl font-bold">Order Materials</h2>
+                <p className="text-sm text-gray-600">
+                  {orderDialogSection} - {formData?.customer_name}
+                </p>
+              </div>
+
+              {/* Customer Info Box */}
+              <div className="mb-4 rounded-lg bg-blue-50 p-4">
+                <h3 className="mb-2 font-semibold">Customer Information</h3>
+                <p className="text-sm"><strong>Name:</strong> {formData?.customer_name}</p>
+                <p className="text-sm"><strong>Phone:</strong> {formData?.customer_phone}</p>
+                <p className="text-sm"><strong>Address:</strong> {formData?.customer_address}</p>
+              </div>
+
+              {/* Materials List */}
+              <div className="mb-4">
+                <label className="mb-2 block text-sm font-bold">Materials to Order</label>
+                <div className="max-h-60 space-y-2 overflow-y-auto rounded border border-gray-300 bg-gray-50 p-3">
+                  {orderMaterials.length === 0 ? (
+                    <p className="text-center text-sm text-gray-500">No materials found</p>
+                  ) : (
+                    orderMaterials.map((material, idx) => (
+                      <div key={idx} className="flex items-center justify-between rounded bg-white p-2">
+                        <span className="text-sm">{material}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleRemoveMaterial(idx)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Form Fields */}
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-bold">Supplier Name</label>
+                  <Input
+                    value={orderSupplier}
+                    onChange={(e) => setOrderSupplier(e.target.value)}
+                    placeholder="Enter supplier name"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-bold">Estimated Cost (£)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={orderEstimatedCost}
+                    onChange={(e) => setOrderEstimatedCost(e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-bold">Date Ordered</label>
+                    <Input
+                      type="date"
+                      value={orderDate}
+                      onChange={(e) => setOrderDate(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-bold">Expected Delivery Date</label>
+                    <Input
+                      type="date"
+                      value={orderExpectedDelivery}
+                      onChange={(e) => setOrderExpectedDelivery(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-bold">Notes</label>
+                  <textarea
+                    className="h-20 w-full resize-none rounded-md border border-gray-300 p-2"
+                    value={orderNotes}
+                    onChange={(e) => setOrderNotes(e.target.value)}
+                    placeholder="Additional notes..."
+                  />
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="mt-6 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowOrderDialog(false)}
+                  disabled={isSubmittingOrder}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSubmitOrder}
+                  disabled={isSubmittingOrder || orderMaterials.length === 0}
+                >
+                  {isSubmittingOrder ? "Creating..." : "Create Material Order"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </SidebarInset>
+
+      {/* Print Styles */}
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4;
+            margin: 10mm;
+          }
+          
+          body {
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+          
+          .print\\:hidden {
+            display: none !important;
+          }
+          
+          .print\\:shadow-none {
+            box-shadow: none !important;
+          }
+          
+          .print\\:border-0 {
+            border: 0 !important;
+          }
+        }
+      `}</style>
     </SidebarProvider>
   );
 }
