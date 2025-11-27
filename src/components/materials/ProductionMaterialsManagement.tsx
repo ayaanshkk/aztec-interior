@@ -255,6 +255,47 @@ export function ProductionMaterialsManagement() {
     }
   };
 
+  // ✅ NEW: Quick status update without opening dialog
+  const handleUpdateMaterialStatus = async (
+    materialId: string,
+    newStatus: string,
+    deliveryDate?: string
+  ) => {
+    try {
+      const payload: any = { status: newStatus };
+      
+      if (newStatus === 'delivered' && deliveryDate) {
+        payload.actual_delivery_date = deliveryDate;
+      }
+
+      console.log('📤 Updating material status:', { materialId, payload });
+
+      const response = await fetchWithAuth(`materials/${materialId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ Update failed:', errorData);
+        throw new Error(errorData.error || 'Failed to update material status');
+      }
+
+      console.log('✅ Material status updated successfully');
+
+      // ✅ Immediately reload materials
+      await fetchMaterials();
+      
+      // Show success message
+      const statusText = newStatus.replace('_', ' ').toUpperCase();
+      alert(`Status updated to ${statusText}`);
+      
+    } catch (error) {
+      console.error('❌ Error updating material status:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update material status. Please try again.');
+    }
+  };
+
   const handleUpdateMaterial = async () => {
     if (!selectedMaterial || !editForm) return;
 
@@ -343,23 +384,25 @@ export function ProductionMaterialsManagement() {
     setIsDetailsDialogOpen(true);
   };
 
-  // ✅ NEW: Parse material specifications for formatted display
+  // ✅ FIXED: Parse material specifications - keep labels on ONE line
   const parseMaterialSpecs = (description: string) => {
     if (description.includes(':')) {
-      const specs = description.split(/(?=[A-Z][a-z]+ [A-Z][a-z]+:|[A-Z][a-z]+:)/)
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
+      // Split on capital letter patterns but be smarter about it
+      const lines = description.split(/(?=(?:Door|Panel|Cabinet|Plinth|Filler|Handle|Material|Finish|Color|Style|Type|Size|Width|Height|Depth|Quantity)\s*(?:Style|Color|Type|Code|Material|Finish|Size)?:)/);
       
-      return specs.map(spec => {
-        const colonIndex = spec.indexOf(':');
-        if (colonIndex > 0) {
-          return {
-            label: spec.substring(0, colonIndex).trim(),
-            value: spec.substring(colonIndex + 1).trim()
-          };
-        }
-        return { label: '', value: spec };
-      });
+      return lines
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => {
+          const colonIndex = line.indexOf(':');
+          if (colonIndex > 0) {
+            return {
+              label: line.substring(0, colonIndex).trim(),
+              value: line.substring(colonIndex + 1).trim()
+            };
+          }
+          return { label: '', value: line };
+        });
     }
     return [{ label: '', value: description }];
   };
@@ -750,12 +793,11 @@ export function ProductionMaterialsManagement() {
           filteredMaterials.map((material) => (
             <Card 
               key={material.id} 
-              className="hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => handleMaterialClick(material)}
+              className="hover:shadow-lg transition-shadow"
             >
               <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 cursor-pointer" onClick={() => handleMaterialClick(material)}>
                     <div className="flex items-center gap-3 mb-3">
                       <h3 className="text-lg font-semibold text-gray-900">
                         {material.customer_name}
@@ -763,12 +805,14 @@ export function ProductionMaterialsManagement() {
                       {getStatusBadge(material.status)}
                     </div>
                     
-                    {/* ✅ FIXED: Display specifications as formatted list */}
-                    <div className="mb-4 space-y-1">
+                    {/* ✅ FIXED: Display specifications as formatted list - labels on ONE line */}
+                    <div className="mb-4 space-y-1.5">
                       {parseMaterialSpecs(material.material_description).map((spec, idx) => (
                         spec.label ? (
-                          <div key={idx} className="flex items-start gap-2">
-                            <span className="font-medium text-gray-600 min-w-[140px]">{spec.label}:</span>
+                          <div key={idx} className="flex items-start gap-3">
+                            <span className="font-medium text-gray-600 whitespace-nowrap min-w-[160px]">
+                              {spec.label}:
+                            </span>
                             <span className="text-gray-900">{spec.value}</span>
                           </div>
                         ) : (
@@ -777,7 +821,7 @@ export function ProductionMaterialsManagement() {
                       ))}
                     </div>
                     
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                       <div>
                         <p className="text-gray-500">Supplier</p>
                         <p className="font-medium">{material.supplier_name || '-'}</p>
@@ -803,6 +847,61 @@ export function ProductionMaterialsManagement() {
                         </p>
                       </div>
                     )}
+                  </div>
+
+                  {/* ✅ NEW: Status Update Buttons in Corner */}
+                  <div className="flex flex-col gap-2 min-w-[140px]">
+                    <Button
+                      size="sm"
+                      variant={material.status === 'ordered' ? 'default' : 'outline'}
+                      className={`justify-start ${material.status === 'ordered' ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpdateMaterialStatus(material.id, 'ordered');
+                      }}
+                    >
+                      <FileText className="h-3 w-3 mr-1" />
+                      Ordered
+                    </Button>
+                    
+                    <Button
+                      size="sm"
+                      variant={material.status === 'in_transit' ? 'default' : 'outline'}
+                      className={`justify-start ${material.status === 'in_transit' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpdateMaterialStatus(material.id, 'in_transit');
+                      }}
+                    >
+                      <Truck className="h-3 w-3 mr-1" />
+                      In Transit
+                    </Button>
+                    
+                    <Button
+                      size="sm"
+                      variant={material.status === 'delivered' ? 'default' : 'outline'}
+                      className={`justify-start ${material.status === 'delivered' ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpdateMaterialStatus(material.id, 'delivered', new Date().toISOString());
+                      }}
+                    >
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Delivered
+                    </Button>
+                    
+                    <Button
+                      size="sm"
+                      variant={material.status === 'delayed' ? 'default' : 'outline'}
+                      className={`justify-start ${material.status === 'delayed' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-300 hover:bg-red-50'}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpdateMaterialStatus(material.id, 'delayed');
+                      }}
+                    >
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Delayed
+                    </Button>
                   </div>
                 </div>
               </CardContent>
