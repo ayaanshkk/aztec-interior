@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -132,6 +132,9 @@ export default function SchedulePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [visibleCalendars, setVisibleCalendars] = useState<string[]>([]);
   const [showOwnCalendar, setShowOwnCalendar] = useState(true);
+  
+  // ✅ NEW: Track if initial data has been loaded
+  const hasLoadedData = useRef(false);
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -158,6 +161,7 @@ export default function SchedulePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false); // ✅ NEW: Prevent concurrent updates
   
   // ✅ FIXED: Pre-fill with defaults including start/end dates
   const [newTask, setNewTask] = useState<Partial<Task>>({
@@ -400,10 +404,16 @@ export default function SchedulePage() {
     };
   };
 
-  // Data fetching
+  // Data fetching with loading guard to prevent race conditions
   const fetchData = async () => {
     if (!token || !user) {
       console.warn("⚠️ No token or user found");
+      return;
+    }
+
+    // ✅ Prevent multiple simultaneous fetches
+    if (loading) {
+      console.warn("⚠️ Already loading, skipping fetch");
       return;
     }
 
@@ -425,6 +435,9 @@ export default function SchedulePage() {
       setTasks(tasksData);
       setAvailableJobs(jobsData);
       setCustomers(customersData);
+      
+      // ✅ Mark as loaded
+      hasLoadedData.current = true;
 
       console.log("✅ Data loaded successfully");
       console.log("📊 Tasks loaded:", tasksData.length);
@@ -594,7 +607,8 @@ export default function SchedulePage() {
   }, [user, token]);
 
   useEffect(() => {
-    if (user && token) {
+    if (user && token && !hasLoadedData.current) {
+      console.log("🎯 Initial data load triggered");
       fetchData();
     }
   }, [user, token]);
@@ -784,28 +798,35 @@ export default function SchedulePage() {
     e.preventDefault();
   };
 
-  // ✅ FIXED: Optimistic update - instant drag/drop, no reload
+  // ✅ FIXED: Optimistic update with proper error recovery and concurrency control
   const handleDrop = async (e: React.DragEvent, date: Date) => {
     e.preventDefault();
-    if (!draggedTask) return;
+    if (!draggedTask || isUpdating) return; // ✅ Prevent concurrent updates
 
     const dateKey = formatDateKey(date);
+    const taskToMove = draggedTask; // Store reference before clearing
+    
+    // Clear dragged task immediately to prevent duplicate drops
+    setDraggedTask(null);
     
     // ✅ OPTIMISTIC UPDATE: Update UI immediately
     const updatedTask = {
-      ...draggedTask,
+      ...taskToMove,
       start_date: dateKey,
       date: dateKey,
       end_date: dateKey
     };
     
+    // Store original state for rollback
+    const previousTasks = tasks;
+    
     // ✅ Update state immediately - instant visual feedback!
-    setTasks((prev) => prev.map((t) => (t.id === draggedTask.id ? updatedTask : t)));
-    setDraggedTask(null);
+    setTasks((prev) => prev.map((t) => (t.id === taskToMove.id ? updatedTask : t)));
     
     // ✅ Then sync with backend in background (no reload!)
+    setIsUpdating(true);
     try {
-      await updateTask(draggedTask.id, { 
+      await updateTask(taskToMove.id, { 
         start_date: dateKey, 
         date: dateKey,
         end_date: dateKey
@@ -813,9 +834,11 @@ export default function SchedulePage() {
       console.log(`✅ Task moved successfully to ${dateKey}`);
     } catch (err) {
       console.error("❌ Failed to move task:", err);
-      alert("Failed to move task");
-      // ✅ Only reload on error to revert changes
-      await fetchData();
+      // ✅ Rollback to previous state instead of fetching
+      setTasks(previousTasks);
+      alert("Failed to move task. Please try again.");
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -962,7 +985,7 @@ export default function SchedulePage() {
                   key={idx}
                   className={`min-h-[100px] border-b border-r p-2 last:border-r-0 cursor-pointer transition-colors hover:bg-gray-50 ${
                     isCurrentMonth ? "bg-white" : "bg-gray-50"
-                  } ${isToday ? "ring-2 ring-inset ring-blue-500" : ""}`}
+                  } ${isToday ? "ring-2 ring-inset ring-blue-500" : ""} ${isUpdating ? "opacity-50 pointer-events-none" : ""}`}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, day)}
                   onClick={() => {
