@@ -825,17 +825,17 @@ export default function ChecklistViewPage() {
 
         <div className="flex flex-1 flex-col gap-4 p-4">
           <div className="rounded-lg border bg-white p-8 shadow-sm">
-            <h2 className="mb-2 text-center text-xl font-semibold">
+            <h2 className="mb-2 text-center text-xl font-semibold print:hidden">
               {formType === "kitchen" ? "Kitchen Installation Checklist" : "Bedroom Installation Checklist"}
             </h2>
-            <p className="mb-6 text-center text-sm text-gray-600">
+            <p className="mb-6 text-center text-sm text-gray-600 print:hidden">
               {isEditing ? "Editing Mode - Make your changes below" : "View Mode - Click Edit to make changes"}
             </p>
 
             {/* Customer Information - Blue Section */}
-            <div className="mb-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-6">
-              <h3 className="mb-4 text-xl font-bold text-blue-900">Customer Information</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="mb-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-6 print:mb-2 print:p-3">
+              <h3 className="mb-4 text-xl font-bold text-blue-900 print:mb-2">Customer Information</h3>
+              <div className={`grid grid-cols-1 gap-4 ${formType === "bedroom" ? "md:grid-cols-4" : "md:grid-cols-3"} print:gap-2`}>
                 <div>
                   <label className="mb-1 block text-sm font-bold text-gray-700">Customer Name</label>
                   <Input 
@@ -2235,7 +2235,7 @@ export default function ChecklistViewPage() {
             )}
             
             {/* Terms and Conditions - Gray Section (for both kitchen and bedroom) */}
-            <div className="mb-6 rounded-lg border-2 border-gray-300 bg-gray-100 p-6">
+            <div className="terms-page-break mb-6 rounded-lg border-2 border-gray-300 bg-gray-100 p-6">
               <h3 className="mb-4 text-xl font-bold text-gray-900">Terms & Information</h3>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
@@ -2522,7 +2522,7 @@ export default function ChecklistViewPage() {
         @media print {
           @page {
             size: A4;
-            margin: 10mm;
+            margin: 8mm;
           }
           
           body {
@@ -2530,10 +2530,114 @@ export default function ChecklistViewPage() {
             -webkit-print-color-adjust: exact;
           }
           
+          /* Hide UI elements */
           .print\\:hidden {
             display: none !important;
           }
           
+          /* Hide the entire header with buttons */
+          header {
+            display: none !important;
+          }
+          
+          /* Hide sidebar */
+          aside {
+            display: none !important;
+          }
+          
+          /* Make content full width */
+          .flex.flex-1.flex-col {
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          
+          /* Compact spacing */
+          .mb-6 {
+            margin-bottom: 8px !important;
+          }
+          
+          .mb-4 {
+            margin-bottom: 6px !important;
+          }
+          
+          .p-6 {
+            padding: 8px !important;
+          }
+          
+          .p-8 {
+            padding: 12px !important;
+          }
+          
+          .space-y-4 > * + * {
+            margin-top: 6px !important;
+          }
+          
+          .space-y-3 > * + * {
+            margin-top: 4px !important;
+          }
+          
+          /* Compact text */
+          h2 {
+            font-size: 16px !important;
+            margin-bottom: 4px !important;
+          }
+          
+          h3 {
+            font-size: 13px !important;
+            margin-bottom: 4px !important;
+          }
+          
+          .text-xl {
+            font-size: 13px !important;
+          }
+          
+          .text-sm {
+            font-size: 10px !important;
+          }
+          
+          .text-xs {
+            font-size: 9px !important;
+          }
+          
+          /* Compact inputs */
+          input, textarea, select {
+            padding: 2px 4px !important;
+            font-size: 10px !important;
+            min-height: 24px !important;
+          }
+          
+          /* Compact grid gaps */
+          .gap-4 {
+            gap: 6px !important;
+          }
+          
+          .gap-3 {
+            gap: 4px !important;
+          }
+          
+          /* Force 2-column layout to stay on same page */
+          .lg\\:grid-cols-2 {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 8px !important;
+          }
+          
+          /* Keep sections together */
+          .rounded-lg.border-2 {
+            page-break-inside: avoid;
+          }
+          
+          /* Force page break before Terms & Signature */
+          .terms-page-break {
+            page-break-before: always !important;
+          }
+          
+          /* Compact signature section */
+          canvas, img[alt="Customer Signature"] {
+            max-height: 60px !important;
+          }
+          
+          /* Remove extra borders and shadows for print */
           .print\\:shadow-none {
             box-shadow: none !important;
           }

@@ -909,60 +909,62 @@ export default function FormPage() {
               </div>
             )}
 
-          {/* Customer Information - Blue Section */}
-          <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-3 mb-3">
-            <h3 className="mb-2 text-base font-bold text-blue-900">Customer Information</h3>
-            <div className="grid grid-cols-4 gap-2">
-              <div>
-                <label className="mb-1 block text-xs font-bold text-gray-700">Customer Name</label>
-                <Input
-                  placeholder="Enter customer name"
-                  className="w-full bg-white h-8 text-sm"
-                  value={formData.customer_name}
-                  onChange={(e) => handleInputChange("customer_name", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-gray-700">Tel/Mobile Number</label>
-                <Input
-                  placeholder="Enter phone number"
-                  type="tel"
-                  className="w-full bg-white h-8 text-sm"
-                  value={formData.customer_phone}
-                  onChange={(e) => handleInputChange("customer_phone", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-gray-700">Address</label>
-                <Input
-                  placeholder="Enter full address"
-                  className="w-full bg-white h-8 text-sm"
-                  value={formData.customer_address}
-                  onChange={(e) => handleInputChange("customer_address", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-bold text-gray-700">Postcode</label>
-                <Input
-                  placeholder="Enter postcode"
-                  className="w-full bg-white h-8 text-sm"
-                  value={formData.customer_postcode}
-                  onChange={(e) => handleInputChange("customer_postcode", e.target.value)}
-                />
-              </div>
-              {formType === "bedroom" && (
-                <div className="col-span-4">
-                  <label className="mb-1 block text-xs font-bold text-gray-700">Room</label>
-                  <Input
-                    placeholder="Enter room details"
-                    className="w-full bg-white h-8 text-sm"
-                    value={formData.room}
-                    onChange={(e) => handleInputChange("room", e.target.value)}
+            {/* Customer Information - Blue Section */}
+            <div className="mb-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-6 print:mb-2 print:p-3">
+              <h3 className="mb-4 text-xl font-bold text-blue-900 print:mb-2">Customer Information</h3>
+              <div className={`grid grid-cols-1 gap-4 ${formType === "bedroom" ? "md:grid-cols-5" : "md:grid-cols-3"} print:gap-2`}>
+                <div>
+                  <label className="mb-1 block text-sm font-bold text-gray-700">Customer Name</label>
+                  <Input 
+                    value={formData.customer_name || ""} 
+                    onChange={(e) => handleInputChange("customer_name", e.target.value)}
+                    readOnly={!isEditing} 
+                    className="bg-white" 
                   />
                 </div>
-              )}
+                <div>
+                  <label className="mb-1 block text-sm font-bold text-gray-700">Tel/Mobile Number</label>
+                  <Input 
+                    value={formData.customer_phone || ""} 
+                    onChange={(e) => handleInputChange("customer_phone", e.target.value)}
+                    readOnly={!isEditing} 
+                    className="bg-white" 
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-bold text-gray-700">Address</label>
+                  <Input 
+                    value={formData.customer_address || ""} 
+                    onChange={(e) => handleInputChange("customer_address", e.target.value)}
+                    readOnly={!isEditing} 
+                    className="bg-white" 
+                  />
+                </div>
+                {formType === "bedroom" && (
+                  <>
+                    <div>
+                      <label className="mb-1 block text-sm font-bold text-gray-700">Postcode</label>
+                      <Input 
+                        value={formData.postcode || ""} 
+                        onChange={(e) => handleInputChange("postcode", e.target.value)}
+                        readOnly={!isEditing} 
+                        className="bg-white" 
+                        placeholder="Enter postcode"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-bold text-gray-700">Room</label>
+                      <Input 
+                        value={formData.room || ""} 
+                        onChange={(e) => handleInputChange("room", e.target.value)}
+                        readOnly={!isEditing} 
+                        className="bg-white" 
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
 
           {/* KITCHEN SPECIFIC SECTIONS */}
           {formType === "kitchen" && (
