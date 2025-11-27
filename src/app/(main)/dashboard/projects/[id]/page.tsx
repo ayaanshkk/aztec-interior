@@ -202,28 +202,31 @@ export default function ProjectDetailsPage() {
     notes: "",
   });
 
-  // ✅ OPTIMIZED: Memoized permission functions
+  // ✅ OPTIMIZED: Memoized permission functions (case-insensitive)
   const canEdit = useMemo(() => {
-    return ["Manager", "HR", "Production", "Sales"].includes(user?.role || "");
+    const role = (user?.role || "").toLowerCase();
+    return ["manager", "hr", "production", "sales"].includes(role);
   }, [user?.role]);
 
   const canDelete = useMemo(() => {
-    return ["Manager", "HR", "Sales"].includes(user?.role || "");
+    const role = (user?.role || "").toLowerCase();
+    return ["manager", "hr", "sales"].includes(role);
   }, [user?.role]);
 
   const canCreateFinancialDocs = useMemo(() => {
-    return ["Manager", "Sales"].includes(user?.role || "");
+    const role = (user?.role || "").toLowerCase();
+    return ["manager", "sales"].includes(role);
   }, [user?.role]);
 
-  const canViewProject = useMemo(() => {
-    if (!user) return false;
-    // All authenticated users can view projects
-    return ["Manager", "HR", "Production", "Sales", "Staff"].includes(user.role);
-  }, [user]);
+  // Note: Backend handles project access permissions
+  // We just check if user is authenticated
 
   const canEditForm = useCallback((submission: FormSubmission) => {
-    if (user?.role === "Manager" || user?.role === "HR") return true;
-    if (user?.role === "Sales") {
+    if (!user?.role) return false;
+    const role = user.role.toLowerCase();
+    
+    if (role === "manager" || role === "hr") return true;
+    if (role === "sales") {
       const formType = getFormType(submission);
       return ["quotation", "invoice", "proforma", "receipt", "payment"].includes(formType);
     }
@@ -249,13 +252,20 @@ export default function ProjectDetailsPage() {
       );
 
       if (!projectRes.ok) {
+        const errorText = await projectRes.text();
+        console.error("Project fetch error:", projectRes.status, errorText);
+        
         if (projectRes.status === 404) {
-          throw new Error("Project not found");
+          throw new Error("Project not found - The project may have been deleted or you may not have access");
         }
-        throw new Error("Failed to load project");
+        if (projectRes.status === 403) {
+          throw new Error("Access denied - You don't have permission to view this project");
+        }
+        throw new Error(`Failed to load project: ${projectRes.status}`);
       }
 
       const projectData = await projectRes.json();
+      console.log("Project loaded successfully:", projectData);
       setProject(projectData);
 
       // ✅ STEP 2: Load everything else in parallel
@@ -263,15 +273,24 @@ export default function ProjectDetailsPage() {
         fetch(
           `https://aztec-interiors.onrender.com/customers/${projectData.customer_id}`,
           { headers }
-        ).catch(() => null),
+        ).catch((err) => {
+          console.error("Customer fetch error:", err);
+          return null;
+        }),
         fetch(
-          `https://aztec-interiors.onrender.com/files/drawings?project_id=${projectId}`,
+          `https://aztec-interiors.onrender.com/files/drawings?customer_id=${projectData.customer_id}`,
           { headers }
-        ).catch(() => null),
+        ).catch((err) => {
+          console.error("Drawings fetch error:", err);
+          return null;
+        }),
         fetch(
           `https://aztec-interiors.onrender.com/projects/${projectId}/forms`,
           { headers }
-        ).catch(() => null),
+        ).catch((err) => {
+          console.error("Forms fetch error:", err);
+          return null;
+        }),
       ]);
 
       // Process customer data
@@ -287,11 +306,15 @@ export default function ProjectDetailsPage() {
         }));
       }
 
-      // Process drawings - API already filters by project_id
+      // Process drawings - Filter by project_id client-side
       if (drawingsRes && drawingsRes.ok) {
         const drawingsData = await drawingsRes.json();
         if (Array.isArray(drawingsData)) {
-          setDrawings(drawingsData);
+          // Filter to only show drawings assigned to THIS project
+          const projectDrawings = drawingsData.filter(
+            (drawing: DrawingDocument) => drawing.project_id === projectId
+          );
+          setDrawings(projectDrawings);
         }
       }
 
@@ -305,27 +328,27 @@ export default function ProjectDetailsPage() {
 
     } catch (error: any) {
       console.error("Error loading project data:", error);
-      if (error.message === "Project not found") {
-        alert("Project not found. You may not have permission to view this project.");
-        router.push("/dashboard/projects");
-      }
+      alert(error.message || "Failed to load project");
+      // Don't redirect immediately - let user see the error
     } finally {
       setLoading(false);
     }
-  }, [projectId, router]);
+  }, [projectId]);
 
   useEffect(() => {
-    if (!projectId || !user) return;
+    if (!projectId) {
+      console.error("No project ID provided");
+      return;
+    }
     
-    // Check permission before loading
-    if (!canViewProject) {
-      alert("You don't have permission to view this project.");
-      router.push("/dashboard/projects");
+    if (!user) {
+      console.log("Waiting for user authentication...");
       return;
     }
 
+    console.log("Loading project:", projectId, "for user:", user.role);
     loadProjectData();
-  }, [projectId, user, canViewProject, loadProjectData, router]);
+  }, [projectId, user, loadProjectData]);
 
   // ✅ OPTIMIZED: File upload with optimistic UI update
   const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -953,7 +976,7 @@ export default function ProjectDetailsPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  {user?.role !== "Sales" && (
+                  {user?.role?.toLowerCase() !== "sales" && (
                     <DropdownMenuItem onClick={handleCreateRemedialChecklist} className="flex items-center space-x-2" disabled={generating}>
                       <CheckSquare className="h-4 w-4" />
                       <span>Remedial Action Checklist</span>
