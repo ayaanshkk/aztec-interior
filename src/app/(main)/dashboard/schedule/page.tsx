@@ -1008,12 +1008,12 @@ export default function SchedulePage() {
   const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   // Loading/Error states
-  if (!user || (loading && tasks.length === 0 && availableJobs.length === 0)) {
+  if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="text-lg font-medium">Loading schedule...</span>
+          <span className="text-lg font-medium">Loading...</span>
         </div>
       </div>
     );
