@@ -3,7 +3,7 @@ import * as React from "react";
 import { useEffect, useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Calendar, PenTool, Upload, Download, Package } from "lucide-react";
+import { Calendar, PenTool, Upload, Download, Package, UserPlus } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -492,6 +492,8 @@ export default function FormPage() {
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [orderDialogSection, setOrderDialogSection] = useState('');
   const [isEditing, setIsEditing] = useState(true);
+  const [isWalkinMode, setIsWalkinMode] = useState(false);
+
 
   const [formData, setFormData] = useState<FormData>({
     customer_id: "",
@@ -598,6 +600,11 @@ export default function FormPage() {
       const custPhone = urlParams.get("customerPhone");
       const custPostcode = urlParams.get("customerPostcode");
       const formTypeParam = urlParams.get("type");
+      const modeParam = urlParams.get("mode");
+
+      if (modeParam === "walkin") {
+        setIsWalkinMode(true);
+      }
 
       if (formTypeParam === "kitchen" || formTypeParam === "bedroom") {
         setFormType(formTypeParam);
@@ -872,13 +879,18 @@ export default function FormPage() {
         body: JSON.stringify({
           token: token || undefined,
           formData: finalFormData,
-          projectId: projectIdFromUrl || undefined,  // ✅ ADD THIS LINE - Pass projectId at top level
+          projectId: projectIdFromUrl || undefined,
+          isWalkinMode: isWalkinMode, 
         }),
       });
 
       const result = await response.json();
 
       if (response.ok && result.success) {
+        const successMsg = isWalkinMode 
+        ? "Customer created and form submitted successfully! Redirecting to customer profile..."
+        : result.message || "Form submitted successfully! Redirecting...";
+
         setSubmitStatus({
           type: "success",
           message: result.message || "Form submitted successfully! Redirecting...",
@@ -971,6 +983,32 @@ export default function FormPage() {
             </Button>
           </div>
         </header>
+
+        {/* ✅ ADD THIS WALK-IN MODE BANNER */}
+        {isWalkinMode && (
+          <div className="mx-2 mt-2 rounded-lg border-2 border-blue-300 bg-blue-50 p-4 print:hidden">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-blue-500 p-2">
+                <UserPlus className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-blue-900">Walk-in Customer Mode</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  This form is in <strong>walk-in mode</strong>. When you submit this checklist:
+                </p>
+                <ul className="text-sm text-blue-700 mt-2 space-y-1 list-disc list-inside">
+                  <li>Customer information will be <strong>automatically extracted</strong> from the form</li>
+                  <li>A new customer will be <strong>created in your database</strong></li>
+                  <li>The checklist will be <strong>linked to this new customer</strong></li>
+                  <li>You'll be redirected to the customer's profile page</li>
+                </ul>
+                <p className="text-xs text-blue-600 mt-3 font-medium">
+                  ℹ️ Make sure to fill in customer name, phone, address, and postcode fields
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-1 flex-col gap-2 p-2" ref={formRef}>
           <form className="rounded-lg border bg-white p-4 shadow-sm print:shadow-none print:border-0">
