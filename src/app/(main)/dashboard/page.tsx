@@ -2,7 +2,7 @@
 
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { MiniCalendar } from "@/components/dashboard/MiniCalendar";
-import { RecentLeadsTable } from "./RecentLeadsTable";
+import { RecentLeadsTable } from "@/components/dashboard/RecentLeadsTable"; // ✅ Changed path
 import { OperationalCards } from "./crm/_components/operational-cards";
 import { OverviewCards } from "./crm/_components/overview-cards";
 

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Eye, FileDown } from "lucide-react";
 import { fetchWithAuth } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { generateRecentLeadsData } from "./crm/_components/crm.config"; // ✅ Updated path
+import { generateRecentLeadsData } from "./crm/_components/crm.config";
 
 export function RecentLeadsTable() {
   const router = useRouter();
