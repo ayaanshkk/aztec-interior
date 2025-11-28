@@ -125,29 +125,54 @@ export default function CreateProjectPage() {
     if (!projectData.notes) delete projectData.notes;
 
     try {
+      console.log("📤 Sending project data:", projectData);
+      
       // Use centralized fetchWithAuth
       const response = await fetchWithAuth(`customers/${customerId}/projects`, {
         method: "POST",
         body: JSON.stringify(projectData),
       });
 
-      if (response.ok) {
+      console.log("📡 Response status:", response.status);
+      console.log("📡 Response headers:", response.headers);
+
+      // ✅ FIX: Check content type before parsing JSON
+      const contentType = response.headers.get("content-type");
+      
+      if (!response.ok) {
+        // Try to get error message
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`);
+        } else {
+          // Server returned HTML error page
+          const htmlText = await response.text();
+          console.error("❌ Server returned HTML instead of JSON:", htmlText.substring(0, 500));
+          throw new Error(`Server error (${response.status}): The server encountered an error. Please check if the API endpoint exists and is working correctly.`);
+        }
+      }
+
+      // ✅ Check if response is JSON before parsing
+      if (contentType && contentType.includes("application/json")) {
         const data = await response.json();
-        alert(`Project "${data.project.project_name}" created successfully!`);
+        console.log("✅ Project created:", data);
+        alert(`Project "${data.project?.project_name || formData.project_name}" created successfully!`);
         // Navigate back to the customer details page
         router.push(`/dashboard/customers/${customerId}`);
       } else {
-        // Improved error handling
-        const errorData = await response.json().catch(() => ({
-          error: `Server responded with status ${response.status}`,
-          statusText: response.statusText,
-        }));
-        setError(`Failed to create project (${response.status}): ${errorData.error || errorData.statusText}`);
+        console.error("❌ Response is not JSON:", contentType);
+        throw new Error("Server returned an invalid response format");
       }
+      
     } catch (err) {
       // Network failure catch
-      console.error("Network Error:", err);
-      setError("Network error: Could not connect to the API server. Please check your connection.");
+      console.error("❌ Error creating project:", err);
+      
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Network error: Could not connect to the API server. Please check your connection.");
+      }
     } finally {
       setLoading(false);
     }
