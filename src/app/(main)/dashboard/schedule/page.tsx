@@ -163,7 +163,7 @@ export default function SchedulePage() {
   const [customAssigneeInput, setCustomAssigneeInput] = useState("");
   const [customTaskInput, setCustomTaskInput] = useState("");
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
@@ -414,36 +414,19 @@ export default function SchedulePage() {
   const fetchData = async () => {
     if (!token || !user) {
       console.warn("⚠️ No token or user found");
-      setLoading(false);
       return;
     }
 
-    // ✅ Prevent multiple simultaneous fetches
-    if (loading) {
-      console.warn("⚠️ Already loading, skipping fetch");
-      return;
-    }
+    // ✅ Don't block if already loading
+    if (loading) return;
 
     try {
       setLoading(true);
       setError(null);
       
       console.log("🔄 Starting data fetch...");
-      console.log("🔑 Token present:", !!token);
-      console.log("👤 User:", user?.full_name, user?.role);
-      console.log("🌐 Backend URL:", "https://aztec-interiors.onrender.com");
 
-      // ✅ Reduced timeout to 5 seconds for faster feedback
-      const fetchWithTimeout = (promise: Promise<any>, timeoutMs: number) => {
-        return Promise.race([
-          promise,
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Request timeout after ' + timeoutMs + 'ms')), timeoutMs)
-          )
-        ]);
-      };
-
-      // ✅ Direct fetch as fallback in case api module has issues
+      // Direct fetch function
       const directFetch = async (endpoint: string) => {
         console.log(`📡 Fetching ${endpoint}...`);
         const response = await fetch(`https://aztec-interiors.onrender.com/${endpoint}`, {
@@ -454,88 +437,75 @@ export default function SchedulePage() {
           },
         });
         
-        console.log(`📡 Response from ${endpoint}:`, response.status, response.statusText);
-        
         if (!response.ok) {
-          throw new Error(`${endpoint} failed: ${response.status} ${response.statusText}`);
+          throw new Error(`${endpoint} failed: ${response.status}`);
         }
         
         const data = await response.json();
-        console.log(`✅ ${endpoint} returned:`, data?.length || 'unknown', 'items');
+        console.log(`✅ ${endpoint} returned:`, data?.length || 0, 'items');
         return data;
       };
 
-      let tasksData, jobsData, customersData;
-
-      try {
-        // Try using api module first
-        console.log("🔧 Attempting to use api module...");
-        [tasksData, jobsData, customersData] = await Promise.all([
-          fetchWithTimeout(
-            api.getAssignments().catch((err) => {
-              console.error("❌ Error fetching assignments via api module:", err);
-              console.log("🔄 Falling back to direct fetch for assignments...");
-              return directFetch('assignments');
-            }),
-            5000 // ✅ 5 second timeout
-          ),
-          fetchWithTimeout(
-            api.getAvailableJobs().catch((err) => {
-              console.error("❌ Error fetching jobs via api module:", err);
-              console.log("🔄 Falling back to direct fetch for jobs...");
-              return directFetch('jobs');
-            }),
-            5000
-          ),
-          fetchWithTimeout(
-            api.getActiveCustomers().catch((err) => {
-              console.error("❌ Error fetching customers via api module:", err);
-              console.log("🔄 Falling back to direct fetch for customers...");
-              return directFetch('customers');
-            }),
-            5000
-          )
-        ]);
-      } catch (apiError) {
-        // If api module completely fails, use direct fetch
-        console.error("❌ API module failed completely:", apiError);
-        console.log("🔄 Using direct fetch for all endpoints...");
-        
-        [tasksData, jobsData, customersData] = await Promise.all([
-          fetchWithTimeout(directFetch('assignments'), 5000).catch(() => []),
-          fetchWithTimeout(directFetch('jobs'), 5000).catch(() => []),
-          fetchWithTimeout(directFetch('customers'), 5000).catch(() => [])
-        ]);
-      }
-
-      console.log("📊 Raw tasks data from API:", tasksData);
-      console.log("📊 Tasks count:", Array.isArray(tasksData) ? tasksData.length : 'Not an array');
-      console.log("📊 Jobs count:", Array.isArray(jobsData) ? jobsData.length : 'Not an array');
-      console.log("📊 Customers count:", Array.isArray(customersData) ? customersData.length : 'Not an array');
+      // Fetch all data in parallel
+      const [tasksData, jobsData, customersData] = await Promise.all([
+        directFetch('assignments').catch((err) => {
+          console.error('Failed to fetch assignments:', err);
+          return [];
+        }),
+        directFetch('jobs').catch((err) => {
+          console.error('Failed to fetch jobs:', err);
+          return [];
+        }),
+        directFetch('customers').catch((err) => {
+          console.error('Failed to fetch customers:', err);
+          return [];
+        })
+      ]);
       
-      // ✅ Ensure we have arrays
+      // Update state
       setTasks(Array.isArray(tasksData) ? tasksData : []);
       setAvailableJobs(Array.isArray(jobsData) ? jobsData : []);
       setCustomers(Array.isArray(customersData) ? customersData : []);
-      
-      // ✅ Mark as loaded
-      hasLoadedData.current = true;
 
       console.log("✅ Data loaded successfully");
     } catch (err) {
       console.error("❌ Error in fetchData:", err);
-      console.error("❌ Error stack:", err instanceof Error ? err.stack : 'No stack trace');
       setError(err instanceof Error ? err.message : "Failed to load schedule data");
-      
-      // ✅ Set empty arrays so page still renders
-      setTasks([]);
-      setAvailableJobs([]);
-      setCustomers([]);
     } finally {
       setLoading(false);
-      console.log("🏁 Loading complete, loading state set to false");
     }
   };
+
+  // Effects
+  useEffect(() => {
+    if (!user || !token) return;
+
+    setVisibleCalendars([user.full_name]);
+
+    const fetchEmployees = async () => {
+      if (user.role !== "Manager") return;
+
+      try {
+        const res = await fetchWithAuth("auth/users/staff");
+        if (res.ok) {
+          const data = await res.json();
+          setEmployees(data.users || []);
+        }
+      } catch (err) {
+        console.error("Error fetching employees:", err);
+      }
+    };
+
+    fetchEmployees();
+  }, [user, token]);
+
+  // ✅ FIXED: Simple useEffect that runs once when user and token are available
+  useEffect(() => {
+    if (user && token) {
+      console.log("🎯 Initial data load triggered");
+      fetchData();
+    }
+  }, [user, token]); // Only depends on user and token - runs once when they're available
 
   // CRUD operations
   const createTask = async (taskData: Partial<Task>) => {
@@ -934,12 +904,12 @@ export default function SchedulePage() {
   const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   // Loading/Error states
-  if (loading) {
+  if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="text-lg font-medium">Loading schedule...</span>
+          <span className="text-lg font-medium">Loading...</span>
         </div>
       </div>
     );
@@ -969,19 +939,19 @@ export default function SchedulePage() {
     <div className="min-h-screen bg-white p-6">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Schedule</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">Schedule</h1>
+          {loading && (
+            <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              console.log("🔍 MANUAL DEBUG CHECK");
-              console.log("📊 Current tasks state:", tasks);
-              console.log("📊 Tasks count:", tasks.length);
-              console.log("📊 TasksByDate:", tasksByDate);
-              fetchData();
-            }}
+            onClick={fetchData}
             disabled={loading}
+            title="Refresh schedule"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
