@@ -1080,6 +1080,14 @@ export default function SchedulePage() {
         </div>
       </div>
 
+      {/* Background Loading Indicator */}
+      {loading && tasks.length === 0 && (
+        <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-3 flex items-center gap-3">
+          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+          <span className="text-sm text-blue-800">Loading schedule data...</span>
+        </div>
+      )}
+
       {/* Toolbar */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
