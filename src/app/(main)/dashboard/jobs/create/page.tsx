@@ -72,9 +72,9 @@ export default function CreateJobPage() {
           setCustomers(customersData);
         }
 
-        // Fetch team members from existing jobs
-        const jobsRes = await fetchWithAuth("tasks");
-        console.log("📡 Tasks response:", jobsRes.status);
+        // ✅ FIXED: Fetch team members from existing jobs
+        const jobsRes = await fetchWithAuth("jobs");  // Changed from "tasks"
+        console.log("📡 Jobs response:", jobsRes.status);
         
         if (jobsRes.ok) {
           const jobsData = await jobsRes.json();
@@ -160,14 +160,15 @@ export default function CreateJobPage() {
 
       console.log("📤 Submitting task data:", submitData);
 
-      const response = await fetchWithAuth("tasks", {
+      // ✅ FIXED: Changed endpoint from "tasks" to "jobs"
+      const response = await fetchWithAuth("jobs", {
         method: "POST",
         body: JSON.stringify(submitData),
       });
 
       console.log("📡 Response status:", response.status);
 
-      // ✅ FIX: Check content type before parsing JSON
+      // Check content type before parsing JSON
       const contentType = response.headers.get("content-type");
       
       if (!response.ok) {
@@ -178,11 +179,11 @@ export default function CreateJobPage() {
           // Server returned HTML error page
           const htmlText = await response.text();
           console.error("❌ Server returned HTML instead of JSON:", htmlText.substring(0, 500));
-          throw new Error(`Server error (${response.status}): The server encountered an error. Please check if the /tasks endpoint exists.`);
+          throw new Error(`Server error (${response.status}): The server encountered an error. Please check if the /jobs endpoint exists.`);
         }
       }
 
-      // ✅ Check if response is JSON before parsing
+      // Check if response is JSON before parsing
       if (contentType && contentType.includes("application/json")) {
         const newJob = await response.json();
         console.log("✅ Task created successfully:", newJob);
@@ -199,7 +200,7 @@ export default function CreateJobPage() {
       let errorMessage = "Error creating task";
       
       if (error.message.includes("not valid JSON") || error.message.includes("<!doctype")) {
-        errorMessage = "Server error: The backend returned an invalid response. Please check if the /tasks endpoint exists and is working correctly.";
+        errorMessage = "Server error: The backend returned an invalid response. Please check if the /jobs endpoint exists and is working correctly.";
       } else if (error.message.includes("timeout")) {
         errorMessage = "Request timeout: The server is taking too long to respond. Please try again.";
       } else {
