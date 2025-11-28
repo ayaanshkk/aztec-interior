@@ -679,24 +679,6 @@ export default function SchedulePage() {
     }
   };
 
-  const updateTask = async (id: string, taskData: Partial<Task>) => {
-    if (!token) throw new Error("Not authenticated");
-
-    try {
-      setSaving(true);
-      const updatedTask = await api.updateAssignment(id, taskData);
-      
-      // ✅ Update state and cache
-      const updatedTasks = tasks.map((a) => (a.id === id ? updatedTask : a));
-      setTasks(updatedTasks);
-      saveToCache({ tasks: updatedTasks });
-      
-      return updatedTask;
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const deleteTask = async (id: string) => {
     if (!token) throw new Error("Not authenticated");
 
