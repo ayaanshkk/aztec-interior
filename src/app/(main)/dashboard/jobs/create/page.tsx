@@ -13,7 +13,7 @@ import { fetchWithAuth } from "@/lib/api";
 
 const JOB_TYPES = ["Kitchen", "Bedroom", "Wardrobe", "Remedial", "Other"];
 
-// ✅ NEW: Work stages
+// ✅ Work stages
 const WORK_STAGES = [
   { value: "Survey", label: "Survey", icon: "📏" },
   { value: "Delivery", label: "Delivery", icon: "🚚" },
@@ -30,7 +30,7 @@ interface FormData {
   completion_date: string;
   notes: string;
   priority: string; 
-  work_stage: string; // ✅ NEW
+  work_stage: string;
 }
 
 export default function CreateJobPage() {
@@ -54,21 +54,28 @@ export default function CreateJobPage() {
     completion_date: "",
     notes: "",
     priority: "Medium",
-    work_stage: "Survey", // ✅ NEW: Default to Survey
+    work_stage: "Survey",
   });
 
   useEffect(() => {
     const loadData = async () => {
       try {
+        console.log("🔄 Loading data for create task page...");
+        
         // Fetch customers
         const customersRes = await fetchWithAuth("customers");
+        console.log("📡 Customers response:", customersRes.status);
+        
         if (customersRes.ok) {
           const customersData = await customersRes.json();
+          console.log("✅ Customers loaded:", customersData.length);
           setCustomers(customersData);
         }
 
         // Fetch team members from existing jobs
         const jobsRes = await fetchWithAuth("tasks");
+        console.log("📡 Tasks response:", jobsRes.status);
+        
         if (jobsRes.ok) {
           const jobsData = await jobsRes.json();
           
@@ -80,16 +87,21 @@ export default function CreateJobPage() {
             )
           ) as string[];
           
+          console.log("✅ Team members loaded:", uniqueTeamMembers.length);
           setTeamMembers(uniqueTeamMembers);
         }
 
         // Fetch unlinked forms for selected customer
         if (formData.customer_id) {
           const formsRes = await fetchWithAuth(`forms/unlinked?customer_id=${formData.customer_id}`);
-          if (formsRes.ok) setAvailableForms(await formsRes.json());
+          if (formsRes.ok) {
+            const formsData = await formsRes.json();
+            console.log("✅ Unlinked forms loaded:", formsData.length);
+            setAvailableForms(formsData);
+          }
         }
       } catch (error) {
-        console.error("Error loading data:", error);
+        console.error("❌ Error loading data:", error);
       }
     };
     loadData();
@@ -141,7 +153,7 @@ export default function CreateJobPage() {
         measure_date: formData.measure_date,
         completion_date: formData.completion_date,
         priority: formData.priority,
-        work_stage: formData.work_stage, // ✅ NEW: Include work stage
+        work_stage: formData.work_stage,
         notes: formData.notes || "",
         attached_forms: attachedForms.map((f) => f.id),
       };
@@ -153,19 +165,49 @@ export default function CreateJobPage() {
         body: JSON.stringify(submitData),
       });
 
+      console.log("📡 Response status:", response.status);
+
+      // ✅ FIX: Check content type before parsing JSON
+      const contentType = response.headers.get("content-type");
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create task");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to create task: ${response.status}`);
+        } else {
+          // Server returned HTML error page
+          const htmlText = await response.text();
+          console.error("❌ Server returned HTML instead of JSON:", htmlText.substring(0, 500));
+          throw new Error(`Server error (${response.status}): The server encountered an error. Please check if the /tasks endpoint exists.`);
+        }
       }
 
-      const newJob = await response.json();
+      // ✅ Check if response is JSON before parsing
+      if (contentType && contentType.includes("application/json")) {
+        const newJob = await response.json();
+        console.log("✅ Task created successfully:", newJob);
+        router.push(`/dashboard/jobs?success=created`);
+      } else {
+        console.error("❌ Response is not JSON:", contentType);
+        throw new Error("Server returned an invalid response format");
+      }
       
-      router.push(`/dashboard/jobs?success=created`);
-      
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Error creating task:", error);
+      
+      // Better error message for user
+      let errorMessage = "Error creating task";
+      
+      if (error.message.includes("not valid JSON") || error.message.includes("<!doctype")) {
+        errorMessage = "Server error: The backend returned an invalid response. Please check if the /tasks endpoint exists and is working correctly.";
+      } else if (error.message.includes("timeout")) {
+        errorMessage = "Request timeout: The server is taking too long to respond. Please try again.";
+      } else {
+        errorMessage = error.message;
+      }
+      
       setErrors({
-        submit: error instanceof Error ? error.message : "Error creating task",
+        submit: errorMessage,
       });
     } finally {
       setLoading(false);
@@ -232,7 +274,7 @@ export default function CreateJobPage() {
                 </p>
               </div>
 
-              {/* ✅ NEW: Work Stage Field */}
+              {/* Work Stage Field */}
               <div>
                 <Label>Work Stage *</Label>
                 <Select value={formData.work_stage} onValueChange={(v) => handleInputChange("work_stage", v)}>
