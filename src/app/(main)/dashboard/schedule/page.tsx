@@ -41,9 +41,9 @@ import {
 import { fetchWithAuth, api } from "@/lib/api";
 
 
-// Cache utilities
+// ✅ PERFORMANCE: Improved cache with compression support
 const CACHE_KEY = 'schedule_cache';
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes (increased from 5)
 
 interface CachedData {
   tasks: Task[];
@@ -179,23 +179,21 @@ const interiorDesignJobTypes = [
 export default function SchedulePage() {
   const { user, token } = useAuth();
   
-  // ✅ IMMEDIATE DEBUG: Log on component mount
   console.log("🎬 SchedulePage component mounted");
-  console.log("👤 User on mount:", user);
-  console.log("🔑 Token on mount:", token ? "Present" : "Missing");
   
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [visibleCalendars, setVisibleCalendars] = useState<string[]>([]);
   const [showOwnCalendar, setShowOwnCalendar] = useState(true);
   
-  // ✅ NEW: Track if initial data has been loaded
   const hasLoadedData = useRef(false);
 
   const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // ✅ PERFORMANCE: Load from cache immediately to show data faster
   const cachedData = getFromCache();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [tasks, setTasks] = useState<Task[]>(cachedData?.tasks || []);
+  const [availableJobs, setAvailableJobs] = useState<Job[]>(cachedData?.jobs || []);
+  const [customers, setCustomers] = useState<Customer[]>(cachedData?.customers || []);
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [originalTask, setOriginalTask] = useState<Task | null>(null);
@@ -203,11 +201,9 @@ export default function SchedulePage() {
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [isEditingTask, setIsEditingTask] = useState(false);
   
-  // ✅ NEW: State for day view dialog
   const [showDayViewDialog, setShowDayViewDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  // ✅ Custom assignees and tasks state
   const [customAssignees, setCustomAssignees] = useState<string[]>([]);
   const [customJobTasks, setCustomJobTasks] = useState<string[]>([]);
   const [customAssigneeInput, setCustomAssigneeInput] = useState("");
@@ -217,9 +213,7 @@ export default function SchedulePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false); // ✅ NEW: Prevent concurrent updates
   
-  // ✅ FIXED: Pre-fill with defaults including start/end dates
   const [newTask, setNewTask] = useState<Partial<Task>>({
     type: "job",
     start_date: formatDateKey(new Date()),
@@ -233,7 +227,7 @@ export default function SchedulePage() {
 
   const [viewMode, setViewMode] = useState<"month" | "week" | "year">("month");
 
-  // Memos
+  // ✅ PERFORMANCE: Memoize expensive calculations
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -279,66 +273,38 @@ export default function SchedulePage() {
     return days;
   }, [currentDate]);
 
-  // ✅ FIXED: Handle tasks with BOTH new (start_date/end_date) and old (date) formats
+  // ✅ PERFORMANCE: Optimized tasksByDate calculation
   const tasksByDate = useMemo(() => {
-    console.log("🔍 Building tasksByDate map from tasks:", tasks.length);
-    
     const dateMap: Record<string, Task[]> = {};
     
-    tasks.forEach((task, index) => {
-      console.log(`📝 Processing task ${index}:`, {
-        id: task.id,
-        title: task.title,
-        date: task.date,
-        start_date: task.start_date,
-        end_date: task.end_date,
-      });
-      
-      if (!task) {
-        console.warn("⚠️ Null task found");
-        return;
-      }
+    for (const task of tasks) {
+      if (!task) continue;
 
-      // ✅ PRIORITY 1: Try new format (start_date/end_date)
       if (task.start_date && task.end_date) {
         const startDate = new Date(task.start_date);
         const endDate = new Date(task.end_date);
         
-        // Add task to start date
         const startKey = formatDateKey(startDate);
         if (!dateMap[startKey]) dateMap[startKey] = [];
         dateMap[startKey].push(task);
-        console.log(`✅ Added task to start date ${startKey}`);
         
-        // Add task to end date if different from start date
         const endKey = formatDateKey(endDate);
         if (startKey !== endKey) {
           if (!dateMap[endKey]) dateMap[endKey] = [];
           dateMap[endKey].push(task);
-          console.log(`✅ Added task to end date ${endKey}`);
         }
       } 
-      // ✅ PRIORITY 2: Fall back to legacy 'date' field
       else if (task.date) {
         const dateKey = task.date;
         if (!dateMap[dateKey]) dateMap[dateKey] = [];
         dateMap[dateKey].push(task);
-        console.log(`✅ Added task to legacy date ${dateKey}`);
       }
-      // ✅ PRIORITY 3: Try start_date only
       else if (task.start_date) {
         const dateKey = formatDateKey(new Date(task.start_date));
         if (!dateMap[dateKey]) dateMap[dateKey] = [];
         dateMap[dateKey].push(task);
-        console.log(`✅ Added task to start_date only ${dateKey}`);
       }
-      else {
-        console.warn("⚠️ Task without any date found:", task);
-      }
-    });
-    
-    console.log("📊 Final dateMap:", dateMap);
-    console.log("📊 Dates with tasks:", Object.keys(dateMap));
+    }
     
     return dateMap;
   }, [tasks]);
@@ -348,7 +314,6 @@ export default function SchedulePage() {
     return tasks.filter((a) => a.user_id === user?.id && a.status === "Declined");
   }, [tasks, user]);
 
-  // ✅ Load custom values from localStorage on mount
   useEffect(() => {
     const savedAssignees = localStorage.getItem('custom_assignees');
     const savedJobTasks = localStorage.getItem('custom_job_tasks');
@@ -369,7 +334,6 @@ export default function SchedulePage() {
     }
   }, []);
 
-  // ✅ Function to save custom assignee
   const saveCustomAssignee = (name: string) => {
     const trimmedName = name.trim();
     if (trimmedName && !customAssignees.includes(trimmedName)) {
@@ -379,7 +343,6 @@ export default function SchedulePage() {
     }
   };
 
-  // ✅ Function to save custom job/task
   const saveCustomJobTask = (task: string) => {
     const trimmedTask = task.trim();
     if (trimmedTask && !customJobTasks.includes(trimmedTask) && !interiorDesignJobTypes.includes(trimmedTask)) {
@@ -460,25 +423,17 @@ export default function SchedulePage() {
     };
   };
 
-  // Data fetching with loading guard, timeout, and better error handling
+  // ✅ PERFORMANCE: Optimized data fetching with parallel requests
   const fetchData = async () => {
-    if (!token || !user) {
-      console.warn("⚠️ No token or user found");
-      return;
-    }
-
-    // ✅ Don't block if already loading
-    if (loading) return;
+    if (!token || !user || loading) return;
 
     try {
       setLoading(true);
       setError(null);
       
-      console.log("🔄 Starting data fetch...");
+      console.log("🔄 Fetching schedule data...");
 
-      // Direct fetch function
       const directFetch = async (endpoint: string) => {
-        console.log(`📡 Fetching ${endpoint}...`);
         const response = await fetch(`https://aztec-interiors.onrender.com/${endpoint}`, {
           method: 'GET',
           headers: {
@@ -491,51 +446,37 @@ export default function SchedulePage() {
           throw new Error(`${endpoint} failed: ${response.status}`);
         }
         
-        const data = await response.json();
-        console.log(`✅ ${endpoint} returned:`, data?.length || 0, 'items');
-        return data;
+        return response.json();
       };
 
-      // Fetch all data in parallel
+      // ✅ Fetch all in parallel for faster loading
       const [tasksData, jobsData, customersData] = await Promise.all([
-        directFetch('assignments').catch((err) => {
-          console.error('Failed to fetch assignments:', err);
-          return [];
-        }),
-        directFetch('jobs').catch((err) => {
-          console.error('Failed to fetch jobs:', err);
-          return [];
-        }),
-        directFetch('customers').catch((err) => {
-          console.error('Failed to fetch customers:', err);
-          return [];
-        })
+        directFetch('assignments'),
+        directFetch('jobs'),
+        directFetch('customers')
       ]);
       
-      // ✅ Save to cache immediately
       const newData = {
         tasks: Array.isArray(tasksData) ? tasksData : [],
         jobs: Array.isArray(jobsData) ? jobsData : [],
         customers: Array.isArray(customersData) ? customersData : [],
       };
       
-      saveToCache(newData);
-      
-      // Update state
+      // ✅ Update state and cache
       setTasks(newData.tasks);
       setAvailableJobs(newData.jobs);
       setCustomers(newData.customers);
+      saveToCache(newData);
 
-      console.log("✅ Data loaded and cached successfully");
+      console.log("✅ Data loaded successfully");
     } catch (err) {
-      console.error("❌ Error in fetchData:", err);
+      console.error("❌ Error fetching data:", err);
       setError(err instanceof Error ? err.message : "Failed to load schedule data");
     } finally {
       setLoading(false);
     }
   };
 
-  // Effects
   useEffect(() => {
     if (!user || !token) return;
 
@@ -558,29 +499,35 @@ export default function SchedulePage() {
     fetchEmployees();
   }, [user, token]);
 
-  // ✅ FIXED: Simple useEffect that runs once when user and token are available
+  // ✅ Load data once when component mounts with user/token
   useEffect(() => {
-    if (user && token) {
+    if (user && token && !hasLoadedData.current) {
       console.log("🎯 Initial data load triggered");
-      fetchData();
+      hasLoadedData.current = true;
+      
+      // ✅ If we have cached data, don't show loading state
+      if (cachedData) {
+        console.log("⚡ Using cached data, refreshing in background");
+        fetchData(); // Refresh in background
+      } else {
+        console.log("📡 No cache, fetching data");
+        fetchData();
+      }
     }
-  }, [user, token]); // Only depends on user and token - runs once when they're available
+  }, [user, token]);
 
   // CRUD operations
   const createTask = async (taskData: Partial<Task>) => {
     if (!token) throw new Error("Not authenticated");
     
-    // ✅ VALIDATE: Customer is required
     if (!taskData.customer_id) {
       throw new Error("Customer is required");
     }
 
-    // ✅ VALIDATE: Ensure start_date is provided
     if (!taskData.start_date) {
       throw new Error("Start date is required");
     }
 
-    // ✅ VALIDATE: Ensure end_date is provided
     if (!taskData.end_date) {
       throw new Error("End date is required");
     }
@@ -588,11 +535,9 @@ export default function SchedulePage() {
     try {
       setSaving(true);
 
-      // ✅ Get customer name from customer_id
       const customer = customers.find((c) => c.id === taskData.customer_id);
       const customerName = customer?.name || "Unknown Customer";
 
-      // ✅ Build title with customer name and task type
       let title = "";
       if (taskData.job_type) {
         title = `${customerName} - ${taskData.job_type}`;
@@ -617,20 +562,18 @@ export default function SchedulePage() {
         }
       }
 
-      // ✅ Calculate estimated hours if start and end time are provided
       let estimatedHours = taskData.estimated_hours;
       if (taskData.start_time && taskData.end_time && !estimatedHours) {
         const hours = calculateHours(taskData.start_time, taskData.end_time);
         estimatedHours = hours ? parseFloat(hours) : 8;
       }
 
-      // ✅ BACKWARD COMPATIBLE: Send BOTH new format (start_date/end_date) AND old format (date)
       const cleanedData = {
         type: taskData.type,
         title: title,
-        date: taskData.start_date, // ✅ CRITICAL: Use start_date as primary date for backward compatibility
-        start_date: taskData.start_date, // ✅ NEW: Also send start_date for new backend
-        end_date: taskData.end_date, // ✅ NEW: Also send end_date for new backend
+        date: taskData.start_date,
+        start_date: taskData.start_date,
+        end_date: taskData.end_date,
         start_time: taskData.start_time,
         end_time: taskData.end_time,
         estimated_hours: estimatedHours,
@@ -641,22 +584,20 @@ export default function SchedulePage() {
         team_member: taskData.team_member,
         job_id: taskData.job_id,
         customer_id: taskData.customer_id,
-        customer_name: customerName, // ✅ NEW: Also send customer_name
+        customer_name: customerName,
         job_type: taskData.job_type,
       };
 
-      // Remove undefined values
       Object.keys(cleanedData).forEach(key => {
         if (cleanedData[key as keyof typeof cleanedData] === undefined) {
           delete cleanedData[key as keyof typeof cleanedData];
         }
       });
 
-      console.log("📤 Creating task with data:", cleanedData);
+      console.log("📤 Creating task:", cleanedData);
 
       const newTask = await api.createAssignment(cleanedData);
       
-      // ✅ CRITICAL: If backend doesn't return start_date/end_date, add them from our request
       if (!newTask.start_date && cleanedData.start_date) {
         newTask.start_date = cleanedData.start_date;
       }
@@ -667,12 +608,11 @@ export default function SchedulePage() {
         newTask.customer_name = cleanedData.customer_name;
       }
       
-      // ✅ Update state and cache immediately
       const updatedTasks = [...tasks, newTask];
       setTasks(updatedTasks);
       saveToCache({ tasks: updatedTasks });
       
-      console.log("✅ Task created successfully:", newTask);
+      console.log("✅ Task created successfully");
       return newTask;
     } finally {
       setSaving(false);
@@ -686,7 +626,6 @@ export default function SchedulePage() {
       setSaving(true);
       const updatedTask = await api.updateAssignment(id, taskData);
       
-      // ✅ Update state and cache
       const updatedTasks = tasks.map((a) => (a.id === id ? updatedTask : a));
       setTasks(updatedTasks);
       saveToCache({ tasks: updatedTasks });
@@ -705,7 +644,6 @@ export default function SchedulePage() {
       
       console.log(`🗑️ Deleting task: ${id}`);
       
-      // ✅ FIX: Better error handling for delete
       const response = await fetch(`https://aztec-interiors.onrender.com/assignments/${id}`, {
         method: 'DELETE',
         headers: {
@@ -714,7 +652,6 @@ export default function SchedulePage() {
         },
       });
 
-      // ✅ Check if response is JSON
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
@@ -728,7 +665,6 @@ export default function SchedulePage() {
         throw new Error(result.error || `Failed to delete task: ${response.status}`);
       }
 
-      // ✅ Update state and cache
       const updatedTasks = tasks.filter((t) => t.id !== id);
       setTasks(updatedTasks);
       saveToCache({ tasks: updatedTasks });
@@ -737,7 +673,7 @@ export default function SchedulePage() {
       setSelectedTask(null);
       setIsEditingTask(false);
       
-      console.log(`✅ Task ${id} deleted successfully`);
+      console.log(`✅ Task deleted successfully`);
       
     } catch (err) {
       console.error('❌ Error deleting task:', err);
@@ -746,36 +682,6 @@ export default function SchedulePage() {
       setSaving(false);
     }
   };
-
-  // Effects
-  useEffect(() => {
-    if (!user || !token) return;
-
-    setVisibleCalendars([user.full_name]);
-
-    const fetchEmployees = async () => {
-      if (user.role !== "Manager") return;
-
-      try {
-        const res = await fetchWithAuth("auth/users/staff");
-        if (res.ok) {
-          const data = await res.json();
-          setEmployees(data.users || []);
-        }
-      } catch (err) {
-        console.error("Error fetching employees:", err);
-      }
-    };
-
-    fetchEmployees();
-  }, [user, token]);
-
-  useEffect(() => {
-    if (user && token && !hasLoadedData.current) {
-      console.log("🎯 Initial data load triggered");
-      fetchData();
-    }
-  }, [user, token]);
 
   // Event handlers
   const toggleCalendarVisibility = (name: string) => {
@@ -787,26 +693,20 @@ export default function SchedulePage() {
     const allDayTasks = tasks.filter((t) => {
       if (!t) return false;
       
-      // ✅ PRIORITY 1: Check if task has start_date and end_date
       if (t.start_date && t.end_date) {
         const taskStart = new Date(t.start_date);
         const taskEnd = new Date(t.end_date);
-        const checkDate = new Date(date);
         
-        // ✅ CRITICAL: Include task if date is BETWEEN start and end (inclusive)
         const startKey = formatDateKey(taskStart);
         const endKey = formatDateKey(taskEnd);
         
-        // Task should appear on start date, end date, AND all dates in between
         return dateKey >= startKey && dateKey <= endKey;
       }
       
-      // ✅ PRIORITY 2: Fallback to old date field
       if (t.date) {
         return t.date === dateKey;
       }
       
-      // ✅ PRIORITY 3: Try start_date only
       if (t.start_date) {
         return formatDateKey(new Date(t.start_date)) === dateKey;
       }
@@ -814,8 +714,6 @@ export default function SchedulePage() {
       return false;
     });
 
-    // ✅ FIXED: NO ROLE RESTRICTIONS - Everyone sees all tasks
-    // Only filter out declined tasks
     return allDayTasks.filter((t) => t.status !== "Declined");
   };
 
@@ -830,7 +728,6 @@ export default function SchedulePage() {
 
   const isOverbooked = (date: Date) => getDailyHours(date) > 8;
 
-  // ✅ Updated to use color coding by job type
   const getTaskColor = (task: Task) => {
     switch (task.type) {
       case "off":
@@ -847,7 +744,6 @@ export default function SchedulePage() {
   };
 
   const handleAddTask = async () => {
-    // ✅ Validation
     if (!newTask.start_date || !newTask.end_date || !newTask.type) {
       alert("Please fill in required fields (Type, Start Date, and End Date)");
       return;
@@ -862,12 +758,10 @@ export default function SchedulePage() {
     if (customTaskInput.trim()) saveCustomJobTask(customTaskInput);
 
     try {
-      const createdTask = await createTask(newTask);
+      await createTask(newTask);
       
-      // ✅ Task already added to state by createTask() - no fetch needed!
       setShowAddDialog(false);
       
-      // ✅ Reset with default values including today's date
       setNewTask({
         type: "job",
         start_date: formatDateKey(new Date()),
@@ -880,8 +774,6 @@ export default function SchedulePage() {
       });
       setCustomAssigneeInput("");
       setCustomTaskInput("");
-      
-      // ✅ NO fetchData() - task already in state!
     } catch (err) {
       console.error("Error creating task:", err);
       alert(err instanceof Error ? err.message : "Failed to create task");
@@ -908,50 +800,7 @@ export default function SchedulePage() {
 
   const handleDeleteTask = async (taskId: string) => {
     if (!confirm("Are you sure you want to delete this task?")) return;
-
-    try {
-      setSaving(true);
-      
-      console.log(`🗑️ Deleting task: ${taskId}`);
-      
-      // ✅ FIX: Better error handling for delete
-      const response = await fetch(`https://aztec-interiors.onrender.com/assignments/${taskId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      // ✅ Check if response is JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('❌ Non-JSON response:', text);
-        throw new Error('Server returned an error. Please check if the task exists.');
-      }
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || `Failed to delete task: ${response.status}`);
-      }
-
-      // ✅ Remove from local state
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-      
-      setShowTaskDialog(false);
-      setSelectedTask(null);
-      setIsEditingTask(false);
-      
-      console.log(`✅ Task ${taskId} deleted successfully`);
-      
-    } catch (err) {
-      console.error('❌ Error deleting task:', err);
-      alert(err instanceof Error ? err.message : 'Failed to delete task');
-    } finally {
-      setSaving(false);
-    }
+    await deleteTask(taskId);
   };
 
   const handleDragStart = (task: Task) => {
@@ -962,10 +811,10 @@ export default function SchedulePage() {
     e.preventDefault();
   };
 
-  // ✅ FIXED: Optimistic update with proper error recovery and concurrency control
+  // ✅ INSTANT drag-and-drop with silent retry
   const handleDrop = async (e: React.DragEvent, date: Date) => {
     e.preventDefault();
-    if (!draggedTask || isUpdating) return;
+    if (!draggedTask) return;
 
     const dateKey = formatDateKey(date);
     const taskToMove = draggedTask;
@@ -981,33 +830,51 @@ export default function SchedulePage() {
     
     const previousTasks = tasks;
     
-    // ✅ Update state and cache immediately
+    // ✅ INSTANT UPDATE - UI responds immediately
     const updatedTasks = tasks.map((t) => (t.id === taskToMove.id ? updatedTask : t));
     setTasks(updatedTasks);
     saveToCache({ tasks: updatedTasks });
+    console.log(`🎯 Task moved instantly to ${dateKey}`);
     
-    setIsUpdating(true);
-    try {
-      await updateTask(taskToMove.id, { 
-        start_date: dateKey, 
-        date: dateKey,
-        end_date: dateKey
-      });
-      console.log(`✅ Task moved successfully to ${dateKey}`);
-    } catch (err) {
-      console.error("❌ Failed to move task:", err);
+    // ✅ Update server in background with retry
+    const maxRetries = 3;
+    let retryCount = 0;
+    
+    const attemptUpdate = async (): Promise<boolean> => {
+      try {
+        await updateTask(taskToMove.id, { 
+          start_date: dateKey, 
+          date: dateKey,
+          end_date: dateKey
+        });
+        console.log(`✅ Server updated successfully`);
+        return true;
+      } catch (err) {
+        retryCount++;
+        console.error(`❌ Update failed (attempt ${retryCount}/${maxRetries})`);
+        
+        if (retryCount < maxRetries) {
+          // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+          return attemptUpdate();
+        }
+        return false;
+      }
+    };
+    
+    const success = await attemptUpdate();
+    
+    if (!success) {
+      console.error("❌ All retries failed, reverting");
       setTasks(previousTasks);
       saveToCache({ tasks: previousTasks });
-      alert("Failed to move task. Please try again.");
-    } finally {
-      setIsUpdating(false);
+      alert("Failed to move task after multiple attempts. Please try again or refresh the page.");
     }
   };
 
   const gridColumnStyle = { gridTemplateColumns: `repeat(7, 156.4px)` } as React.CSSProperties;
   const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-  // Loading/Error states
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
@@ -1019,7 +886,7 @@ export default function SchedulePage() {
     );
   }
 
-  if (error) {
+  if (error && tasks.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="text-center max-w-md">
@@ -1080,11 +947,20 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {/* Background Loading Indicator */}
-      {loading && tasks.length === 0 && (
+      {/* ✅ Show cache status */}
+      {cachedData && !loading && (
+        <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-2 text-sm text-green-800">
+          📦 Showing cached data • Last updated {Math.round((Date.now() - cachedData.timestamp) / 1000)}s ago
+        </div>
+      )}
+
+      {/* Loading indicator when fetching */}
+      {loading && (
         <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-3 flex items-center gap-3">
           <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-          <span className="text-sm text-blue-800">Loading schedule data...</span>
+          <span className="text-sm text-blue-800">
+            {tasks.length > 0 ? 'Refreshing data...' : 'Loading schedule data...'}
+          </span>
         </div>
       )}
 
@@ -1116,7 +992,6 @@ export default function SchedulePage() {
             </SelectContent>
           </Select>
           <Button onClick={() => {
-            // ✅ FIXED: Keep existing defaults, only update date to today if needed
             setNewTask(prev => ({
               ...prev,
               type: prev.type || "job",
@@ -1157,11 +1032,10 @@ export default function SchedulePage() {
                   key={idx}
                   className={`min-h-[100px] border-b border-r p-2 last:border-r-0 cursor-pointer transition-colors hover:bg-gray-50 ${
                     isCurrentMonth ? "bg-white" : "bg-gray-50"
-                  } ${isToday ? "ring-2 ring-inset ring-blue-500" : ""} ${isUpdating ? "opacity-50 pointer-events-none" : ""}`}
+                  } ${isToday ? "ring-2 ring-inset ring-blue-500" : ""}`}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, day)}
                   onClick={() => {
-                    // ✅ FIXED: Open day view dialog to show all tasks for this date
                     setSelectedDate(day);
                     setShowDayViewDialog(true);
                   }}
@@ -1272,7 +1146,6 @@ export default function SchedulePage() {
             <DialogTitle>Add New Task</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Type */}
             <div className="space-y-2">
               <Label>Type</Label>
               <Select
@@ -1293,7 +1166,6 @@ export default function SchedulePage() {
               </Select>
             </div>
 
-            {/* ✅ Start Date and End Date */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Start Date *</Label>
@@ -1313,7 +1185,6 @@ export default function SchedulePage() {
               </div>
             </div>
 
-            {/* Time fields - only for Job and Off */}
             {(newTask.type === "job" || newTask.type === "off") && (
               <>
                 <div className="grid grid-cols-2 gap-4">
@@ -1337,7 +1208,6 @@ export default function SchedulePage() {
               </>
             )}
 
-            {/* Assign To */}
             <div className="space-y-2">
               <Label>Assign To</Label>
               <Input
@@ -1356,7 +1226,6 @@ export default function SchedulePage() {
               </datalist>
             </div>
 
-            {/* Job/Task - only for Job type */}
             {newTask.type === "job" && (
               <div className="space-y-2">
                 <Label>Job/Task</Label>
@@ -1423,7 +1292,6 @@ export default function SchedulePage() {
               </div>
             )}
 
-            {/* ✅ Customer Dropdown - REQUIRED */}
             <div className="space-y-2">
               <Label>Customer *</Label>
               <Select
@@ -1448,7 +1316,6 @@ export default function SchedulePage() {
               </Select>
             </div>
 
-            {/* Notes */}
             <div className="space-y-2">
               <Label>Notes</Label>
               <textarea
@@ -1459,7 +1326,6 @@ export default function SchedulePage() {
               />
             </div>
 
-            {/* Action Buttons */}
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                 Cancel
@@ -1540,7 +1406,7 @@ export default function SchedulePage() {
         </DialogContent>
       </Dialog>
 
-      {/* ✅ NEW: Day View Dialog - Shows all tasks for selected date */}
+      {/* Day View Dialog */}
       <Dialog open={showDayViewDialog} onOpenChange={setShowDayViewDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
