@@ -1,16 +1,10 @@
-// export default function Page() {
-//   return <>Coming Soon</>;
-// }
-
-
-
 "use client";
 
-import { OperationalCards } from "./OperationalCards";
-import { OverviewCards } from "./OverviewCards";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { MiniCalendar } from "@/components/dashboard/MiniCalendar";
 import { RecentLeadsTable } from "./RecentLeadsTable";
+import { OperationalCards } from "./crm/_components/operational-cards";
+import { OverviewCards } from "./crm/_components/overview-cards";
 
 export default function Page() {
   return (

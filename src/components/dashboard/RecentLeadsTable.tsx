@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Eye, FileDown } from "lucide-react";
 import { fetchWithAuth } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { generateRecentLeadsData } from "./crm.config";
+import { generateRecentLeadsData } from "./crm/_components/crm.config"; // ✅ Updated path
 
 export function RecentLeadsTable() {
   const router = useRouter();
@@ -53,9 +53,9 @@ export function RecentLeadsTable() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/customers")}>
               <Eye className="mr-2 h-4 w-4" />
-              View
+              View All
             </Button>
             <Button variant="outline" size="sm">
               <FileDown className="mr-2 h-4 w-4" />
@@ -72,24 +72,32 @@ export function RecentLeadsTable() {
                 <th className="text-left p-3 text-sm font-medium">Name</th>
                 <th className="text-left p-3 text-sm font-medium">Email</th>
                 <th className="text-left p-3 text-sm font-medium">Phone</th>
-                <th className="text-left p-3 text-sm font-medium">Salesperson</th>
-                <th className="text-left p-3 text-sm font-medium">Date Added</th>
+                <th className="text-left p-3 text-sm font-medium">Source</th>
+                <th className="text-left p-3 text-sm font-medium">Added</th>
               </tr>
             </thead>
             <tbody>
-              {leads.map((lead) => (
-                <tr
-                  key={lead.id}
-                  className="border-b hover:bg-gray-50 cursor-pointer"
-                  onClick={() => router.push(`/dashboard/customers/${lead.id}`)}
-                >
-                  <td className="p-3 text-sm">{lead.name}</td>
-                  <td className="p-3 text-sm">{lead.email}</td>
-                  <td className="p-3 text-sm">{lead.phone}</td>
-                  <td className="p-3 text-sm">{lead.source}</td>
-                  <td className="p-3 text-sm">{lead.lastActivity}</td>
+              {leads.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-6 text-center text-gray-500">
+                    No recent leads found
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                leads.map((lead) => (
+                  <tr
+                    key={lead.id}
+                    className="border-b hover:bg-gray-50 cursor-pointer"
+                    onClick={() => router.push(`/dashboard/customers/${lead.id}`)}
+                  >
+                    <td className="p-3 text-sm">{lead.name}</td>
+                    <td className="p-3 text-sm">{lead.email}</td>
+                    <td className="p-3 text-sm">{lead.phone}</td>
+                    <td className="p-3 text-sm">{lead.source}</td>
+                    <td className="p-3 text-sm">{lead.lastActivity}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
