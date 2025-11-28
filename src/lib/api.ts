@@ -45,8 +45,8 @@ function deduplicateRequest<T>(key: string, requestFn: () => Promise<T>): Promis
   return promise;
 }
 
-// ✅ OPTIMISTIC TIMEOUT: Reduced from 15s to 8s for better UX
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 8000) {
+// ✅ INCREASED TIMEOUT: 30s for slow Render backend (handles cold starts)
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 30000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   
@@ -60,7 +60,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout 
   } catch (error: any) {
     clearTimeout(id);
     if (error.name === 'AbortError') {
-      throw new Error(`Request timeout after ${timeout}ms`);
+      throw new Error(`Request timeout after ${timeout}ms - server is taking too long to respond`);
     }
     throw error;
   }
@@ -111,11 +111,11 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
   };
 
   try {
-    // ✅ Reduced timeout to 8s for faster feedback
+    // ✅ Increased timeout to 30s for Render cold starts
     const response = await fetchWithTimeout(url, {
       ...options,
       headers,
-    }, 8000);
+    }, 30000);
 
     // ✅ DON'T logout on 401 - mock auth setup
     if (response.status === 401) {
@@ -124,9 +124,9 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
 
     return response;
   } catch (error: any) {
-    if (error.name === 'AbortError') {
-      console.error("⏱️ Request timeout - backend not responding");
-      throw new Error("Request timeout - please try again");
+    if (error.name === 'AbortError' || error.message.includes('timeout')) {
+      console.error("⏱️ Request timeout - backend not responding (likely cold start)");
+      throw new Error("Request timeout - the server is taking too long. Please try again.");
     }
     throw error;
   }
@@ -305,21 +305,33 @@ export const api = {
   async createAssignment(assignmentData: any) {
     try {
       console.log("📝 Creating assignment:", assignmentData);
+      console.log("⏳ This may take up to 30 seconds if the server is waking up...");
+      
       const response = await fetchWithAuth("/assignments", {
         method: "POST",
         body: JSON.stringify(assignmentData),
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create assignment");
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to create assignment: ${response.status}`);
+        } else {
+          const errorText = await response.text();
+          console.error("Non-JSON error response:", errorText);
+          throw new Error(`Server error: ${response.status}. Please try again.`);
+        }
       }
       
       const result = await response.json();
-      console.log("✅ Assignment created:", result.assignment.id);
-      return result.assignment;
-    } catch (error) {
+      console.log("✅ Assignment created:", result.assignment?.id || result.id);
+      return result.assignment || result;
+    } catch (error: any) {
       console.error("❌ createAssignment failed:", error);
+      if (error.message.includes('timeout')) {
+        throw new Error('The server is taking too long to respond. This might be because the server is waking up. Please try again in a moment.');
+      }
       throw error;
     }
   },
@@ -333,13 +345,18 @@ export const api = {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update assignment");
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to update assignment");
+        } else {
+          throw new Error(`Server error: ${response.status}`);
+        }
       }
       
       const result = await response.json();
-      console.log("✅ Assignment updated:", result.assignment.id);
-      return result.assignment;
+      console.log("✅ Assignment updated:", result.assignment?.id || result.id);
+      return result.assignment || result;
     } catch (error) {
       console.error("❌ updateAssignment failed:", error);
       throw error;
@@ -354,8 +371,13 @@ export const api = {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete assignment");
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to delete assignment");
+        } else {
+          throw new Error(`Server error: ${response.status}`);
+        }
       }
       
       console.log("✅ Assignment deleted");
