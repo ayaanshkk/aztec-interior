@@ -40,6 +40,55 @@ import {
 } from "lucide-react";
 import { fetchWithAuth, api } from "@/lib/api";
 
+
+// Cache utilities
+const CACHE_KEY = 'schedule_cache';
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+interface CachedData {
+  tasks: Task[];
+  jobs: Job[];
+  customers: Customer[];
+  timestamp: number;
+}
+
+const saveToCache = (data: Partial<CachedData>) => {
+  try {
+    const existing = getFromCache();
+    const updated = {
+      ...existing,
+      ...data,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
+    console.log('💾 Saved to cache:', Object.keys(data));
+  } catch (err) {
+    console.error('Failed to save cache:', err);
+  }
+};
+
+const getFromCache = (): CachedData | null => {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (!cached) return null;
+    
+    const data = JSON.parse(cached) as CachedData;
+    const age = Date.now() - data.timestamp;
+    
+    if (age > CACHE_DURATION) {
+      console.log('⏰ Cache expired');
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    
+    console.log('✅ Loaded from cache (age: ' + Math.round(age / 1000) + 's)');
+    return data;
+  } catch (err) {
+    console.error('Failed to load cache:', err);
+    return null;
+  }
+};
+
 // Interfaces
 interface Employee {
   id: number;
@@ -143,6 +192,7 @@ export default function SchedulePage() {
   const hasLoadedData = useRef(false);
 
   const [currentDate, setCurrentDate] = useState(new Date());
+  const cachedData = getFromCache();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -462,12 +512,21 @@ export default function SchedulePage() {
         })
       ]);
       
+      // ✅ Save to cache immediately
+      const newData = {
+        tasks: Array.isArray(tasksData) ? tasksData : [],
+        jobs: Array.isArray(jobsData) ? jobsData : [],
+        customers: Array.isArray(customersData) ? customersData : [],
+      };
+      
+      saveToCache(newData);
+      
       // Update state
-      setTasks(Array.isArray(tasksData) ? tasksData : []);
-      setAvailableJobs(Array.isArray(jobsData) ? jobsData : []);
-      setCustomers(Array.isArray(customersData) ? customersData : []);
+      setTasks(newData.tasks);
+      setAvailableJobs(newData.jobs);
+      setCustomers(newData.customers);
 
-      console.log("✅ Data loaded successfully");
+      console.log("✅ Data loaded and cached successfully");
     } catch (err) {
       console.error("❌ Error in fetchData:", err);
       setError(err instanceof Error ? err.message : "Failed to load schedule data");
@@ -608,7 +667,11 @@ export default function SchedulePage() {
         newTask.customer_name = cleanedData.customer_name;
       }
       
-      setTasks((prev) => [...prev, newTask]);
+      // ✅ Update state and cache immediately
+      const updatedTasks = [...tasks, newTask];
+      setTasks(updatedTasks);
+      saveToCache({ tasks: updatedTasks });
+      
       console.log("✅ Task created successfully:", newTask);
       return newTask;
     } finally {
@@ -622,7 +685,12 @@ export default function SchedulePage() {
     try {
       setSaving(true);
       const updatedTask = await api.updateAssignment(id, taskData);
-      setTasks((prev) => prev.map((a) => (a.id === id ? updatedTask : a)));
+      
+      // ✅ Update state and cache
+      const updatedTasks = tasks.map((a) => (a.id === id ? updatedTask : a));
+      setTasks(updatedTasks);
+      saveToCache({ tasks: updatedTasks });
+      
       return updatedTask;
     } finally {
       setSaving(false);
@@ -634,8 +702,112 @@ export default function SchedulePage() {
 
     try {
       setSaving(true);
-      await api.deleteAssignment(id);
-      setTasks((prev) => prev.filter((a) => a.id !== id));
+      
+      console.log(`🗑️ Deleting task: ${id}`);
+      
+      // ✅ FIX: Better error handling for delete
+      const response = await fetch(`https://aztec-interiors.onrender.com/assignments/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // ✅ Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ Non-JSON response:', text);
+        throw new Error('Server returned an error. Please check if the task exists.');
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || `Failed to delete task: ${response.status}`);
+      }
+
+      // ✅ Update state and cache
+      const updatedTasks = tasks.filter((t) => t.id !== id);
+      setTasks(updatedTasks);
+      saveToCache({ tasks: updatedTasks });
+      
+      setShowTaskDialog(false);
+      setSelectedTask(null);
+      setIsEditingTask(false);
+      
+      console.log(`✅ Task ${id} deleted successfully`);
+      
+    } catch (err) {
+      console.error('❌ Error deleting task:', err);
+      alert(err instanceof Error ? err.message : 'Failed to delete task');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateTask = async (id: string, taskData: Partial<Task>) => {
+    if (!token) throw new Error("Not authenticated");
+
+    try {
+      setSaving(true);
+      const updatedTask = await api.updateAssignment(id, taskData);
+      
+      // ✅ Update state and cache
+      const updatedTasks = tasks.map((a) => (a.id === id ? updatedTask : a));
+      setTasks(updatedTasks);
+      saveToCache({ tasks: updatedTasks });
+      
+      return updatedTask;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteTask = async (id: string) => {
+    if (!token) throw new Error("Not authenticated");
+
+    try {
+      setSaving(true);
+      
+      console.log(`🗑️ Deleting task: ${id}`);
+      
+      const response = await fetch(`https://aztec-interiors.onrender.com/assignments/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('❌ Non-JSON response:', text);
+        throw new Error('Server returned an error. Please check if the task exists.');
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || `Failed to delete task: ${response.status}`);
+      }
+
+      // ✅ Update state and cache
+      const updatedTasks = tasks.filter((t) => t.id !== id);
+      setTasks(updatedTasks);
+      saveToCache({ tasks: updatedTasks });
+      
+      setShowTaskDialog(false);
+      setSelectedTask(null);
+      setIsEditingTask(false);
+      
+      console.log(`✅ Task ${id} deleted successfully`);
+      
+    } catch (err) {
+      console.error('❌ Error deleting task:', err);
+      alert(err instanceof Error ? err.message : 'Failed to delete task');
     } finally {
       setSaving(false);
     }
@@ -859,15 +1031,13 @@ export default function SchedulePage() {
   // ✅ FIXED: Optimistic update with proper error recovery and concurrency control
   const handleDrop = async (e: React.DragEvent, date: Date) => {
     e.preventDefault();
-    if (!draggedTask || isUpdating) return; // ✅ Prevent concurrent updates
+    if (!draggedTask || isUpdating) return;
 
     const dateKey = formatDateKey(date);
-    const taskToMove = draggedTask; // Store reference before clearing
+    const taskToMove = draggedTask;
     
-    // Clear dragged task immediately to prevent duplicate drops
     setDraggedTask(null);
     
-    // ✅ OPTIMISTIC UPDATE: Update UI immediately
     const updatedTask = {
       ...taskToMove,
       start_date: dateKey,
@@ -875,13 +1045,13 @@ export default function SchedulePage() {
       end_date: dateKey
     };
     
-    // Store original state for rollback
     const previousTasks = tasks;
     
-    // ✅ Update state immediately - instant visual feedback!
-    setTasks((prev) => prev.map((t) => (t.id === taskToMove.id ? updatedTask : t)));
+    // ✅ Update state and cache immediately
+    const updatedTasks = tasks.map((t) => (t.id === taskToMove.id ? updatedTask : t));
+    setTasks(updatedTasks);
+    saveToCache({ tasks: updatedTasks });
     
-    // ✅ Then sync with backend in background (no reload!)
     setIsUpdating(true);
     try {
       await updateTask(taskToMove.id, { 
@@ -892,8 +1062,8 @@ export default function SchedulePage() {
       console.log(`✅ Task moved successfully to ${dateKey}`);
     } catch (err) {
       console.error("❌ Failed to move task:", err);
-      // ✅ Rollback to previous state instead of fetching
       setTasks(previousTasks);
+      saveToCache({ tasks: previousTasks });
       alert("Failed to move task. Please try again.");
     } finally {
       setIsUpdating(false);
