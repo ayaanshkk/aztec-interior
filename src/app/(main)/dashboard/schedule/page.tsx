@@ -679,56 +679,6 @@ export default function SchedulePage() {
     }
   };
 
-  const deleteTask = async (id: string) => {
-    if (!token) throw new Error("Not authenticated");
-
-    try {
-      setSaving(true);
-      
-      console.log(`🗑️ Deleting task: ${id}`);
-      
-      // ✅ FIX: Better error handling for delete
-      const response = await fetch(`https://aztec-interiors.onrender.com/assignments/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      // ✅ Check if response is JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('❌ Non-JSON response:', text);
-        throw new Error('Server returned an error. Please check if the task exists.');
-      }
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || `Failed to delete task: ${response.status}`);
-      }
-
-      // ✅ Update state and cache
-      const updatedTasks = tasks.filter((t) => t.id !== id);
-      setTasks(updatedTasks);
-      saveToCache({ tasks: updatedTasks });
-      
-      setShowTaskDialog(false);
-      setSelectedTask(null);
-      setIsEditingTask(false);
-      
-      console.log(`✅ Task ${id} deleted successfully`);
-      
-    } catch (err) {
-      console.error('❌ Error deleting task:', err);
-      alert(err instanceof Error ? err.message : 'Failed to delete task');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const updateTask = async (id: string, taskData: Partial<Task>) => {
     if (!token) throw new Error("Not authenticated");
 
@@ -755,6 +705,7 @@ export default function SchedulePage() {
       
       console.log(`🗑️ Deleting task: ${id}`);
       
+      // ✅ FIX: Better error handling for delete
       const response = await fetch(`https://aztec-interiors.onrender.com/assignments/${id}`, {
         method: 'DELETE',
         headers: {
@@ -763,6 +714,7 @@ export default function SchedulePage() {
         },
       });
 
+      // ✅ Check if response is JSON
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
