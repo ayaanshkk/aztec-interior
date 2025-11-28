@@ -55,11 +55,12 @@ export default function CreateProjectPage() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
 
+  // Get customer info from URL params (if coming from customer details page)
   const customerIdParam = searchParams.get("customerId") || "";
   const customerNameParam = searchParams.get("customerName") || "";
 
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
   
   const [formData, setFormData] = useState<FormData>({
     project_name: "",
@@ -73,22 +74,47 @@ export default function CreateProjectPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch customers on mount
+  // Fetch customers ONLY if no customer ID in URL (standalone mode)
   useEffect(() => {
+    if (customerIdParam) {
+      // Customer already selected from URL, no need to fetch all customers
+      return;
+    }
+
     const fetchCustomers = async () => {
       try {
         setLoadingCustomers(true);
+        console.log("🔄 Fetching customers...");
+        
         const response = await fetchWithAuth("customers");
+        console.log("📡 Response status:", response.status);
+        
         if (response.ok) {
           const data = await response.json();
-          setCustomers(data.customers || []);
-          console.log("✅ Loaded customers:", data.customers?.length || 0);
+          console.log("📦 Raw data:", data);
+          
+          // Handle different possible response structures
+          let customersList: Customer[] = [];
+          if (Array.isArray(data)) {
+            customersList = data;
+          } else if (data.customers && Array.isArray(data.customers)) {
+            customersList = data.customers;
+          } else if (data.data && Array.isArray(data.data)) {
+            customersList = data.data;
+          }
+          
+          console.log("✅ Customers loaded:", customersList.length);
+          setCustomers(customersList);
+          
+          if (customersList.length === 0) {
+            setError("No customers found. Please create a customer first.");
+          }
         } else {
-          console.error("Failed to fetch customers");
-          setError("Failed to load customers");
+          console.error("❌ Failed to fetch customers:", response.status);
+          setError(`Failed to load customers (${response.status})`);
         }
       } catch (err) {
-        console.error("Error fetching customers:", err);
+        console.error("❌ Error fetching customers:", err);
         setError("Error loading customers");
       } finally {
         setLoadingCustomers(false);
@@ -96,9 +122,9 @@ export default function CreateProjectPage() {
     };
 
     fetchCustomers();
-  }, []);
+  }, [customerIdParam]);
 
-  // Set default project name when customer changes
+  // Set default project name when customer or type changes
   useEffect(() => {
     if (formData.customer_id && customers.length > 0) {
       const selectedCustomer = customers.find(c => c.id === formData.customer_id);
@@ -114,7 +140,7 @@ export default function CreateProjectPage() {
         project_name: `${customerNameParam}'s Project (${formData.project_type})`,
       }));
     }
-  }, [formData.customer_id, formData.project_type, customers, customerNameParam]);
+  }, [formData.customer_id, formData.project_type, customers, customerNameParam, formData.project_name]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -125,7 +151,7 @@ export default function CreateProjectPage() {
     setFormData((prev) => {
       const newFormData = { ...prev, [name]: value };
 
-      // Update project name default if project type changes
+      // Update project name if project type changes
       if (name === "project_type") {
         const currentCustomerId = prev.customer_id || customerIdParam;
         const customer = customers.find(c => c.id === currentCustomerId);
@@ -164,8 +190,9 @@ export default function CreateProjectPage() {
       return;
     }
 
-    // Validate customer selection
+    // Get the customer ID (either from form or URL param)
     const customerId = formData.customer_id || customerIdParam;
+    
     if (!customerId) {
       setError("Please select a customer");
       setLoading(false);
@@ -173,22 +200,24 @@ export default function CreateProjectPage() {
     }
 
     const projectData = {
-      ...formData,
-      customer_id: customerId,
+      project_name: formData.project_name,
+      project_type: formData.project_type,
+      stage: formData.stage,
       date_of_measure: formData.date_of_measure ? format(formData.date_of_measure, "yyyy-MM-dd") : null,
+      notes: formData.notes,
+      customer_id: customerId,
       created_by: user?.id,
     };
 
-    // Clean up empty notes field and customer_id from spread
+    // Clean up empty notes field
     if (!projectData.notes) delete projectData.notes;
-    delete (projectData as any).customer_id; // Remove from top level since we're adding it separately
 
     try {
       console.log("📤 Sending project data:", projectData);
       
       const response = await fetchWithAuth(`customers/${customerId}/projects`, {
         method: "POST",
-        body: JSON.stringify({ ...projectData, customer_id: customerId }),
+        body: JSON.stringify(projectData),
       });
 
       console.log("📡 Response status:", response.status);
@@ -201,8 +230,8 @@ export default function CreateProjectPage() {
           throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`);
         } else {
           const htmlText = await response.text();
-          console.error("❌ Server returned HTML instead of JSON:", htmlText.substring(0, 500));
-          throw new Error(`Server error (${response.status}): The server encountered an error. Please check if the API endpoint exists and is working correctly.`);
+          console.error("❌ Server returned HTML:", htmlText.substring(0, 500));
+          throw new Error(`Server error (${response.status}): The server encountered an error.`);
         }
       }
 
@@ -212,18 +241,12 @@ export default function CreateProjectPage() {
         alert(`Project "${data.project?.project_name || formData.project_name}" created successfully!`);
         router.push(`/dashboard/customers/${customerId}`);
       } else {
-        console.error("❌ Response is not JSON:", contentType);
         throw new Error("Server returned an invalid response format");
       }
       
     } catch (err) {
       console.error("❌ Error creating project:", err);
-      
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("Network error: Could not connect to the API server. Please check your connection.");
-      }
+      setError(err instanceof Error ? err.message : "Failed to create project");
     } finally {
       setLoading(false);
     }
@@ -246,6 +269,7 @@ export default function CreateProjectPage() {
       </div>
 
       <div className="mx-auto max-w-4xl p-8">
+        {/* Show customer info if pre-selected */}
         {selectedCustomerName && (
           <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
             <h2 className="text-lg font-medium text-blue-800">
@@ -258,7 +282,7 @@ export default function CreateProjectPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6 rounded-xl bg-gray-50 p-6 shadow">
-          {/* Customer Selection - Show only if no customer ID in URL */}
+          {/* Customer Selection - Show ONLY if no customer ID in URL */}
           {!customerIdParam && (
             <div className="space-y-2">
               <label htmlFor="customer" className="text-sm font-medium text-gray-700">
@@ -286,8 +310,10 @@ export default function CreateProjectPage() {
                   Loading customers...
                 </p>
               )}
-              {!loadingCustomers && customers.length === 0 && (
-                <p className="text-xs text-red-500">No customers found. Please create a customer first.</p>
+              {!loadingCustomers && !customerIdParam && customers.length === 0 && (
+                <p className="text-xs text-red-500">
+                  No customers found. Please create a customer first.
+                </p>
               )}
             </div>
           )}
@@ -402,7 +428,11 @@ export default function CreateProjectPage() {
             />
           </div>
 
-          {error && <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+          {error && (
+            <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+              {error}
+            </div>
+          )}
 
           <Button type="submit" className="w-full" disabled={loading || loadingCustomers}>
             {loading ? (
