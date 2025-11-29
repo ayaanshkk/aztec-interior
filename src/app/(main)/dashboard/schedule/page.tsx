@@ -298,14 +298,14 @@ export default function SchedulePage() {
       try {
         setCustomAssignees(JSON.parse(savedAssignees));
       } catch (e) {
-        error('Failed to parse custom assignees:', e);
+        console.error('Failed to parse custom assignees:', e);
       }
     }
     if (savedJobTasks) {
       try {
         setCustomJobTasks(JSON.parse(savedJobTasks));
       } catch (e) {
-        error('Failed to parse custom job tasks:', e);
+        console.error('Failed to parse custom job tasks:', e);
       }
     }
   }, []);
