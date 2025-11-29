@@ -449,10 +449,10 @@ export default function SchedulePage() {
       if (user.role !== "Manager") return;
 
       try {
-        const response = await api.getUsers();
+        const response = await api.getAllUsers();  // ✅ Use getAllUsers
         setEmployees(response.users || []);
       } catch (err) {
-        error("Error fetching employees:", err);
+        console.error("Error fetching employees:", err);  // ✅ Fixed error logging
       }
     };
 
