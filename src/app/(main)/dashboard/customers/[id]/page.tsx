@@ -49,6 +49,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { api, fetchParallel, cacheUtils } from "@/lib/api";
 
+const log = (...args: any[]) => {
+  if (process.env.NODE_ENV === 'development') console.log(...args);
+};
+
 // ... (keeping all your existing interfaces the same)
 interface Project {
   id: string;
