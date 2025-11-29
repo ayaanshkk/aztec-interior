@@ -144,7 +144,8 @@ export const getSidebarItems = (userRole: string, notificationCount?: number): N
   return allSidebarItems
     .map((group) => ({
       ...group,
-      items: group.items
+      // ✅ FIX: Add safety check for group.items
+      items: Array.isArray(group.items) ? group.items
         .filter((item) => {
           // If no roles defined, show to everyone
           if (!item.roles || item.roles.length === 0) return true;
@@ -160,7 +161,7 @@ export const getSidebarItems = (userRole: string, notificationCount?: number): N
             };
           }
           return item;
-        }),
+        }) : [],
     }))
     .filter((group) => group.items.length > 0); // Remove empty groups
 };
