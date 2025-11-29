@@ -14,6 +14,7 @@ import {
   Upload,
   Package,
   Download,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -440,6 +441,52 @@ export default function ChecklistViewPage() {
     }
   };
 
+  const handleGenerateQuote = async () => {
+    if (!formSubmissionId || !formData) return;
+    
+    const confirmGenerate = window.confirm(
+      `Generate a quotation from this ${formType} checklist?\n\nThis will automatically extract all materials and create a draft quote.`
+    );
+    
+    if (!confirmGenerate) return;
+
+    try {
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch(
+        `https://aztec-interiors.onrender.com/quotations/generate-from-checklist/${formSubmissionId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(
+          `✅ Quote generated successfully!\n\n` +
+          `Reference: ${data.reference_number}\n` +
+          `Items extracted: ${data.items_count}\n` +
+          `Checklist type: ${data.checklist_type}`
+        );
+        
+        // Open quote editor in new tab
+        window.open(
+          `/dashboard/quotes/${data.quotation_id}/edit?source=checklist`,
+          '_blank'
+        );
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        alert(`Failed to generate quote: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error generating quote:", error);
+      alert("Network error: Could not generate quote");
+    }
+  };
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !isEditing) return;
     setIsDrawing(true);
@@ -798,6 +845,17 @@ export default function ChecklistViewPage() {
                 </>
               ) : (
                 <>
+                  {/* NEW: Generate Quote Button */}
+                  {canEdit() && (
+                    <Button
+                      onClick={handleGenerateQuote}
+                      className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>Generate Quote</span>
+                    </Button>
+                  )}
+                  
                   {canEdit() && (
                     <Button
                       onClick={handleEdit}
