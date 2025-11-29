@@ -603,7 +603,7 @@ export default function SchedulePage() {
       log(`✅ Task deleted successfully`);
       
     } catch (err) {
-      error('❌ Error deleting task:', err);
+      console.error('❌ Error deleting task:', err);
       alert(err instanceof Error ? err.message : 'Failed to delete task');
     } finally {
       setSaving(false);
