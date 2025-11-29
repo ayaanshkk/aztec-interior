@@ -749,6 +749,12 @@ export default function ProjectDetailsPage() {
     setShowDeleteFormDialog(true);
   }, []);
 
+  const handleAddTask = useCallback(async () => {
+    // TODO: Implement task creation
+    console.log("Add task functionality not yet implemented");
+    alert("Task functionality coming soon!");
+  }, []);
+
   // // ✅ NEW: Confirm delete form
   // const handleConfirmDeleteForm = useCallback(async () => {
   //   if (!formToDelete || isDeletingForm) return;
