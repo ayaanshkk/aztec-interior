@@ -602,7 +602,7 @@ export default function EnhancedPipelinePage() {
     });
 
     if (unauthorizedMoves.length > 0) {
-      error("❌ Unauthorized moves detected");
+      console.error("❌ Unauthorized moves detected");
       alert("You don't have permission to move some of these items. Reverting changes.");
       return;
     }
