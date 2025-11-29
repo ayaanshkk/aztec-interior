@@ -509,43 +509,43 @@ export default function ProjectDetailsPage() {
     setShowDeleteFormDialog(true);
   }, []);
 
-  // ✅ NEW: Confirm delete form
-  const handleConfirmDeleteForm = useCallback(async () => {
-    if (!formToDelete || isDeletingForm) return;
+  // // ✅ NEW: Confirm delete form
+  // const handleConfirmDeleteForm = useCallback(async () => {
+  //   if (!formToDelete || isDeletingForm) return;
     
-    setIsDeletingForm(true);
-    const token = localStorage.getItem("auth_token");
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-    };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+  //   setIsDeletingForm(true);
+  //   const token = localStorage.getItem("auth_token");
+  //   const headers: HeadersInit = {
+  //     "Content-Type": "application/json",
+  //   };
+  //   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    try {
-      const res = await fetch(
-        `https://aztec-interior.onrender.com/form-submissions/${formToDelete.id}`,
-        { 
-          method: "DELETE", 
-          headers 
-        }
-      );
+  //   try {
+  //     const res = await fetch(
+  //       `https://aztec-interior.onrender.com/form-submissions/${formToDelete.id}`,
+  //       { 
+  //         method: "DELETE", 
+  //         headers 
+  //       }
+  //     );
 
-      if (res.ok) {
-        // Remove from state immediately
-        setForms((prev) => prev.filter((f) => f.id !== formToDelete.id));
-        setShowDeleteFormDialog(false);
-        setFormToDelete(null);
-        alert("Form deleted successfully!");
-      } else {
-        const err = await res.json().catch(() => ({ error: "Server error" }));
-        alert(`Failed to delete form: ${err.error}`);
-      }
-    } catch (e) {
-      console.error("Delete form error:", e);
-      alert("Network error: Could not delete form");
-    } finally {
-      setIsDeletingForm(false);
-    }
-  }, [formToDelete, isDeletingForm]);
+  //     if (res.ok) {
+  //       // Remove from state immediately
+  //       setForms((prev) => prev.filter((f) => f.id !== formToDelete.id));
+  //       setShowDeleteFormDialog(false);
+  //       setFormToDelete(null);
+  //       alert("Form deleted successfully!");
+  //     } else {
+  //       const err = await res.json().catch(() => ({ error: "Server error" }));
+  //       alert(`Failed to delete form: ${err.error}`);
+  //     }
+  //   } catch (e) {
+  //     console.error("Delete form error:", e);
+  //     alert("Network error: Could not delete form");
+  // ;  } finally {
+  //     setIsDeletingForm(false);
+  //   }
+  // }, [formToDelete, isDeletingForm])
 
   // Loading state with skeleton
   if (loading) {
