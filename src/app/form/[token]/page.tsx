@@ -580,7 +580,7 @@ export default function FormPage() {
 
 
   const OrderButton = ({ sectionTitle, onClick }: { sectionTitle: string; onClick: () => void }) => {
-    // Hide for Sales and HR
+    // ✅ Hide order button for Sales and HR roles
     if (userRole === "sales" || userRole === "hr") {
       return null;
     }
@@ -2125,7 +2125,7 @@ export default function FormPage() {
                     />
                   </div>
                   
-                  {/* ✅ NEW: Wrapped in space-y-3 container */}
+                  {/* ✅ CHANGED: Wrapped in space-y-3 container instead of just grid */}
                   <div className="space-y-3">
                     <div className="grid grid-cols-3 gap-3">
                       <div>
@@ -2158,7 +2158,7 @@ export default function FormPage() {
                       </div>
                     </div>
 
-                    {/* ✅ NEW: Additional Handles Section - Exact copy from Kitchen */}
+                    {/* ✅ NEW SECTION: Additional Handles - Copy from Kitchen */}
                     <div className="border-t pt-4">
                       <div className="mb-3 flex items-center justify-between">
                         <label className="text-sm font-bold text-gray-700">Handle Details (Additional Handles)</label>
