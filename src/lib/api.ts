@@ -98,6 +98,7 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
   const url = `${DATA_API_ROOT}${path.startsWith("/") ? "" : "/"}${path}`;
 
   console.log('📡 fetchWithAuth calling:', url);
+  console.log('🔑 Token:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN');
 
   if (!token) {
     console.error("❌ No auth token found - redirecting to login");
@@ -112,6 +113,7 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
   };
 
   try {
+    // ✅ Increased timeout to 30s for Render cold starts
     const response = await fetchWithTimeout(url, {
       ...options,
       headers,
@@ -128,7 +130,7 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
     return response;
   } catch (error: any) {
     if (error.name === 'AbortError' || error.message.includes('timeout')) {
-      console.error("⏱️ Request timeout - backend not responding");
+      console.error("⏱️ Request timeout - backend not responding (likely cold start)");
       throw new Error("Request timeout - the server is taking too long. Please try again.");
     }
     throw error;
@@ -137,12 +139,6 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
 
 // ✅ Helper to handle API responses gracefully
 async function handleApiResponse(response: Response) {
-  // For 401s, return empty data instead of throwing
-  if (response.status === 401) {
-    console.warn("⚠️ 401 response - returning empty data for mock auth");
-    return { data: [], error: "Backend authentication in progress" };
-  }
-
   if (response.ok) {
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
@@ -189,14 +185,17 @@ export const api = {
   },
 
   // DATA ENDPOINTS (use fetchWithAuth - calls Render backend)
+  // ✅ ALWAYS return arrays, never wrapper objects
   async getCustomers() {
     return deduplicateRequest('getCustomers', async () => {
       try {
         const response = await fetchWithAuth("/customers");
-        return await handleApiResponse(response);
+        const data = await handleApiResponse(response);
+        // ✅ Always return an array
+        return Array.isArray(data) ? data : (data.customers || []);
       } catch (error) {
-        console.warn("⚠️ getCustomers failed, returning empty data");
-        return { customers: [] };
+        console.warn("⚠️ getCustomers failed, returning empty array");
+        return [];
       }
     });
   },
@@ -205,10 +204,12 @@ export const api = {
     return deduplicateRequest('getJobs', async () => {
       try {
         const response = await fetchWithAuth("/jobs");
-        return await handleApiResponse(response);
+        const data = await handleApiResponse(response);
+        // ✅ Always return an array
+        return Array.isArray(data) ? data : (data.jobs || []);
       } catch (error) {
-        console.warn("⚠️ getJobs failed, returning empty data");
-        return { jobs: [] };
+        console.warn("⚠️ getJobs failed, returning empty array");
+        return [];
       }
     });
   },
@@ -217,10 +218,12 @@ export const api = {
     return deduplicateRequest('getPipeline', async () => {
       try {
         const response = await fetchWithAuth("/pipeline");
-        return await handleApiResponse(response);
+        const data = await handleApiResponse(response);
+        // ✅ Always return an array
+        return Array.isArray(data) ? data : (data.pipeline || []);
       } catch (error) {
-        console.warn("⚠️ getPipeline failed, returning empty data");
-        return { pipeline: [] };
+        console.warn("⚠️ getPipeline failed, returning empty array");
+        return [];
       }
     });
   },
@@ -254,11 +257,12 @@ export const api = {
         }
         
         const data = await response.json();
-        console.log(`✅ Got ${data.length} assignments`);
-        return data;
+        console.log(`✅ Got ${Array.isArray(data) ? data.length : 0} assignments`);
+        // ✅ Always return an array
+        return Array.isArray(data) ? data : (data.assignments || []);
       } catch (error) {
         console.error("❌ getAssignments failed:", error);
-        throw error;
+        return []; // Return empty array instead of throwing
       }
     });
   },
@@ -275,8 +279,9 @@ export const api = {
         }
         
         const data = await response.json();
-        console.log(`✅ Got ${data.length} jobs`);
-        return data;
+        console.log(`✅ Got ${Array.isArray(data) ? data.length : 0} jobs`);
+        // ✅ Always return an array
+        return Array.isArray(data) ? data : (data.jobs || []);
       } catch (error) {
         console.warn("⚠️ getAvailableJobs failed (non-critical):", error);
         return []; // Return empty array for graceful degradation
@@ -296,8 +301,9 @@ export const api = {
         }
         
         const data = await response.json();
-        console.log(`✅ Got ${data.length} customers`);
-        return data;
+        console.log(`✅ Got ${Array.isArray(data) ? data.length : 0} customers`);
+        // ✅ Always return an array
+        return Array.isArray(data) ? data : (data.customers || []);
       } catch (error) {
         console.warn("⚠️ getActiveCustomers failed (non-critical):", error);
         return []; // Return empty array for graceful degradation
@@ -404,11 +410,12 @@ export const api = {
         }
         
         const data = await response.json();
-        console.log(`✅ Got ${data.length} assignments in range`);
-        return data;
+        console.log(`✅ Got ${Array.isArray(data) ? data.length : 0} assignments in range`);
+        // ✅ Always return an array
+        return Array.isArray(data) ? data : (data.assignments || []);
       } catch (error) {
         console.error("❌ getAssignmentsByDateRange failed:", error);
-        throw error;
+        return []; // Return empty array instead of throwing
       }
     });
   },
