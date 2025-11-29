@@ -92,7 +92,7 @@ export default function JobsPage() {
       const endTime = performance.now();
       log(`⏱️ Jobs loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
     } catch (err) {
-      error("❌ Error loading jobs:", err);
+      console.error("❌ Error loading jobs:", err);
       setJobs([]);
     } finally {
       setLoading(false);
@@ -159,7 +159,7 @@ export default function JobsPage() {
       await api.updateJobWorkStage(jobId, newWorkStage);
       log(`✅ Updated job ${jobId} work stage to ${newWorkStage}`);
     } catch (err) {
-      error("Error updating work stage:", err);
+      console.error("Error updating work stage:", err);
       
       // Rollback on error
       setJobs(previousJobs);
@@ -188,7 +188,7 @@ export default function JobsPage() {
       setJobToDelete(null);
       log(`✅ Deleted job ${jobToDelete.id}`);
     } catch (err) {
-      error("Error deleting job:", err);
+      console.error("Error deleting job:", err);
       
       // Rollback on error
       setJobs(previousJobs);
