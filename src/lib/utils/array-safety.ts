@@ -1,3 +1,5 @@
+import React from 'react';
+
 /**
  * Global Array Safety Utilities
  * Import these anywhere you need to safely work with arrays
@@ -123,16 +125,17 @@ export const safe = {
 export function withArraySafety<T extends Record<string, any>>(
   Component: React.ComponentType<T>,
   arrayProps: (keyof T)[]
-) {
-  return (props: T) => {
+): React.ComponentType<T> {
+  const SafeComponent = (props: T) => {
     const safeProps = { ...props };
     arrayProps.forEach(prop => {
       if (prop in safeProps) {
         safeProps[prop] = toArray(safeProps[prop]) as any;
       }
     });
-    return <Component {...safeProps} />;
+    return React.createElement(Component, safeProps);
   };
+  return SafeComponent;
 }
 
 export { toArray as ensureArray };
