@@ -399,9 +399,9 @@ export default function CustomerDetailsPage() {
         setHasAccess(true);
       }
 
-      // ✅ Filter unassigned files
-      const unassignedDrawings = drawings.filter(doc => !doc.project_id);
-      const unassignedForms = formDocs.filter(form => !form.project_id);
+      // ✅ Filter unassigned files with type assertions
+      const unassignedDrawings = (drawings as DrawingDocument[]).filter((doc: DrawingDocument) => !doc.project_id);
+      const unassignedForms = (formDocs as FormDocument[]).filter((form: FormDocument) => !form.project_id);
 
       // ✅ BATCH STATE UPDATE (single re-render)
       setCustomer(normalizedCustomer);
