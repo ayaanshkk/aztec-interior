@@ -430,7 +430,7 @@ export default function SchedulePage() {
       log(`⏱️ Schedule loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
     } catch (err) {
-      error("❌ Error fetching data:", err);
+      console.error("❌ Error fetching data:", err);
       setError(err instanceof Error ? err.message : "Failed to load schedule data");
     } finally {
       setLoading(false);
