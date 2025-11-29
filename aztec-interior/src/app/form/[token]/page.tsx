@@ -300,7 +300,7 @@ function OrderMaterialsDialog({
 
       const token = localStorage.getItem('token');
 
-      const response = await fetch('https://aztec-interiors.onrender.com/materials', {
+      const response = await fetch('https://aztec-interior.onrender.com/materials', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -579,18 +579,25 @@ export default function FormPage() {
   });
 
 
-  const OrderButton = ({ sectionTitle, onClick }: { sectionTitle: string; onClick: () => void }) => (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      className="flex items-center gap-1 text-xs print:hidden"
-      onClick={onClick}
-    >
-      <Package className="h-3 w-3" />
-      Order
-    </Button>
-  );
+  const OrderButton = ({ sectionTitle, onClick }: { sectionTitle: string; onClick: () => void }) => {
+    // ✅ Hide order button for Sales and HR roles
+    if (userRole === "sales" || userRole === "hr") {
+      return null;
+    }
+    
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="flex items-center gap-1 text-xs print:hidden"
+        onClick={onClick}
+      >
+        <Package className="h-3 w-3" />
+        Order
+      </Button>
+    );
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -722,7 +729,7 @@ export default function FormPage() {
       additional_handles: [...prev.additional_handles, { 
         handles_code: "", 
         handles_quantity: "", 
-        handles_size: "" 
+        handles_size: ""  
       }],
     }));
   };
@@ -873,7 +880,7 @@ export default function FormPage() {
     setSubmitStatus({ type: null, message: "" });
 
     try {
-      const response = await fetch("https://aztec-interiors.onrender.com/submit-customer-form", {
+      const response = await fetch("https://aztec-interior.onrender.com/submit-customer-form", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2118,38 +2125,96 @@ export default function FormPage() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
-                      <Input
-                        placeholder="Enter handle code"
-                        className="w-full bg-white"
-                        value={formData.handles_code}
-                        onChange={(e) => handleInputChange("handles_code", e.target.value)}
-                      />
+                  {/* ✅ CHANGED: Wrapped in space-y-3 container instead of just grid */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
+                        <Input
+                          placeholder="Enter handle code"
+                          className="w-full bg-white"
+                          value={formData.handles_code}
+                          onChange={(e) => handleInputChange("handles_code", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Quantity</label>
+                        <Input
+                          placeholder="Enter quantity"
+                          type="text"
+                          className="w-full bg-white"
+                          value={formData.handles_quantity}
+                          onChange={(e) => handleInputChange("handles_quantity", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Size</label>
+                        <Input
+                          placeholder="Enter size (e.g., 128mm)"
+                          className="w-full bg-white"
+                          value={formData.handles_size}
+                          onChange={(e) => handleInputChange("handles_size", e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Quantity</label>
-                      <Input
-                        placeholder="Enter quantity"
-                        type="text"
-                        className="w-full bg-white"
-                        value={formData.handles_quantity}
-                        onChange={(e) => handleInputChange("handles_quantity", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Size</label>
-                      <Input
-                        placeholder="Enter size (e.g., 128mm)"
-                        className="w-full bg-white"
-                        value={formData.handles_size}
-                        onChange={(e) => handleInputChange("handles_size", e.target.value)}
-                      />
+
+                    {/* ✅ NEW SECTION: Additional Handles - Copy from Kitchen */}
+                    <div className="border-t pt-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <label className="text-sm font-bold text-gray-700">Handle Details (Additional Handles)</label>
+                        <Button type="button" size="sm" onClick={addAdditionalHandle} className="bg-purple-600">
+                          + Add Additional Handle
+                        </Button>
+                      </div>
+                      {formData.additional_handles.map((handle, idx) => (
+                        <div key={idx} className="mb-3 space-y-3 rounded border-2 border-purple-300 bg-white p-4">
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Handle Code</label>
+                              <Input
+                                placeholder="Enter handle code"
+                                className="text-sm"
+                                value={handle.handles_code}
+                                onChange={(e) => handleAdditionalHandleChange(idx, "handles_code", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Handle Quantity</label>
+                              <Input
+                                placeholder="Enter quantity"
+                                type="text"
+                                className="text-sm"
+                                value={handle.handles_quantity}
+                                onChange={(e) => handleAdditionalHandleChange(idx, "handles_quantity", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Handle Size</label>
+                              <Input
+                                placeholder="Size (e.g., 128mm)"
+                                className="text-sm"
+                                value={handle.handles_size}
+                                onChange={(e) => handleAdditionalHandleChange(idx, "handles_size", e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => removeAdditionalHandle(idx)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
-
+                
                 {/* 3. Accessories & Floor Protection - Pink Section */}
                 <div className="rounded-lg border-2 border-pink-200 bg-pink-50 p-6">
                   <div className="flex items-center justify-between mb-2">
