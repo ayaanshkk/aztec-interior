@@ -65,9 +65,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   console.log("Current user role:", currentUser.role);
   console.log("Full user object:", currentUser);
 
-  // ✅ Get filtered sidebar items - with fallback to show all if role doesn't match
-  const userRole = currentUser.role?.toLowerCase();
-  const sidebarItems = getSidebarItems(userRole);
+  // ✅ Get filtered sidebar items - with SAFETY CHECKS
+  const userRole = currentUser.role?.toLowerCase() || "manager";
+  let sidebarItems: ReturnType<typeof getSidebarItems> = [];
+  
+  try {
+    const items = getSidebarItems(userRole);
+    // ✅ SAFETY: Ensure it's an array and each group has an items array
+    sidebarItems = Array.isArray(items) 
+      ? items.map(group => ({
+          ...group,
+          items: Array.isArray(group.items) ? group.items : []
+        }))
+      : [];
+  } catch (error) {
+    console.error("Error getting sidebar items:", error);
+    sidebarItems = []; // Fallback to empty array
+  }
 
   console.log("Filtered sidebar items:", sidebarItems);
 
