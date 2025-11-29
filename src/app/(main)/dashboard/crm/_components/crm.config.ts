@@ -79,6 +79,17 @@ export const projectRevenueChartConfig = {
  * Generate sales pipeline funnel data from real pipeline items
  */
 export const generateSalesPipelineData = (pipelineItems: any[]) => {
+  // ✅ Safety check: ensure pipelineItems is an array
+  if (!Array.isArray(pipelineItems)) {
+    return [
+      { stage: "Lead", value: 0, fill: "var(--color-lead)" },
+      { stage: "Quote", value: 0, fill: "var(--color-quote)" },
+      { stage: "Accepted", value: 0, fill: "var(--color-accepted)" },
+      { stage: "Production", value: 0, fill: "var(--color-production)" },
+      { stage: "Complete", value: 0, fill: "var(--color-complete)" },
+    ];
+  }
+
   const stageCounts: Record<string, number> = {
     Lead: 0,
     Survey: 0,
@@ -93,7 +104,7 @@ export const generateSalesPipelineData = (pipelineItems: any[]) => {
     Remedial: 0,
     Rejected: 0,
   };
-  
+
   // Count items in each stage
   pipelineItems.forEach(item => {
     const stage = item.stage || 'Lead';
@@ -116,24 +127,29 @@ export const generateSalesPipelineData = (pipelineItems: any[]) => {
  * Generate new leads data from customers created in last 30 days
  */
 export const generateNewLeadsData = (customers: any[]) => {
+  // ✅ Safety check: ensure customers is an array
+  if (!Array.isArray(customers)) {
+    return { total: 0, disqualified: 0 };
+  }
+
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
+
   // Filter customers created in last 30 days
   const recentCustomers = customers.filter(c => {
     if (!c.created_at) return false;
     const createdDate = new Date(c.created_at);
     return createdDate >= thirtyDaysAgo;
   });
-  
+
   // Count new leads (those still in Lead stage or recently moved)
-  const newLeads = recentCustomers.filter(c => 
+  const newLeads = recentCustomers.filter(c =>
     c.stage === 'Lead' || c.stage === 'Survey' || c.stage === 'Design' || c.stage === 'Quote'
   );
   
   // Count disqualified (rejected) in last 30 days
   const disqualified = recentCustomers.filter(c => c.stage === 'Rejected');
-  
+
   return {
     total: newLeads.length,
     disqualified: disqualified.length,
@@ -147,8 +163,20 @@ export const generateNewLeadsData = (customers: any[]) => {
  * etc.
  */
 export const generateLeadsChartData = (customers: any[]) => {
+  // ✅ Safety check: ensure customers is an array
+  if (!Array.isArray(customers)) {
+    return [
+      { date: "1-5", newLeads: 0, disqualified: 0 },
+      { date: "6-10", newLeads: 0, disqualified: 0 },
+      { date: "11-15", newLeads: 0, disqualified: 0 },
+      { date: "16-20", newLeads: 0, disqualified: 0 },
+      { date: "21-25", newLeads: 0, disqualified: 0 },
+      { date: "26-30", newLeads: 0, disqualified: 0 },
+    ];
+  }
+
   const today = new Date();
-  
+
   // Define 6 periods of 5 days each, going back 30 days
   const periods = [
     { label: "1-5", daysAgoStart: 1, daysAgoEnd: 5 },      // 1-5 days ago
@@ -164,7 +192,7 @@ export const generateLeadsChartData = (customers: any[]) => {
     const endDate = new Date(today);
     endDate.setDate(today.getDate() - period.daysAgoStart);
     endDate.setHours(23, 59, 59, 999);
-    
+
     const startDate = new Date(today);
     startDate.setDate(today.getDate() - period.daysAgoEnd);
     startDate.setHours(0, 0, 0, 0);
@@ -191,6 +219,11 @@ export const generateLeadsChartData = (customers: any[]) => {
  * Calculate total revenue from completed jobs
  */
 export const calculateTotalRevenue = (jobs: any[]) => {
+  // ✅ Safety check: ensure jobs is an array
+  if (!Array.isArray(jobs)) {
+    return 0;
+  }
+
   return jobs
     .filter(job => job.stage === 'Complete' && job.sold_amount)
     .reduce((sum, job) => sum + (job.sold_amount || 0), 0);
@@ -200,13 +233,28 @@ export const calculateTotalRevenue = (jobs: any[]) => {
  * Generate monthly revenue data for the chart
  */
 export const generateRevenueChartData = (jobs: any[]) => {
+  // ✅ Safety check: ensure jobs is an array
+  if (!Array.isArray(jobs)) {
+    const months = [];
+    const today = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      months.push({
+        month: monthKey,
+        revenue: 0,
+      });
+    }
+    return months;
+  }
+
   const monthlyRevenue: Record<string, number> = {};
-  
+
   jobs.forEach(job => {
     if (job.stage === 'Complete' && job.sold_amount && job.completion_date) {
       const date = new Date(job.completion_date);
       const monthKey = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-      
+
       if (!monthlyRevenue[monthKey]) {
         monthlyRevenue[monthKey] = 0;
       }
@@ -233,8 +281,20 @@ export const generateRevenueChartData = (jobs: any[]) => {
  * Generate proposals sent data (quotes sent in last 30 days, broken into 5-day periods)
  */
 export const generateProposalsChartData = (jobs: any[]) => {
+  // ✅ Safety check: ensure jobs is an array
+  if (!Array.isArray(jobs)) {
+    return [
+      { date: "1-5", proposalsSent: 0 },
+      { date: "6-10", proposalsSent: 0 },
+      { date: "11-15", proposalsSent: 0 },
+      { date: "16-20", proposalsSent: 0 },
+      { date: "21-25", proposalsSent: 0 },
+      { date: "26-30", proposalsSent: 0 },
+    ];
+  }
+
   const today = new Date();
-  
+
   const periods = [
     { label: "1-5", daysAgoStart: 1, daysAgoEnd: 5 },
     { label: "6-10", daysAgoStart: 6, daysAgoEnd: 10 },
@@ -248,7 +308,7 @@ export const generateProposalsChartData = (jobs: any[]) => {
     const endDate = new Date(today);
     endDate.setDate(today.getDate() - period.daysAgoStart);
     endDate.setHours(23, 59, 59, 999);
-    
+
     const startDate = new Date(today);
     startDate.setDate(today.getDate() - period.daysAgoEnd);
     startDate.setHours(0, 0, 0, 0);
@@ -271,6 +331,11 @@ export const generateProposalsChartData = (jobs: any[]) => {
  * Returns the most recent 15 customers in Lead stage
  */
 export const generateRecentLeadsData = (pipelineItems: any[]) => {
+  // ✅ Safety check: ensure pipelineItems is an array
+  if (!Array.isArray(pipelineItems)) {
+    return [];
+  }
+
   // Filter for customers in Lead stage
   const leadCustomers = pipelineItems
     .filter(item => item.type === 'customer' && item.stage === 'Lead')
