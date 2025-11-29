@@ -158,14 +158,15 @@ export function NavMain({ items }: NavMainProps) {
     return subItems?.some((sub) => path.startsWith(sub.url)) ?? false;
   };
 
+  // ✅ FIX: Add safety check for group.items
   const filteredItems = items.map((group) => ({
     ...group,
-    items: group.items.filter((item) => {
+    items: Array.isArray(group.items) ? group.items.filter((item) => {
       if (user?.role === "Staff") {
         return !["Jobs", "Forms/Checklists", "Appliances"].includes(item.title);
       }
       return true;
-    }),
+    }) : [],
   }));
 
   return (
