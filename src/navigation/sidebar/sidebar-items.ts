@@ -167,4 +167,4 @@ export const getSidebarItems = (userRole: string, notificationCount?: number): N
 };
 
 // For backwards compatibility, export default items (manager view shows all)
-export const sidebarItems = getSidebarItems("manager");
+export const sidebarItems = allSidebarItems;
