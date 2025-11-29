@@ -126,6 +126,7 @@ interface FormDocument {
   type: "excel" | "pdf" | "other";
   created_at: string;
   customer_id: string;
+  project_id?: string;
 }
 
 // ... (keeping all your existing constants the same - FIELD_LABELS, FINANCIAL_FIELDS, etc.)
