@@ -61,6 +61,19 @@ const nextConfig = {
   experimental: {
     optimizeCss: true,
   },
+  
+  // ====================================================
+  // ✅ DEVELOPMENT: Disable caching to force fresh builds
+  // ====================================================
+  ...(process.env.NODE_ENV === 'development' && {
+    onDemandEntries: {
+      maxInactiveAge: 0,
+      pagesBufferLength: 0,
+    },
+    generateBuildId: async () => {
+      return `dev-${Date.now()}`;
+    },
+  }),
 };
 
 export default nextConfig;
