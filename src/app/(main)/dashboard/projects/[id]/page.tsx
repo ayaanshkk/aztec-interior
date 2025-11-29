@@ -266,7 +266,7 @@ export default function ProjectDetailsPage() {
       // ✅ NOW fetch customer and drawings with customer_id
       if (projectData.customer_id) {
         const [customerResult, drawingsResult] = await Promise.all([
-          api.getCustomer(projectData.customer_id),
+          api.getCustomerDetails(projectData.customer_id),  // ✅ Use getCustomerDetails
           api.getCustomerDrawings(projectData.customer_id, projectId),
         ]);
 
