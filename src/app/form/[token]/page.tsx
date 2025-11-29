@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar, PenTool, Upload, Download, Package, UserPlus } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 import Link from "next/link";
 import {
   Sidebar,
@@ -21,6 +22,18 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
+
+// ============================================================================
+// DEV-ONLY LOGGING
+// ============================================================================
+const IS_DEV = process.env.NODE_ENV === 'development';
+const log = (...args: any[]) => {
+  if (IS_DEV) console.log(...args);
+};
+const warn = (...args: any[]) => {
+  if (IS_DEV) console.warn(...args);
+};
+const error = console.error; // Always log errors
 
 interface Appliance {
   make: string;
@@ -298,20 +311,8 @@ function OrderMaterialsDialog({
         status: 'ordered',
       };
 
-      const token = localStorage.getItem('token');
-
-      const response = await fetch('https://aztec-interiors.onrender.com/materials', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create material order');
-      }
+      // ✅ USE API LAYER
+      await api.createMaterialOrder(payload);
 
       alert('Material order created successfully!');
       onClose();
@@ -324,8 +325,8 @@ function OrderMaterialsDialog({
       setExpectedDelivery('');
       setNotes('');
       
-    } catch (error) {
-      console.error('Error creating material order:', error);
+    } catch (err) {
+      error('Error creating material order:', err);
       alert('Failed to create material order. Please try again.');
     } finally {
       setSubmitting(false);
@@ -579,18 +580,25 @@ export default function FormPage() {
   });
 
 
-  const OrderButton = ({ sectionTitle, onClick }: { sectionTitle: string; onClick: () => void }) => (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      className="flex items-center gap-1 text-xs print:hidden"
-      onClick={onClick}
-    >
-      <Package className="h-3 w-3" />
-      Order
-    </Button>
-  );
+  const OrderButton = ({ sectionTitle, onClick }: { sectionTitle: string; onClick: () => void }) => {
+    // Hide for Sales and HR
+    if (userRole === "sales" || userRole === "hr") {
+      return null;
+    }
+    
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="flex items-center gap-1 text-xs print:hidden"
+        onClick={onClick}
+      >
+        <Package className="h-3 w-3" />
+        Order
+      </Button>
+    );
+  };
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -822,11 +830,12 @@ export default function FormPage() {
     const redirectUrl = searchParams.get("redirect");
     const token = searchParams.get("token") || "";
     const customerIdFromUrl = searchParams.get("customerId") || "";
-    const projectIdFromUrl = searchParams.get("projectId") || "";  // ✅ ADD THIS LINE
+    const projectIdFromUrl = searchParams.get("projectId") || "";
     const isClientOwned = formData.appliances_customer_owned === "no";
 
     const finalAppliances = [...formData.appliances];
 
+    // Add integrated fridge/freezer if present
     if (
       formData.integ_fridge_qty?.trim() ||
       formData.integ_fridge_make?.trim() ||
@@ -873,33 +882,27 @@ export default function FormPage() {
     setSubmitStatus({ type: null, message: "" });
 
     try {
-      const response = await fetch("https://aztec-interiors.onrender.com/submit-customer-form", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: token || undefined,
-          formData: finalFormData,
-          projectId: projectIdFromUrl || undefined,
-          isWalkinMode: isWalkinMode, 
-        }),
-      });
+      // ✅ USE API LAYER
+      const result = await api.submitCustomerForm(
+        finalFormData,
+        token || undefined,
+        projectIdFromUrl || undefined,
+        isWalkinMode
+      );
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (result.success) {
         const successMsg = isWalkinMode 
-        ? "Customer created and form submitted successfully! Redirecting to customer profile..."
-        : result.message || "Form submitted successfully! Redirecting...";
+          ? "Customer created and form submitted successfully! Redirecting to customer profile..."
+          : result.message || "Form submitted successfully! Redirecting...";
 
         setSubmitStatus({
           type: "success",
-          message: result.message || "Form submitted successfully! Redirecting...",
+          message: successMsg,
         });
 
         setTimeout(() => {
           const targetCustomerId = result.customer_id || customerIdFromUrl;
 
-          // ✅ ADD THIS IF BLOCK
           if (projectIdFromUrl) {
             router.push(`/dashboard/projects/${projectIdFromUrl}`);
           } else if (redirectUrl) {
@@ -916,8 +919,8 @@ export default function FormPage() {
           message: result.error || "Failed to submit form",
         });
       }
-    } catch (error) {
-      console.error("Submit error:", error);
+    } catch (err) {
+      error("Submit error:", err);
       setSubmitStatus({
         type: "error",
         message: "Network error. Please try again.",
@@ -2118,34 +2121,92 @@ export default function FormPage() {
                     />
                   </div>
                   
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
-                      <Input
-                        placeholder="Enter handle code"
-                        className="w-full bg-white"
-                        value={formData.handles_code}
-                        onChange={(e) => handleInputChange("handles_code", e.target.value)}
-                      />
+                  {/* ✅ NEW: Wrapped in space-y-3 container */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
+                        <Input
+                          placeholder="Enter handle code"
+                          className="w-full bg-white"
+                          value={formData.handles_code}
+                          onChange={(e) => handleInputChange("handles_code", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Quantity</label>
+                        <Input
+                          placeholder="Enter quantity"
+                          type="text"
+                          className="w-full bg-white"
+                          value={formData.handles_quantity}
+                          onChange={(e) => handleInputChange("handles_quantity", e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Size</label>
+                        <Input
+                          placeholder="Enter size (e.g., 128mm)"
+                          className="w-full bg-white"
+                          value={formData.handles_size}
+                          onChange={(e) => handleInputChange("handles_size", e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Quantity</label>
-                      <Input
-                        placeholder="Enter quantity"
-                        type="text"
-                        className="w-full bg-white"
-                        value={formData.handles_quantity}
-                        onChange={(e) => handleInputChange("handles_quantity", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Handle Size</label>
-                      <Input
-                        placeholder="Enter size (e.g., 128mm)"
-                        className="w-full bg-white"
-                        value={formData.handles_size}
-                        onChange={(e) => handleInputChange("handles_size", e.target.value)}
-                      />
+
+                    {/* ✅ NEW: Additional Handles Section - Exact copy from Kitchen */}
+                    <div className="border-t pt-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <label className="text-sm font-bold text-gray-700">Handle Details (Additional Handles)</label>
+                        <Button type="button" size="sm" onClick={addAdditionalHandle} className="bg-purple-600">
+                          + Add Additional Handle
+                        </Button>
+                      </div>
+                      {formData.additional_handles.map((handle, idx) => (
+                        <div key={idx} className="mb-3 space-y-3 rounded border-2 border-purple-300 bg-white p-4">
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Handle Code</label>
+                              <Input
+                                placeholder="Enter handle code"
+                                className="text-sm"
+                                value={handle.handles_code}
+                                onChange={(e) => handleAdditionalHandleChange(idx, "handles_code", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Handle Quantity</label>
+                              <Input
+                                placeholder="Enter quantity"
+                                type="text"
+                                className="text-sm"
+                                value={handle.handles_quantity}
+                                onChange={(e) => handleAdditionalHandleChange(idx, "handles_quantity", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Handle Size</label>
+                              <Input
+                                placeholder="Size (e.g., 128mm)"
+                                className="text-sm"
+                                value={handle.handles_size}
+                                onChange={(e) => handleAdditionalHandleChange(idx, "handles_size", e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => removeAdditionalHandle(idx)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>

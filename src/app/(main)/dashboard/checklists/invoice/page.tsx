@@ -222,7 +222,7 @@ export default function InvoicePage() {
 
       const invoiceData = getInvoiceData();
 
-      const response = await fetch("https://aztec-interiors.onrender.com/invoices/save", {
+      const response = await fetch("https://aztec-interior.onrender.com/invoices/save", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -286,7 +286,7 @@ export default function InvoicePage() {
     }
 
     try {
-      const response = await fetch(`https://aztec-interiors.onrender.com/approvals/status/${submissionId}`);
+      const response = await fetch(`https://aztec-interior.onrender.com/approvals/status/${submissionId}`);
       const data = await response.json();
 
       setApprovalStatus(data.approval_status);
@@ -316,7 +316,7 @@ export default function InvoicePage() {
 
     setMessage("Generating PDF...");
     try {
-      const response = await fetch("https://aztec-interiors.onrender.com/invoices/download-pdf", {
+      const response = await fetch("https://aztec-interior.onrender.com/invoices/download-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(getInvoiceData()),

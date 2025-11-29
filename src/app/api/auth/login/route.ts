@@ -1,7 +1,9 @@
 // src/app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interiors.onrender.com';
+export const preferredRegion = "fra1";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
 
 export async function POST(request: NextRequest) {
   try {

@@ -20,7 +20,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 
 // Import the base URL for constructing API URLs
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://aztec-interiors.onrender.com";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://aztec-interior.onrender.com";
 const API_ROOT = `${BASE_URL}/streemlyne`;
 
 interface ImportStatus {

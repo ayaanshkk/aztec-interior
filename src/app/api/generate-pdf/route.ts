@@ -5,6 +5,7 @@ import puppeteer from "puppeteer";
 // Import Buffer from Node.js standard library (available in Next.js API Routes)
 import { Buffer } from "buffer";
 
+
 interface QuoteItem {
   item: string;
   description: string;

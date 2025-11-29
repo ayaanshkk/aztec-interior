@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,8 +32,23 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { fetchWithAuth } from "@/lib/api";
+import { api } from "@/lib/api";
 
+// ============================================================================
+// DEV-ONLY LOGGING
+// ============================================================================
+const IS_DEV = process.env.NODE_ENV === 'development';
+const log = (...args: any[]) => {
+  if (IS_DEV) console.log(...args);
+};
+const warn = (...args: any[]) => {
+  if (IS_DEV) console.warn(...args);
+};
+const error = console.error; // Always log errors
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 const formatDate = (dateString: string) => {
   if (!dateString) return "—";
   try {
@@ -87,11 +102,14 @@ const getApprovalStatusBadge = (status: string) => {
   return <Badge className={variant.className}>{variant.text}</Badge>;
 };
 
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 export default function JobDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const jobId = params?.id;
+  const jobId = params?.id as string;
   const showSuccess = searchParams?.get("success") === "created";
 
   const [job, setJob] = useState<any | null>(null);
@@ -103,108 +121,114 @@ export default function JobDetailsPage() {
   
   // Delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
+  // ============================================================================
+  // ✅ OPTIMIZED: Parallel data fetching with API layer
+  // ============================================================================
+  const loadJobData = useCallback(async () => {
     if (!jobId) return;
-    loadJobData();
-  }, [jobId]);
+    
+    setLoading(true);
+    const startTime = performance.now();
 
-  const loadJobData = async () => {
     try {
-      setLoading(true);
+      log("🔄 Loading job details...");
 
-      // Load job details
-      const jobRes = await fetchWithAuth(`jobs/${jobId}`);
-      if (!jobRes.ok) throw new Error("Failed to fetch task");
-      const jobData = await jobRes.json();
+      // ✅ STEP 1: Load job first (need customer_id)
+      const jobData = await api.getJob(jobId);
       setJob(jobData);
 
-      // Load customer details
+      // ✅ STEP 2: Load customer, documents, and forms in PARALLEL
       if (jobData.customer_id) {
-        const customerRes = await fetchWithAuth(`customers/${jobData.customer_id}`);
-        if (customerRes.ok) {
-          const customerData = await customerRes.json();
-          setCustomer(customerData);
-          
-          // ✅ FIXED: Load customer's drawings from correct endpoint
-          try {
-            const docsRes = await fetchWithAuth(`files/drawings?customer_id=${jobData.customer_id}`);
-            if (docsRes.ok) {
-              const docsData = await docsRes.json();
-              console.log("✅ Loaded documents:", docsData);
-              
-              // Map the response to match our interface
-              const mappedDocs = docsData.map((doc: any) => ({
-                id: doc.id,
-                filename: doc.file_name || doc.filename,
-                url: doc.file_url || doc.url,
-                type: doc.category || doc.type || 'other',
-                created_at: doc.created_at,
-                uploaded_by: doc.uploaded_by
-              }));
-              
-              setDocuments(mappedDocs);
-            } else {
-              console.log("No drawings found or endpoint returned non-OK status");
-              setDocuments([]);
-            }
-          } catch (error) {
-            console.error("Error loading documents:", error);
-            setDocuments([]);
-          }
+        const [customerData, docsData] = await Promise.all([
+          api.getCustomer(jobData.customer_id),
+          api.getCustomerDrawings(jobData.customer_id),
+        ]);
 
-          // ✅ FIXED: Get form submissions from customer object
-          try {
-            // Form submissions are nested in the customer object
-            const formSubmissions = customerData.form_submissions || [];
-            console.log("✅ Loaded form submissions:", formSubmissions);
-            setFormSubmissions(formSubmissions);
-          } catch (error) {
-            console.error("Error loading form submissions:", error);
-            setFormSubmissions([]);
-          }
+        setCustomer(customerData);
+
+        // Map documents to correct format
+        if (Array.isArray(docsData)) {
+          const mappedDocs = docsData.map((doc: any) => ({
+            id: doc.id,
+            filename: doc.file_name || doc.filename,
+            url: doc.file_url || doc.url,
+            type: doc.category || doc.type || 'other',
+            created_at: doc.created_at,
+            uploaded_by: doc.uploaded_by
+          }));
+          setDocuments(mappedDocs);
         }
+
+        // Get form submissions from customer object
+        const formSubmissions = customerData.form_submissions || [];
+        setFormSubmissions(formSubmissions);
       }
 
-    } catch (error) {
-      console.error("Error loading task data:", error);
+      const endTime = performance.now();
+      log(`⏱️ Job details loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+
+    } catch (err) {
+      error("❌ Error loading job data:", err);
+      // Don't show alert for 404s (job might be deleted)
+      if (err instanceof Error && !err.message.includes('404')) {
+        alert("Failed to load job details. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [jobId]);
 
-  const handleEdit = () => {
-    router.push(`/dashboard/jobs/${jobId}/edit`);
-  };
+  useEffect(() => {
+    loadJobData();
+  }, [loadJobData]);
 
-  const handleCreateSchedule = () => {
-    router.push(`/dashboard/schedules/create?jobId=${jobId}`);
-  };
+  // ============================================================================
+  // ✅ OPTIMIZED: Delete with optimistic navigation
+  // ============================================================================
+  const handleDeleteJob = useCallback(async () => {
+    if (!jobId || isDeleting) return;
 
-  // Delete job handler
-  const handleDeleteJob = async () => {
+    setIsDeleting(true);
+    setDeleteDialogOpen(false);
+
+    // Optimistic navigation - go back immediately
+    router.push("/dashboard/jobs?deleted=true");
+
     try {
-      const response = await fetchWithAuth(`jobs/${jobId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete job");
-      }
-
-      router.push("/dashboard/jobs?deleted=true");
-    } catch (error) {
-      console.error("Error deleting task:", error);
-      alert("Failed to delete task. Please try again.");
+      await api.deleteJob(jobId);
+      log(`✅ Deleted job ${jobId}`);
+    } catch (err) {
+      error("Error deleting job:", err);
+      // If delete fails, navigate back to job details
+      router.push(`/dashboard/jobs/${jobId}`);
+      alert(`Failed to delete job: ${err instanceof Error ? err.message : 'Please try again'}`);
+    } finally {
+      setIsDeleting(false);
     }
-  };
+  }, [jobId, isDeleting, router]);
 
+  // ============================================================================
+  // NAVIGATION HANDLERS
+  // ============================================================================
+  const handleEdit = useCallback(() => {
+    router.push(`/dashboard/jobs/${jobId}/edit`);
+  }, [jobId, router]);
+
+  const handleCreateSchedule = useCallback(() => {
+    router.push(`/dashboard/schedules/create?jobId=${jobId}`);
+  }, [jobId, router]);
+
+  // ============================================================================
+  // RENDER - LOADING STATE
+  // ============================================================================
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading task details...</p>
+          <p className="text-gray-600">Loading job details...</p>
         </div>
       </div>
     );
@@ -214,15 +238,18 @@ export default function JobDetailsPage() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
-          <p className="text-lg text-gray-600">Task not found</p>
+          <p className="text-lg text-gray-600">Job not found</p>
           <Button onClick={() => router.push("/dashboard/jobs")} className="mt-4">
-            Back to Tasks
+            Back to Jobs
           </Button>
         </div>
       </div>
     );
   }
 
+  // ============================================================================
+  // RENDER - MAIN UI
+  // ============================================================================
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Success Alert */}
@@ -232,7 +259,7 @@ export default function JobDetailsPage() {
             <Alert className="border-green-200 bg-green-50">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                Task {job.job_reference} created successfully!
+                Job {job.job_reference} created successfully!
               </AlertDescription>
             </Alert>
           </div>
@@ -270,14 +297,15 @@ export default function JobDetailsPage() {
                 variant="outline" 
                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
                 onClick={() => setDeleteDialogOpen(true)}
+                disabled={isDeleting}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                Delete Task
+                Delete Job
               </Button>
               
               <Button variant="outline" onClick={handleEdit}>
                 <Edit className="mr-2 h-4 w-4" />
-                Edit Task
+                Edit Job
               </Button>
             </div>
           </div>
@@ -351,13 +379,13 @@ export default function JobDetailsPage() {
               {/* Job Information */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Task Information</CardTitle>
+                  <CardTitle>Job Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm font-medium text-gray-500">Task Reference</p>
-                      <p className="text-base">{job.job_reference || `Task #${job.id}`}</p>
+                      <p className="text-sm font-medium text-gray-500">Job Reference</p>
+                      <p className="text-base">{job.job_reference || `Job #${job.id}`}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-500">Type</p>
@@ -460,7 +488,7 @@ export default function JobDetailsPage() {
             </div>
           </TabsContent>
 
-          {/* DOCUMENTS TAB - Real-time from Customer's Drawings */}
+          {/* DOCUMENTS TAB */}
           <TabsContent value="documents" className="space-y-6">
             <Card>
               <CardHeader>
@@ -504,7 +532,7 @@ export default function JobDetailsPage() {
                             onClick={() => {
                               const viewUrl = doc.url.startsWith('http') 
                                 ? doc.url 
-                                : `https://aztec-interiors.onrender.com${doc.url}`;
+                                : `https://aztec-interior.onrender.com${doc.url}`;
                               window.open(viewUrl, '_blank');
                             }}
                           >
@@ -517,7 +545,7 @@ export default function JobDetailsPage() {
                             onClick={() => {
                               const downloadUrl = doc.url.startsWith('http') 
                                 ? doc.url 
-                                : `https://aztec-interiors.onrender.com${doc.url}`;
+                                : `https://aztec-interior.onrender.com${doc.url}`;
                               const link = document.createElement('a');
                               link.href = downloadUrl;
                               link.download = doc.filename;
@@ -552,7 +580,7 @@ export default function JobDetailsPage() {
             </Card>
           </TabsContent>
 
-          {/* CHECKLISTS TAB - Real-time from Customer's Form Submissions */}
+          {/* CHECKLISTS TAB */}
           <TabsContent value="checklists" className="space-y-6">
             <Card>
               <CardHeader>
@@ -620,9 +648,8 @@ export default function JobDetailsPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  // Open checklist in new tab or navigate to customer profile
                                   if (isChecklist) {
-                                    window.open(`/streemlyne/checklist-view?id=${form.id}`, '_blank');
+                                    window.open(`/checklist-view?id=${form.id}`, '_blank');
                                   } else {
                                     router.push(`/dashboard/customers/${customer.id}?formId=${form.id}`);
                                   }
@@ -724,13 +751,13 @@ export default function JobDetailsPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Task?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Job?</AlertDialogTitle>
             <AlertDialogDescription>
               <p className="mb-2">
-                Are you sure you want to delete this task?
+                Are you sure you want to delete this job?
               </p>
               <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
-                <p><strong>Task Reference:</strong> {job.job_reference}</p>
+                <p><strong>Job Reference:</strong> {job.job_reference}</p>
                 <p><strong>Customer:</strong> {customer?.name}</p>
                 <p><strong>Type:</strong> {job.job_type}</p>
               </div>
@@ -740,14 +767,18 @@ export default function JobDetailsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>
+            <AlertDialogCancel 
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteJob}
+              disabled={isDeleting}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete Task
+              {isDeleting ? "Deleting..." : "Delete Job"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

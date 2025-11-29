@@ -45,7 +45,7 @@ export function CustomerProjectTimeline({ customerId }: { customerId: string }) 
       console.log(`🔍 Fetching timeline for customer ${customerId}...`);
       
       const response = await fetch(
-        `https://aztec-interiors.onrender.com/materials/timeline/${customerId}`,
+        `https://aztec-interior.onrender.com/materials/timeline/${customerId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

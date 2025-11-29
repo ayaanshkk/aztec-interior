@@ -38,58 +38,23 @@ import {
   X,
   Archive,
 } from "lucide-react";
-import { fetchWithAuth, api } from "@/lib/api";
+import { api, cacheUtils } from "@/lib/api";
 
-
-// ✅ PERFORMANCE: Improved cache with compression support
-const CACHE_KEY = 'schedule_cache';
-const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes (increased from 5)
-
-interface CachedData {
-  tasks: Task[];
-  jobs: Job[];
-  customers: Customer[];
-  timestamp: number;
-}
-
-const saveToCache = (data: Partial<CachedData>) => {
-  try {
-    const existing = getFromCache();
-    const updated = {
-      ...existing,
-      ...data,
-      timestamp: Date.now(),
-    };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
-    console.log('💾 Saved to cache:', Object.keys(data));
-  } catch (err) {
-    console.error('Failed to save cache:', err);
-  }
+// ============================================================================
+// DEV-ONLY LOGGING
+// ============================================================================
+const IS_DEV = process.env.NODE_ENV === 'development';
+const log = (...args: any[]) => {
+  if (IS_DEV) console.log(...args);
 };
-
-const getFromCache = (): CachedData | null => {
-  try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (!cached) return null;
-    
-    const data = JSON.parse(cached) as CachedData;
-    const age = Date.now() - data.timestamp;
-    
-    if (age > CACHE_DURATION) {
-      console.log('⏰ Cache expired');
-      localStorage.removeItem(CACHE_KEY);
-      return null;
-    }
-    
-    console.log('✅ Loaded from cache (age: ' + Math.round(age / 1000) + 's)');
-    return data;
-  } catch (err) {
-    console.error('Failed to load cache:', err);
-    return null;
-  }
+const warn = (...args: any[]) => {
+  if (IS_DEV) console.warn(...args);
 };
+const error = console.error; // Always log errors
 
-// Interfaces
+// ============================================================================
+// INTERFACES
+// ============================================================================
 interface Employee {
   id: number;
   full_name: string;
@@ -139,7 +104,9 @@ interface Task {
   updated_by_name?: string;
 }
 
-// Helper functions - MOVED BEFORE COMPONENT
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 const formatDateKey = (date: Date | string) => {
   if (typeof date === "string") return date;
   const yyyy = date.getFullYear();
@@ -148,7 +115,6 @@ const formatDateKey = (date: Date | string) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-// ✅ Color coding for job types
 const getTaskColorByType = (jobType?: string) => {
   switch (jobType?.toLowerCase()) {
     case "survey":
@@ -162,7 +128,9 @@ const getTaskColorByType = (jobType?: string) => {
   }
 };
 
-// Constants
+// ============================================================================
+// CONSTANTS
+// ============================================================================
 const START_HOUR_WEEK = 7;
 const HOUR_HEIGHT_PX = 60;
 const timeSlotsWeek = Array.from({ length: 14 }, (_, i) => {
@@ -176,11 +144,17 @@ const interiorDesignJobTypes = [
   "Installation",
 ];
 
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 export default function SchedulePage() {
   const { user, token } = useAuth();
   
-  console.log("🎬 SchedulePage component mounted");
+  log("🎬 SchedulePage component mounted");
   
+  // ============================================================================
+  // STATE
+  // ============================================================================
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [visibleCalendars, setVisibleCalendars] = useState<string[]>([]);
   const [showOwnCalendar, setShowOwnCalendar] = useState(true);
@@ -189,11 +163,9 @@ export default function SchedulePage() {
 
   const [currentDate, setCurrentDate] = useState(new Date());
   
-  // ✅ PERFORMANCE: Load from cache immediately to show data faster
-  const cachedData = getFromCache();
-  const [tasks, setTasks] = useState<Task[]>(cachedData?.tasks || []);
-  const [availableJobs, setAvailableJobs] = useState<Job[]>(cachedData?.jobs || []);
-  const [customers, setCustomers] = useState<Customer[]>(cachedData?.customers || []);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [availableJobs, setAvailableJobs] = useState<Job[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
 
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [originalTask, setOriginalTask] = useState<Task | null>(null);
@@ -227,7 +199,9 @@ export default function SchedulePage() {
 
   const [viewMode, setViewMode] = useState<"month" | "week" | "year">("month");
 
-  // ✅ PERFORMANCE: Memoize expensive calculations
+  // ============================================================================
+  // MEMOIZED CALCULATIONS
+  // ============================================================================
   const calendarDays = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -273,7 +247,6 @@ export default function SchedulePage() {
     return days;
   }, [currentDate]);
 
-  // ✅ PERFORMANCE: Optimized tasksByDate calculation
   const tasksByDate = useMemo(() => {
     const dateMap: Record<string, Task[]> = {};
     
@@ -314,6 +287,9 @@ export default function SchedulePage() {
     return tasks.filter((a) => a.user_id === user?.id && a.status === "Declined");
   }, [tasks, user]);
 
+  // ============================================================================
+  // CUSTOM ASSIGNEES/TASKS (localStorage)
+  // ============================================================================
   useEffect(() => {
     const savedAssignees = localStorage.getItem('custom_assignees');
     const savedJobTasks = localStorage.getItem('custom_job_tasks');
@@ -322,14 +298,14 @@ export default function SchedulePage() {
       try {
         setCustomAssignees(JSON.parse(savedAssignees));
       } catch (e) {
-        console.error('Failed to parse custom assignees:', e);
+        error('Failed to parse custom assignees:', e);
       }
     }
     if (savedJobTasks) {
       try {
         setCustomJobTasks(JSON.parse(savedJobTasks));
       } catch (e) {
-        console.error('Failed to parse custom job tasks:', e);
+        error('Failed to parse custom job tasks:', e);
       }
     }
   }, []);
@@ -352,6 +328,9 @@ export default function SchedulePage() {
     }
   };
 
+  // ============================================================================
+  // NAVIGATION & FORMATTING
+  // ============================================================================
   const formatHeaderDate = (date: Date, view: "month" | "week" | "year") => {
     if (view === "year") {
       return date.getFullYear().toString();
@@ -423,7 +402,9 @@ export default function SchedulePage() {
     };
   };
 
-  // ✅ PERFORMANCE: Optimized data fetching with parallel requests
+  // ============================================================================
+  // ✅ OPTIMIZED: Fetch data using API layer
+  // ============================================================================
   const fetchData = async () => {
     if (!token || !user || loading) return;
 
@@ -431,52 +412,34 @@ export default function SchedulePage() {
       setLoading(true);
       setError(null);
       
-      console.log("🔄 Fetching schedule data...");
+      log("🔄 Fetching schedule data with optimized API...");
+      const startTime = performance.now();
 
-      const directFetch = async (endpoint: string) => {
-        const response = await fetch(`https://aztec-interiors.onrender.com/${endpoint}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (!response.ok) {
-          throw new Error(`${endpoint} failed: ${response.status}`);
-        }
-        
-        return response.json();
-      };
-
-      // ✅ Fetch all in parallel for faster loading
+      // ✅ USE OPTIMIZED API LAYER with parallel fetching
       const [tasksData, jobsData, customersData] = await Promise.all([
-        directFetch('assignments'),
-        directFetch('jobs'),
-        directFetch('customers')
+        api.getAssignments(),
+        api.getJobs(),
+        api.getCustomers()
       ]);
       
-      const newData = {
-        tasks: Array.isArray(tasksData) ? tasksData : [],
-        jobs: Array.isArray(jobsData) ? jobsData : [],
-        customers: Array.isArray(customersData) ? customersData : [],
-      };
-      
-      // ✅ Update state and cache
-      setTasks(newData.tasks);
-      setAvailableJobs(newData.jobs);
-      setCustomers(newData.customers);
-      saveToCache(newData);
+      setTasks(Array.isArray(tasksData) ? tasksData : []);
+      setAvailableJobs(Array.isArray(jobsData) ? jobsData : []);
+      setCustomers(Array.isArray(customersData) ? customersData : []);
 
-      console.log("✅ Data loaded successfully");
+      const endTime = performance.now();
+      log(`⏱️ Schedule loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+
     } catch (err) {
-      console.error("❌ Error fetching data:", err);
+      error("❌ Error fetching data:", err);
       setError(err instanceof Error ? err.message : "Failed to load schedule data");
     } finally {
       setLoading(false);
     }
   };
 
+  // ============================================================================
+  // FETCH EMPLOYEES (Manager only)
+  // ============================================================================
   useEffect(() => {
     if (!user || !token) return;
 
@@ -486,51 +449,36 @@ export default function SchedulePage() {
       if (user.role !== "Manager") return;
 
       try {
-        const res = await fetchWithAuth("auth/users/staff");
-        if (res.ok) {
-          const data = await res.json();
-          setEmployees(data.users || []);
-        }
+        const response = await api.getUsers();
+        setEmployees(response.users || []);
       } catch (err) {
-        console.error("Error fetching employees:", err);
+        error("Error fetching employees:", err);
       }
     };
 
     fetchEmployees();
   }, [user, token]);
 
-  // ✅ Load data once when component mounts with user/token
+  // ============================================================================
+  // ✅ OPTIMIZED: Load data once on mount
+  // ============================================================================
   useEffect(() => {
     if (user && token && !hasLoadedData.current) {
-      console.log("🎯 Initial data load triggered");
+      log("🎯 Initial data load triggered");
       hasLoadedData.current = true;
-      
-      // ✅ If we have cached data, don't show loading state
-      if (cachedData) {
-        console.log("⚡ Using cached data, refreshing in background");
-        fetchData(); // Refresh in background
-      } else {
-        console.log("📡 No cache, fetching data");
-        fetchData();
-      }
+      fetchData();
     }
   }, [user, token]);
 
-  // CRUD operations
+  // ============================================================================
+  // ✅ OPTIMIZED: CRUD operations using API layer
+  // ============================================================================
   const createTask = async (taskData: Partial<Task>) => {
     if (!token) throw new Error("Not authenticated");
     
-    if (!taskData.customer_id) {
-      throw new Error("Customer is required");
-    }
-
-    if (!taskData.start_date) {
-      throw new Error("Start date is required");
-    }
-
-    if (!taskData.end_date) {
-      throw new Error("End date is required");
-    }
+    if (!taskData.customer_id) throw new Error("Customer is required");
+    if (!taskData.start_date) throw new Error("Start date is required");
+    if (!taskData.end_date) throw new Error("End date is required");
 
     try {
       setSaving(true);
@@ -594,8 +542,9 @@ export default function SchedulePage() {
         }
       });
 
-      console.log("📤 Creating task:", cleanedData);
+      log("📤 Creating task:", cleanedData);
 
+      // ✅ USE API LAYER
       const newTask = await api.createAssignment(cleanedData);
       
       if (!newTask.start_date && cleanedData.start_date) {
@@ -608,11 +557,9 @@ export default function SchedulePage() {
         newTask.customer_name = cleanedData.customer_name;
       }
       
-      const updatedTasks = [...tasks, newTask];
-      setTasks(updatedTasks);
-      saveToCache({ tasks: updatedTasks });
+      setTasks([...tasks, newTask]);
       
-      console.log("✅ Task created successfully");
+      log("✅ Task created successfully");
       return newTask;
     } finally {
       setSaving(false);
@@ -624,11 +571,11 @@ export default function SchedulePage() {
 
     try {
       setSaving(true);
+      
+      // ✅ USE API LAYER
       const updatedTask = await api.updateAssignment(id, taskData);
       
-      const updatedTasks = tasks.map((a) => (a.id === id ? updatedTask : a));
-      setTasks(updatedTasks);
-      saveToCache({ tasks: updatedTasks });
+      setTasks(tasks.map((a) => (a.id === id ? updatedTask : a)));
       
       return updatedTask;
     } finally {
@@ -642,48 +589,30 @@ export default function SchedulePage() {
     try {
       setSaving(true);
       
-      console.log(`🗑️ Deleting task: ${id}`);
+      log(`🗑️ Deleting task: ${id}`);
       
-      const response = await fetch(`https://aztec-interiors.onrender.com/assignments/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('❌ Non-JSON response:', text);
-        throw new Error('Server returned an error. Please check if the task exists.');
-      }
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || `Failed to delete task: ${response.status}`);
-      }
-
-      const updatedTasks = tasks.filter((t) => t.id !== id);
-      setTasks(updatedTasks);
-      saveToCache({ tasks: updatedTasks });
+      // ✅ USE API LAYER
+      await api.deleteAssignment(id);
+      
+      setTasks(tasks.filter((t) => t.id !== id));
       
       setShowTaskDialog(false);
       setSelectedTask(null);
       setIsEditingTask(false);
       
-      console.log(`✅ Task deleted successfully`);
+      log(`✅ Task deleted successfully`);
       
     } catch (err) {
-      console.error('❌ Error deleting task:', err);
+      error('❌ Error deleting task:', err);
       alert(err instanceof Error ? err.message : 'Failed to delete task');
     } finally {
       setSaving(false);
     }
   };
 
-  // Event handlers
+  // ============================================================================
+  // EVENT HANDLERS
+  // ============================================================================
   const toggleCalendarVisibility = (name: string) => {
     setVisibleCalendars((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
   };
@@ -775,7 +704,7 @@ export default function SchedulePage() {
       setCustomAssigneeInput("");
       setCustomTaskInput("");
     } catch (err) {
-      console.error("Error creating task:", err);
+      error("Error creating task:", err);
       alert(err instanceof Error ? err.message : "Failed to create task");
     }
   };
@@ -811,7 +740,9 @@ export default function SchedulePage() {
     e.preventDefault();
   };
 
-  // ✅ INSTANT drag-and-drop with silent retry
+  // ============================================================================
+  // ✅ OPTIMIZED: Instant drag-and-drop with API retry
+  // ============================================================================
   const handleDrop = async (e: React.DragEvent, date: Date) => {
     e.preventDefault();
     if (!draggedTask) return;
@@ -830,51 +761,34 @@ export default function SchedulePage() {
     
     const previousTasks = tasks;
     
-    // ✅ INSTANT UPDATE - UI responds immediately
-    const updatedTasks = tasks.map((t) => (t.id === taskToMove.id ? updatedTask : t));
-    setTasks(updatedTasks);
-    saveToCache({ tasks: updatedTasks });
-    console.log(`🎯 Task moved instantly to ${dateKey}`);
+    // ✅ OPTIMISTIC UPDATE
+    setTasks(tasks.map((t) => (t.id === taskToMove.id ? updatedTask : t)));
+    log(`🎯 Task moved instantly to ${dateKey}`);
     
-    // ✅ Update server in background with retry
-    const maxRetries = 3;
-    let retryCount = 0;
-    
-    const attemptUpdate = async (): Promise<boolean> => {
-      try {
-        await updateTask(taskToMove.id, { 
-          start_date: dateKey, 
-          date: dateKey,
-          end_date: dateKey
-        });
-        console.log(`✅ Server updated successfully`);
-        return true;
-      } catch (err) {
-        retryCount++;
-        console.error(`❌ Update failed (attempt ${retryCount}/${maxRetries})`);
-        
-        if (retryCount < maxRetries) {
-          // Exponential backoff
-          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-          return attemptUpdate();
-        }
-        return false;
-      }
-    };
-    
-    const success = await attemptUpdate();
-    
-    if (!success) {
-      console.error("❌ All retries failed, reverting");
+    // ✅ API LAYER ALREADY HAS RETRY LOGIC
+    try {
+      await updateTask(taskToMove.id, { 
+        start_date: dateKey, 
+        date: dateKey,
+        end_date: dateKey
+      });
+      log(`✅ Server updated successfully`);
+    } catch (err) {
+      error("❌ Failed to update task on server, reverting");
       setTasks(previousTasks);
-      saveToCache({ tasks: previousTasks });
-      alert("Failed to move task after multiple attempts. Please try again or refresh the page.");
+      alert("Failed to move task. Please try again.");
     }
   };
 
+  // ============================================================================
+  // RENDER HELPERS
+  // ============================================================================
   const gridColumnStyle = { gridTemplateColumns: `repeat(7, 156.4px)` } as React.CSSProperties;
   const weekdayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+  // ============================================================================
+  // LOADING / ERROR STATES
+  // ============================================================================
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white">
@@ -905,7 +819,9 @@ export default function SchedulePage() {
     );
   }
 
-  // Main render
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
   return (
     <div className="min-h-screen bg-white p-6">
       {/* Header */}
@@ -947,14 +863,7 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {/* ✅ Show cache status */}
-      {cachedData && !loading && (
-        <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-2 text-sm text-green-800">
-          📦 Showing cached data • Last updated {Math.round((Date.now() - cachedData.timestamp) / 1000)}s ago
-        </div>
-      )}
-
-      {/* Loading indicator when fetching */}
+      {/* Loading indicator */}
       {loading && (
         <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-3 flex items-center gap-3">
           <Loader2 className="h-4 w-4 animate-spin text-blue-600" />

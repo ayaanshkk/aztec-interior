@@ -196,7 +196,7 @@ export default function ChecklistViewPage() {
           Authorization: `Bearer ${token}`,
         };
 
-        const userResponse = await fetch("https://aztec-interiors.onrender.com/users/me", { headers });
+        const userResponse = await fetch("https://aztec-interior.onrender.com/users/me", { headers });
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setUser(userData);
@@ -228,7 +228,7 @@ export default function ChecklistViewPage() {
         }
 
         const response = await fetch(
-          `https://aztec-interiors.onrender.com/form-submissions/${formSubmissionId}`,
+          `https://aztec-interior.onrender.com/form-submissions/${formSubmissionId}`,
           { headers }
         );
 
@@ -371,7 +371,7 @@ export default function ChecklistViewPage() {
     try {
       const token = localStorage.getItem("auth_token");
       const response = await fetch(
-        `https://aztec-interiors.onrender.com/form-submissions/${formSubmissionId}`,
+        `https://aztec-interior.onrender.com/form-submissions/${formSubmissionId}`,
         {
           method: "PUT",
           headers: {
@@ -414,7 +414,7 @@ export default function ChecklistViewPage() {
     try {
       const token = localStorage.getItem("auth_token");
       const response = await fetch(
-        `https://aztec-interiors.onrender.com/form-submissions/${formSubmissionId}`,
+        `https://aztec-interior.onrender.com/form-submissions/${formSubmissionId}`,
         {
           method: "DELETE",
           headers: {
@@ -592,7 +592,7 @@ export default function ChecklistViewPage() {
         status: 'ordered',
       };
 
-      const response = await fetch('https://aztec-interiors.onrender.com/materials', {
+      const response = await fetch('https://aztec-interior.onrender.com/materials', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

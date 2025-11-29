@@ -160,7 +160,7 @@ export default function SettingsPage() {
       // If Next.js route doesn't exist (404), try the Render backend
       if (!usersRes.ok && usersRes.status === 404) {
         console.log("Next.js API route not found, trying Render backend...");
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://aztec-interiors.onrender.com";
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://aztec-interior.onrender.com";
         url = `${backendUrl}/auth/users`;
         console.log("Fetching users from backend:", url);
         
@@ -292,7 +292,7 @@ export default function SettingsPage() {
       // If Next.js route doesn't exist (404), try the Render backend
       if (!res.ok && res.status === 404) {
         console.log("Next.js API route not found, trying Render backend...");
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://aztec-interiors.onrender.com";
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "https://aztec-interior.onrender.com";
         url = `${backendUrl}/auth/invite-user`;
         console.log("Sending invitation to backend:", url);
         

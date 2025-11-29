@@ -127,7 +127,7 @@ export default function ReceiptViewPage() {
     const data = getReceiptData();
 
     try {
-      const response = await fetch(`https://aztec-interiors.onrender.com/receipts/save`, {
+      const response = await fetch(`https://aztec-interior.onrender.com/receipts/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -165,7 +165,7 @@ export default function ReceiptViewPage() {
     }
 
     try {
-      const response = await fetch(`https://aztec-interiors.onrender.com/approvals/status/${submissionId}`);
+      const response = await fetch(`https://aztec-interior.onrender.com/approvals/status/${submissionId}`);
       const data = await response.json();
 
       setApprovalStatus(data.approval_status);
@@ -198,7 +198,7 @@ export default function ReceiptViewPage() {
     const data = getReceiptData();
 
     try {
-      const response = await fetch(`https://aztec-interiors.onrender.com/receipts/download-pdf`, {
+      const response = await fetch(`https://aztec-interior.onrender.com/receipts/download-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
