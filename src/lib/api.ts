@@ -1237,7 +1237,7 @@ export function fetchParallel<T extends readonly unknown[]>(
  * Fetch multiple endpoints in parallel with error handling
  * Returns partial results even if some requests fail
  */
-export function fetchParallelSafe<T extends readonly unknown[]>(
+export async function fetchParallelSafe<T extends readonly unknown[]>(
   promises: readonly [...T]
 ): Promise<Array<{ data: any; error: Error | null }>> {
   const results = await Promise.allSettled(promises);

@@ -3,10 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const preferredRegion = "fra1";
 
-
-export const preferredRegion = "fra1";
-
-
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
 
 export async function POST(request: NextRequest) {
