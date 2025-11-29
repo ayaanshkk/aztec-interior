@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar, PenTool, Upload, Download, Package, UserPlus } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { api } from "@/lib/api";
 import Link from "next/link";
 import {
   Sidebar,
@@ -22,18 +21,6 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
-
-// ============================================================================
-// DEV-ONLY LOGGING
-// ============================================================================
-const IS_DEV = process.env.NODE_ENV === 'development';
-const log = (...args: any[]) => {
-  if (IS_DEV) console.log(...args);
-};
-const warn = (...args: any[]) => {
-  if (IS_DEV) console.warn(...args);
-};
-const error = console.error; // Always log errors
 
 interface Appliance {
   make: string;
@@ -311,8 +298,20 @@ function OrderMaterialsDialog({
         status: 'ordered',
       };
 
-      // ✅ USE API LAYER
-      await api.createMaterialOrder(payload);
+      const token = localStorage.getItem('token');
+
+      const response = await fetch('https://aztec-interior.onrender.com/materials', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create material order');
+      }
 
       alert('Material order created successfully!');
       onClose();
@@ -325,8 +324,8 @@ function OrderMaterialsDialog({
       setExpectedDelivery('');
       setNotes('');
       
-    } catch (err) {
-      error('Error creating material order:', err);
+    } catch (error) {
+      console.error('Error creating material order:', error);
       alert('Failed to create material order. Please try again.');
     } finally {
       setSubmitting(false);
@@ -830,12 +829,11 @@ export default function FormPage() {
     const redirectUrl = searchParams.get("redirect");
     const token = searchParams.get("token") || "";
     const customerIdFromUrl = searchParams.get("customerId") || "";
-    const projectIdFromUrl = searchParams.get("projectId") || "";
+    const projectIdFromUrl = searchParams.get("projectId") || "";  // ✅ ADD THIS LINE
     const isClientOwned = formData.appliances_customer_owned === "no";
 
     const finalAppliances = [...formData.appliances];
 
-    // Add integrated fridge/freezer if present
     if (
       formData.integ_fridge_qty?.trim() ||
       formData.integ_fridge_make?.trim() ||
@@ -882,27 +880,33 @@ export default function FormPage() {
     setSubmitStatus({ type: null, message: "" });
 
     try {
-      // ✅ USE API LAYER
-      const result = await api.submitCustomerForm(
-        finalFormData,
-        token || undefined,
-        projectIdFromUrl || undefined,
-        isWalkinMode
-      );
+      const response = await fetch("https://aztec-interior.onrender.com/submit-customer-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: token || undefined,
+          formData: finalFormData,
+          projectId: projectIdFromUrl || undefined,
+          isWalkinMode: isWalkinMode, 
+        }),
+      });
 
-      if (result.success) {
+      const result = await response.json();
+
+      if (response.ok && result.success) {
         const successMsg = isWalkinMode 
-          ? "Customer created and form submitted successfully! Redirecting to customer profile..."
-          : result.message || "Form submitted successfully! Redirecting...";
+        ? "Customer created and form submitted successfully! Redirecting to customer profile..."
+        : result.message || "Form submitted successfully! Redirecting...";
 
         setSubmitStatus({
           type: "success",
-          message: successMsg,
+          message: result.message || "Form submitted successfully! Redirecting...",
         });
 
         setTimeout(() => {
           const targetCustomerId = result.customer_id || customerIdFromUrl;
 
+          // ✅ ADD THIS IF BLOCK
           if (projectIdFromUrl) {
             router.push(`/dashboard/projects/${projectIdFromUrl}`);
           } else if (redirectUrl) {
@@ -919,8 +923,8 @@ export default function FormPage() {
           message: result.error || "Failed to submit form",
         });
       }
-    } catch (err) {
-      error("Submit error:", err);
+    } catch (error) {
+      console.error("Submit error:", error);
       setSubmitStatus({
         type: "error",
         message: "Network error. Please try again.",
@@ -2210,7 +2214,6 @@ export default function FormPage() {
                     </div>
                   </div>
                 </div>
-
                 {/* 3. Accessories & Floor Protection - Pink Section */}
                 <div className="rounded-lg border-2 border-pink-200 bg-pink-50 p-6">
                   <div className="flex items-center justify-between mb-2">

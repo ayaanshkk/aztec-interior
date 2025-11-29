@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Filter, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Eye, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,35 +16,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { api, cacheUtils } from "@/lib/api";
-import JobStageBadge from "@/components/JobStageBadge";
+import { fetchWithAuth } from "@/lib/api";
+import JobStageBadge from "@/components/JobStageBadge"; // ✅ Import the badge component
 
-// ============================================================================
-// DEV-ONLY LOGGING
-// ============================================================================
-const IS_DEV = process.env.NODE_ENV === 'development';
-const log = (...args: any[]) => {
-  if (IS_DEV) console.log(...args);
-};
-const warn = (...args: any[]) => {
-  if (IS_DEV) console.warn(...args);
-};
-const error = console.error; // Always log errors
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
 const JOB_TYPES = ["Kitchen", "Bedroom", "Wardrobe", "Remedial", "Other"];
 
+// ✅ Work stages definition
 const WORK_STAGES = [
   { value: "Survey", label: "Survey", icon: "📏" },
   { value: "Delivery", label: "Delivery", icon: "🚚" },
   { value: "Installation", label: "Installation", icon: "🏗️" },
 ];
 
-// ============================================================================
-// INTERFACES
-// ============================================================================
 interface Job {
   id: string;
   job_reference: string;
@@ -52,7 +35,7 @@ interface Job {
   customer_name: string;
   job_type: string;
   stage: string;
-  work_stage?: string;
+  work_stage?: string; // ✅ NEW: Work stage field
   priority: string;
   start_date: string;
   end_date: string;
@@ -60,157 +43,182 @@ interface Job {
   created_at: string;
 }
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
 export default function JobsPage() {
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
-  const [filterWorkStage, setFilterWorkStage] = useState<string>("all");
+  const [filterWorkStage, setFilterWorkStage] = useState<string>("all"); // ✅ NEW: Work stage filter
   
   // Delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  // ============================================================================
-  // ✅ OPTIMIZED: Load jobs with API layer and caching
-  // ============================================================================
-  const loadJobs = useCallback(async () => {
+  useEffect(() => {
+    loadJobs();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [jobs, searchTerm, filterType, filterWorkStage]); // ✅ Added filterWorkStage
+
+  const loadJobs = async () => {
     setLoading(true);
     const startTime = performance.now();
     
     try {
-      log("🔄 Loading jobs...");
-      const data = await api.getJobs();
+      const token = localStorage.getItem("auth_token");
+      if (!token) {
+        console.error("❌ No auth token found");
+        setLoading(false);
+        return;
+      }
+
+      console.log("🔄 Fetching tasks...");
       
-      setJobs(Array.isArray(data) ? data : []);
+      const headers: HeadersInit = { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      // ✅ Retry logic
+      let response;
+      let retryCount = 0;
+      const maxRetries = 2;
+
+      while (retryCount <= maxRetries) {
+        try {
+          response = await fetch("https://aztec-interior.onrender.com/jobs", {
+            headers,
+            signal: AbortSignal.timeout(15000), // 15 second timeout
+          });
+
+          if (response.ok) {
+            break; // Success, exit retry loop
+          }
+
+          // If we get a timeout or server error, retry
+          if (response.status === 408 || response.status >= 500) {
+            retryCount++;
+            if (retryCount <= maxRetries) {
+              console.log(`⏳ Retry ${retryCount}/${maxRetries} for tasks...`);
+              await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
+              continue;
+            }
+          }
+
+          throw new Error(`Failed to fetch tasks: ${response.status}`);
+          
+        } catch (error: any) {
+          if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+            if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(`⏳ Timeout - Retry ${retryCount}/${maxRetries} for tasks...`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              continue;
+            }
+          }
+          throw error;
+        }
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(`Failed to fetch tasks after ${maxRetries} retries`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ Tasks received: ${data.length} jobs`);
+      
+      setJobs(data);
 
       const endTime = performance.now();
-      log(`⏱️ Jobs loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
-    } catch (err) {
-      console.error("❌ Error loading jobs:", err);
-      setJobs([]);
+      console.log(`⏱️ Tasks page loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+
+    } catch (error) {
+      console.error("❌ Error loading tasks:", error);
+      setJobs([]); // Set empty array instead of leaving undefined
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    loadJobs();
-  }, [loadJobs]);
-
-  // ============================================================================
-  // ✅ OPTIMIZED: Memoized filtering (only recomputes when dependencies change)
-  // ============================================================================
-  const filteredJobs = useMemo(() => {
+  const applyFilters = () => {
     let filtered = [...jobs];
 
-    // Search filter
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (job) =>
-          job.job_reference?.toLowerCase().includes(term) ||
-          job.job_name?.toLowerCase().includes(term) ||
-          job.customer_name?.toLowerCase().includes(term)
+          job.job_reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          job.job_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          job.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
-    // Type filter
     if (filterType && filterType !== "all") {
       filtered = filtered.filter((job) => job.job_type === filterType);
     }
 
-    // Work stage filter
+    // ✅ NEW: Filter by work stage
     if (filterWorkStage && filterWorkStage !== "all") {
       filtered = filtered.filter((job) => job.work_stage === filterWorkStage);
     }
 
-    return filtered;
-  }, [jobs, searchTerm, filterType, filterWorkStage]);
+    setFilteredJobs(filtered);
+  };
 
-  // ============================================================================
-  // ✅ OPTIMIZED: Work stage stats (memoized)
-  // ============================================================================
-  const workStageStats = useMemo(() => {
-    return WORK_STAGES.map((stage) => ({
-      ...stage,
-      count: jobs.filter((j) => j.work_stage === stage.value).length,
-    }));
-  }, [jobs]);
-
-  // ============================================================================
-  // ✅ OPTIMIZED: Update work stage with optimistic UI
-  // ============================================================================
-  const handleUpdateWorkStage = useCallback(async (jobId: string, newWorkStage: string) => {
-    // Store previous state for rollback
-    const previousJobs = [...jobs];
-    
-    // Optimistic update - update UI immediately
-    setJobs((prev) =>
-      prev.map((j) => (j.id === jobId ? { ...j, work_stage: newWorkStage } : j))
-    );
-
+  // ✅ NEW: Update job work stage
+  const handleUpdateWorkStage = async (jobId: string, newWorkStage: string) => {
     try {
-      await api.updateJobWorkStage(jobId, newWorkStage);
-      log(`✅ Updated job ${jobId} work stage to ${newWorkStage}`);
-    } catch (err) {
-      console.error("Error updating work stage:", err);
+      const response = await fetchWithAuth(`jobs/${jobId}`, {
+        method: "PUT",
+        body: JSON.stringify({ work_stage: newWorkStage }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to update work stage");
+      }
+
+      const updatedJob = await response.json();
       
-      // Rollback on error
-      setJobs(previousJobs);
-      alert(`Failed to update work stage: ${err instanceof Error ? err.message : 'Please try again'}`);
+      // Update state
+      setJobs((prev) =>
+        prev.map((j) => (j.id === jobId ? { ...j, work_stage: updatedJob.work_stage } : j))
+      );
+      
+      console.log(`✅ Updated task ${jobId} work stage to ${newWorkStage}`);
+    } catch (error) {
+      console.error("Error updating work stage:", error);
+      alert(`Failed to update work stage: ${error instanceof Error ? error.message : 'Please try again'}`);
     }
-  }, [jobs]);
+  };
 
-  // ============================================================================
-  // ✅ OPTIMIZED: Delete job with optimistic UI
-  // ============================================================================
-  const handleDeleteJob = useCallback(async () => {
-    if (!jobToDelete || isDeleting) return;
-
-    setIsDeleting(true);
-    
-    // Store previous state for rollback
-    const previousJobs = [...jobs];
-    
-    // Optimistic update - remove from UI immediately
-    setJobs((prev) => prev.filter((j) => j.id !== jobToDelete.id));
-    setDeleteDialogOpen(false);
+  // ✅ Delete job handler
+  const handleDeleteJob = async () => {
+    if (!jobToDelete) return;
 
     try {
-      await api.deleteJob(jobToDelete.id);
-      
+      const response = await fetchWithAuth(`jobs/${jobToDelete.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete task");
+      }
+
+      // Remove from state
+      setJobs((prev) => prev.filter((j) => j.id !== jobToDelete.id));
+      setDeleteDialogOpen(false);
       setJobToDelete(null);
-      log(`✅ Deleted job ${jobToDelete.id}`);
-    } catch (err) {
-      console.error("Error deleting job:", err);
-      
-      // Rollback on error
-      setJobs(previousJobs);
-      setDeleteDialogOpen(true); // Re-open dialog
-      alert(`Failed to delete job: ${err instanceof Error ? err.message : 'Please try again'}`);
-    } finally {
-      setIsDeleting(false);
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      alert(`Failed to delete task: ${error instanceof Error ? error.message : 'Please try again'}`);
     }
-  }, [jobToDelete, jobs, isDeleting]);
+  };
 
-  // ============================================================================
-  // ✅ OPTIMIZED: Clear filters callback
-  // ============================================================================
-  const clearFilters = useCallback(() => {
-    setSearchTerm("");
-    setFilterWorkStage("all");
-    setFilterType("all");
-  }, []);
-
-  // ============================================================================
-  // HELPER FUNCTIONS (Keep existing)
-  // ============================================================================
   const getStageColor = (stage: string) => {
     const colors: Record<string, string> = {
       Lead: "bg-gray-100 text-gray-800",
@@ -238,42 +246,34 @@ export default function JobsPage() {
     return colors[priority] || "text-gray-600";
   };
 
-  // ============================================================================
-  // RENDER - LOADING STATE
-  // ============================================================================
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading jobs...</p>
+          <p className="text-gray-600">Loading tasks...</p>
         </div>
       </div>
     );
   }
 
-  // ============================================================================
-  // RENDER - MAIN UI
-  // ============================================================================
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="border-b bg-white px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-gray-900">Jobs</h1>
+            <h1 className="text-3xl font-semibold text-gray-900">Tasks</h1>
             <p className="mt-1 text-sm text-gray-600">
-              Manage and track all your jobs in one place
+              Manage and track all your tasks in one place
             </p>
           </div>
           <Button onClick={() => router.push("/dashboard/jobs/create")} className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
-            Create New Job
+            Create New Task
           </Button>
         </div>
       </header>
 
-      {/* Filters */}
       <div className="border-b bg-white px-8 py-4">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex-1 min-w-[300px]">
@@ -304,6 +304,7 @@ export default function JobsPage() {
             </Select>
           </div>
 
+          {/* ✅ NEW: Work Stage Filter */}
           <div className="w-[200px]">
             <Select value={filterWorkStage} onValueChange={setFilterWorkStage}>
               <SelectTrigger>
@@ -324,37 +325,45 @@ export default function JobsPage() {
           </div>
 
           {(searchTerm || filterWorkStage !== "all" || filterType !== "all") && (
-            <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearchTerm("");
+                setFilterWorkStage("all");
+                setFilterType("all");
+              }}
+            >
               Clear Filters
             </Button>
           )}
         </div>
       </div>
 
-      {/* Stats */}
       <div className="border-b bg-white px-8 py-4">
         <div className="flex gap-8">
           <div>
-            <p className="text-sm text-gray-600">Total Jobs</p>
+            <p className="text-sm text-gray-600">Total Tasks</p>
             <p className="text-2xl font-semibold">{jobs.length}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Filtered Results</p>
             <p className="text-2xl font-semibold">{filteredJobs.length}</p>
           </div>
-          {workStageStats.map((stage) => {
-            if (stage.count === 0) return null;
+          {/* ✅ NEW: Work stage counts */}
+          {WORK_STAGES.map((stage) => {
+            const count = jobs.filter((j) => j.work_stage === stage.value).length;
+            if (count === 0) return null;
             return (
               <div key={stage.value}>
                 <p className="text-sm text-gray-600">{stage.icon} {stage.label}</p>
-                <p className="text-2xl font-semibold">{stage.count}</p>
+                <p className="text-2xl font-semibold">{count}</p>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Jobs Table */}
       <main className="px-8 py-6">
         {filteredJobs.length === 0 ? (
           <div className="rounded-lg border bg-white p-12 text-center">
@@ -368,7 +377,7 @@ export default function JobsPage() {
             {jobs.length === 0 && (
               <Button onClick={() => router.push("/dashboard/jobs/create")} className="mt-4">
                 <Plus className="mr-2 h-4 w-4" />
-                Create Your First Job
+                Create Your First Task
               </Button>
             )}
           </div>
@@ -379,10 +388,10 @@ export default function JobsPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
-                      Job Reference
+                      Task Reference
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
-                      Job Name
+                      Task Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
                       Customer
@@ -390,6 +399,7 @@ export default function JobsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
                       Type
                     </th>
+                    {/* ✅ NEW: Work Stage column */}
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
                       Work Stage
                     </th>
@@ -427,6 +437,7 @@ export default function JobsPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-700">{job.job_type}</span>
                       </td>
+                      {/* ✅ NEW: Work Stage cell with inline editing */}
                       <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <Select
                           value={job.work_stage || "Survey"}
@@ -486,19 +497,19 @@ export default function JobsPage() {
         )}
       </main>
 
-      {/* Delete Confirmation Dialog */}
+      {/* ✅ Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Job?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Task?</AlertDialogTitle>
             <AlertDialogDescription>
               {jobToDelete && (
                 <>
                   <p className="mb-2">
-                    Are you sure you want to delete this job?
+                    Are you sure you want to delete this task?
                   </p>
                   <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
-                    <p><strong>Job Reference:</strong> {jobToDelete.job_reference}</p>
+                    <p><strong>Task Reference:</strong> {jobToDelete.job_reference}</p>
                     <p><strong>Customer:</strong> {jobToDelete.customer_name}</p>
                     <p><strong>Type:</strong> {jobToDelete.job_type}</p>
                   </div>
@@ -510,21 +521,17 @@ export default function JobsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel 
-              onClick={() => {
-                setDeleteDialogOpen(false);
-                setJobToDelete(null);
-              }}
-              disabled={isDeleting}
-            >
+            <AlertDialogCancel onClick={() => {
+              setDeleteDialogOpen(false);
+              setJobToDelete(null);
+            }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteJob}
-              disabled={isDeleting}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

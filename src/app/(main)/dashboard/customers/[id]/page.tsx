@@ -47,11 +47,6 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { api, fetchParallel, cacheUtils } from "@/lib/api";
-
-const log = (...args: any[]) => {
-  if (process.env.NODE_ENV === 'development') console.log(...args);
-};
 
 // ... (keeping all your existing interfaces the same)
 interface Project {
@@ -126,7 +121,6 @@ interface FormDocument {
   type: "excel" | "pdf" | "other";
   created_at: string;
   customer_id: string;
-  project_id?: string;
 }
 
 // ... (keeping all your existing constants the same - FIELD_LABELS, FINANCIAL_FIELDS, etc.)
@@ -351,35 +345,38 @@ export default function CustomerDetailsPage() {
 
   useEffect(() => {
     if (!id) return;
-    
-    // Only reload if user changes in a meaningful way (id or role)
     loadCustomerData();
-    
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, user?.id, user?.role]); // ✅ Only depend on primitives, not whole object
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      // Cancel any pending requests if component unmounts
-      log("🧹 Cleaning up customer details page");
-    };
-  }, []);
+  }, [id, user]);
 
   const loadCustomerData = async () => {
     setLoading(true);
-    const startTime = performance.now();
+
+    const token = localStorage.getItem("auth_token");
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
 
     try {
-      log("🔄 Loading customer data with optimized API...");
-
-      // ✅ PARALLEL FETCH using optimized API layer
-      const [customerData, drawings, formDocs] = await Promise.all([
-        api.getCustomerDetails(id),
-        api.getCustomerDrawings(id),
-        api.getCustomerFormDocuments(id),
+      // ✅ PARALLEL FETCH - All requests happen at once
+      const [customerRes, drawingsRes, formDocsRes] = await Promise.all([
+        fetch(`https://aztec-interior.onrender.com/customers/${id}`, { headers }),
+        fetch(`https://aztec-interior.onrender.com/files/drawings?customer_id=${id}`, { headers })
+          .catch(() => null),
+        fetch(`https://aztec-interior.onrender.com/files/forms?customer_id=${id}`, { headers })
+          .catch(() => null),
       ]);
 
+      if (!customerRes.ok) {
+        throw new Error("Failed to load customer data");
+      }
+
+      // Process customer data
+      const customerData = await customerRes.json();
+      
       // Normalize postcode
       const normalizedCustomer = {
         ...customerData,
@@ -400,17 +397,33 @@ export default function CustomerDetailsPage() {
         setHasAccess(true);
       }
 
-      // ✅ Filter unassigned files with type assertions
-      const unassignedDrawings = (drawings as DrawingDocument[]).filter((doc: DrawingDocument) => !doc.project_id);
-      const unassignedForms = (formDocs as FormDocument[]).filter((form: FormDocument) => !form.project_id);
-
-      // ✅ BATCH STATE UPDATE (single re-render)
       setCustomer(normalizedCustomer);
-      setDrawingDocuments(unassignedDrawings);
-      setFormDocuments(unassignedForms);
 
-      const endTime = performance.now();
-      log(`⏱️ Customer data loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+      // ✅ Process drawings - Filter out assigned files (only show unassigned)
+      if (drawingsRes && drawingsRes.ok) {
+        const contentType = drawingsRes.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const drawingsData = await drawingsRes.json();
+          if (Array.isArray(drawingsData)) {
+            // ✅ ONLY SHOW FILES WITHOUT project_id (unassigned files)
+            const unassignedDrawings = drawingsData.filter(doc => !doc.project_id);
+            setDrawingDocuments(unassignedDrawings);
+          }
+        }
+      }
+
+      // ✅ Process form documents - Filter out assigned files
+      if (formDocsRes && formDocsRes.ok) {
+        const contentType = formDocsRes.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const formDocsData = await formDocsRes.json();
+          if (Array.isArray(formDocsData)) {
+            // ✅ ONLY SHOW FORMS WITHOUT project_id (unassigned forms)
+            const unassignedForms = formDocsData.filter(form => !form.project_id);
+            setFormDocuments(unassignedForms);
+          }
+        }
+      }
 
     } catch (error) {
       console.error("Error loading customer data:", error);
@@ -420,199 +433,198 @@ export default function CustomerDetailsPage() {
     }
   };
 
-  const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
 
-    setUploading(true);
-    const startTime = performance.now();
+  const token = localStorage.getItem("auth_token");
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
+  const uploadedDocs: FormDocument[] = [];
+
+  for (const file of Array.from(files)) {
     try {
-      log(`📤 Uploading ${files.length} form documents in parallel...`);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("customer_id", id);
 
-      // ✅ PARALLEL UPLOAD instead of sequential
-      const uploadPromises = Array.from(files).map(file => 
-        api.uploadFormDocument(file, id)
-      );
-
-      const results = await Promise.allSettled(uploadPromises);
-
-      // Process results
-      const uploadedDocs: FormDocument[] = [];
-      const failedUploads: string[] = [];
-
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value) {
-          const doc = result.value;
-          uploadedDocs.push({
-            id: doc.id,
-            filename: doc.filename || files[index].name,
-            url: doc.url || doc.file_url,
-            type: doc.type || "other",
-            created_at: doc.created_at || new Date().toISOString(),
-            customer_id: id,
-          });
-        } else {
-          failedUploads.push(files[index].name);
-        }
-      });
-
-      // ✅ UPDATE STATE IN ONE GO
-      if (uploadedDocs.length > 0) {
-        setFormDocuments(prev => {
-          const updated = [...uploadedDocs, ...prev];
-          return updated.sort((a, b) => 
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
-        });
-      }
-
-      const endTime = performance.now();
-      log(`✅ Uploaded ${uploadedDocs.length}/${files.length} files in ${((endTime - startTime) / 1000).toFixed(2)}s`);
-
-      if (failedUploads.length > 0) {
-        console.warn(`⚠️ Failed uploads: ${failedUploads.join(', ')}`);
-        alert(`Successfully uploaded ${uploadedDocs.length} files. Failed: ${failedUploads.join(', ')}`);
-      }
-
-    } catch (error) {
-      console.error("Upload error:", error);
-      alert("Error uploading files. Please try again.");
-    } finally {
-      setUploading(false);
-      if (event.target) event.target.value = "";
-    }
-  };
-
-  const handleUploadFormDocument = () => {
-    if (formFileInputRef.current) {
-      formFileInputRef.current.click();
-    }
-  };
-
-  // NEW: Drag and drop handlers
-  const handleDragStart = (type: 'form' | 'drawing', id: string) => {
-    setDraggedItem({ type, id });
-  };
-
-  const handleDragEnd = () => {
-    setDraggedItem(null);
-    setDragOverProject(null);
-  };
-
-  const handleDragOver = (e: React.DragEvent, projectId: string) => {
-    e.preventDefault();
-    setDragOverProject(projectId);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverProject(null);
-  };
-
-  const handleDrop = async (e: React.DragEvent, projectId: string) => {
-    e.preventDefault();
-    setDragOverProject(null);
-
-    if (!draggedItem) return;
-
-    const token = localStorage.getItem("auth_token");
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-    };
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-
-    try {
-      let endpoint = "";
-      
-      if (draggedItem.type === "form") {
-        endpoint = `https://aztec-interior.onrender.com/form-submissions/${draggedItem.id}`;
-      } else if (draggedItem.type === "drawing") {
-        endpoint = `https://aztec-interior.onrender.com/files/drawings/${draggedItem.id}`;
-      }
-
-      const response = await fetch(endpoint, {
-        method: "PATCH",
+      const response = await fetch("https://aztec-interior.onrender.com/files/forms", {
+        method: "POST",
         headers: headers,
-        body: JSON.stringify({ project_id: projectId }),
+        body: formData,
       });
 
       if (response.ok) {
-        // ✅ REMOVE FILE FROM LOCAL STATE - IT NOW BELONGS TO THE PROJECT
-        if (draggedItem.type === "drawing") {
-          setDrawingDocuments(prev => 
-            prev.filter(doc => doc.id !== draggedItem.id)
-          );
-        } else if (draggedItem.type === "form") {
-          setCustomer(prev => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              form_submissions: prev.form_submissions.filter(
-                form => String(form.id) !== draggedItem.id
-              )
-            };
-          });
+        const data = await response.json();
+        if (data.form_document && data.form_document.id) {
+          const newDoc: FormDocument = {
+            id: data.form_document.id,
+            filename: data.form_document.filename || file.name,
+            url: data.form_document.url || data.form_document.file_url,
+            type: data.form_document.type || "other",
+            created_at: data.form_document.created_at || new Date().toISOString(),
+            customer_id: id,
+          };
+
+          uploadedDocs.push(newDoc);
         }
-        
-        // ✅ Optional: Show success message
-        // alert("File assigned to project successfully!");
-        
-      } else {
-        const error = await response.json().catch(() => ({ error: "Failed to assign" }));
-        alert(`Error: ${error.error || error.message || "Failed to assign to project"}`);
       }
     } catch (error) {
-      console.error("Error assigning to project:", error);
-      alert("Network error");
+      console.error(`Upload error:`, error);
     }
+  }
 
-    setDraggedItem(null);
+  // ✅ UPDATE STATE IN ONE GO
+  if (uploadedDocs.length > 0) {
+    setFormDocuments(prev => {
+      const updated = [...uploadedDocs, ...prev];
+      return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    });
+  }
+
+  if (event.target) event.target.value = "";
+};
+
+const handleUploadFormDocument = () => {
+  if (formFileInputRef.current) {
+    formFileInputRef.current.click();
+  }
+};
+
+// NEW: Drag and drop handlers
+const handleDragStart = (type: 'form' | 'drawing', id: string) => {
+  setDraggedItem({ type, id });
+};
+
+const handleDragEnd = () => {
+  setDraggedItem(null);
+  setDragOverProject(null);
+};
+
+const handleDragOver = (e: React.DragEvent, projectId: string) => {
+  e.preventDefault();
+  setDragOverProject(projectId);
+};
+
+const handleDragLeave = () => {
+  setDragOverProject(null);
+};
+
+const handleDrop = async (e: React.DragEvent, projectId: string) => {
+  e.preventDefault();
+  setDragOverProject(null);
+
+  if (!draggedItem) return;
+
+  const token = localStorage.getItem("auth_token");
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
   };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const handleViewFormDocument = (doc: FormDocument) => {
-    const BACKEND_URL = "https://aztec-interior.onrender.com";
-    let viewUrl = doc.url;
-
-    if (viewUrl && viewUrl.startsWith('http')) {
-      window.open(viewUrl, "_blank");
-      return;
+  try {
+    let endpoint = "";
+    
+    if (draggedItem.type === "form") {
+      endpoint = `https://aztec-interior.onrender.com/form-submissions/${draggedItem.id}`;
+    } else if (draggedItem.type === "drawing") {
+      endpoint = `https://aztec-interior.onrender.com/files/drawings/${draggedItem.id}`;
     }
 
-    if (viewUrl && !viewUrl.startsWith('http')) {
-      viewUrl = `${BACKEND_URL}${viewUrl.startsWith('/') ? viewUrl : '/' + viewUrl}`;
-    } else if (!viewUrl) {
-      alert("Error: Form document URL is missing or invalid.");
-      return;
-    }
+    const response = await fetch(endpoint, {
+      method: "PATCH",
+      headers: headers,
+      body: JSON.stringify({ project_id: projectId }),
+    });
 
+    if (response.ok) {
+      // ✅ REMOVE FILE FROM LOCAL STATE - IT NOW BELONGS TO THE PROJECT
+      if (draggedItem.type === "drawing") {
+        setDrawingDocuments(prev => 
+          prev.filter(doc => doc.id !== draggedItem.id)
+        );
+      } else if (draggedItem.type === "form") {
+        setCustomer(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            form_submissions: prev.form_submissions.filter(
+              form => String(form.id) !== draggedItem.id
+            )
+          };
+        });
+      }
+      
+      // ✅ Optional: Show success message
+      // alert("File assigned to project successfully!");
+      
+    } else {
+      const error = await response.json().catch(() => ({ error: "Failed to assign" }));
+      alert(`Error: ${error.error || error.message || "Failed to assign to project"}`);
+    }
+  } catch (error) {
+    console.error("Error assigning to project:", error);
+    alert("Network error");
+  }
+
+  setDraggedItem(null);
+};
+
+const handleViewFormDocument = (doc: FormDocument) => {
+  const BACKEND_URL = "https://aztec-interior.onrender.com";
+  let viewUrl = doc.url;
+
+  if (viewUrl && viewUrl.startsWith('http')) {
     window.open(viewUrl, "_blank");
-  };
+    return;
+  }
 
-  const handleDeleteFormDocument = async (doc: FormDocument) => {
-    if (isDeletingFormDoc) return;
-    setFormDocToDelete(doc);
-    setShowDeleteFormDocDialog(true);
-  };
+  if (viewUrl && !viewUrl.startsWith('http')) {
+    viewUrl = `${BACKEND_URL}${viewUrl.startsWith('/') ? viewUrl : '/' + viewUrl}`;
+  } else if (!viewUrl) {
+    alert("Error: Form document URL is missing or invalid.");
+    return;
+  }
 
-  const handleConfirmDeleteFormDocument = async () => {
-    if (!formDocToDelete) return;
-    setIsDeletingFormDoc(true);
+  window.open(viewUrl, "_blank");
+};
 
-    try {
-      await api.deleteFormDocument(formDocToDelete.id, id);
-      
-      // ✅ Optimistic update
+const handleDeleteFormDocument = async (doc: FormDocument) => {
+  if (isDeletingFormDoc) return;
+  setFormDocToDelete(doc);
+  setShowDeleteFormDocDialog(true);
+};
+
+const handleConfirmDeleteFormDocument = async () => {
+  if (!formDocToDelete) return;
+  setIsDeletingFormDoc(true);
+  
+  const token = localStorage.getItem("auth_token");
+  const headers: HeadersInit = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  try {
+    const res = await fetch(
+      `https://aztec-interior.onrender.com/files/forms/${formDocToDelete.id}`,
+      { method: "DELETE", headers }
+    );
+
+    if (res.ok) {
       setFormDocuments((prev) => prev.filter((d) => d.id !== formDocToDelete.id));
-      
       setShowDeleteFormDocDialog(false);
       setFormDocToDelete(null);
-    } catch (err) {
-      console.error("Delete error:", err);
-      alert(`Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setIsDeletingFormDoc(false);
+    } else {
+      const err = await res.json().catch(() => ({ error: "Server error" }));
+      alert(`Failed to delete: ${err.error}`);
     }
-  };
+  } catch (e) {
+    console.error(e);
+    alert("Network error");
+  } finally {
+    setIsDeletingFormDoc(false);
+  }
+};
 
   // NEW: Bulk delete handlers for drawings
   const handleToggleDrawingSelection = (drawingId: string) => {
@@ -746,72 +758,73 @@ export default function CustomerDetailsPage() {
     const files = fileInputRef.current?.files;
     if (!files || files.length === 0) return;
 
-    setUploading(true);
-    const startTime = performance.now();
+    const token = localStorage.getItem("auth_token");
+    const headers: HeadersInit = {};
 
-    try {
-      log(`📤 Uploading ${files.length} drawings in parallel...`);
-
-      // ✅ PARALLEL UPLOAD
-      const uploadPromises = Array.from(files).map(file => 
-        api.uploadDrawing(file, id, selectedProjectForUpload || undefined)
-      );
-
-      const results = await Promise.allSettled(uploadPromises);
-
-      // Process results
-      const uploadedDocs: DrawingDocument[] = [];
-      const failedUploads: string[] = [];
-
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value) {
-          const doc = result.value;
-          
-          // Only add to state if NO project_id (unassigned)
-          if (!doc.project_id) {
-            uploadedDocs.push({
-              id: doc.id,
-              filename: doc.filename || doc.file_name || files[index].name,
-              url: doc.url || doc.file_url,
-              type: doc.type || doc.category || "other",
-              created_at: doc.created_at || new Date().toISOString(),
-              project_id: doc.project_id,
-            });
-          }
-        } else {
-          failedUploads.push(files[index].name);
-        }
-      });
-
-      // ✅ UPDATE STATE - Only unassigned files
-      if (uploadedDocs.length > 0) {
-        setDrawingDocuments(prev => {
-          const updated = [...uploadedDocs, ...prev];
-          return updated.sort((a, b) => 
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
-        });
-      }
-
-      const endTime = performance.now();
-      log(`✅ Uploaded ${uploadedDocs.length + (files.length - uploadedDocs.length - failedUploads.length)}/${files.length} files in ${((endTime - startTime) / 1000).toFixed(2)}s`);
-
-      if (failedUploads.length > 0) {
-        alert(`Some uploads failed: ${failedUploads.join(', ')}`);
-      }
-
-    } catch (error) {
-      console.error("Upload error:", error);
-      alert("Error uploading files. Please try again.");
-    } finally {
-      // Clean up
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-      setShowProjectSelectDialog(false);
-      setSelectedProjectForUpload(null);
-      setUploading(false);
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
     }
+
+    setUploading(true);
+    const uploadedDocs: DrawingDocument[] = [];
+
+    for (const file of Array.from(files)) {
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("customer_id", id);
+        
+        if (selectedProjectForUpload) {
+          formData.append("project_id", selectedProjectForUpload);
+        }
+
+        const response = await fetch("https://aztec-interior.onrender.com/files/drawings", {
+          method: "POST",
+          headers: headers,
+          body: formData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+
+          if (data.drawing && data.drawing.id) {
+            const newDoc: DrawingDocument = {
+              id: data.drawing.id,
+              filename: data.drawing.filename || data.drawing.file_name || file.name,
+              url: data.drawing.url || data.drawing.file_url,
+              type: data.drawing.type || data.drawing.category || "other",
+              created_at: data.drawing.created_at || new Date().toISOString(),
+              project_id: data.drawing.project_id,
+            };
+
+            // ✅ Only add to state if NO project_id (unassigned)
+            if (!newDoc.project_id) {
+              uploadedDocs.push(newDoc);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Upload error:`, error);
+      }
+    }
+
+    // ✅ UPDATE STATE - Only unassigned files
+    if (uploadedDocs.length > 0) {
+      setDrawingDocuments(prev => {
+        const updated = [...uploadedDocs, ...prev];
+        return updated.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      });
+    }
+
+    // Clean up
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setShowProjectSelectDialog(false);
+    setSelectedProjectForUpload(null);
+    setUploading(false);
   };
 
   const handleUploadDrawing = () => {
@@ -850,20 +863,29 @@ export default function CustomerDetailsPage() {
     if (!drawingToDelete) return;
 
     setIsDeletingDrawing(true);
+    const token = localStorage.getItem("auth_token");
+    const headers: HeadersInit = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      await api.deleteDrawing(drawingToDelete.id, id);
-      
-      // ✅ Optimistic update
-      setDrawingDocuments((prev) =>
-        prev.filter((d) => d.id !== drawingToDelete.id)
+      const res = await fetch(
+        `https://aztec-interior.onrender.com/files/drawings/${drawingToDelete.id}`,
+        { method: "DELETE", headers }
       );
-      
-      setShowDeleteDrawingDialog(false);
-      setDrawingToDelete(null);
-    } catch (err) {
-      console.error("Delete error:", err);
-      alert(`Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`);
+
+      if (res.ok) {
+        setDrawingDocuments((prev) =>
+          prev.filter((d) => d.id !== drawingToDelete.id)
+        );
+        setShowDeleteDrawingDialog(false);
+        setDrawingToDelete(null);
+      } else {
+        const err = await res.json().catch(() => ({ error: "Server error" }));
+        alert(`Failed to delete: ${err.error}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Network error");
     } finally {
       setIsDeletingDrawing(false);
     }
@@ -1013,6 +1035,8 @@ export default function CustomerDetailsPage() {
     const allowedRoles = ['Manager', 'HR', 'Production', 'Sales'];
     return allowedRoles.some(role => role.toLowerCase() === user.role.toLowerCase());
   };
+
+  // -------------------------------------------------------------
 
   // Add permission check function
   const canEditForm = (submission: FormSubmission): boolean => {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Search, Plus, Edit, Trash2, ChevronDown, Filter, AlertCircle, Clock, FolderOpen, ChevronRight, ChevronLeft, ChevronLast, ChevronFirst } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,20 +21,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation"; 
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 import { CustomerProjectTimeline } from "@/components/materials/CustomerProjectTimeline";
 import { useAuth } from "@/contexts/AuthContext";
-import { api, fetchParallel } from "@/lib/api"; // ✅ USE OPTIMIZED API
 
 // ---------------- Constants ----------------
 const CUSTOMERS_PER_PAGE = 25;
-const IS_DEV = process.env.NODE_ENV === 'development';
-
-// Dev-only logging
-const log = (...args: any[]) => {
-  if (IS_DEV) console.log(...args);
-};
 
 // ---------------- Types ----------------
 type JobStage =
@@ -89,6 +82,7 @@ interface Customer {
   project_types?: ProjectType[];
   form_submissions?: any[];
   projects?: Project[];
+  // Document counts from backend
   drawing_count: number;
   form_count: number;
   form_document_count: number;
@@ -145,11 +139,13 @@ const getProjectTypeColor = (type: ProjectType): string => {
 
 // ---------------- Component ----------------
 export default function CustomersPage() {
-  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]); 
   const [searchTerm, setSearchTerm] = useState("");
   const [stageFilter, setStageFilter] = useState<JobStage | "All">("All");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
 
   // Timeline modal state
@@ -165,24 +161,39 @@ export default function CustomersPage() {
   const router = useRouter();
   const { user } = useAuth();
 
-  // ============================================================================
-  // ✅ OPTIMIZED: Fetch customers using new API layer with caching
-  // ============================================================================
-  const fetchCustomers = useCallback(async () => {
+  // Fetch customers initially
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
+  // Reset page when filters/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, stageFilter]);
+
+  // ---------------- Fetch Customers - OPTIMIZED ----------------
+  const fetchCustomers = async () => {
     setIsLoading(true);
     const startTime = performance.now();
-
+    
     try {
-      log("🔄 Fetching customers with optimized API...");
+      const token = localStorage.getItem("auth_token");
+      const headers: HeadersInit = { Authorization: `Bearer ${token}` };
 
-      // ✅ USE OPTIMIZED API LAYER (includes caching, retry, deduplication)
-      const data = await api.getCustomers();
+      console.log("🔄 Fetching customers...");
+      
+      const response = await fetch("https://aztec-interior.onrender.com/customers", {
+        headers,
+      });
 
-      const customers = data.customers || data || [];
-      log(`✅ Customers received: ${customers.length} customers`);
+      if (!response.ok) throw new Error("Failed to fetch customers");
+
+      const data = await response.json();
+
+      console.log(`✅ Customers received: ${data.length} customers`);
 
       // Map the data
-      const customersWithData = customers.map((c: any) => {
+      const customersWithData = data.map((c: any) => {
         const customer: Customer = {
           ...c,
           postcode: c.postcode || c.post_code || "",
@@ -191,7 +202,7 @@ export default function CustomersPage() {
           stage: c.stage || c.status || "Lead",
           project_count: Number(c.project_count) || 0,
           form_submissions: c.form_submissions || [],
-          updated_at: c.updated_at || c.created_at,
+          updated_at: c.updated_at || c.created_at, 
         };
 
         return customer;
@@ -200,170 +211,57 @@ export default function CustomersPage() {
       setAllCustomers(customersWithData);
 
       const endTime = performance.now();
-      log(`⏱️ Page loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+      console.log(`⏱️ Page loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
-      // ✅ Prefetch projects for first 3 customers with multiple projects
-      // (improves perceived performance when user expands them)
-      const customersWithMultipleProjects = customersWithData
-        .filter((c: Customer) => c.project_count > 1)
-        .slice(0, 3);
+      // ✅ DEBUG: Log Accepted stage customers
+      const acceptedCustomers = customersWithData.filter((c: Customer) => 
+        (c.stage || "").trim().toLowerCase() === "accepted"
+      );
+      console.log(`🟣 Found ${acceptedCustomers.length} customers in Accepted stage:`, 
+        acceptedCustomers.map((c: Customer) => c.name)
+      );
 
-      if (customersWithMultipleProjects.length > 0) {
-        log(`🚀 Prefetching projects for ${customersWithMultipleProjects.length} customers...`);
-        // Prefetch in background without blocking UI
-        customersWithMultipleProjects.forEach((customer: Customer) => {
-          prefetchCustomerProjects(customer.id);
-        });
-      }
     } catch (err) {
       console.error("Error fetching customers:", err);
       setAllCustomers([]);
     } finally {
       setIsLoading(false);
     }
-  }, []); // ✅ Empty deps - only create once
+  };
 
-  // ============================================================================
-  // ✅ OPTIMIZED: Prefetch projects (background, non-blocking)
-  // ============================================================================
-  const prefetchCustomerProjects = useCallback(async (customerId: string) => {
-    if (customerProjects[customerId]) return;
-
-    try {
-      const data = await api.getCustomerProjects(customerId);
-      const projects = data.projects || [];
-      setCustomerProjects((prev) => ({ ...prev, [customerId]: projects }));
-      log(`✅ Prefetched ${projects.length} projects for customer ${customerId}`);
-    } catch (err) {
-      // Silent fail for prefetch
-      log(`⚠️ Prefetch failed for customer ${customerId}`);
+  // ---------------- Fetch Customer Projects (for expansion) ----------------
+  const fetchCustomerProjects = async (customerId: string) => {
+    if (customerProjects[customerId]) {
+      return;
     }
-  }, [customerProjects]);
 
-  // ============================================================================
-  // ✅ OPTIMIZED: Fetch customer projects on-demand (with deduplication)
-  // ============================================================================
-  const fetchCustomerProjects = useCallback(async (customerId: string) => {
-    if (customerProjects[customerId]) return;
-    if (loadingProjects[customerId]) return;
-
-    setLoadingProjects((prev) => ({ ...prev, [customerId]: true }));
+    setLoadingProjects(prev => ({ ...prev, [customerId]: true }));
 
     try {
-      const data = await api.getCustomerProjects(customerId);
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch(
+        `https://aztec-interior.onrender.com/customers/${customerId}/projects`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to fetch projects");
+
+      const data = await response.json();
       const projects = data.projects || [];
-      setCustomerProjects((prev) => ({ ...prev, [customerId]: projects }));
+
+      setCustomerProjects(prev => ({ ...prev, [customerId]: projects }));
     } catch (err) {
       console.error("Error fetching customer projects:", err);
-      setCustomerProjects((prev) => ({ ...prev, [customerId]: [] }));
+      setCustomerProjects(prev => ({ ...prev, [customerId]: [] }));
     } finally {
-      setLoadingProjects((prev) => ({ ...prev, [customerId]: false }));
+      setLoadingProjects(prev => ({ ...prev, [customerId]: false }));
     }
-  }, [customerProjects, loadingProjects]);
+  };
 
-  // ============================================================================
-  // Initial fetch
-  // ============================================================================
-  useEffect(() => {
-    fetchCustomers();
-  }, [fetchCustomers]);
-
-  // Reset page when filters/search change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, stageFilter]);
-
-  // ============================================================================
-  // ✅ OPTIMIZED: Single-pass filtering with memoization
-  // ============================================================================
-  const processedCustomers = useMemo(() => {
-    const startTime = performance.now();
-
-    let result = [...allCustomers];
-
-    // STEP 1: Role-based filtering
-    if (user?.role === "Sales") {
-      result = result.filter((customer) => {
-        const customerCreatedBy = String(customer.created_by || "").trim();
-        const userId = String(user.id || "").trim();
-        const matchesCreatedBy = customerCreatedBy === userId;
-
-        const customerSalesperson = String(customer.salesperson || "").trim();
-        const userName = String(user.name || "").trim();
-        const matchesSalesperson =
-          customerSalesperson.toLowerCase() === userName.toLowerCase();
-
-        return matchesCreatedBy || matchesSalesperson;
-      });
-
-      log(`✅ Sales filter: ${result.length} customers visible to ${user.name}`);
-    }
-
-    // STEP 2: Sort (Accepted first, then by date)
-    result.sort((a, b) => {
-      const aIsAccepted = (a.stage || "").trim().toLowerCase() === "accepted";
-      const bIsAccepted = (b.stage || "").trim().toLowerCase() === "accepted";
-
-      if (aIsAccepted && !bIsAccepted) return -1;
-      if (!aIsAccepted && bIsAccepted) return 1;
-
-      const aDate = new Date(a.updated_at || a.created_at).getTime();
-      const bDate = new Date(b.updated_at || b.created_at).getTime();
-
-      return bDate - aDate;
-    });
-
-    // STEP 3: Search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter((customer) => {
-        return (
-          (customer.name || "").toLowerCase().includes(term) ||
-          (customer.address || "").toLowerCase().includes(term) ||
-          (customer.email || "").toLowerCase().includes(term) ||
-          (customer.phone || "").toLowerCase().includes(term) ||
-          (customer.postcode || "").toLowerCase().includes(term)
-        );
-      });
-    }
-
-    // STEP 4: Stage filter
-    if (stageFilter !== "All") {
-      const stageFilterLower = stageFilter.toLowerCase();
-      result = result.filter((customer) => {
-        const customerStageLower = (customer.stage || "").trim().toLowerCase();
-        return customerStageLower === stageFilterLower;
-      });
-    }
-
-    const endTime = performance.now();
-    log(`⚡ Filtered ${result.length} customers in ${(endTime - startTime).toFixed(2)}ms`);
-
-    return result;
-  }, [allCustomers, user, searchTerm, stageFilter]);
-
-  // ============================================================================
-  // ✅ OPTIMIZED: Pagination (memoized)
-  // ============================================================================
-  const totalPages = Math.ceil(processedCustomers.length / CUSTOMERS_PER_PAGE);
-
-  const paginatedCustomers = useMemo(() => {
-    const startIndex = (currentPage - 1) * CUSTOMERS_PER_PAGE;
-    const endIndex = startIndex + CUSTOMERS_PER_PAGE;
-    return processedCustomers.slice(startIndex, endIndex);
-  }, [processedCustomers, currentPage]);
-
-  // ============================================================================
-  // ✅ OPTIMIZED: Unique stages (memoized)
-  // ============================================================================
-  const uniqueStages = useMemo(() => {
-    return Array.from(new Set(processedCustomers.map((c) => c.stage)));
-  }, [processedCustomers]);
-
-  // ============================================================================
-  // Toggle Project Breakdown
-  // ============================================================================
-  const toggleProjectBreakdown = useCallback(async (customerId: string, e: React.MouseEvent) => {
+  // ---------------- Toggle Project Breakdown ----------------
+  const toggleProjectBreakdown = async (customerId: string, e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (expandedCustomerId === customerId) {
@@ -372,12 +270,116 @@ export default function CustomersPage() {
       setExpandedCustomerId(customerId);
       await fetchCustomerProjects(customerId);
     }
-  }, [expandedCustomerId, fetchCustomerProjects]);
+  };
 
-  // ============================================================================
-  // Permissions
-  // ============================================================================
-  const canEditCustomer = useCallback((customer: Customer): boolean => {
+  // ✅ STEP 1: Apply role-based filtering FIRST with comprehensive debugging
+  const roleFilteredCustomers = useMemo(() => {
+    if (user?.role === "Sales") {
+      console.log("🔍 Sales Role Filter Debug:");
+      console.log("- User ID:", user.id, "Type:", typeof user.id);
+      console.log("- User Name:", user.name);
+      console.log("- Total Customers:", allCustomers.length);
+      
+      const filtered = allCustomers.filter((customer: Customer) => {
+        // Normalize values for comparison
+        const customerCreatedBy = String(customer.created_by || "").trim();
+        const userId = String(user.id || "").trim();
+        const matchesCreatedBy = customerCreatedBy === userId;
+        
+        const customerSalesperson = String(customer.salesperson || "").trim();
+        const userName = String(user.name || "").trim();
+        // Case-insensitive comparison for salesperson name
+        const matchesSalesperson = customerSalesperson.toLowerCase() === userName.toLowerCase();
+        
+        const isVisible = matchesCreatedBy || matchesSalesperson;
+        
+        // Log first 5 customers for debugging
+        if (allCustomers.indexOf(customer) < 5) {
+          console.log(`\nCustomer: ${customer.name}`);
+          console.log(`  - created_by: "${customer.created_by}" (type: ${typeof customer.created_by})`);
+          console.log(`  - salesperson: "${customer.salesperson}"`);
+          console.log(`  - matchesCreatedBy: ${matchesCreatedBy} ("${customerCreatedBy}" === "${userId}")`);
+          console.log(`  - matchesSalesperson: ${matchesSalesperson} ("${customerSalesperson.toLowerCase()}" === "${userName.toLowerCase()}")`);
+          console.log(`  - isVisible: ${isVisible}`);
+        }
+        
+        return isVisible;
+      });
+      
+      console.log(`\n✅ Sales filter result: ${filtered.length} customers visible to ${user.name}`);
+      if (filtered.length > 0) {
+        console.log("Visible customers:", filtered.map(c => c.name));
+      } else {
+        console.warn("⚠️ NO CUSTOMERS VISIBLE - Check if:");
+        console.warn("  1. Customer created_by matches user ID");
+        console.warn("  2. Customer salesperson matches user name");
+        console.warn("  3. Data types are consistent (all strings)");
+      }
+      
+      return filtered;
+    }
+    
+    console.log(`✅ Non-Sales role (${user?.role}): Showing all ${allCustomers.length} customers`);
+    return allCustomers;
+  }, [allCustomers, user]);
+
+  // ✅ STEP 2: Sort with Accepted stage first
+  const sortedCustomers = useMemo(() => {
+    const sorted = [...roleFilteredCustomers].sort((a, b) => {
+      // Priority 1: Accepted stage customers come first
+      const aIsAccepted = (a.stage || "").trim().toLowerCase() === "accepted";
+      const bIsAccepted = (b.stage || "").trim().toLowerCase() === "accepted";
+      
+      if (aIsAccepted && !bIsAccepted) return -1;
+      if (!aIsAccepted && bIsAccepted) return 1;
+      
+      // Priority 2: Within same group, sort by most recent update
+      const aDate = new Date(a.updated_at || a.created_at).getTime();
+      const bDate = new Date(b.updated_at || b.created_at).getTime();
+      
+      return bDate - aDate;
+    });
+
+    // ✅ DEBUG: Log sorting results
+    const acceptedCount = sorted.filter(c => 
+      (c.stage || "").trim().toLowerCase() === "accepted"
+    ).length;
+    console.log(`🔄 Sorted: ${acceptedCount} Accepted customers at top of ${sorted.length} total`);
+    
+    return sorted;
+  }, [roleFilteredCustomers]);
+
+  // ✅ STEP 3: Apply search and stage filters
+  const filteredCustomers = useMemo(() => {
+    return sortedCustomers.filter((customer) => {
+      const term = searchTerm.toLowerCase();
+      const matchesSearch =
+        (customer.name || "").toLowerCase().includes(term) ||
+        (customer.address || "").toLowerCase().includes(term) ||
+        (customer.email || "").toLowerCase().includes(term) ||
+        (customer.phone || "").toLowerCase().includes(term) ||
+        (customer.postcode || "").toLowerCase().includes(term);
+
+      const customerStageLower = (customer.stage || "").trim().toLowerCase();
+      const stageFilterLower = (stageFilter === "All" ? "All" : stageFilter).toLowerCase();
+      
+      const matchesStage = stageFilterLower === "all" || customerStageLower === stageFilterLower;
+
+      return matchesSearch && matchesStage;
+    });
+  }, [sortedCustomers, searchTerm, stageFilter]);
+
+  // ---------------- Pagination Calculations ----------------
+  const totalPages = Math.ceil(filteredCustomers.length / CUSTOMERS_PER_PAGE);
+
+  const paginatedCustomers = useMemo(() => {
+    const startIndex = (currentPage - 1) * CUSTOMERS_PER_PAGE;
+    const endIndex = startIndex + CUSTOMERS_PER_PAGE;
+    return filteredCustomers.slice(startIndex, endIndex);
+  }, [filteredCustomers, currentPage]);
+
+  // ---------------- Permissions ----------------
+  const canEditCustomer = (customer: Customer): boolean => {
     if (user?.role === "Manager" || user?.role === "HR") return true;
     if (user?.role === "Sales") {
       const customerCreatedBy = String(customer.created_by || "").trim();
@@ -387,24 +389,22 @@ export default function CustomersPage() {
       return customerCreatedBy === userId || customerSalesperson === userName;
     }
     return false;
-  }, [user]);
+  };
 
-  const canDeleteCustomer = useCallback((customer: Customer): boolean => {
-    return user?.role === "Manager" || user?.role === "HR";
-  }, [user]);
+  const canDeleteCustomer = (customer: Customer): boolean =>
+    user?.role === "Manager" || user?.role === "HR";
 
-  const canViewTimeline = useCallback((): boolean => {
+  const canViewTimeline = (): boolean => {
     return user?.role === "Manager" || user?.role === "HR" || user?.role === "Production";
-  }, [user]);
+  };
 
-  const isCustomerInAcceptedStage = useCallback((customer: Customer): boolean => {
+  // ✅ Robust check for Accepted stage
+  const isCustomerInAcceptedStage = (customer: Customer): boolean => {
     return (customer.stage || "").trim().toLowerCase() === "accepted";
-  }, []);
+  };
 
-  // ============================================================================
-  // ✅ OPTIMIZED: Delete Customer (with cache invalidation)
-  // ============================================================================
-  const deleteCustomer = useCallback(async (id: string) => {
+  // ---------------- Delete Customer ----------------
+  const deleteCustomer = async (id: string) => {
     const target = allCustomers.find((c) => c.id === id);
     if (!target || !canDeleteCustomer(target)) {
       alert("You don't have permission to delete customers.");
@@ -420,80 +420,28 @@ export default function CustomersPage() {
       });
       if (!res.ok) throw new Error("Failed to delete customer");
 
-      // ✅ Update local state
       setAllCustomers((prev) => prev.filter((c) => c.id !== id));
-
-      // ✅ Invalidate cache
-      const { cacheUtils } = await import("@/lib/api");
-      cacheUtils.invalidate("customers");
-
-      // Adjust pagination if needed
+      
       if (paginatedCustomers.length === 1 && currentPage > 1) {
-        setCurrentPage((prev) => prev - 1);
+        setCurrentPage(prev => prev - 1);
       }
     } catch (err) {
       console.error("Delete error:", err);
       alert("Error deleting customer");
     }
-  }, [allCustomers, canDeleteCustomer, paginatedCustomers.length, currentPage]);
+  };
 
-  // ============================================================================
-  // Open Timeline Modal
-  // ============================================================================
-  const openTimelineModal = useCallback((customerId: string, customerName: string) => {
+  // ---------------- Open Timeline Modal ----------------
+  const openTimelineModal = (customerId: string, customerName: string) => {
     setSelectedCustomerId(customerId);
     setSelectedCustomerName(customerName);
     setShowTimelineModal(true);
-  }, []);
+  };
 
-  // ============================================================================
-  // ✅ OPTIMIZED: Skeleton Loader Component
-  // ============================================================================
-  const SkeletonRow = () => (
-    <tr className="animate-pulse">
-      <td className="px-6 py-4">
-        <div className="h-4 bg-gray-200 rounded w-32"></div>
-      </td>
-      <td className="px-6 py-4">
-        <div className="h-4 bg-gray-200 rounded w-24"></div>
-      </td>
-      <td className="px-6 py-4">
-        <div className="h-4 bg-gray-200 rounded w-40"></div>
-      </td>
-      <td className="px-6 py-4">
-        <div className="h-4 bg-gray-200 rounded w-48"></div>
-      </td>
-      <td className="px-6 py-4">
-        <div className="h-4 bg-gray-200 rounded w-16"></div>
-      </td>
-      <td className="px-6 py-4">
-        <div className="h-6 bg-gray-200 rounded-full w-20"></div>
-      </td>
-      <td className="px-6 py-4">
-        <div className="h-4 bg-gray-200 rounded w-8"></div>
-      </td>
-      {(user?.role === "Manager" || user?.role === "HR") && (
-        <td className="px-6 py-4">
-          <div className="h-4 bg-gray-200 rounded w-24"></div>
-        </td>
-      )}
-      <td className="px-6 py-4">
-        <div className="h-6 bg-gray-200 rounded-full w-16"></div>
-      </td>
-      {user?.role !== "Staff" && (
-        <td className="px-6 py-4">
-          <div className="flex gap-2 justify-end">
-            <div className="h-8 w-8 bg-gray-200 rounded"></div>
-            <div className="h-8 w-8 bg-gray-200 rounded"></div>
-          </div>
-        </td>
-      )}
-    </tr>
-  );
+  // ---------------- UI ----------------
+  const uniqueStages = Array.from(new Set(sortedCustomers.map((c) => c.stage)));
 
-  // ============================================================================
   // Pagination Component
-  // ============================================================================
   const PaginationControls = () => {
     if (totalPages <= 1) return null;
 
@@ -502,9 +450,9 @@ export default function CustomersPage() {
         <div className="text-sm text-gray-700">
           Showing <span className="font-medium">{(currentPage - 1) * CUSTOMERS_PER_PAGE + 1}</span> to{" "}
           <span className="font-medium">
-            {Math.min(currentPage * CUSTOMERS_PER_PAGE, processedCustomers.length)}
+            {Math.min(currentPage * CUSTOMERS_PER_PAGE, filteredCustomers.length)}
           </span>{" "}
-          of <span className="font-medium">{processedCustomers.length}</span> customers
+          of <span className="font-medium">{filteredCustomers.length}</span> customers
         </div>
         <div className="flex space-x-1">
           <Button
@@ -519,21 +467,21 @@ export default function CustomersPage() {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             disabled={currentPage === 1}
             title="Previous Page"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-
+          
           <div className="flex items-center px-3 text-sm text-gray-700">
             Page {currentPage} of {totalPages}
           </div>
-
+          
           <Button
             variant="outline"
             size="icon"
-            onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
             disabled={currentPage === totalPages}
             title="Next Page"
           >
@@ -553,9 +501,6 @@ export default function CustomersPage() {
     );
   };
 
-  // ============================================================================
-  // RENDER
-  // ============================================================================
   return (
     <div className="w-full p-6">
       <h1 className="mb-6 text-3xl font-bold">
@@ -636,12 +581,12 @@ export default function CustomersPage() {
 
             <tbody className="divide-y divide-gray-200 bg-white">
               {isLoading ? (
-                // ✅ SKELETON LOADER instead of spinner
-                <>
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <SkeletonRow key={i} />
-                  ))}
-                </>
+                <tr>
+                  <td colSpan={10} className="px-6 py-12 text-center">
+                    <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent text-gray-600"></div>
+                    <p className="mt-4 text-gray-500">Loading customers...</p>
+                  </td>
+                </tr>
               ) : paginatedCustomers.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-6 py-12 text-center text-gray-500">
@@ -662,8 +607,8 @@ export default function CustomersPage() {
                       <tr
                         onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
                         className={`cursor-pointer hover:bg-gray-50 transition-colors ${
-                          !customer.has_documents ? "bg-red-50" : ""
-                        } ${isAccepted ? "bg-purple-50" : ""}`}
+                          !customer.has_documents ? 'bg-red-50' : ''
+                        } ${isAccepted ? 'bg-purple-50' : ''}`}
                       >
                         <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
                           <div className="flex items-center space-x-2">
@@ -719,7 +664,7 @@ export default function CustomersPage() {
                                   {customer.project_count > 1 && (
                                     <ChevronRight
                                       className={`w-4 h-4 text-gray-400 transition-transform ${
-                                        isExpanded ? "rotate-90" : ""
+                                        isExpanded ? 'rotate-90' : ''
                                       }`}
                                     />
                                   )}
@@ -749,8 +694,7 @@ export default function CustomersPage() {
                                                 {project.project_name}
                                               </p>
                                               <p className="text-xs text-gray-500">
-                                                Created{" "}
-                                                {new Date(project.created_at).toLocaleDateString()}
+                                                Created {new Date(project.created_at).toLocaleDateString()}
                                               </p>
                                             </div>
                                             <span
@@ -859,7 +803,7 @@ export default function CustomersPage() {
           </table>
         </div>
 
-        {!isLoading && processedCustomers.length > 0 && <PaginationControls />}
+        {!isLoading && filteredCustomers.length > 0 && <PaginationControls />}
       </div>
 
       {showCreateModal && (
@@ -875,7 +819,9 @@ export default function CustomersPage() {
           <DialogHeader>
             <DialogTitle>Project Timeline - {selectedCustomerName}</DialogTitle>
           </DialogHeader>
-          {selectedCustomerId && <CustomerProjectTimeline customerId={selectedCustomerId} />}
+          {selectedCustomerId && (
+            <CustomerProjectTimeline customerId={selectedCustomerId} />
+          )}
         </DialogContent>
       </Dialog>
     </div>

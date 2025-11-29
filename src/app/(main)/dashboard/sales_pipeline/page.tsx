@@ -12,7 +12,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { api, cacheUtils } from "@/lib/api";
 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -48,15 +47,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { fetchWithAuth } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
-
-const IS_DEV = process.env.NODE_ENV === 'development';
-const log = (...args: any[]) => {
-  if (IS_DEV) console.log(...args);
-};
-const warn = (...args: any[]) => {
-  if (IS_DEV) console.warn(...args);
-};
-const error = console.error; // Always log errors
+// --- START OF STAGE AND ROLE DEFINITIONS ---
 
 // MODIFICATION 1: REMOVED "Consultation" and "Quoted"
 const STAGES = [
@@ -285,7 +276,6 @@ type AuditLog = {
 };
 
 
-
 const makeColumns = () =>
   STAGES.map((name) => ({
     id: `col-${name.toLowerCase().replace(/\s+/g, "-")}`,
@@ -426,11 +416,11 @@ export default function EnhancedPipelinePage() {
     });
   }, []); // Empty deps - function doesn't need to change
 
-  // ============================================================================
-  // ✅ OPTIMIZED: Fetch pipeline data with caching
-  // ============================================================================
+  // Fetch data from backend
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading) {
+      return;
+    }
 
     if (!user || !token) {
       setError("User not authenticated.");
@@ -445,23 +435,40 @@ export default function EnhancedPipelinePage() {
         setLoading(true);
         setError(null);
 
-        const startTime = performance.now();
-        log("🔄 Loading pipeline with optimized API...");
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-        // ✅ USE OPTIMIZED API LAYER
-        const rawPipelineData = await api.getPipeline();
+        const pipelineResponse = await fetch(
+          "https://aztec-interior.onrender.com/pipeline",
+          {
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            signal: controller.signal,
+          }
+        );
+
+        clearTimeout(timeoutId);
+
+        if (!pipelineResponse.ok) {
+          throw new Error(`Failed to fetch: ${pipelineResponse.status}`);
+        }
+
+        const rawPipelineData = await pipelineResponse.json();
         
         if (isCancelled) return;
         
         processPipelineData(rawPipelineData);
 
-        const endTime = performance.now();
-        log(`⏱️ Pipeline loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
-
       } catch (err: any) {
         if (isCancelled) return;
         
-        setError(err instanceof Error ? err.message : "Failed to load data");
+        if (err.name === 'AbortError') {
+          setError("Request timeout. Please refresh the page.");
+        } else {
+          setError(err instanceof Error ? err.message : "Failed to load data");
+        }
       } finally {
         if (!isCancelled) {
           setLoading(false);
@@ -478,16 +485,9 @@ export default function EnhancedPipelinePage() {
 
   // Extract the data processing logic into a separate function
   const processPipelineData = useCallback((rawPipelineData: any[]) => {
-    // Use requestIdleCallback for non-blocking processing
-    if ('requestIdleCallback' in window) {
-      requestIdleCallback(() => processData(rawPipelineData), { timeout: 1000 });
-    } else {
-      // Fallback for browsers without requestIdleCallback
-      setTimeout(() => processData(rawPipelineData), 0);
-    }
-    
-    function processData(data: any[]) {
-      const pipelineItemsRetrieved = data
+    // Use requestAnimationFrame for non-blocking UI updates
+    requestAnimationFrame(() => {
+      const pipelineItemsRetrieved = rawPipelineData
         .map((item: any) => {
           const isProjectItem = item.id.startsWith("project-");
           const backendStage = item.stage?.trim() || "Lead";
@@ -561,314 +561,282 @@ export default function EnhancedPipelinePage() {
       const mappedFeatures = mapPipelineToFeatures(filteredItems);
       setFeatures(mappedFeatures);
       prevFeaturesRef.current = mappedFeatures;
-    }
+    });
   }, [mapPipelineToFeatures]);
 
 
-  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleDataChange = useCallback(async (next: any[]) => {
-    log("🎯 DRAG DETECTED - Starting handleDataChange");
-    
-    if (!permissions.canDragDrop) {
-      warn("⛔ User doesn't have drag permission");
-      alert("You don't have permission to move items in the pipeline.");
-      return;
-    }
-
-    const prev = prevFeaturesRef.current;
-    const moved = next.filter((n) => {
-      const p = prev.find((x) => x.id === n.id);
-      return p && p.column !== n.column;
-    });
-    
-    if (moved.length === 0) {
-      log("⚠️ No items detected as moved - exiting");
-      return;
-    }
-
-    log("🎯 Moved items:", moved.map(m => m.name));
-
-    // Create stage updates map
-    const stageUpdates = new Map(
-      moved.map((item) => [item.itemId, columnIdToStage(item.column)])
-    );
-
-    // Check for unauthorized moves
-    const unauthorizedMoves = moved.filter((item) => {
-      const originalItem = pipelineItems.find((pi) => pi.id === item.itemId);
-      if (!originalItem) return true;
-      return !canUserEditItem(originalItem);
-    });
-
-    if (unauthorizedMoves.length > 0) {
-      console.error("❌ Unauthorized moves detected");
-      alert("You don't have permission to move some of these items. Reverting changes.");
-      return;
-    }
-
-    // Take snapshots for potential rollback
-    const previousFeaturesSnapshot = prevFeaturesRef.current;
-    const previousPipelineSnapshot = pipelineItems;
-    log("📸 Snapshots taken for rollback");
-
-    // ✅ OPTIMISTIC UI UPDATE
-    log("🎨 Applying optimistic UI updates...");
-    const movedIds = new Set(moved.map((item) => item.id));
-    const nextById = new Map(next.map((item) => [item.id, item]));
-
-    const optimisticallyUpdatedFeatures = features.map((feature) => {
-      if (!movedIds.has(feature.id)) return feature;
-
-      const nextFeature = nextById.get(feature.id);
-      const nextColumn = nextFeature?.column ?? feature.column;
-      const nextStage = stageUpdates.get(feature.itemId) ?? feature.stage;
-
-      return {
-        ...feature,
-        column: nextColumn,
-        stage: nextStage,
-      };
-    });
-
-    setFeatures(optimisticallyUpdatedFeatures);
-    prevFeaturesRef.current = optimisticallyUpdatedFeatures;
-
-    setPipelineItems((current) =>
-      current.map((item) => {
-        const newStage = stageUpdates.get(item.id);
-        if (!newStage) return item;
-        return { ...item, stage: newStage };
-      })
-    );
-
-    log("✅ Optimistic UI updates applied");
-
-    // ✅ DEBOUNCE API CALLS (wait 300ms for more drags)
-    if (dragTimeoutRef.current) {
-      clearTimeout(dragTimeoutRef.current);
-    }
-
-    dragTimeoutRef.current = setTimeout(async () => {
-      log("📤 Starting API calls...");
+  const handleDataChange = async (next: any[]) => {
+      console.log("=".repeat(60));
+      console.log("🎯 DRAG DETECTED - Starting handleDataChange");
       
-      try {
-        const updatePromises = moved.map(async (item) => {
-          const newStage = columnIdToStage(item.column);
-          const isProject = item.itemId.startsWith("project-");
-          const isCustomer = item.itemId.startsWith("customer-");
-          const isJob = item.itemId.startsWith("job-");
+      if (!permissions.canDragDrop) {
+        console.warn("⛔ User doesn't have drag permission");
+        alert("You don't have permission to move items in the pipeline.");
+        return;
+      }
 
-          let entityId: string;
+      const prev = prevFeaturesRef.current;
+      const moved = next.filter((n) => {
+        const p = prev.find((x) => x.id === n.id);
+        const hasMoved = p && p.column !== n.column;
+        return hasMoved;
+      });
+      
+      if (moved.length === 0) {
+        console.log("⚠️ No items detected as moved - exiting");
+        return;
+      }
 
-          if (isJob) {
-            entityId = item.itemId.replace("job-", "");
-            return api.updateJobStage(
-              entityId,
-              newStage,
-              "Moved via Kanban board",
-              user?.email || "current_user"
-            );
-          } else if (isProject) {
-            entityId = item.itemId.replace("project-", "");
-            const originalItem = pipelineItems.find((pi) => pi.id === item.itemId);
-            return api.updateProjectStage(entityId, newStage, {
-              project_name: originalItem?.job?.job_name,
-              project_type: originalItem?.job?.job_type,
-              date_of_measure: originalItem?.job?.measure_date,
-              notes: originalItem?.job?.notes,
-              updated_by: user?.email || "current_user",
-            });
-          } else if (isCustomer) {
-            entityId = item.itemId.replace("customer-", "");
-            return api.updateCustomerStage(
-              entityId,
-              newStage,
-              "Moved via Kanban board",
-              user?.email || "current_user"
-            );
+      // ✅ ADD THIS DEBUG CODE
+      console.log("🎯 Moved items details:");
+      moved.forEach(item => {
+        const newStage = columnIdToStage(item.column);
+        console.log(`  - ${item.name}: ${item.column} → Stage: ${newStage}`);
+      });
+
+      // Create stage updates map
+      const stageUpdates = new Map(
+        moved.map((item) => [item.itemId, columnIdToStage(item.column)]),
+      );
+
+      // Check for unauthorized moves
+      const unauthorizedMoves = moved.filter((item) => {
+        const originalItem = pipelineItems.find((pi) => pi.id === item.itemId);
+        if (!originalItem) return true;
+        return !canUserEditItem(originalItem);
+      });
+
+      if (unauthorizedMoves.length > 0) {
+        console.error("❌ Unauthorized moves detected:", unauthorizedMoves);
+        alert("You don't have permission to move some of these items. Reverting changes.");
+        return;
+      }
+
+      // Take snapshots for potential rollback
+      const previousFeaturesSnapshot = prevFeaturesRef.current;
+      const previousPipelineSnapshot = pipelineItems;
+      console.log("📸 Snapshots taken for rollback");
+
+      // Optimistically update UI
+      console.log("🎨 Applying optimistic UI updates...");
+      const movedIds = new Set(moved.map((item) => item.id));
+      const nextById = new Map(next.map((item) => [item.id, item]));
+
+      const optimisticallyUpdatedFeatures = features.map((feature) => {
+        if (!movedIds.has(feature.id)) {
+          return feature;
+        }
+
+        const nextFeature = nextById.get(feature.id);
+        const nextColumn = nextFeature?.column ?? feature.column;
+        const nextStage = stageUpdates.get(feature.itemId) ?? feature.stage;
+
+        return {
+          ...feature,
+          column: nextColumn,
+          stage: nextStage,
+        };
+      });
+
+      setFeatures(optimisticallyUpdatedFeatures);
+      prevFeaturesRef.current = optimisticallyUpdatedFeatures;
+
+      setPipelineItems((current) =>
+        current.map((item) => {
+          const newStage = stageUpdates.get(item.id);
+          if (!newStage) {
+            return item;
           }
+          return {
+            ...item,
+            stage: newStage,
+          };
+        }),
+      );
 
+      console.log("✅ Optimistic UI updates applied");
+      console.log("📤 Starting API calls...");
+
+    try {
+      const updatePromises = moved.map(async (item) => {
+        const newStage = columnIdToStage(item.column);
+        
+        const isProject = item.itemId.startsWith("project-");
+        const isCustomer = item.itemId.startsWith("customer-");
+        const isJob = item.itemId.startsWith("job-");
+
+        let entityId;
+        let endpoint;
+
+        if (isJob) {
+          entityId = item.itemId.replace("job-", "");
+          endpoint = `jobs/${entityId}/stage`;
+        } else if (isProject) {
+          entityId = item.itemId.replace("project-", "");
+          endpoint = `projects/${entityId}/stage`;
+        } else if (isCustomer) {
+          entityId = item.itemId.replace("customer-", "");
+          endpoint = `customers/${entityId}/stage`;
+        } else {
           throw new Error(`Unknown pipeline item type: ${item.itemId}`);
+        }
+
+        const bodyData = {
+          stage: newStage,
+          reason: "Moved via Kanban board",
+          updated_by: user?.email || "current_user",
+        };
+
+        const response = await fetchWithAuth(endpoint, {
+          method: "PATCH",
+          body: JSON.stringify(bodyData),
         });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to update ${item.itemType} ${entityId}`);
+        }
 
-        await Promise.all(updatePromises);
-        
-        // ✅ NO REFETCH - Optimistic update is enough
-        log("✅ Stage updates completed (no refetch needed)");
+        return await response.json();
+      });
 
-      } catch (error) {
-        console.error("❌ Error updating stages:", error);
-        
-        // Revert on error
-        setFeatures(previousFeaturesSnapshot);
-        prevFeaturesRef.current = previousFeaturesSnapshot;
-        setPipelineItems(previousPipelineSnapshot);
-        
-        alert(`Failed to update stage. Changes reverted.`);
+      await Promise.all(updatePromises);
+      
+      // ✅ DON'T REFETCH - Optimistic update is enough
+      // await refetchPipelineData();
+      
+      console.log("✅ Stage updates completed");
+
+    } catch (error) {
+      console.error("❌ Error updating stages:", error);
+      
+      // Only revert on error
+      setFeatures(previousFeaturesSnapshot);
+      prevFeaturesRef.current = previousFeaturesSnapshot;
+      setPipelineItems(previousPipelineSnapshot);
+      
+      alert(`Failed to update stage. Changes reverted.`);
+    }
+  };
+
+  const refetchPipelineData = async () => {
+    try {
+      const pipelineResponse = await fetchWithAuth("pipeline");
+      if (pipelineResponse.ok) {
+        const pipelineData = await pipelineResponse.json();
+
+        const items = pipelineData.map((item: any) => {
+          const isProjectItem = item.id.startsWith("project-");
+
+          const backendStage = item.stage ? item.stage.trim() : "Lead";
+          const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
+
+          const commonItem = {
+            id: item.id,
+            customer: item.customer,
+            name: item.customer.name,
+            salesperson: item.job?.salesperson_name || item.customer.salesperson,
+            measureDate: item.job?.measure_date || item.customer.date_of_measure,
+            stage: validStage,
+          };
+
+          if (item.type === "customer") {
+            return {
+              ...commonItem,
+              type: "customer" as const,
+              reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
+              jobType: item.customer.project_types?.join(", "),
+              project_count: item.project_count || 0,
+            };
+          } else {
+            // ✅ CRITICAL FIX: Safety check for missing job data
+            if (!item.job) {
+                // If malformed, treat it as a customer item for safety and display
+                 return {
+                    ...commonItem,
+                    type: "customer" as const, // Force type to customer for safe rendering
+                    reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
+                    jobType: item.customer.project_types?.join(", "),
+                    project_count: item.project_count || 0,
+                };
+            }
+
+            const jobStage = validStage;
+
+            // ✅ SAFE ACCESS
+            const jobReference = isProjectItem
+              ? item.job.job_reference || `PROJ-${item.job.id?.slice(-4).toUpperCase() || 'NEW'}`
+              : item.job.job_reference || `JOB-${item.job.id?.slice(-4).toUpperCase() || 'NEW'}`;
+
+            const jobName = isProjectItem ? `${item.customer.name} - ${item.job.job_name || 'Project'}` : item.customer.name;
+
+            return {
+              ...commonItem,
+              type: isProjectItem ? ("project" as const) : ("job" as const),
+              job: item.job,
+              name: jobName,
+              reference: jobReference,
+              stage: jobStage as Stage,
+              jobType: item.job.job_type,
+              quotePrice: item.job.quote_price,
+              agreedPrice: item.job.agreed_price,
+              soldAmount: item.job.sold_amount,
+              deposit1: item.job.deposit1,
+              deposit2: item.job.deposit2,
+              deposit1Paid: item.job.deposit1_paid || false,
+              deposit2Paid: item.job.deposit2_paid || false,
+              deliveryDate: item.job.delivery_date,
+              measureDate: item.job.measure_date,
+            };
+          }
+        }).filter(Boolean); // Filter out nulls
+
+        const filteredItems = items.filter((item: PipelineItem) => canUserAccessItem(item));
+        setPipelineItems(filteredItems);
+
+        const updatedFeatures = mapPipelineToFeatures(filteredItems);
+        setFeatures(updatedFeatures);
+        prevFeaturesRef.current = updatedFeatures;
       }
-    }, 300); // 300ms debounce
-
-  }, [permissions.canDragDrop, features, pipelineItems, user]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (dragTimeoutRef.current) {
-        clearTimeout(dragTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // const refetchPipelineData = async () => {
-  //   try {
-  //     const pipelineResponse = await fetchWithAuth("pipeline");
-  //     if (pipelineResponse.ok) {
-  //       const pipelineData = await pipelineResponse.json();
-
-  //       const items = pipelineData.map((item: any) => {
-  //         const isProjectItem = item.id.startsWith("project-");
-
-  //         const backendStage = item.stage ? item.stage.trim() : "Lead";
-  //         const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
-
-  //         const commonItem = {
-  //           id: item.id,
-  //           customer: item.customer,
-  //           name: item.customer.name,
-  //           salesperson: item.job?.salesperson_name || item.customer.salesperson,
-  //           measureDate: item.job?.measure_date || item.customer.date_of_measure,
-  //           stage: validStage,
-  //         };
-
-  //         if (item.type === "customer") {
-  //           return {
-  //             ...commonItem,
-  //             type: "customer" as const,
-  //             reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
-  //             jobType: item.customer.project_types?.join(", "),
-  //             project_count: item.project_count || 0,
-  //           };
-  //         } else {
-  //           // ✅ CRITICAL FIX: Safety check for missing job data
-  //           if (!item.job) {
-  //               // If malformed, treat it as a customer item for safety and display
-  //                return {
-  //                   ...commonItem,
-  //                   type: "customer" as const, // Force type to customer for safe rendering
-  //                   reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
-  //                   jobType: item.customer.project_types?.join(", "),
-  //                   project_count: item.project_count || 0,
-  //               };
-  //           }
-
-  //           const jobStage = validStage;
-
-  //           // ✅ SAFE ACCESS
-  //           const jobReference = isProjectItem
-  //             ? item.job.job_reference || `PROJ-${item.job.id?.slice(-4).toUpperCase() || 'NEW'}`
-  //             : item.job.job_reference || `JOB-${item.job.id?.slice(-4).toUpperCase() || 'NEW'}`;
-
-  //           const jobName = isProjectItem ? `${item.customer.name} - ${item.job.job_name || 'Project'}` : item.customer.name;
-
-  //           return {
-  //             ...commonItem,
-  //             type: isProjectItem ? ("project" as const) : ("job" as const),
-  //             job: item.job,
-  //             name: jobName,
-  //             reference: jobReference,
-  //             stage: jobStage as Stage,
-  //             jobType: item.job.job_type,
-  //             quotePrice: item.job.quote_price,
-  //             agreedPrice: item.job.agreed_price,
-  //             soldAmount: item.job.sold_amount,
-  //             deposit1: item.job.deposit1,
-  //             deposit2: item.job.deposit2,
-  //             deposit1Paid: item.job.deposit1_paid || false,
-  //             deposit2Paid: item.job.deposit2_paid || false,
-  //             deliveryDate: item.job.delivery_date,
-  //             measureDate: item.job.measure_date,
-  //           };
-  //         }
-  //       }).filter(Boolean); // Filter out nulls
-
-  //       const filteredItems = items.filter((item: PipelineItem) => canUserAccessItem(item));
-  //       setPipelineItems(filteredItems);
-
-  //       const updatedFeatures = mapPipelineToFeatures(filteredItems);
-  //       setFeatures(updatedFeatures);
-  //       prevFeaturesRef.current = updatedFeatures;
-  //     }
-  //   } catch (pipelineError) {
-  //     console.log("Pipeline refetch failed, using last known state.");
-  //   }
-  // };
+    } catch (pipelineError) {
+      console.log("Pipeline refetch failed, using last known state.");
+    }
+  };
 
   const filteredFeatures = useMemo(() => {
     if (loading) return [];
 
-    const startTime = performance.now();
+    return features.filter((item) => {
+      const matchesSearch =
+        !searchTerm ||
+        item.customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.customer.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.customer.phone?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const filtered = features.filter((item) => {
-      // Search filter
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        const matchesSearch =
-          item.customer.name?.toLowerCase().includes(term) ||
-          item.reference?.toLowerCase().includes(term) ||
-          item.customer.address?.toLowerCase().includes(term) ||
-          item.customer.phone?.toLowerCase().includes(term);
-        
-        if (!matchesSearch) return false;
-      }
-
-      // Salesperson filter
-      if (filterSalesperson !== "all" && item.salesperson !== filterSalesperson) {
-        return false;
-      }
+      const matchesSalesperson = filterSalesperson === "all" || item.salesperson === filterSalesperson;
       
-      // Stage filter
-      if (filterStage !== "all" && item.stage !== filterStage) {
-        return false;
-      }
+      const matchesStage = filterStage === "all" || item.stage === filterStage;
+      const isVisibleStage = visibleStages.includes(item.stage as Stage);
 
-      // Visible stage check
-      if (!visibleStages.includes(item.stage as Stage)) {
-        return false;
-      }
+      const matchesType = filterType === "all" || item.jobType === filterType;
 
-      // Type filter
-      if (filterType !== "all" && item.jobType !== filterType) {
-        return false;
-      }
-
-      // Date range filter
-      if (filterDateRange !== "all") {
+      const matchesDateRange = () => {
         const today = new Date();
         const measureDate = item.measureDate ? new Date(item.measureDate) : null;
-        
         if (filterDateRange === "today") {
-          if (!measureDate || measureDate.toDateString() !== today.toDateString()) {
-            return false;
-          }
+          return measureDate && measureDate.toDateString() === today.toDateString();
         } else if (filterDateRange === "week") {
-          if (!measureDate || !isWithinInterval(measureDate, { start: today, end: addDays(today, 7) })) {
-            return false;
-          }
+          return measureDate && isWithinInterval(measureDate, { start: today, end: addDays(today, 7) });
         } else if (filterDateRange === "month") {
-          if (!measureDate || measureDate.getMonth() !== today.getMonth()) {
-            return false;
-          }
+          return measureDate && measureDate.getMonth() === today.getMonth();
         }
-      }
+        return true; // "all"
+      };
 
-      return true;
+      const matchesVisibility = visibleStages.includes(item.stage as Stage); 
+
+      return matchesSearch && matchesSalesperson && matchesStage && matchesType && matchesDateRange() && matchesVisibility;
     });
-
-    const endTime = performance.now();
-    log(`⚡ Filtered ${filtered.length}/${features.length} items in ${(endTime - startTime).toFixed(2)}ms`);
-
-    return filtered;
   }, [features, searchTerm, filterSalesperson, filterStage, filterType, filterDateRange, loading, visibleStages]);
 
   const filteredListItems = useMemo(() => {
@@ -920,69 +888,74 @@ export default function EnhancedPipelinePage() {
     newStage: Stage,
     itemType: "customer" | "job" | "project"
   ) => {
+    // Check permissions
     const item = pipelineItems.find((i) => i.id === itemId);
     if (!item || !canUserEditItem(item)) {
       alert("You don't have permission to change the stage of this item.");
       return;
     }
 
-    // ✅ OPTIMISTIC UPDATE FIRST
-    setPipelineItems((current) =>
-      current.map((i) => (i.id === itemId ? { ...i, stage: newStage } : i))
-    );
-
-    setFeatures((current) =>
-      current.map((f) => (f.itemId === itemId ? { ...f, stage: newStage, column: stageToColumnId(newStage) } : f))
-    );
-
     try {
       const isProject = itemId.startsWith("project-");
       const isCustomer = itemId.startsWith("customer-");
       const isJob = itemId.startsWith("job-");
 
-      let entityId: string;
+      let entityId;
+      let endpoint;
+      let method = "PATCH";
 
       if (isJob) {
         entityId = itemId.replace("job-", "");
-        await api.updateJobStage(
-          entityId,
-          newStage,
-          "Rejected via quick button on Kanban board",
-          user?.email || "current_user"
-        );
+        endpoint = `jobs/${entityId}/stage`;
       } else if (isProject) {
         entityId = itemId.replace("project-", "");
-        const originalItem = pipelineItems.find((pi) => pi.id === itemId);
-        await api.updateProjectStage(entityId, newStage, {
+        endpoint = `projects/${entityId}`;
+        method = "PUT";
+      } else if (isCustomer) {
+        entityId = itemId.replace("customer-", "");
+        endpoint = `customers/${entityId}/stage`;
+      } else {
+        throw new Error(`Unknown pipeline item type: ${itemId}`);
+      }
+
+      // Get original item for project data
+      const originalItem = pipelineItems.find((pi) => pi.id === itemId);
+      let bodyData: any;
+
+      if (isProject) {
+        // For projects, send full data (PUT requires all fields)
+        bodyData = {
           project_name: originalItem?.job?.job_name,
           project_type: originalItem?.job?.job_type,
           date_of_measure: originalItem?.job?.measure_date,
           notes: originalItem?.job?.notes,
+          stage: newStage,
           updated_by: user?.email || "current_user",
-        });
-      } else if (isCustomer) {
-        entityId = itemId.replace("customer-", "");
-        await api.updateCustomerStage(
-          entityId,
-          newStage,
-          "Rejected via quick button on Kanban board",
-          user?.email || "current_user"
-        );
+        };
+      } else {
+        // For customers/jobs, send only stage update
+        bodyData = {
+          stage: newStage,
+          reason: "Rejected via quick button on Kanban board",
+          updated_by: user?.email || "current_user",
+        };
       }
 
-      log("✅ Quick stage change successful");
+      const response = await fetchWithAuth(endpoint, {
+        method: method,
+        body: JSON.stringify(bodyData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to update stage`);
+      }
+
+      await refetchPipelineData();
 
     } catch (e) {
       console.error("Failed to quick change stage:", e);
-      alert("Failed to move to Rejected. Reverting changes.");
-      
-      // ✅ REVERT on error
-      setPipelineItems((current) =>
-        current.map((i) => (i.id === itemId ? item : i))
-      );
-      setFeatures((current) =>
-        current.map((f) => (f.itemId === itemId ? { ...f, stage: item.stage, column: stageToColumnId(item.stage) } : f))
-      );
+      alert("Failed to move to Rejected. Please try again.");
     }
   };
 
@@ -993,45 +966,71 @@ export default function EnhancedPipelinePage() {
     reason: string,
     itemType: "customer" | "job" | "project",
   ) => {
+    // Check permissions
     const item = pipelineItems.find((i) => i.id === itemId);
     if (!item || !canUserEditItem(item)) {
       alert("You don't have permission to change the stage of this item.");
       return;
     }
 
-    // ✅ OPTIMISTIC UPDATE
-    setPipelineItems((current) =>
-      current.map((i) => (i.id === itemId ? { ...i, stage: newStage } : i))
-    );
-
-    setFeatures((current) =>
-      current.map((f) => (f.itemId === itemId ? { ...f, stage: newStage, column: stageToColumnId(newStage) } : f))
-    );
-
     try {
       const isProject = itemId.startsWith("project-");
       const isCustomer = itemId.startsWith("customer-");
       const isJob = itemId.startsWith("job-");
 
-      let entityId: string;
+      let entityId;
+      let endpoint;
+      let method;
 
       if (isJob) {
         entityId = itemId.replace("job-", "");
-        await api.updateJobStage(entityId, newStage, reason, user?.email || "current_user");
+        endpoint = `jobs/${entityId}/stage`; 
+        method = "PATCH";
       } else if (isProject) {
         entityId = itemId.replace("project-", "");
-        const originalItem = pipelineItems.find((pi) => pi.id === itemId);
-        await api.updateProjectStage(entityId, newStage, {
+        endpoint = `projects/${entityId}`; 
+        method = "PUT";
+      } else if (isCustomer) {
+        entityId = itemId.replace("customer-", "");
+        endpoint = `customers/${entityId}/stage`; 
+        method = "PATCH";
+      } else {
+        throw new Error(`Unknown pipeline item type: ${itemId}`);
+      }
+
+      // Retrieve original item data to send full body for PUT requests (Projects)
+      const originalItem = pipelineItems.find((pi) => pi.id === itemId);
+      let bodyData: any;
+
+      if (isProject) {
+        bodyData = {
           project_name: originalItem?.job?.job_name,
           project_type: originalItem?.job?.job_type,
           date_of_measure: originalItem?.job?.measure_date,
           notes: originalItem?.job?.notes,
+          stage: newStage, // Update the stage
           updated_by: user?.email || "current_user",
-        });
-      } else if (isCustomer) {
-        entityId = itemId.replace("customer-", "");
-        await api.updateCustomerStage(entityId, newStage, reason, user?.email || "current_user");
+        };
+      } else {
+        // For PATCH (Job/Customer), only send the stage and audit details.
+        bodyData = {
+          stage: newStage,
+          reason: reason,
+          updated_by: user?.email || "current_user",
+        };
       }
+
+      const response = await fetchWithAuth(endpoint, {
+        method: method,
+        body: JSON.stringify(bodyData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to update stage for ${item.type} ${entityId}`);
+      }
+
+      await refetchPipelineData();
 
       // Log audit entry
       const auditEntry: AuditLog = {
@@ -1045,19 +1044,20 @@ export default function EnhancedPipelinePage() {
       };
       setAuditLogs((prev) => [auditEntry, ...prev.slice(0, 4)]);
 
-      log("✅ Stage change successful");
-
+      // Trigger automation for "Accepted" stage - only for real job entities
+      if (newStage === "Accepted" && isJob && permissions.canSendQuotes) {
+        try {
+          await fetchWithAuth(`invoices`, {
+            method: "POST",
+            body: JSON.stringify({ jobId: entityId, templateId: "default_invoice" }),
+          });
+        } catch (e) {
+          console.warn("Failed to create invoice automatically:", e);
+        }
+      }
     } catch (e) {
       console.error("Failed to update stage:", e);
-      alert("Failed to update stage. Reverting changes.");
-      
-      // ✅ REVERT on error
-      setPipelineItems((current) =>
-        current.map((i) => (i.id === itemId ? item : i))
-      );
-      setFeatures((current) =>
-        current.map((f) => (f.itemId === itemId ? { ...f, stage: item.stage, column: stageToColumnId(item.stage) } : f))
-      );
+      alert("Failed to update stage. Please try again.");
     }
   };
 
@@ -1223,7 +1223,7 @@ export default function EnhancedPipelinePage() {
           {permissions.canCreate && (
             <Button variant="outline" size="sm" onClick={handleCreateJob}>
               <Plus className="mr-2 h-4 w-4" />
-              New Task
+              New Job
             </Button>
           )}
         </div>
