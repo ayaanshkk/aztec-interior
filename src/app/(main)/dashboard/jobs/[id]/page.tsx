@@ -142,7 +142,7 @@ export default function JobDetailsPage() {
       // ✅ STEP 2: Load customer, documents, and forms in PARALLEL
       if (jobData.customer_id) {
         const [customerData, docsData] = await Promise.all([
-          api.getCustomer(jobData.customer_id),
+          api.getCustomerDetails(jobData.customer_id),  // ✅ Fixed method name
           api.getCustomerDrawings(jobData.customer_id),
         ]);
 

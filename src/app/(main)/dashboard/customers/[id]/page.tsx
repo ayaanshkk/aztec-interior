@@ -1014,8 +1014,6 @@ export default function CustomerDetailsPage() {
     return allowedRoles.some(role => role.toLowerCase() === user.role.toLowerCase());
   };
 
-  // -------------------------------------------------------------
-
   // Add permission check function
   const canEditForm = (submission: FormSubmission): boolean => {
     if (!user) return false;
