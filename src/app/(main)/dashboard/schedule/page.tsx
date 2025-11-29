@@ -704,7 +704,7 @@ export default function SchedulePage() {
       setCustomAssigneeInput("");
       setCustomTaskInput("");
     } catch (err) {
-      error("Error creating task:", err);
+      console.error("Error creating task:", err);
       alert(err instanceof Error ? err.message : "Failed to create task");
     }
   };
@@ -774,7 +774,7 @@ export default function SchedulePage() {
       });
       log(`✅ Server updated successfully`);
     } catch (err) {
-      error("❌ Failed to update task on server, reverting");
+      console.error("❌ Failed to update task on server, reverting");
       setTasks(previousTasks);
       alert("Failed to move task. Please try again.");
     }
