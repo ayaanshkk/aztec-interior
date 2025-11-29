@@ -410,14 +410,21 @@ export const api = {
 
     return deduplicateRequest(cacheKey, async () => {
       try {
+        log("📋 Fetching pipeline data...");
         const response = await fetchWithAuth("/pipeline");
-        const data = await handleApiResponse(response);
         
-        cache.set(cacheKey, data, CACHE_TTL.pipeline);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch pipeline: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        log(`✅ Got ${data.length} pipeline items`);
+        
+        cache.set(cacheKey, data, 2 * 60 * 1000); // 2 minutes
         return data;
       } catch (err) {
-        warn("⚠️ getPipeline failed, returning empty data");
-        return { pipeline: [] };
+        error("❌ getPipeline failed:", err);
+        throw err;
       }
     });
   },
@@ -650,8 +657,10 @@ export const api = {
     });
   },
 
-  async getCustomerDrawings(customerId: string, skipCache = false) {
-    const cacheKey = `customer-drawings-${customerId}`;
+  async getCustomerDrawings(customerId: string, projectId?: string, skipCache = false) {
+    const cacheKey = projectId 
+      ? `customer-drawings-${customerId}-${projectId}` 
+      : `customer-drawings-${customerId}`;
     
     if (!skipCache) {
       const cached = cache.get(cacheKey);
@@ -679,8 +688,13 @@ export const api = {
         const data = await response.json();
         const drawings = Array.isArray(data) ? data : [];
         
-        cache.set(cacheKey, drawings, 2 * 60 * 1000); // 2 minutes
-        return drawings;
+        // Filter by project if specified
+        const filtered = projectId
+          ? drawings.filter((d: any) => d.project_id === projectId)
+          : drawings;
+        
+        cache.set(cacheKey, filtered, 2 * 60 * 1000); // 2 minutes
+        return filtered;
       } catch (err) {
         warn("⚠️ getCustomerDrawings failed:", err);
         return [];
@@ -887,38 +901,6 @@ export const api = {
     });
   },
 
-  async getPipeline(skipCache = false) {
-    const cacheKey = 'pipeline';
-    
-    if (!skipCache) {
-      const cached = cache.get(cacheKey);
-      if (cached) {
-        log('✅ Cache hit: pipeline');
-        return cached;
-      }
-    }
-
-    return deduplicateRequest(cacheKey, async () => {
-      try {
-        log("📋 Fetching pipeline data...");
-        const response = await fetchWithAuth("/pipeline");
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch pipeline: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        log(`✅ Got ${data.length} pipeline items`);
-        
-        cache.set(cacheKey, data, 2 * 60 * 1000); // 2 minutes
-        return data;
-      } catch (err) {
-        error("❌ getPipeline failed:", err);
-        throw err;
-      }
-    });
-  },
-
   async updateCustomerStage(customerId: string, stage: string, reason: string, updatedBy: string) {
     try {
       const response = await fetchWithAuth(`/customers/${customerId}/stage`, {
@@ -934,6 +916,8 @@ export const api = {
       
       // Invalidate pipeline cache
       cache.invalidate('pipeline');
+      cache.invalidate('customers');
+      cache.invalidate('activeCustomers');
       
       return result;
     } catch (err) {
@@ -957,6 +941,8 @@ export const api = {
       
       // Invalidate pipeline cache
       cache.invalidate('pipeline');
+      cache.invalidate('jobs');
+      cache.invalidate('availableJobs');
       
       return result;
     } catch (err) {
@@ -991,135 +977,7 @@ export const api = {
     }
   },
 
-  // ==========================================================================
-  // MUTATION ENDPOINTS (invalidate cache after changes)
-  // ==========================================================================
-
-  async updateCustomerStage(customerId: string, stage: string, reason: string, updatedBy: string) {
-    const response = await fetchWithAuth(`/customers/${customerId}/stage`, {
-      method: "PATCH",
-      body: JSON.stringify({ stage, reason, updated_by: updatedBy }),
-    });
-    const result = await handleApiResponse(response);
-    
-    // Invalidate related caches
-    cache.invalidate('customers');
-    cache.invalidate('pipeline');
-    cache.invalidate('activeCustomers');
-    
-    return result;
-  },
-
-  async updateJobStage(jobId: string, stage: string, reason: string, updatedBy: string) {
-    const response = await fetchWithAuth(`/jobs/${jobId}/stage`, {
-      method: "PATCH",
-      body: JSON.stringify({ stage, reason, updated_by: updatedBy }),
-    });
-    const result = await handleApiResponse(response);
-    
-    // Invalidate related caches
-    cache.invalidate('jobs');
-    cache.invalidate('pipeline');
-    cache.invalidate('availableJobs');
-    
-    return result;
-  },
-
-  async createAssignment(assignmentData: any) {
-    try {
-      log("📝 Creating assignment:", assignmentData);
-      const response = await fetchWithAuth("/assignments", {
-        method: "POST",
-        body: JSON.stringify(assignmentData),
-      });
-      
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType?.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Failed to create assignment: ${response.status}`);
-        }
-        throw new Error(`Server error: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      log("✅ Assignment created:", result.assignment?.id || result.id);
-      
-      // Invalidate assignments cache
-      cache.invalidatePattern('assignments');
-      
-      return result.assignment || result;
-    } catch (err: any) {
-      error("❌ createAssignment failed:", err);
-      if (err.message.includes('timeout')) {
-        throw new Error('Request timed out. The server may be waking up, please try again.');
-      }
-      throw err;
-    }
-  },
-
-  async updateAssignment(assignmentId: string, assignmentData: any) {
-    try {
-      log(`📝 Updating assignment ${assignmentId}:`, assignmentData);
-      const response = await fetchWithAuth(`/assignments/${assignmentId}`, {
-        method: "PUT",
-        body: JSON.stringify(assignmentData),
-      });
-      
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType?.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to update assignment");
-        }
-        throw new Error(`Server error: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      log("✅ Assignment updated:", result.assignment?.id || result.id);
-      
-      // Invalidate assignments cache
-      cache.invalidatePattern('assignments');
-      
-      return result.assignment || result;
-    } catch (err) {
-      error("❌ updateAssignment failed:", err);
-      throw err;
-    }
-  },
-
-  async deleteAssignment(assignmentId: string) {
-    try {
-      log(`🗑️ Deleting assignment ${assignmentId}`);
-      const response = await fetchWithAuth(`/assignments/${assignmentId}`, {
-        method: "DELETE",
-      });
-      
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType?.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to delete assignment");
-        }
-        throw new Error(`Server error: ${response.status}`);
-      }
-      
-      log("✅ Assignment deleted");
-      
-      // Invalidate assignments cache
-      cache.invalidatePattern('assignments');
-      
-      return true;
-    } catch (err) {
-      error("❌ deleteAssignment failed:", err);
-      throw err;
-    }
-  },
-
-  // ============================================================================
   // PROJECT METHODS
-  // ============================================================================
-
   async getProject(projectId: string, skipCache = false) {
     const cacheKey = `project-${projectId}`;
     
@@ -1184,106 +1042,6 @@ export const api = {
     });
   },
 
-  async getCustomerDrawings(customerId: string, projectId?: string, skipCache = false) {
-    const cacheKey = projectId 
-      ? `drawings-${customerId}-${projectId}` 
-      : `drawings-${customerId}`;
-    
-    if (!skipCache) {
-      const cached = cache.get(cacheKey);
-      if (cached) {
-        log(`✅ Cache hit: ${cacheKey}`);
-        return cached;
-      }
-    }
-
-    return deduplicateRequest(cacheKey, async () => {
-      try {
-        log(`📐 Fetching drawings for customer ${customerId}...`);
-        const response = await fetchWithAuth(`/files/drawings?customer_id=${customerId}`);
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch drawings: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        // Filter by project if specified
-        const filtered = projectId && Array.isArray(data)
-          ? data.filter((d: any) => d.project_id === projectId)
-          : data;
-        
-        log(`✅ Got ${filtered.length} drawings`);
-        
-        cache.set(cacheKey, filtered, 5 * 60 * 1000); // 5 minutes
-        return filtered;
-      } catch (err) {
-        error("❌ getCustomerDrawings failed:", err);
-        throw err;
-      }
-    });
-  },
-
-  async uploadDrawing(file: File, customerId: string, projectId: string) {
-    try {
-      log(`📤 Uploading drawing: ${file.name}`);
-      
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("customer_id", customerId);
-      formData.append("project_id", projectId);
-
-      const token = getAuthToken();
-      const response = await fetch(`${API_BASE_URL}/files/drawings`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to upload drawing: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      // Invalidate drawings cache
-      cache.invalidatePattern('drawings-');
-      
-      log(`✅ Drawing uploaded: ${file.name}`);
-      return result;
-    } catch (err) {
-      error("❌ uploadDrawing failed:", err);
-      throw err;
-    }
-  },
-
-  async deleteDrawing(drawingId: string, customerId: string) {
-    try {
-      log(`🗑️ Deleting drawing ${drawingId}`);
-      
-      const response = await fetchWithAuth(`/files/drawings/${drawingId}`, {
-        method: "DELETE",
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to delete drawing: ${response.status}`);
-      }
-      
-      const result = await handleApiResponse(response);
-      
-      // Invalidate drawings cache
-      cache.invalidatePattern('drawings-');
-      
-      log(`✅ Drawing deleted`);
-      return result;
-    } catch (err) {
-      error("❌ deleteDrawing failed:", err);
-      throw err;
-    }
-  },
-
   async deleteFormSubmission(formId: number, projectId: string) {
     try {
       log(`🗑️ Deleting form ${formId}`);
@@ -1308,10 +1066,6 @@ export const api = {
       throw err;
     }
   },
-
-  // ============================================================================
-  // FORM SUBMISSION METHODS
-  // ============================================================================
 
   async submitCustomerForm(formData: any, token?: string, projectId?: string, isWalkinMode?: boolean) {
     try {
@@ -1373,43 +1127,6 @@ export const api = {
       error("❌ createMaterialOrder failed:", err);
       throw err;
     }
-  },
-
-  // ============================================================================
-  // JOBS METHODS
-  // ============================================================================
-
-  async getJobs(skipCache = false) {
-    const cacheKey = 'jobs';
-    
-    if (!skipCache) {
-      const cached = cache.get(cacheKey);
-      if (cached) {
-        log(`✅ Cache hit: jobs`);
-        return cached;
-      }
-    }
-
-    return deduplicateRequest(cacheKey, async () => {
-      try {
-        log("📋 Fetching jobs...");
-        const response = await fetchWithAuth("/jobs");
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch jobs: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        log(`✅ Got ${data.length} jobs`);
-        
-        // 5-minute cache for jobs list
-        cache.set(cacheKey, data, 5 * 60 * 1000);
-        return data;
-      } catch (err) {
-        error("❌ getJobs failed:", err);
-        throw err;
-      }
-    });
   },
 
   async getJob(jobId: string, skipCache = false) {
@@ -1496,6 +1213,7 @@ export const api = {
       throw err;
     }
   },
+};
 
 // ============================================================================
 // 10. PARALLEL FETCHING HELPERS
@@ -1503,13 +1221,13 @@ export const api = {
 
 /**
  * Fetch multiple endpoints in parallel
- * Usage: const [customers, jobs, pipeline] = await api.fetchParallel([
+ * Usage: const [customers, jobs, pipeline] = await fetchParallel([
  *   api.getCustomers(),
  *   api.getJobs(),
  *   api.getPipeline()
  * ]);
  */
-export async function fetchParallel<T extends readonly unknown[]>(
+export function fetchParallel<T extends readonly unknown[]>(
   promises: readonly [...T]
 ): Promise<{ -readonly [P in keyof T]: Awaited<T[P]> }> {
   return Promise.all(promises) as any;
@@ -1519,7 +1237,7 @@ export async function fetchParallel<T extends readonly unknown[]>(
  * Fetch multiple endpoints in parallel with error handling
  * Returns partial results even if some requests fail
  */
-export async function fetchParallelSafe<T extends readonly unknown[]>(
+export function fetchParallelSafe<T extends readonly unknown[]>(
   promises: readonly [...T]
 ): Promise<Array<{ data: any; error: Error | null }>> {
   const results = await Promise.allSettled(promises);

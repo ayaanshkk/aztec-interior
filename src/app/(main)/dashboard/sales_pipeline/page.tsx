@@ -1223,7 +1223,7 @@ export default function EnhancedPipelinePage() {
           {permissions.canCreate && (
             <Button variant="outline" size="sm" onClick={handleCreateJob}>
               <Plus className="mr-2 h-4 w-4" />
-              New Job
+              New Task
             </Button>
           )}
         </div>
