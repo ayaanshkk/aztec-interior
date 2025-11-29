@@ -100,7 +100,8 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
   console.log('📡 fetchWithAuth calling:', url);
 
   if (!token) {
-    console.error("No auth token found");
+    console.error("❌ No auth token found - redirecting to login");
+    redirectToLogin();
     throw new Error("Not authenticated");
   }
 
@@ -111,21 +112,23 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
   };
 
   try {
-    // ✅ Increased timeout to 30s for Render cold starts
     const response = await fetchWithTimeout(url, {
       ...options,
       headers,
     }, 30000);
 
-    // ✅ DON'T logout on 401 - mock auth setup
+    // ✅ PROPERLY handle 401 - token is invalid/expired
     if (response.status === 401) {
-      console.warn("⚠️ Got 401 from backend - continuing with mock auth");
+      console.error("❌ 401 Unauthorized - token invalid or expired");
+      localStorage.removeItem("auth_token");
+      redirectToLogin();
+      throw new Error("Session expired - please login again");
     }
 
     return response;
   } catch (error: any) {
     if (error.name === 'AbortError' || error.message.includes('timeout')) {
-      console.error("⏱️ Request timeout - backend not responding (likely cold start)");
+      console.error("⏱️ Request timeout - backend not responding");
       throw new Error("Request timeout - the server is taking too long. Please try again.");
     }
     throw error;

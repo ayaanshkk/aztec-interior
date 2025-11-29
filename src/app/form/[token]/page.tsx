@@ -729,7 +729,7 @@ export default function FormPage() {
       additional_handles: [...prev.additional_handles, { 
         handles_code: "", 
         handles_quantity: "", 
-        handles_size: "" 
+        handles_size: ""  
       }],
     }));
   };
@@ -2214,6 +2214,7 @@ export default function FormPage() {
                     </div>
                   </div>
                 </div>
+                
                 {/* 3. Accessories & Floor Protection - Pink Section */}
                 <div className="rounded-lg border-2 border-pink-200 bg-pink-50 p-6">
                   <div className="flex items-center justify-between mb-2">
