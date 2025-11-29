@@ -1213,6 +1213,39 @@ export const api = {
       throw err;
     }
   },
+
+  async getAllUsers(skipCache = false) {
+    const cacheKey = 'users';
+    
+    if (!skipCache) {
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        log('✅ Cache hit: users');
+        return cached;
+      }
+    }
+
+    return deduplicateRequest(cacheKey, async () => {
+      try {
+        log("👥 Fetching all users...");
+        const response = await fetchWithAuth("/users");
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch users: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        log(`✅ Got ${data.users?.length || 0} users`);
+        
+        cache.set(cacheKey, data, 5 * 60 * 1000); // 5 minutes
+        return data;
+      } catch (err) {
+        error("❌ getAllUsers failed:", err);
+        // Return empty data instead of throwing
+        return { users: [] };
+      }
+    });
+  },
 };
 
 // ============================================================================
