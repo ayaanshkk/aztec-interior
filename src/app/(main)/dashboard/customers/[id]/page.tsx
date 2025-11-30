@@ -1203,43 +1203,109 @@ const handleConfirmDeleteFormDocument = async () => {
     setTimeout(() => setLinkCopied(false), 2000);
   };
 
-  const handleCreateQuote = () => {
+  const handleCreateQuote = async () => {
     if (!canEdit()) {
       alert("You don't have permission to create quotes for this customer.");
       return;
     }
+
+    // ✅ CHECK: Does customer have bedroom or kitchen checklist?
+    const bedroomChecklist = customer?.form_submissions?.find((form) => {
+      const type = getFormType(form);
+      return type === "bedroom";
+    });
+
+    const kitchenChecklist = customer?.form_submissions?.find((form) => {
+      const type = getFormType(form);
+      return type === "kitchen";
+    });
+
+    // ✅ If checklist exists, ask user if they want to generate from it
+    if (bedroomChecklist || kitchenChecklist) {
+      const checklistType = bedroomChecklist ? "bedroom" : "kitchen";
+      const checklistId = bedroomChecklist?.id || kitchenChecklist?.id;
+      
+      const generateFromChecklist = window.confirm(
+        `You have a ${checklistType} checklist on file. Would you like to:\n\n` +
+        `✅ YES - Generate quote from checklist (auto-extract items)\n` +
+        `❌ NO - Create blank quote manually`
+      );
+
+      if (generateFromChecklist) {
+        // Generate quote from checklist
+        try {
+          const token = localStorage.getItem("auth_token");
+          const response = await fetch(
+            `https://aztec-interiors.onrender.com/quotations/generate-from-checklist/${checklistId}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            alert(
+              `✅ Quote generated successfully!\n\n` +
+              `Reference: ${data.reference_number}\n` +
+              `Items: ${data.items_count}\n` +
+              `Type: ${data.checklist_type}\n\n` +
+              `Redirecting to quote editor...`
+            );
+            // Redirect to quote editor
+            router.push(`/dashboard/quotes/${data.quotation_id}/edit`);
+            return;
+          } else {
+            const error = await response.json();
+            alert(`Failed to generate quote: ${error.error || "Unknown error"}`);
+            return;
+          }
+        } catch (error) {
+          console.error("Error generating quote:", error);
+          alert("Network error: Could not generate quote");
+          return;
+        }
+      }
+    }
+
+    // ✅ No checklist OR user chose to create blank quote
     const queryParams = new URLSearchParams({
       customerId: String(id),
       customerName: customer?.name || "",
       customerAddress: customer?.address || "",
       customerPhone: customer?.phone || "",
       customerEmail: customer?.email || "",
+      type: "quotation",
+      source: "customer",
     });
     router.push(`/dashboard/quotes/create?${queryParams.toString()}`);
   };
 
-  const handleCreateJob = () => {
-    if (user?.role === "Sales") {
-      alert("Sales users cannot directly create jobs. Jobs are created from accepted quotes.");
-      return;
-    }
-    const queryParams = new URLSearchParams({
-      customerId: String(id),
-      customerName: customer?.name || "",
-      customerAddress: customer?.address || "",
-      customerPhone: customer?.phone || "",
-      customerEmail: customer?.email || "",
-    });
-    router.push(`/dashboard/jobs/create?${queryParams.toString()}`);
-  };
+  // const handleCreateJob = () => {
+  //   if (user?.role === "Sales") {
+  //     alert("Sales users cannot directly create jobs. Jobs are created from accepted quotes.");
+  //     return;
+  //   }
+  //   const queryParams = new URLSearchParams({
+  //     customerId: String(id),
+  //     customerName: customer?.name || "",
+  //     customerAddress: customer?.address || "",
+  //     customerPhone: customer?.phone || "",
+  //     customerEmail: customer?.email || "",
+  //   });
+  //   router.push(`/dashboard/jobs/create?${queryParams.toString()}`);
+  // };
 
-  const handleCreateChecklist = () => {
-    if (!canEdit()) {
-      alert("You don't have permission to create checklists for this customer.");
-      return;
-    }
-    router.push(`/dashboard/checklists/create?customerId=${id}`);
-  };
+  // const handleCreateChecklist = () => {
+  //   if (!canEdit()) {
+  //     alert("You don't have permission to create checklists for this customer.");
+  //     return;
+  //   }
+  //   router.push(`/dashboard/checklists/create?customerId=${id}`);
+  // };
 
   const buildCustomerQuery = () => {
     const qp = new URLSearchParams({
@@ -1328,7 +1394,7 @@ const handleConfirmDeleteFormDocument = async () => {
       alert("You don't have permission to create invoices.");
       return;
     }
-    router.push(`/dashboard/invoices/create?${buildCustomerQuery()}`);
+    router.push(`/dashboard/checklists/invoices/create?${buildCustomerQuery()}`); // ✅ CHANGED
   };
 
   const handleCreateProformaInvoice = () => {
@@ -1336,7 +1402,7 @@ const handleConfirmDeleteFormDocument = async () => {
       alert("You don't have permission to create invoices.");
       return;
     }
-    router.push(`/dashboard/invoices/create?type=proforma&${buildCustomerQuery()}`);
+    router.push(`/dashboard/checklists/invoices/create?type=proforma&${buildCustomerQuery()}`); // ✅ CHANGED
   };
 
   const handleCreatePaymentTerms = () => {
@@ -1344,7 +1410,7 @@ const handleConfirmDeleteFormDocument = async () => {
       alert("You don't have permission to create payment terms.");
       return;
     }
-    router.push(`/dashboard/payment-terms/create?${buildCustomerQuery()}`);
+    router.push(`/dashboard/checklists/payment-terms/create?${buildCustomerQuery()}`); // ✅ CHANGED
   };
 
   const handleCreateKitchenChecklist = async () => {
@@ -2199,10 +2265,10 @@ const handleConfirmDeleteFormDocument = async () => {
                       <span>Remedial Action Checklist</span>
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={handleCreateChecklist} className="flex items-center space-x-2">
+                  {/* <DropdownMenuItem onClick={handleCreateChecklist} className="flex items-center space-x-2">
                     <CheckSquare className="h-4 w-4" />
                     <span>Checklist</span>
-                    </DropdownMenuItem>
+                  </DropdownMenuItem> */}
                   <DropdownMenuItem onClick={handleCreateQuote} className="flex items-center space-x-2">
                     <FileText className="h-4 w-4" />
                     <span>Quotation</span>

@@ -688,20 +688,100 @@ export default function ProjectDetailsPage() {
     router.push(`/dashboard/checklists/create?customerId=${customer.id}`);
   }, [customer, router]);
 
-  const handleCreateQuote = useCallback(() => {
+  const handleCreateQuote = useCallback(async () => {
     if (!customer?.id) {
       alert("Error: No customer associated with this project");
       return;
     }
+
+    // ✅ CHECK: Does this project have bedroom or kitchen checklist?
+    const bedroomChecklist = forms.find((form) => {
+      try {
+        const formDataRaw = typeof form.form_data === "string" 
+          ? JSON.parse(form.form_data) 
+          : form.form_data;
+        const formType = (formDataRaw?.form_type || "").toString().toLowerCase();
+        return formType.includes("bed");
+      } catch {
+        return false;
+      }
+    });
+
+    const kitchenChecklist = forms.find((form) => {
+      try {
+        const formDataRaw = typeof form.form_data === "string" 
+          ? JSON.parse(form.form_data) 
+          : form.form_data;
+        const formType = (formDataRaw?.form_type || "").toString().toLowerCase();
+        return formType.includes("kitchen");
+      } catch {
+        return false;
+      }
+    });
+
+    // ✅ If checklist exists, ask user if they want to generate from it
+    if (bedroomChecklist || kitchenChecklist) {
+      const checklistType = bedroomChecklist ? "bedroom" : "kitchen";
+      const checklistId = bedroomChecklist?.id || kitchenChecklist?.id;
+      
+      const generateFromChecklist = window.confirm(
+        `This project has a ${checklistType} checklist. Would you like to:\n\n` +
+        `✅ YES - Generate quote from checklist (auto-extract items)\n` +
+        `❌ NO - Create blank quote manually`
+      );
+
+      if (generateFromChecklist) {
+        // Generate quote from checklist
+        try {
+          const token = localStorage.getItem("auth_token");
+          const response = await fetch(
+            `https://aztec-interiors.onrender.com/quotations/generate-from-checklist/${checklistId}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            alert(
+              `✅ Quote generated successfully!\n\n` +
+              `Reference: ${data.reference_number}\n` +
+              `Items: ${data.items_count}\n` +
+              `Type: ${data.checklist_type}\n\n` +
+              `Redirecting to quote editor...`
+            );
+            // Redirect to quote editor
+            router.push(`/dashboard/quotes/${data.quotation_id}/edit`);
+            return;
+          } else {
+            const error = await response.json();
+            alert(`Failed to generate quote: ${error.error || "Unknown error"}`);
+            return;
+          }
+        } catch (error) {
+          console.error("Error generating quote:", error);
+          alert("Network error: Could not generate quote");
+          return;
+        }
+      }
+    }
+
+    // ✅ No checklist OR user chose to create blank quote
     const params = new URLSearchParams({
       customerId: customer.id,
       customerName: customer.name || "",
       customerAddress: customer.address || "",
       customerPhone: customer.phone || "",
       customerEmail: customer.email || "",
+      type: "quotation",
+      source: "project",
     });
     router.push(`/dashboard/quotes/create?${params.toString()}`);
-  }, [customer, router]);
+  }, [customer, router, forms]); // ✅ IMPORTANT: Add 'forms' to dependencies
 
   const handleCreateInvoice = useCallback(() => {
     if (!customer?.id) {
@@ -715,7 +795,7 @@ export default function ProjectDetailsPage() {
       customerPhone: customer.phone || "",
       customerEmail: customer.email || "",
     });
-    router.push(`/dashboard/invoices/create?${params.toString()}`);
+    router.push(`/dashboard/checklists/invoices/create?${params.toString()}`);  // ✅ CHANGED
   }, [customer, router]);
 
   const handleCreateProformaInvoice = useCallback(() => {
@@ -730,7 +810,7 @@ export default function ProjectDetailsPage() {
       customerPhone: customer.phone || "",
       customerEmail: customer.email || "",
     });
-    router.push(`/dashboard/invoices/create?type=proforma&${params.toString()}`);
+    router.push(`/dashboard/checklists/invoices/create?type=proforma&${params.toString()}`);  // ✅ CHANGED
   }, [customer, router]);
 
   const handleCreateReceipt = useCallback(() => {
@@ -807,7 +887,7 @@ export default function ProjectDetailsPage() {
       customerAddress: customer.address || "",
       customerPhone: customer.phone || "",
     });
-    router.push(`/dashboard/payment-terms/create?${params.toString()}`);
+    router.push(`/dashboard/checklists/payment-terms/create?${params.toString()}`);  // ✅ CHANGED
   }, [customer, router]);
 
   const handleViewChecklist = useCallback((submission: FormSubmission) => {
@@ -1024,10 +1104,10 @@ export default function ProjectDetailsPage() {
                       <span>Remedial Action Checklist</span>
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={handleCreateChecklist} className="flex items-center space-x-2" disabled={generating}>
+                  {/* <DropdownMenuItem onClick={handleCreateChecklist} className="flex items-center space-x-2" disabled={generating}>
                     <CheckSquare className="h-4 w-4" />
                     <span>Checklist</span>
-                  </DropdownMenuItem>
+                  </DropdownMenuItem> */}
                   <DropdownMenuItem onClick={handleCreateQuote} className="flex items-center space-x-2" disabled={generating}>
                     <FileText className="h-4 w-4" />
                     <span>Quotation</span>
