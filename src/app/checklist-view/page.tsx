@@ -444,8 +444,40 @@ export default function ChecklistViewPage() {
   const handleGenerateQuote = async () => {
     if (!formSubmissionId || !formData) return;
     
+    // Intelligently detect form type from the data
+    const detectFormType = (): string => {
+      if (formData.form_type) {
+        return formData.form_type.toLowerCase().includes("kitchen") ? "kitchen" : "bedroom";
+      }
+      
+      // Fallback: detect from fields present
+      const hasKitchenFields = !!(
+        formData.worktop_material_type || 
+        formData.appliances?.length || 
+        formData.sink_details ||
+        formData.integ_fridge_make
+      );
+      
+      const hasBedroomFields = !!(
+        formData.bedside_cabinets_type ||
+        formData.mirror_type ||
+        formData.dresser_desk ||
+        formData.soffit_lights_type
+      );
+      
+      if (hasKitchenFields && !hasBedroomFields) return "kitchen";
+      if (hasBedroomFields && !hasKitchenFields) return "bedroom";
+      
+      // Default to bedroom if unclear
+      return "bedroom";
+    };
+    
+    const detectedType = detectFormType();
+    
     const confirmGenerate = window.confirm(
-      `Generate a quotation from this ${formType} checklist?\n\nThis will automatically extract all materials and create a draft quote.`
+      `Generate a quotation from this ${detectedType} checklist?\n\n` +
+      `This will automatically extract all materials and create a draft quote.\n\n` +
+      `Customer: ${formData.customer_name || 'N/A'}`
     );
     
     if (!confirmGenerate) return;
@@ -469,7 +501,7 @@ export default function ChecklistViewPage() {
           `✅ Quote generated successfully!\n\n` +
           `Reference: ${data.reference_number}\n` +
           `Items extracted: ${data.items_count}\n` +
-          `Checklist type: ${data.checklist_type}`
+          `Type: ${data.checklist_type}`
         );
         
         // Open quote editor in new tab
@@ -845,16 +877,14 @@ export default function ChecklistViewPage() {
                 </>
               ) : (
                 <>
-                  {/* NEW: Generate Quote Button */}
-                  {canEdit() && (
-                    <Button
-                      onClick={handleGenerateQuote}
-                      className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
-                    >
-                      <FileText className="h-4 w-4" />
-                      <span>Generate Quote</span>
-                    </Button>
-                  )}
+                  {/* Generate Quote Button - ALWAYS SHOW when not editing */}
+                  <Button
+                    onClick={handleGenerateQuote}
+                    className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span>Generate Quote</span>
+                  </Button>
                   
                   {canEdit() && (
                     <Button
