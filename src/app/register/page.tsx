@@ -65,7 +65,7 @@ function InviteRegistrationForm() {
 
     const validateToken = async (urlToken: string) => {
         // ✅ FIXED: Use correct backend endpoint
-        const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interiors.onrender.com';
+        const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
         const validationUrl = `${BACKEND_URL}/auth/validate-invitation`;
 
         try {
@@ -112,7 +112,7 @@ function InviteRegistrationForm() {
         setRegistering(true);
         
         // ✅ FIXED: Use correct backend endpoint
-        const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interiors.onrender.com';
+        const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
         const registerUrl = `${BACKEND_URL}/auth/register`;
 
         try {

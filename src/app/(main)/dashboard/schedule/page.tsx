@@ -434,7 +434,7 @@ export default function SchedulePage() {
       console.log("🔄 Fetching schedule data...");
 
       const directFetch = async (endpoint: string) => {
-        const response = await fetch(`https://aztec-interiors.onrender.com/${endpoint}`, {
+        const response = await fetch(`https://aztec-interior.onrender.com/${endpoint}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -644,7 +644,7 @@ export default function SchedulePage() {
       
       console.log(`🗑️ Deleting task: ${id}`);
       
-      const response = await fetch(`https://aztec-interiors.onrender.com/assignments/${id}`, {
+      const response = await fetch(`https://aztec-interior.onrender.com/assignments/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

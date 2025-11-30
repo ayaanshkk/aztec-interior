@@ -182,7 +182,7 @@
 
 //       console.log("🔄 Fetching customers...");
       
-//       const response = await fetch("https://aztec-interiors.onrender.com/customers", {
+//       const response = await fetch("https://aztec-interior.onrender.com/customers", {
 //         headers,
 //       });
 
@@ -240,7 +240,7 @@
 //     try {
 //       const token = localStorage.getItem("auth_token");
 //       const response = await fetch(
-//         `https://aztec-interiors.onrender.com/customers/${customerId}/projects`,
+//         `https://aztec-interior.onrender.com/customers/${customerId}/projects`,
 //         {
 //           headers: { Authorization: `Bearer ${token}` },
 //         }
@@ -373,7 +373,7 @@
 
 //     try {
 //       const token = localStorage.getItem("auth_token");
-//       const res = await fetch(`https://aztec-interiors.onrender.com/customers/${id}`, {
+//       const res = await fetch(`https://aztec-interior.onrender.com/customers/${id}`, {
 //         method: "DELETE",
 //         headers: { Authorization: `Bearer ${token}` },
 //       });
@@ -972,7 +972,7 @@ export default function CustomersPage() {
 
       console.log("🔄 Fetching customers...");
       
-      const response = await fetch("https://aztec-interiors.onrender.com/customers", {
+      const response = await fetch("https://aztec-interior.onrender.com/customers", {
         headers,
       });
 
@@ -1030,7 +1030,7 @@ export default function CustomersPage() {
     try {
       const token = localStorage.getItem("auth_token");
       const response = await fetch(
-        `https://aztec-interiors.onrender.com/customers/${customerId}/projects`,
+        `https://aztec-interior.onrender.com/customers/${customerId}/projects`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -1204,7 +1204,7 @@ export default function CustomersPage() {
 
     try {
       const token = localStorage.getItem("auth_token");
-      const res = await fetch(`https://aztec-interiors.onrender.com/customers/${id}`, {
+      const res = await fetch(`https://aztec-interior.onrender.com/customers/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

@@ -250,7 +250,7 @@ export default function ProjectDetailsPage() {
 
     try {
       const projectRes = await fetch(
-        `https://aztec-interiors.onrender.com/projects/${projectId}`,
+        `https://aztec-interior.onrender.com/projects/${projectId}`,
         { headers }
       );
 
@@ -272,21 +272,21 @@ export default function ProjectDetailsPage() {
 
       const [customerRes, drawingsRes, formsRes] = await Promise.all([
         fetch(
-          `https://aztec-interiors.onrender.com/customers/${projectData.customer_id}`,
+          `https://aztec-interior.onrender.com/customers/${projectData.customer_id}`,
           { headers }
         ).catch((err) => {
           console.error("Customer fetch error:", err);
           return null;
         }),
         fetch(
-          `https://aztec-interiors.onrender.com/files/drawings?customer_id=${projectData.customer_id}`,
+          `https://aztec-interior.onrender.com/files/drawings?customer_id=${projectData.customer_id}`,
           { headers }
         ).catch((err) => {
           console.error("Drawings fetch error:", err);
           return null;
         }),
         fetch(
-          `https://aztec-interiors.onrender.com/projects/${projectId}/forms`,
+          `https://aztec-interior.onrender.com/projects/${projectId}/forms`,
           { headers }
         ).catch((err) => {
           console.error("Forms fetch error:", err);
@@ -363,7 +363,7 @@ export default function ProjectDetailsPage() {
         formData.append("customer_id", project?.customer_id || "");
         formData.append("project_id", projectId);
 
-        const response = await fetch("https://aztec-interiors.onrender.com/files/drawings", {
+        const response = await fetch("https://aztec-interior.onrender.com/files/drawings", {
           method: "POST",
           headers: headers,
           body: formData,
@@ -401,7 +401,7 @@ export default function ProjectDetailsPage() {
   }, [projectId, project?.customer_id]);
 
   const handleViewDrawing = useCallback((doc: DrawingDocument) => {
-    const BACKEND_URL = "https://aztec-interiors.onrender.com";
+    const BACKEND_URL = "https://aztec-interior.onrender.com";
     let viewUrl = doc.url;
 
     if (viewUrl && viewUrl.startsWith("http")) {
@@ -433,7 +433,7 @@ export default function ProjectDetailsPage() {
 
     try {
       const res = await fetch(
-        `https://aztec-interiors.onrender.com/files/drawings/${drawingToDelete.id}`,
+        `https://aztec-interior.onrender.com/files/drawings/${drawingToDelete.id}`,
         { method: "DELETE", headers }
       );
 
@@ -478,7 +478,7 @@ export default function ProjectDetailsPage() {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      const response = await fetch("https://aztec-interiors.onrender.com/tasks", {
+      const response = await fetch("https://aztec-interior.onrender.com/tasks", {
         method: "POST",
         headers: headers,
         body: JSON.stringify({
@@ -518,7 +518,7 @@ export default function ProjectDetailsPage() {
 
     setGenerating(true);
     try {
-      const res = await fetch("https://aztec-interiors.onrender.com/form-tokens", {
+      const res = await fetch("https://aztec-interior.onrender.com/form-tokens", {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -534,27 +534,27 @@ export default function ProjectDetailsPage() {
         let formUrl = "";
 
         if (type === "kitchen") {
-          formUrl = `https://aztec-interiors.onrender.com/kitchen-checklist?token=${newToken}`;
+          formUrl = `https://aztec-interior.onrender.com/kitchen-checklist?token=${newToken}`;
         } else if (type === "bedroom") {
-          formUrl = `https://aztec-interiors.onrender.com/bedroom-checklist?token=${newToken}`;
+          formUrl = `https://aztec-interior.onrender.com/bedroom-checklist?token=${newToken}`;
         } else if (type === "remedial") {
-          formUrl = `https://aztec-interiors.onrender.com/remedial-checklist?token=${newToken}`;
+          formUrl = `https://aztec-interior.onrender.com/remedial-checklist?token=${newToken}`;
         } else if (type === "checklist") {
-          formUrl = `https://aztec-interiors.onrender.com/checklist-form?token=${newToken}`;
+          formUrl = `https://aztec-interior.onrender.com/checklist-form?token=${newToken}`;
         } else if (type === "quotation") {
-          formUrl = `https://aztec-interiors.onrender.com/quotation?token=${newToken}`;
+          formUrl = `https://aztec-interior.onrender.com/quotation?token=${newToken}`;
         } else if (type === "invoice") {
-          formUrl = `https://aztec-interiors.onrender.com/invoice?token=${newToken}`;
+          formUrl = `https://aztec-interior.onrender.com/invoice?token=${newToken}`;
         } else if (type === "proforma") {
-          formUrl = `https://aztec-interiors.onrender.com/proforma-invoice?token=${newToken}`;
+          formUrl = `https://aztec-interior.onrender.com/proforma-invoice?token=${newToken}`;
         } else if (type === "receipt") {
-          formUrl = `https://aztec-interiors.onrender.com/receipt?token=${newToken}`;
+          formUrl = `https://aztec-interior.onrender.com/receipt?token=${newToken}`;
         } else if (type === "deposit") {
-          formUrl = `https://aztec-interiors.onrender.com/deposit-receipt?token=${newToken}`;
+          formUrl = `https://aztec-interior.onrender.com/deposit-receipt?token=${newToken}`;
         } else if (type === "final") {
-          formUrl = `https://aztec-interiors.onrender.com/final-receipt?token=${newToken}`;
+          formUrl = `https://aztec-interior.onrender.com/final-receipt?token=${newToken}`;
         } else if (type === "payment") {
-          formUrl = `https://aztec-interiors.onrender.com/payment-terms?token=${newToken}`;
+          formUrl = `https://aztec-interior.onrender.com/payment-terms?token=${newToken}`;
         }
 
         window.open(formUrl, "_blank");
@@ -581,7 +581,7 @@ export default function ProjectDetailsPage() {
     setGenerating(true);
     try {
       const response = await fetch(
-        `https://aztec-interiors.onrender.com/customers/${customer.id}/generate-form-link`,
+        `https://aztec-interior.onrender.com/customers/${customer.id}/generate-form-link`,
         {
           method: "POST",
           headers: {
@@ -629,7 +629,7 @@ export default function ProjectDetailsPage() {
     setGenerating(true);
     try {
       const response = await fetch(
-        `https://aztec-interiors.onrender.com/customers/${customer.id}/generate-form-link`,
+        `https://aztec-interior.onrender.com/customers/${customer.id}/generate-form-link`,
         {
           method: "POST",
           headers: {
@@ -735,7 +735,7 @@ export default function ProjectDetailsPage() {
         try {
           const token = localStorage.getItem("auth_token");
           const response = await fetch(
-            `https://aztec-interiors.onrender.com/quotations/generate-from-checklist/${checklistId}`,
+            `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${checklistId}`,
             {
               method: "POST",
               headers: {
@@ -955,7 +955,7 @@ export default function ProjectDetailsPage() {
 
     try {
       const res = await fetch(
-        `https://aztec-interiors.onrender.com/form-submissions/${formToDelete.id}`,
+        `https://aztec-interior.onrender.com/form-submissions/${formToDelete.id}`,
         { 
           method: "DELETE", 
           headers 

@@ -99,7 +99,7 @@ export default function QuoteDetailsPage() {
 
       console.log("Fetching quotation:", quoteId);
 
-      const response = await fetch(`https://aztec-interiors.onrender.com/quotations/${quoteId}`, {
+      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}`, {
         headers,
       });
 
@@ -130,7 +130,7 @@ export default function QuoteDetailsPage() {
 
       console.log("Downloading PDF for quotation:", quoteId);
 
-      const response = await fetch(`https://aztec-interiors.onrender.com/quotations/${quoteId}/pdf`, {
+      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}/pdf`, {
         headers,
       });
 
@@ -175,7 +175,7 @@ export default function QuoteDetailsPage() {
 
       console.log("Deleting quotation:", quoteId);
 
-      const response = await fetch(`https://aztec-interiors.onrender.com/quotations/${quoteId}`, {
+      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}`, {
         method: "DELETE",
         headers,
       });

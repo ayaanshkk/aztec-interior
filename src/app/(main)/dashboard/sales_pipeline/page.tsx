@@ -439,7 +439,7 @@ export default function EnhancedPipelinePage() {
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
         const pipelineResponse = await fetch(
-          "https://aztec-interiors.onrender.com/pipeline",
+          "https://aztec-interior.onrender.com/pipeline",
           {
             headers: {
               "Authorization": `Bearer ${token}`,

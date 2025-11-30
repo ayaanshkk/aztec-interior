@@ -255,7 +255,7 @@ export default function CreateQuotePage() {
         customer_id: customerId,
       };
 
-      const response = await fetch("https://aztec-interiors.onrender.com/quotations", {
+      const response = await fetch("https://aztec-interior.onrender.com/quotations", {
         method: "POST",
         headers: headers,
         body: JSON.stringify(formDataToSend),
@@ -355,7 +355,7 @@ export default function CreateQuotePage() {
 
       console.log("Sending quote data:", quoteData);
 
-      const response = await fetch("https://aztec-interiors.onrender.com/quotations/generate-quote", {
+      const response = await fetch("https://aztec-interior.onrender.com/quotations/generate-quote", {
         method: "POST",
         headers: headers,
         body: JSON.stringify(quoteData),
@@ -419,7 +419,7 @@ export default function CreateQuotePage() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`https://aztec-interiors.onrender.com/quotations/${savedQuoteId}/pdf`, {
+      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${savedQuoteId}/pdf`, {
         method: "GET",
         headers: headers,
       });

@@ -127,7 +127,7 @@ const RemedialActionChecklistPage = () => {
     };
 
     try {
-      const response = await fetch(`https://aztec-interiors.onrender.com/checklists/save`, {
+      const response = await fetch(`https://aztec-interior.onrender.com/checklists/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -161,7 +161,7 @@ const RemedialActionChecklistPage = () => {
 
     try {
       // Call the Flask backend PDF generation endpoint
-      const response = await fetch(`https://aztec-interiors.onrender.com/checklists/download-pdf`, {
+      const response = await fetch(`https://aztec-interior.onrender.com/checklists/download-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
