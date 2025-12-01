@@ -1166,7 +1166,7 @@ const handleConfirmDeleteFormDocument = async () => {
     const projectSpecificForms = customer?.form_submissions.filter((form) => form.project_id === projectId) || [];
     setProjectForms(projectSpecificForms);
 
-    const projectSpecificDocs = financialDocs.filter((doc) => doc.project_id === projectId);
+    const projectSpecificDocs = financialDocuments.filter((doc) => doc.project_id === projectId);
     setProjectDocs(projectSpecificDocs);
   };
 
