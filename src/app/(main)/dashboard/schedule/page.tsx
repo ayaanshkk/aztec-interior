@@ -947,12 +947,12 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {/* ✅ Show cache status */}
+      {/* ✅ Show cache status
       {cachedData && !loading && (
         <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-2 text-sm text-green-800">
           📦 Showing cached data • Last updated {Math.round((Date.now() - cachedData.timestamp) / 1000)}s ago
         </div>
-      )}
+      )} */}
 
       {/* Loading indicator when fetching */}
       {loading && (
