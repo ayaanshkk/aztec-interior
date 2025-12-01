@@ -62,7 +62,8 @@ export default function QuoteDetailsPage() {
   const router = useRouter();
 
   // Handle both [id] and [quoteId] route parameters
-  const quoteId = (params?.quoteId || params?.id) as string;
+  const quoteId = params?.id as string;
+
 
   const [quotation, setQuotation] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);

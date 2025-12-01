@@ -498,6 +498,7 @@ export default function CustomerDetailsPage() {
         if (contentType && contentType.includes("application/json")) {
           const quotationsData = await quotationsRes.json();
           if (Array.isArray(quotationsData)) {
+            // ✅ SHOW ALL QUOTATIONS (don't filter by project_id)
             quotationsData.forEach((quote: Quotation) => {
               allFinancialDocs.push({
                 id: quote.id,
