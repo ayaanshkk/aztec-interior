@@ -1468,6 +1468,9 @@ const handleConfirmDeleteFormDocument = async () => {
     
     try {
       const token = localStorage.getItem("auth_token");
+      
+      console.log("🔄 Generating quote from checklist:", checklistForQuote);
+      
       const response = await fetch(
         `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${checklistForQuote.id}`,
         {
@@ -1479,15 +1482,22 @@ const handleConfirmDeleteFormDocument = async () => {
         }
       );
 
+      console.log("📡 Response status:", response.status);
+
       if (response.ok) {
         const data = await response.json();
         
-        // ✅ FIXED: Open quote as PDF in new tab
-        const pdfUrl = `/dashboard/quotes/${data.quotation_id}/pdf`;
-        window.open(pdfUrl, '_blank');
+        console.log("✅ Quote data received:", data);
         
-        // ✅ Reload customer data to show new quote
+        // ✅ CRITICAL: Reload customer data BEFORE opening new tab
+        console.log("🔄 Reloading customer data...");
         await loadCustomerData();
+        console.log("✅ Customer data reloaded");
+        
+        // ✅ Open quote DETAILS page (not PDF) in new tab
+        const detailsUrl = `/dashboard/quotes/${data.quotation_id}`;
+        console.log("🔗 Opening quote details:", detailsUrl);
+        window.open(detailsUrl, '_blank');
         
         // Show success message
         alert(
@@ -1498,10 +1508,11 @@ const handleConfirmDeleteFormDocument = async () => {
         );
       } else {
         const error = await response.json();
+        console.error("❌ Quote generation failed:", error);
         alert(`Failed to generate quote: ${error.error || "Unknown error"}`);
       }
     } catch (error) {
-      console.error("Error generating quote:", error);
+      console.error("❌ Error generating quote:", error);
       alert("Network error: Could not generate quote");
     } finally {
       setChecklistForQuote(null);
@@ -1519,52 +1530,6 @@ const handleConfirmDeleteFormDocument = async () => {
       source: "customer",
     });
     router.push(`/dashboard/quotes/create?${queryParams.toString()}`);
-  };
-
-  const handleGenerateFromChecklist = async () => {
-    if (!checklistForQuote) return;
-
-    setShowQuoteGenerationDialog(false);
-    
-    try {
-      const token = localStorage.getItem("auth_token");
-      const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${checklistForQuote.id}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        // ✅ Open quote details page in new tab
-        window.open(`/dashboard/quotes/${data.quotation_id}`, '_blank');
-        
-        // ✅ Reload customer data to show new quote
-        await loadCustomerData();
-        
-        // Show success message
-        alert(
-          `✅ Quote generated successfully!\n\n` +
-          `Reference: ${data.reference_number}\n` +
-          `Items: ${data.items_count}\n` +
-          `Total: £${data.total.toFixed(2)}`
-        );
-      } else {
-        const error = await response.json();
-        alert(`Failed to generate quote: ${error.error || "Unknown error"}`);
-      }
-    } catch (error) {
-      console.error("Error generating quote:", error);
-      alert("Network error: Could not generate quote");
-    } finally {
-      setChecklistForQuote(null);
-    }
   };
 
   // const handleCreateJob = () => {
