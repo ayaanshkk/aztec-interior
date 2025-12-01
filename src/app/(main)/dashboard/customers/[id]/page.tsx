@@ -1461,6 +1461,53 @@ const handleConfirmDeleteFormDocument = async () => {
     createBlankQuote();
   };
 
+  const handleGenerateFromChecklist = async () => {
+    if (!checklistForQuote) return;
+
+    setShowQuoteGenerationDialog(false);
+    
+    try {
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch(
+        `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${checklistForQuote.id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // ✅ FIXED: Open quote as PDF in new tab
+        const pdfUrl = `/dashboard/quotes/${data.quotation_id}/pdf`;
+        window.open(pdfUrl, '_blank');
+        
+        // ✅ Reload customer data to show new quote
+        await loadCustomerData();
+        
+        // Show success message
+        alert(
+          `✅ Quote ${data.message?.includes('already exists') ? 'opened' : 'generated'} successfully!\n\n` +
+          `Reference: ${data.reference_number}\n` +
+          `Items: ${data.items_count}\n` +
+          `Total: £${data.total.toFixed(2)}`
+        );
+      } else {
+        const error = await response.json();
+        alert(`Failed to generate quote: ${error.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Error generating quote:", error);
+      alert("Network error: Could not generate quote");
+    } finally {
+      setChecklistForQuote(null);
+    }
+  };
+
   const createBlankQuote = () => {
     const queryParams = new URLSearchParams({
       customerId: String(id),

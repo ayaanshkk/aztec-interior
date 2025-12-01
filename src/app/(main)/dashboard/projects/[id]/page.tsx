@@ -308,7 +308,7 @@ export default function ProjectDetailsPage() {
     if (!projectId) return;
     
     setLoading(true);
-    setError(null); // Clear previous errors
+    setError(null);
     
     const token = localStorage.getItem("auth_token");
     const headers = {
@@ -350,14 +350,14 @@ export default function ProjectDetailsPage() {
       const [
         formsRes,
         drawingsRes,
-        quotationsRes,
+        quotationsRes,  // ✅ ADD THIS
         invoicesRes,
         receiptsRes,
         paymentTermsRes
       ] = await Promise.allSettled([
         fetch(`https://aztec-interior.onrender.com/form-submissions?project_id=${projectId}`, { headers }),
         fetch(`https://aztec-interior.onrender.com/files/drawings?project_id=${projectId}`, { headers }),
-        fetch(`https://aztec-interior.onrender.com/quotations?project_id=${projectId}`, { headers }),
+        fetch(`https://aztec-interior.onrender.com/quotations?project_id=${projectId}`, { headers }),  // ✅ ADD THIS
         fetch(`https://aztec-interior.onrender.com/invoices?project_id=${projectId}`, { headers }),
         fetch(`https://aztec-interior.onrender.com/receipts?project_id=${projectId}`, { headers }),
         fetch(`https://aztec-interior.onrender.com/payment-terms?project_id=${projectId}`, { headers }),
@@ -383,8 +383,7 @@ export default function ProjectDetailsPage() {
       // ✅ Process financial documents
       const allFinancialDocs: FinancialDocument[] = [];
 
-
-      // Quotations
+      // ✅ ADD: Quotations
       if (quotationsRes.status === 'fulfilled' && quotationsRes.value.ok) {
         const quotationsData = await quotationsRes.value.json();
         if (Array.isArray(quotationsData)) {
@@ -473,7 +472,7 @@ export default function ProjectDetailsPage() {
     } finally {
       setLoading(false);
     }
-  }, [projectId]); // ✅ Only projectId as dependency
+  }, [projectId]);
 
   // ✅ Fixed useEffect
   useEffect(() => {
@@ -1624,7 +1623,7 @@ const handleCreateInvoice = useCallback(() => {
       </div>
 
       {/* FINANCIAL DOCUMENTS SECTION - Only show if documents exist */}
-      <div className="mb-8 border-t border-gray-200 pt-8 px-8">
+      <div className="mb-8 border-t border-gray-200 pt-8">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">
             Financial Documents ({financialDocuments.length})

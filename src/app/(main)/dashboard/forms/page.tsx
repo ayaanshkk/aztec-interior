@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CheckSquare, FileText, Receipt, DollarSign, User } from "lucide-react";
+import { CheckSquare, FileText, Receipt, DollarSign, User, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,

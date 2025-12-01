@@ -277,113 +277,6 @@ function OrderMaterialsDialog({
     setMaterials(materials.filter((_, i) => i !== index));
   };
 
-  const handleSectionNA = (sectionType: string) => {
-    if (!window.confirm(`Set all fields in this section to "N/A"?`)) return;
-
-    switch (sectionType) {
-      case "material_specs":
-        setFormData((prev) => ({
-          ...prev,
-          door_style: "N/A",
-          door_color: "N/A",
-          door_manufacturer: "",
-          door_name: "",
-          glazing_material: "",
-          end_panel_color: "N/A",
-          plinth_filler_color: "N/A",
-          cabinet_color: "N/A",
-          worktop_material_color: "N/A",
-        }));
-        break;
-
-      case "hardware_specs":
-        setFormData((prev) => ({
-          ...prev,
-          handles_code: "N/A",
-          handles_quantity: "0",
-          handles_size: "N/A",
-          accessories: "N/A",
-          lighting_spec: "N/A",
-          under_wall_unit_lights_color: "N/A",
-          under_wall_unit_lights_profile: "N/A",
-          under_worktop_lights_color: "N/A",
-        }));
-        break;
-
-      case "worktop_specs":
-        setFormData((prev) => ({
-          ...prev,
-          worktop_material_type: "",
-          worktop_material_color: "N/A",
-          worktop_size: "N/A",
-          worktop_features: [],
-          worktop_other_details: "N/A",
-        }));
-        break;
-
-      case "appliances":
-        setFormData((prev) => ({
-          ...prev,
-          appliances_customer_owned: "N/A",
-          sink_tap_customer_owned: "N/A",
-          appliances: [
-            { make: "N/A", model: "N/A", order_date: "" },
-            { make: "N/A", model: "N/A", order_date: "" },
-            { make: "N/A", model: "N/A", order_date: "" },
-            { make: "N/A", model: "N/A", order_date: "" },
-            { make: "N/A", model: "N/A", order_date: "" },
-            { make: "N/A", model: "N/A", order_date: "" },
-            { make: "N/A", model: "N/A", order_date: "" },
-          ],
-          integ_fridge_qty: "0",
-          integ_fridge_make: "N/A",
-          integ_fridge_model: "N/A",
-          integ_freezer_qty: "0",
-          integ_freezer_make: "N/A",
-          integ_freezer_model: "N/A",
-          sink_details: "N/A",
-          sink_model: "N/A",
-          tap_details: "N/A",
-          tap_model: "N/A",
-          other_appliances: "N/A",
-        }));
-        break;
-
-      case "bedroom_furniture":
-        setFormData((prev) => ({
-          ...prev,
-          bedside_cabinets_type: "N/A",
-          bedside_cabinets_qty: "0",
-          dresser_desk: "N/A",
-          dresser_desk_details: "0",
-          internal_mirror: "N/A",
-          internal_mirror_details: "0",
-          mirror_type: "N/A",
-          mirror_qty: "0",
-        }));
-        break;
-
-      case "lighting":
-        setFormData((prev) => ({
-          ...prev,
-          soffit_lights_type: "N/A",
-          soffit_lights_color: "N/A",
-          gable_lights_type: "N/A",
-          gable_lights_main_color: "N/A",
-          gable_lights_profile_color: "N/A",
-        }));
-        break;
-
-      case "accessories":
-        setFormData((prev) => ({
-          ...prev,
-          other_accessories: "N/A",
-          floor_protection: ["No Floor Protection Required"],
-        }));
-        break;
-    }
-  };
-
   const handleSubmitOrder = async () => {
     if (materials.length === 0) {
       alert('No materials to order');
@@ -684,6 +577,98 @@ export default function FormPage() {
     integ_freezer_model: "",
     integ_freezer_order_date: "",
   });
+
+  const handleSectionNA = (sectionType: string) => {
+    if (!window.confirm(`Set all fields in this section to "N/A"?`)) return;
+
+    setFormData((prev) => {
+      const updates: Partial<FormData> = {};
+
+      switch (sectionType) {
+        case "material_specs":
+          updates.door_style = "N/A";
+          updates.door_color = "N/A";
+          updates.door_manufacturer = "";
+          updates.door_name = "";
+          updates.glazing_material = "";
+          updates.end_panel_color = "N/A";
+          updates.plinth_filler_color = "N/A";
+          updates.cabinet_color = "N/A";
+          updates.worktop_material_color = "N/A";
+          break;
+
+        case "hardware_specs":
+          updates.handles_code = "N/A";
+          updates.handles_quantity = "0";
+          updates.handles_size = "N/A";
+          updates.accessories = "N/A";
+          updates.lighting_spec = "N/A";
+          updates.under_wall_unit_lights_color = "N/A";
+          updates.under_wall_unit_lights_profile = "N/A";
+          updates.under_worktop_lights_color = "N/A";
+          break;
+
+        case "worktop_specs":
+          updates.worktop_material_type = "";
+          updates.worktop_material_color = "N/A";
+          updates.worktop_size = "N/A";
+          updates.worktop_features = [];
+          updates.worktop_other_details = "N/A";
+          break;
+
+        case "appliances":
+          updates.appliances_customer_owned = "N/A";
+          updates.sink_tap_customer_owned = "N/A";
+          updates.appliances = [
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+          ];
+          updates.integ_fridge_qty = "0";
+          updates.integ_fridge_make = "N/A";
+          updates.integ_fridge_model = "N/A";
+          updates.integ_freezer_qty = "0";
+          updates.integ_freezer_make = "N/A";
+          updates.integ_freezer_model = "N/A";
+          updates.sink_details = "N/A";
+          updates.sink_model = "N/A";
+          updates.tap_details = "N/A";
+          updates.tap_model = "N/A";
+          updates.other_appliances = "N/A";
+          break;
+
+        case "bedroom_furniture":
+          updates.bedside_cabinets_type = "N/A";
+          updates.bedside_cabinets_qty = "0";
+          updates.dresser_desk = "N/A";
+          updates.dresser_desk_details = "0";
+          updates.internal_mirror = "N/A";
+          updates.internal_mirror_details = "0";
+          updates.mirror_type = "N/A";
+          updates.mirror_qty = "0";
+          break;
+
+        case "lighting":
+          updates.soffit_lights_type = "N/A";
+          updates.soffit_lights_color = "N/A";
+          updates.gable_lights_type = "N/A";
+          updates.gable_lights_main_color = "N/A";
+          updates.gable_lights_profile_color = "N/A";
+          break;
+
+        case "accessories":
+          updates.other_accessories = "N/A";
+          updates.floor_protection = ["No Floor Protection Required"];
+          break;
+      }
+
+      return { ...prev, ...updates };
+    });
+  };
 
 
   const OrderButton = ({ sectionTitle, onClick }: { sectionTitle: string; onClick: () => void }) => {
