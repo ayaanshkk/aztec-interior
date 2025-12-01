@@ -16,6 +16,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+// ✅ ADD THIS - AlertDialog import
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,10 +54,13 @@ import {
   Package,
   Image,
   Upload,
+  Loader2, // ✅ ADD THIS - for loading spinner
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+// ✅ ADD THIS - Toast hook
+import { useToast } from "@/components/ui/use-toast";
 
 // ... (keeping all your existing interfaces the same)
 interface Project {
@@ -392,6 +406,9 @@ export default function CustomerDetailsPage() {
     type: string;
     id: number;
   } | null>(null);
+  const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [quoteToDelete, setQuoteToDelete] = useState<{ id: number; reference: string } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -1094,6 +1111,49 @@ const handleConfirmDeleteFormDocument = async () => {
         return 'from-orange-50 to-orange-100';
       default:
         return 'from-gray-50 to-gray-100';
+    }
+  };
+
+  const handleDeleteQuote = async (quoteId: number) => {
+    setDeletingQuoteId(quoteId);
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(
+        `https://aztec-interior.onrender.com/quotations/${quoteId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete quotation');
+      }
+
+      console.log('✅ Quotation deleted successfully');
+      
+      // Reload the data to refresh the list
+      await loadCustomerData(); // or loadProjectData() for project page
+      
+      toast({
+        title: 'Success',
+        description: 'Quotation deleted successfully',
+      });
+    } catch (error) {
+      console.error('❌ Error deleting quotation:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete quotation',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingQuoteId(null);
+      setDeleteDialogOpen(false);
+      setQuoteToDelete(null);
     }
   };
 
@@ -3152,16 +3212,37 @@ const handleConfirmDeleteFormDocument = async () => {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex items-center justify-end">
+                  <div className="mt-4 flex items-center gap-2">
                     <Button
                       onClick={() => handleViewFinancialDocument(doc)}
                       variant="outline"
                       size="sm"
-                      className="w-full bg-white hover:bg-gray-50"
+                      className="flex-1 bg-white hover:bg-gray-50"
                     >
                       <Eye className="mr-2 h-4 w-4" />
                       View Details
                     </Button>
+                    
+                    {/* Delete Button - ONLY for quotations */}
+                    {doc.type === 'quotation' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQuoteToDelete({ id: doc.id, reference: doc.reference || doc.title });
+                          setDeleteDialogOpen(true);
+                        }}
+                        disabled={deletingQuoteId === doc.id}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                      >
+                        {deletingQuoteId === doc.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -3192,6 +3273,42 @@ const handleConfirmDeleteFormDocument = async () => {
             </div>
           )}
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Quotation</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete quotation "{quoteToDelete?.reference}"? 
+                This action cannot be undone and will permanently remove the quotation and all its items.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deletingQuoteId !== null}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (quoteToDelete) {
+                    handleDeleteQuote(quoteToDelete.id);
+                  }
+                }}
+                disabled={deletingQuoteId !== null}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {deletingQuoteId !== null ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete Quotation'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* PROJECT SELECTION DIALOG FOR UPLOADS */}
         <Dialog open={showProjectSelectDialog} onOpenChange={setShowProjectSelectDialog}>

@@ -1,5 +1,17 @@
 "use client";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,8 +49,11 @@ import {
   Receipt,
   DollarSign,
   Edit,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/use-toast";
+
 
 interface Project {
   id: string;
@@ -276,6 +291,11 @@ export default function ProjectDetailsPage() {
   const [showDeleteFormDialog, setShowDeleteFormDialog] = useState(false);
   const [formToDelete, setFormToDelete] = useState<FormSubmission | null>(null);
   const [isDeletingForm, setIsDeletingForm] = useState(false);
+
+    const { toast } = useToast();
+    const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [quoteToDelete, setQuoteToDelete] = useState<{ id: number; reference: string } | null>(null);
 
   // Task form state
   const [taskData, setTaskData] = useState({
@@ -683,6 +703,49 @@ export default function ProjectDetailsPage() {
       return newSet;
     });
   }, []);
+
+  const handleDeleteQuote = async (quoteId: number) => {
+    setDeletingQuoteId(quoteId);
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(
+        `https://aztec-interior.onrender.com/quotations/${quoteId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete quotation');
+      }
+
+      console.log('✅ Quotation deleted successfully');
+      
+      // Reload the project data to refresh the list
+      await loadProjectData();
+      
+      toast({
+        title: 'Success',
+        description: 'Quotation deleted successfully',
+      });
+    } catch (error) {
+      console.error('❌ Error deleting quotation:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete quotation',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingQuoteId(null);
+      setDeleteDialogOpen(false);
+      setQuoteToDelete(null);
+    }
+  };
 
   const handleAddTask = useCallback(async () => {
     const token = localStorage.getItem("auth_token");
@@ -1623,7 +1686,7 @@ const handleCreateInvoice = useCallback(() => {
       </div>
 
       {/* FINANCIAL DOCUMENTS SECTION - Only show if documents exist */}
-      <div className="mb-8 border-t border-gray-200 pt-8">
+      <div className="mb-8 border-t border-gray-200 pt-8 px-8">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">
             Financial Documents ({financialDocuments.length})
@@ -1699,16 +1762,41 @@ const handleCreateInvoice = useCallback(() => {
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center justify-end">
+                {/* ✅ CHANGED: Buttons now in flex row with gap */}
+                <div className="mt-4 flex items-center gap-2">
                   <Button
                     onClick={() => handleViewFinancialDocument(doc)}
                     variant="outline"
                     size="sm"
-                    className="w-full bg-white hover:bg-gray-50"
+                    className="flex-1 bg-white hover:bg-gray-50"
                   >
                     <Eye className="mr-2 h-4 w-4" />
                     View Details
                   </Button>
+                  
+                  {/* ✅ NEW: Delete Button - ONLY for quotations */}
+                  {doc.type === 'quotation' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setQuoteToDelete({ 
+                          id: typeof doc.id === 'string' ? parseInt(doc.id) : doc.id, 
+                          reference: doc.reference || doc.title 
+                        });
+                        setDeleteDialogOpen(true);
+                      }}
+                      disabled={deletingQuoteId === doc.id}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                    >
+                      {deletingQuoteId === doc.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -1723,6 +1811,42 @@ const handleCreateInvoice = useCallback(() => {
           </div>
         )}
       </div>
+
+      {/* ✅ NEW: Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Quotation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete quotation "{quoteToDelete?.reference}"? 
+              This action cannot be undone and will permanently remove the quotation and all its items.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingQuoteId !== null}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (quoteToDelete) {
+                  handleDeleteQuote(quoteToDelete.id);
+                }
+              }}
+              disabled={deletingQuoteId !== null}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deletingQuoteId !== null ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Quotation'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ADD TASK DIALOG */}
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
