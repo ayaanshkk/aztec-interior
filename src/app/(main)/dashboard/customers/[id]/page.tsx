@@ -1134,7 +1134,7 @@ const handleConfirmDeleteFormDocument = async () => {
 
       console.log('✅ Quotation deleted successfully');
       
-      await loadProjectData(); // or loadCustomerData() for customer page
+      await loadCustomerData(); 
       
       alert('✅ Quotation deleted successfully!'); // ← Simple alert
     } catch (error) {
