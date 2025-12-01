@@ -433,8 +433,6 @@ export default function CreateQuotePage() {
           }
         }}
         isDownloading={isDownloading}
-        approvalStatus="approved" // Always approved
-        userRole={user?.role}
       />
 
       <form onSubmit={handleSubmit}>
