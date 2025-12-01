@@ -64,9 +64,9 @@ export function QuickActions() {
             Bedroom Checklist
           </Button>
 
-          <div className="pt-3 border-t text-xs text-gray-500">
+          {/* <div className="pt-3 border-t text-xs text-gray-500">
             <p>💡 <strong>Walk-in customers:</strong> Use checklists to capture customer info automatically</p>
-          </div>
+          </div> */}
         </CardContent>
       </Card>
 
