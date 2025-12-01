@@ -277,6 +277,113 @@ function OrderMaterialsDialog({
     setMaterials(materials.filter((_, i) => i !== index));
   };
 
+  const handleSectionNA = (sectionType: string) => {
+    if (!window.confirm(`Set all fields in this section to "N/A"?`)) return;
+
+    switch (sectionType) {
+      case "material_specs":
+        setFormData((prev) => ({
+          ...prev,
+          door_style: "N/A",
+          door_color: "N/A",
+          door_manufacturer: "",
+          door_name: "",
+          glazing_material: "",
+          end_panel_color: "N/A",
+          plinth_filler_color: "N/A",
+          cabinet_color: "N/A",
+          worktop_material_color: "N/A",
+        }));
+        break;
+
+      case "hardware_specs":
+        setFormData((prev) => ({
+          ...prev,
+          handles_code: "N/A",
+          handles_quantity: "0",
+          handles_size: "N/A",
+          accessories: "N/A",
+          lighting_spec: "N/A",
+          under_wall_unit_lights_color: "N/A",
+          under_wall_unit_lights_profile: "N/A",
+          under_worktop_lights_color: "N/A",
+        }));
+        break;
+
+      case "worktop_specs":
+        setFormData((prev) => ({
+          ...prev,
+          worktop_material_type: "",
+          worktop_material_color: "N/A",
+          worktop_size: "N/A",
+          worktop_features: [],
+          worktop_other_details: "N/A",
+        }));
+        break;
+
+      case "appliances":
+        setFormData((prev) => ({
+          ...prev,
+          appliances_customer_owned: "N/A",
+          sink_tap_customer_owned: "N/A",
+          appliances: [
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+            { make: "N/A", model: "N/A", order_date: "" },
+          ],
+          integ_fridge_qty: "0",
+          integ_fridge_make: "N/A",
+          integ_fridge_model: "N/A",
+          integ_freezer_qty: "0",
+          integ_freezer_make: "N/A",
+          integ_freezer_model: "N/A",
+          sink_details: "N/A",
+          sink_model: "N/A",
+          tap_details: "N/A",
+          tap_model: "N/A",
+          other_appliances: "N/A",
+        }));
+        break;
+
+      case "bedroom_furniture":
+        setFormData((prev) => ({
+          ...prev,
+          bedside_cabinets_type: "N/A",
+          bedside_cabinets_qty: "0",
+          dresser_desk: "N/A",
+          dresser_desk_details: "0",
+          internal_mirror: "N/A",
+          internal_mirror_details: "0",
+          mirror_type: "N/A",
+          mirror_qty: "0",
+        }));
+        break;
+
+      case "lighting":
+        setFormData((prev) => ({
+          ...prev,
+          soffit_lights_type: "N/A",
+          soffit_lights_color: "N/A",
+          gable_lights_type: "N/A",
+          gable_lights_main_color: "N/A",
+          gable_lights_profile_color: "N/A",
+        }));
+        break;
+
+      case "accessories":
+        setFormData((prev) => ({
+          ...prev,
+          other_accessories: "N/A",
+          floor_protection: ["No Floor Protection Required"],
+        }));
+        break;
+    }
+  };
+
   const handleSubmitOrder = async () => {
     if (materials.length === 0) {
       alert('No materials to order');
@@ -595,6 +702,21 @@ export default function FormPage() {
       >
         <Package className="h-3 w-3" />
         Order
+      </Button>
+    );
+  };
+
+  const NAButton = ({ sectionType, onClick }: { sectionType: string; onClick: () => void }) => {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="flex items-center gap-1 text-xs border-gray-400 text-gray-700 hover:bg-gray-100 print:hidden"
+        onClick={onClick}
+      >
+        <X className="h-3 w-3" />
+        Mark All N/A
       </Button>
     );
   };
@@ -1103,13 +1225,19 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xl font-bold text-green-900">1. Material Specifications (Ordering)</h3>
-                    <OrderButton
-                      sectionTitle="Material Specifications"
-                      onClick={() => {
-                        setOrderDialogSection('Material Specifications');
-                        setOrderDialogOpen(true);
-                      }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <NAButton 
+                        sectionType="material_specs" 
+                        onClick={() => handleSectionNA("material_specs")} 
+                      />
+                      <OrderButton
+                        sectionTitle="Material Specifications"
+                        onClick={() => {
+                          setOrderDialogSection('Material Specifications');
+                          setOrderDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-4">
@@ -1371,13 +1499,19 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xl font-bold text-purple-900">2. Hardware Specifications</h3>
-                    <OrderButton
-                      sectionTitle="Hardware Specifications"
-                      onClick={() => {
-                        setOrderDialogSection('Hardware Specifications');
-                        setOrderDialogOpen(true);
-                      }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <NAButton 
+                        sectionType="hardware_specs" 
+                        onClick={() => handleSectionNA("hardware_specs")} 
+                      />
+                      <OrderButton
+                        sectionTitle="Hardware Specifications"
+                        onClick={() => {
+                          setOrderDialogSection('Hardware Specifications');
+                          setOrderDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-3">
@@ -1534,13 +1668,19 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xl font-bold text-orange-900">3. Worktop Specifications (Ordering)</h3>
-                    <OrderButton
-                      sectionTitle="Worktop Specifications"
-                      onClick={() => {
-                        setOrderDialogSection('Worktop Specifications');
-                        setOrderDialogOpen(true);
-                      }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <NAButton 
+                        sectionType="worktop_specs" 
+                        onClick={() => handleSectionNA("worktop_specs")} 
+                      />
+                      <OrderButton
+                        sectionTitle="Worktop Specifications"
+                        onClick={() => {
+                          setOrderDialogSection('Worktop Specifications');
+                          setOrderDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-4">
@@ -1627,13 +1767,19 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-yellow-200 bg-yellow-50 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xl font-bold text-yellow-900">4. Appliance and Sink & Tap Information</h3>
-                    <OrderButton
-                      sectionTitle="Appliances"
-                      onClick={() => {
-                        setOrderDialogSection('Appliances');
-                        setOrderDialogOpen(true);
-                      }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <NAButton 
+                        sectionType="appliances" 
+                        onClick={() => handleSectionNA("appliances")} 
+                      />
+                      <OrderButton
+                        sectionTitle="Appliances"
+                        onClick={() => {
+                          setOrderDialogSection('Appliances');
+                          setOrderDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   
                   {/* Appliances */}
@@ -1865,13 +2011,19 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-green-200 bg-green-50 p-3">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-base font-bold text-green-900">1. Material Specifications</h3>
-                    <OrderButton
-                      sectionTitle="Material Specifications"
-                      onClick={() => {
-                        setOrderDialogSection('Material Specifications');
-                        setOrderDialogOpen(true);
-                      }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <NAButton 
+                        sectionType="material_specs" 
+                        onClick={() => handleSectionNA("material_specs")} 
+                      />
+                      <OrderButton
+                        sectionTitle="Material Specifications"
+                        onClick={() => {
+                          setOrderDialogSection('Material Specifications');
+                          setOrderDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-4">
@@ -2115,13 +2267,19 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xl font-bold text-purple-900">2. Hardware Specifications</h3>
-                    <OrderButton
-                      sectionTitle="Hardware Specifications"
-                      onClick={() => {
-                        setOrderDialogSection('Hardware Specifications');
-                        setOrderDialogOpen(true);
-                      }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <NAButton 
+                        sectionType="hardware_specs" 
+                        onClick={() => handleSectionNA("hardware_specs")} 
+                      />
+                      <OrderButton
+                        sectionTitle="Hardware Specifications"
+                        onClick={() => {
+                          setOrderDialogSection('Hardware Specifications');
+                          setOrderDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   
                   {/* ✅ CHANGED: Wrapped in space-y-3 container instead of just grid */}
@@ -2217,14 +2375,20 @@ export default function FormPage() {
                 {/* 3. Accessories & Floor Protection - Pink Section */}
                 <div className="rounded-lg border-2 border-pink-200 bg-pink-50 p-6">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-base font-bold text-pink-900">3. Accessories & Floor Protection</h3>
-                    <OrderButton
-                      sectionTitle="Accessories"
-                      onClick={() => {
-                        setOrderDialogSection('Accessories');
-                        setOrderDialogOpen(true);
-                      }}
-                    />
+                    <h3 className="text-base font-bold text-pink-900">5. Accessories & Floor Protection</h3>
+                    <div className="flex items-center gap-2">
+                      <NAButton 
+                        sectionType="accessories" 
+                        onClick={() => handleSectionNA("accessories")} 
+                      />
+                      <OrderButton
+                        sectionTitle="Accessories"
+                        onClick={() => {
+                          setOrderDialogSection('Accessories');
+                          setOrderDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-4">
@@ -2265,13 +2429,19 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-base font-bold text-orange-900">4. Bedroom Furniture Specifications</h3>
-                    <OrderButton
-                      sectionTitle="Bedroom Furniture"
-                      onClick={() => {
-                        setOrderDialogSection('Bedroom Furniture');
-                        setOrderDialogOpen(true);
-                      }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <NAButton 
+                        sectionType="bedroom_furniture" 
+                        onClick={() => handleSectionNA("bedroom_furniture")} 
+                      />
+                      <OrderButton
+                        sectionTitle="Bedroom Furniture"
+                        onClick={() => {
+                          setOrderDialogSection('Bedroom Furniture');
+                          setOrderDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-4">
@@ -2384,13 +2554,19 @@ export default function FormPage() {
                 <div className="rounded-lg border-2 border-yellow-200 bg-yellow-50 p-6">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-base font-bold text-yellow-900">5. Lighting Specifications</h3>
-                    <OrderButton
-                      sectionTitle="Lighting"
-                      onClick={() => {
-                        setOrderDialogSection('Lighting');
-                        setOrderDialogOpen(true);
-                      }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <NAButton 
+                        sectionType="lighting" 
+                        onClick={() => handleSectionNA("lighting")} 
+                      />
+                      <OrderButton
+                        sectionTitle="Lighting"
+                        onClick={() => {
+                          setOrderDialogSection('Lighting');
+                          setOrderDialogOpen(true);
+                        }}
+                      />
+                    </div>
                   </div>
                   
                   <div className="space-y-4">
@@ -2750,6 +2926,11 @@ export default function FormPage() {
           display: grid !important;
           grid-template-columns: 1fr 1fr !important;
           gap: 6px !important;
+        }
+        
+        /* Hide walk-in banner */
+        .border-2.border-blue-300 {
+          display: none !important;
         }
       }
     `}</style>
