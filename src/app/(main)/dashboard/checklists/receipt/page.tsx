@@ -93,6 +93,8 @@ export default function ReceiptViewPage() {
   const [receiptDate, setReceiptDate] = useState<string>(getParam("receiptDate", today));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [approvalStatus, setApprovalStatus] = useState<string>("pending");
+
 
   // Approval workflow state
   // const [submissionId, setSubmissionId] = useState<number | null>(null);
