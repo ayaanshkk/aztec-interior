@@ -2742,19 +2742,32 @@ export default function FormPage() {
           -webkit-print-color-adjust: exact;
         }
         
-        /* Hide ONLY navigation, buttons, and sidebar */
+        /* Hide sidebar, header, navigation, and buttons */
         aside,
         header,
         nav,
         button,
-        .print\\:hidden {
+        .print\\:hidden,
+        [data-sidebar],
+        [role="complementary"] {
           display: none !important;
         }
         
-        /* FORCE all content containers to be visible */
+        /* Hide the top "Installation Checklist" section */
+        main > div:first-child,
+        .flex.h-16.shrink-0.items-center,
+        h1:contains("Installation Checklist") {
+          display: none !important;
+        }
+        
+        /* Target and hide the specific header with "Installation Checklist" */
+        .flex.flex-1.flex-col.gap-4.p-4 > div:first-child {
+          display: none !important;
+        }
+        
+        /* FORCE all form content to be visible */
         main,
         [role="main"],
-        .flex.flex-1.flex-col,
         form,
         div,
         section {
@@ -2781,10 +2794,16 @@ export default function FormPage() {
           opacity: 1 !important;
         }
         
+        /* Remove left margin from main content (where sidebar was) */
+        main {
+          margin-left: 0 !important;
+          padding-left: 0 !important;
+          width: 100% !important;
+        }
+        
         /* Reset any transforms or positioning */
         * {
           transform: none !important;
-          position: static !important;
         }
         
         /* Typography scaling */
@@ -2799,6 +2818,7 @@ export default function FormPage() {
         h2 {
           font-size: 14px !important;
           margin-bottom: 4px !important;
+          page-break-after: avoid;
         }
         
         h3 {
@@ -2870,6 +2890,12 @@ export default function FormPage() {
           padding: 4px !important;
         }
         
+        /* Remove extra padding from container */
+        .flex.flex-1.flex-col.gap-4 {
+          padding: 0 !important;
+          gap: 0 !important;
+        }
+        
         /* Margin adjustments */
         .mb-6 {
           margin-bottom: 6px !important;
@@ -2928,8 +2954,20 @@ export default function FormPage() {
         }
         
         /* Ensure flexbox containers show children */
-        .flex {
-          display: flex !important;
+        .flex.flex-col {
+          display: block !important;
+        }
+        
+        /* Start content at the top of the page */
+        body, html {
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        
+        /* Hide the outer container header */
+        .rounded-lg.border.bg-white.p-4.shadow-sm > h2:first-child,
+        .rounded-lg.border.bg-white.p-4.shadow-sm > p:nth-child(2) {
+          display: none !important;
         }
       }
     `}</style>
