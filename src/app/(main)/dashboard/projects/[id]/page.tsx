@@ -304,43 +304,24 @@ export default function ProjectDetailsPage() {
     return ["manager", "sales"].includes(role);
   }, [user?.role]);
 
-  const loadProjectData = async () => {
+  const loadProjectData = useCallback(async () => {
     if (!projectId) return;
     
     setLoading(true);
+    setError(null); // Clear previous errors
+    
     const token = localStorage.getItem("auth_token");
-    const headers: HeadersInit = {
+    const headers = {
       "Content-Type": "application/json",
+      ...(token && { "Authorization": `Bearer ${token}` })
     };
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
 
     try {
-      // ✅ PARALLEL FETCH - All requests happen at once
-      const [
-        projectRes,
-        formsRes,
-        drawingsRes,
-        quotationsRes,
-        invoicesRes,
-        receiptsRes,
-        paymentTermsRes
-      ] = await Promise.all([
-        fetch(`https://aztec-interior.onrender.com/projects/${projectId}`, { headers }),
-        fetch(`https://aztec-interior.onrender.com/form-submissions?project_id=${projectId}`, { headers })
-          .catch(() => null),
-        fetch(`https://aztec-interior.onrender.com/files/drawings?project_id=${projectId}`, { headers })
-          .catch(() => null),
-        fetch(`https://aztec-interior.onrender.com/quotations?project_id=${projectId}`, { headers })
-          .catch(() => null),
-        fetch(`https://aztec-interior.onrender.com/invoices?project_id=${projectId}`, { headers })
-          .catch(() => null),
-        fetch(`https://aztec-interior.onrender.com/receipts?project_id=${projectId}`, { headers })
-          .catch(() => null),
-        fetch(`https://aztec-interior.onrender.com/payment-terms?project_id=${projectId}`, { headers })
-          .catch(() => null),
-      ]);
+      // ✅ Fetch project first
+      const projectRes = await fetch(
+        `https://aztec-interior.onrender.com/projects/${projectId}`, 
+        { headers }
+      );
 
       if (!projectRes.ok) {
         throw new Error("Failed to load project data");
@@ -349,30 +330,64 @@ export default function ProjectDetailsPage() {
       const projectData = await projectRes.json();
       setProject(projectData);
 
-      // Process forms
-      if (formsRes && formsRes.ok) {
-        const formsData = await formsRes.json();
+      // ✅ Fetch customer data
+      if (projectData.customer_id) {
+        try {
+          const customerRes = await fetch(
+            `https://aztec-interior.onrender.com/customers/${projectData.customer_id}`,
+            { headers }
+          );
+          if (customerRes.ok) {
+            const customerData = await customerRes.json();
+            setCustomer(customerData);
+          }
+        } catch (err) {
+          console.warn("Failed to load customer:", err);
+        }
+      }
+
+      // ✅ Parallel fetch with proper error handling
+      const [
+        formsRes,
+        drawingsRes,
+        quotationsRes,
+        invoicesRes,
+        receiptsRes,
+        paymentTermsRes
+      ] = await Promise.allSettled([
+        fetch(`https://aztec-interior.onrender.com/form-submissions?project_id=${projectId}`, { headers }),
+        fetch(`https://aztec-interior.onrender.com/files/drawings?project_id=${projectId}`, { headers }),
+        fetch(`https://aztec-interior.onrender.com/quotations?project_id=${projectId}`, { headers }),
+        fetch(`https://aztec-interior.onrender.com/invoices?project_id=${projectId}`, { headers }),
+        fetch(`https://aztec-interior.onrender.com/receipts?project_id=${projectId}`, { headers }),
+        fetch(`https://aztec-interior.onrender.com/payment-terms?project_id=${projectId}`, { headers }),
+      ]);
+
+      // ✅ Process forms
+      if (formsRes.status === 'fulfilled' && formsRes.value.ok) {
+        const formsData = await formsRes.value.json();
         if (Array.isArray(formsData)) {
+          setForms(formsData);
           setFormSubmissions(formsData);
         }
       }
 
-      // Process drawings
-      if (drawingsRes && drawingsRes.ok) {
-        const drawingsData = await drawingsRes.json();
+      // ✅ Process drawings
+      if (drawingsRes.status === 'fulfilled' && drawingsRes.value.ok) {
+        const drawingsData = await drawingsRes.value.json();
         if (Array.isArray(drawingsData)) {
           setDrawings(drawingsData);
         }
       }
 
-      // ✅ Process and combine all financial documents
-      const allFinancialDocs: FinancialDocument[] = [];
+      // ✅ Process financial documents
+      const allFinancialDocs = [];
 
       // Quotations
-      if (quotationsRes && quotationsRes.ok) {
-        const quotationsData = await quotationsRes.json();
+      if (quotationsRes.status === 'fulfilled' && quotationsRes.value.ok) {
+        const quotationsData = await quotationsRes.value.json();
         if (Array.isArray(quotationsData)) {
-          quotationsData.forEach((quote: Quotation) => {
+          quotationsData.forEach((quote) => {
             allFinancialDocs.push({
               id: quote.id,
               type: 'quotation',
@@ -388,10 +403,10 @@ export default function ProjectDetailsPage() {
       }
 
       // Invoices
-      if (invoicesRes && invoicesRes.ok) {
-        const invoicesData = await invoicesRes.json();
+      if (invoicesRes.status === 'fulfilled' && invoicesRes.value.ok) {
+        const invoicesData = await invoicesRes.value.json();
         if (Array.isArray(invoicesData)) {
-          invoicesData.forEach((invoice: Invoice) => {
+          invoicesData.forEach((invoice) => {
             allFinancialDocs.push({
               id: invoice.id,
               type: invoice.invoice_number?.toLowerCase().includes('proforma') ? 'proforma' : 'invoice',
@@ -407,10 +422,10 @@ export default function ProjectDetailsPage() {
       }
 
       // Receipts
-      if (receiptsRes && receiptsRes.ok) {
-        const receiptsData = await receiptsRes.json();
+      if (receiptsRes.status === 'fulfilled' && receiptsRes.value.ok) {
+        const receiptsData = await receiptsRes.value.json();
         if (Array.isArray(receiptsData)) {
-          receiptsData.forEach((receipt: Receipt) => {
+          receiptsData.forEach((receipt) => {
             const receiptType = receipt.receipt_type?.toLowerCase() || 'receipt';
             allFinancialDocs.push({
               id: receipt.id,
@@ -427,10 +442,10 @@ export default function ProjectDetailsPage() {
       }
 
       // Payment Terms
-      if (paymentTermsRes && paymentTermsRes.ok) {
-        const paymentTermsData = await paymentTermsRes.json();
+      if (paymentTermsRes.status === 'fulfilled' && paymentTermsRes.value.ok) {
+        const paymentTermsData = await paymentTermsRes.value.json();
         if (Array.isArray(paymentTermsData)) {
-          paymentTermsData.forEach((terms: PaymentTerms) => {
+          paymentTermsData.forEach((terms) => {
             allFinancialDocs.push({
               id: terms.id,
               type: 'payment_terms',
@@ -444,7 +459,7 @@ export default function ProjectDetailsPage() {
         }
       }
 
-      // Sort by created date (newest first)
+      // Sort by date
       allFinancialDocs.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
@@ -453,11 +468,17 @@ export default function ProjectDetailsPage() {
 
     } catch (error) {
       console.error("Error loading project data:", error);
-      setError("Failed to load project data");
+      setError("Failed to load project data. Please try again.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId]); // ✅ Only projectId as dependency
+
+  // ✅ Fixed useEffect
+  useEffect(() => {
+    if (!projectId || !user) return;
+    loadProjectData();
+  }, [projectId, user, loadProjectData]);
 
   // Financial Document Helper Functions
   const getFinancialDocIcon = (type: string) => {
