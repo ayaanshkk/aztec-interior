@@ -2730,7 +2730,6 @@ export default function FormPage() {
       }}
     />
 
-    {/* Print Styles */}
     <style jsx global>{`
       @media print {
         @page {
@@ -2743,7 +2742,7 @@ export default function FormPage() {
           -webkit-print-color-adjust: exact;
         }
         
-        /* Hide ONLY sidebar, header, and buttons */
+        /* Hide ONLY navigation, buttons, and sidebar */
         aside,
         header,
         nav,
@@ -2752,35 +2751,40 @@ export default function FormPage() {
           display: none !important;
         }
         
-        /* FORCE main content to be visible */
+        /* FORCE all content containers to be visible */
         main,
         [role="main"],
         .flex.flex-1.flex-col,
-        form {
+        form,
+        div,
+        section {
           display: block !important;
           visibility: visible !important;
           opacity: 1 !important;
           position: static !important;
-          padding: 0 !important;
-          margin: 0 !important;
-          width: 100% !important;
         }
         
-        /* Show the form title */
-        h2 {
-          display: block !important;
-          visibility: visible !important;
-          page-break-after: avoid;
-        }
-        
-        /* Show all form sections */
-        div,
-        section,
+        /* Ensure form sections are visible */
         .rounded-lg,
-        .border-2 {
+        .border-2,
+        .bg-blue-50,
+        .bg-green-50,
+        .bg-purple-50,
+        .bg-orange-50,
+        .bg-yellow-50,
+        .bg-pink-50,
+        .bg-gray-50,
+        .bg-gray-100,
+        .bg-indigo-50 {
           display: block !important;
           visibility: visible !important;
           opacity: 1 !important;
+        }
+        
+        /* Reset any transforms or positioning */
+        * {
+          transform: none !important;
+          position: static !important;
         }
         
         /* Typography scaling */
@@ -2916,6 +2920,16 @@ export default function FormPage() {
         /* Hide walk-in banner */
         .border-2.border-blue-300 {
           display: none !important;
+        }
+        
+        /* Make sure grids display properly */
+        .grid {
+          display: grid !important;
+        }
+        
+        /* Ensure flexbox containers show children */
+        .flex {
+          display: flex !important;
         }
       }
     `}</style>

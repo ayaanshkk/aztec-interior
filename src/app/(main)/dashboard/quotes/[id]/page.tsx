@@ -64,7 +64,6 @@ export default function QuoteDetailsPage() {
   // Handle both [id] and [quoteId] route parameters
   const quoteId = params?.id as string;
 
-
   const [quotation, setQuotation] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -72,107 +71,65 @@ export default function QuoteDetailsPage() {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  // ✅ Define loadQuotation once before useEffect
+  const loadQuotation = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const token = localStorage.getItem("auth_token");
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      console.log("🔍 Fetching quotation:", quoteId);
+
+      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}`, {
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load quotation");
+      }
+
+      const data = await response.json();
+      console.log("✅ Quotation loaded:", data);
+      console.log("💰 Total:", data.total);
+      console.log("📦 Items:", data.items);
+      setQuotation(data);
+    } catch (err) {
+      console.error("❌ Error loading quotation:", err);
+      setError(err instanceof Error ? err.message : "Failed to load quotation");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Single useEffect
   useEffect(() => {
-    console.log("Route params:", params);
-    console.log("Quote ID:", quoteId);
+    console.log("🎬 Route params:", params);
+    console.log("🔑 Quote ID:", quoteId);
 
     if (!quoteId) {
       setError("No quote ID provided");
       setLoading(false);
       return;
     }
+
     loadQuotation();
     
-    // ✅ Auto-download PDF if it's a newly generated quote
+    // Auto-download PDF if it's a newly generated quote
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('autoDownload') === 'true') {
       setTimeout(() => {
         handleDownloadPDF();
-      }, 1000); // Small delay to ensure page is loaded
+      }, 1000);
     }
-  }, [quoteId]);useEffect(() => {
-  console.log("Route params:", params);
-  console.log("Quote ID:", quoteId);
-
-  if (!quoteId) {
-    setError("No quote ID provided");
-    setLoading(false);
-    return;
-  }
-
-  // ✅ Define loadQuotation inside useEffect to avoid dependency issues
-  const loadQuotation = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const token = localStorage.getItem("auth_token");
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      console.log("Fetching quotation:", quoteId);
-
-      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}`, {
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to load quotation");
-      }
-
-      const data = await response.json();
-      console.log("Quotation loaded:", data);
-      setQuotation(data);
-    } catch (err) {
-      console.error("Error loading quotation:", err);
-      setError(err instanceof Error ? err.message : "Failed to load quotation");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  loadQuotation();
-}, [quoteId]); // ✅ Now loadQuotation is defined inside, so no dependency issue
-
-  const loadQuotation = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const token = localStorage.getItem("auth_token");
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      console.log("Fetching quotation:", quoteId);
-
-      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}`, {
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to load quotation");
-      }
-
-      const data = await response.json();
-      console.log("Quotation loaded:", data);
-      setQuotation(data);
-    } catch (err) {
-      console.error("Error loading quotation:", err);
-      setError(err instanceof Error ? err.message : "Failed to load quotation");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [quoteId]);
 
   const handleDownloadPDF = async () => {
     setDownloading(true);
@@ -184,7 +141,7 @@ export default function QuoteDetailsPage() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      console.log("Downloading PDF for quotation:", quoteId);
+      console.log("📄 Downloading PDF for quotation:", quoteId);
 
       const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}/pdf`, {
         headers,
@@ -208,9 +165,9 @@ export default function QuoteDetailsPage() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      console.log("PDF downloaded successfully");
+      console.log("✅ PDF downloaded successfully");
     } catch (err) {
-      console.error("Error downloading PDF:", err);
+      console.error("❌ Error downloading PDF:", err);
       alert(`Failed to download PDF: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       setDownloading(false);
@@ -229,7 +186,7 @@ export default function QuoteDetailsPage() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      console.log("Deleting quotation:", quoteId);
+      console.log("🗑️ Deleting quotation:", quoteId);
 
       const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}`, {
         method: "DELETE",
@@ -241,12 +198,12 @@ export default function QuoteDetailsPage() {
         throw new Error(errorData.error || "Failed to delete quotation");
       }
 
-      console.log("Quotation deleted successfully");
+      console.log("✅ Quotation deleted successfully");
 
       // Navigate back to customer details or quotes list
       router.back();
     } catch (err) {
-      console.error("Error deleting quotation:", err);
+      console.error("❌ Error deleting quotation:", err);
       alert(`Failed to delete quotation: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       setDeleting(false);
