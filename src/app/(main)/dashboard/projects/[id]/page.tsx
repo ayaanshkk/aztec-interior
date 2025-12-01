@@ -381,7 +381,8 @@ export default function ProjectDetailsPage() {
       }
 
       // ✅ Process financial documents
-      const allFinancialDocs = [];
+      const allFinancialDocs: FinancialDocument[] = [];
+
 
       // Quotations
       if (quotationsRes.status === 'fulfilled' && quotationsRes.value.ok) {
