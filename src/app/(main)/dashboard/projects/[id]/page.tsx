@@ -257,6 +257,7 @@ export default function ProjectDetailsPage() {
   const [drawings, setDrawings] = useState<DrawingDocument[]>([]);
   const [forms, setForms] = useState<FormSubmission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedDrawings, setSelectedDrawings] = useState<Set<string>>(new Set());
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
   const [showDeleteDrawingDialog, setShowDeleteDrawingDialog] = useState(false);
