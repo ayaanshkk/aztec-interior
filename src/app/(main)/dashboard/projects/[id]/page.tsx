@@ -1010,20 +1010,23 @@ export default function ProjectDetailsPage() {
     }
   }, [checklistForQuote, loadProjectData]);
 
-  const handleCreateInvoice = useCallback(() => {
-    if (!customer?.id) {
-      alert("Error: No customer associated with this project");
-      return;
-    }
-    const params = new URLSearchParams({
-      customerId: customer.id,
-      customerName: customer.name || "",
-      customerAddress: customer.address || "",
-      customerPhone: customer.phone || "",
-      customerEmail: customer.email || "",
-    });
-    router.push(`/dashboard/checklists/invoices/create?${params.toString()}`);  // ✅ CHANGED
-  }, [customer, router]);
+const handleCreateInvoice = useCallback(() => {
+  if (!customer?.id) {
+    alert("Error: No customer associated with this project");
+    return;
+  }
+  const params = new URLSearchParams({
+    customerId: customer.id,
+    customerName: customer.name || "",
+    customerAddress: customer.address || "",
+    customerPhone: customer.phone || "",
+    customerEmail: customer.email || "",
+    type: "invoice",
+    source: "project",
+    projectId: projectId
+  });
+  router.push(`/dashboard/checklists/invoice/?${params.toString()}`);
+}, [customer, projectId, router]);
 
   const handleCreateProformaInvoice = useCallback(() => {
     if (!customer?.id) {
@@ -1036,9 +1039,12 @@ export default function ProjectDetailsPage() {
       customerAddress: customer.address || "",
       customerPhone: customer.phone || "",
       customerEmail: customer.email || "",
+      type: "proforma",
+      source: "project",
+      projectId: projectId
     });
-    router.push(`/dashboard/checklists/invoices/create?type=proforma&${params.toString()}`);  // ✅ CHANGED
-  }, [customer, router]);
+    router.push(`/dashboard/checklists/invoice/?${params.toString()}`);
+  }, [customer, projectId, router]);
 
   const handleCreateReceipt = useCallback(() => {
     if (!customer?.id) {
@@ -1057,9 +1063,10 @@ export default function ProjectDetailsPage() {
       receiptDate: new Date().toISOString().split("T")[0],
       paymentMethod: "BACS",
       paymentDescription: "Payment received for your Kitchen/Bedroom Cabinetry.",
+      projectId: projectId  // ✅ ADD THIS
     });
     router.push(`/dashboard/checklists/receipt?${params.toString()}`);
-  }, [customer, router]);
+  }, [customer, projectId, router]);
 
   const handleCreateDepositReceipt = useCallback(() => {
     if (!customer?.id) {
@@ -1078,9 +1085,10 @@ export default function ProjectDetailsPage() {
       receiptDate: new Date().toISOString().split("T")[0],
       paymentMethod: "BACS",
       paymentDescription: "Deposit payment received for your Kitchen/Bedroom Cabinetry.",
+      projectId: projectId  // ✅ ADD THIS
     });
     router.push(`/dashboard/checklists/receipt?${params.toString()}`);
-  }, [customer, router]);
+  }, [customer, projectId, router]);
 
   const handleCreateFinalReceipt = useCallback(() => {
     if (!customer?.id) {
@@ -1099,9 +1107,10 @@ export default function ProjectDetailsPage() {
       receiptDate: new Date().toISOString().split("T")[0],
       paymentMethod: "BACS",
       paymentDescription: "Final payment received for your Kitchen/Bedroom Cabinetry.",
+      projectId: projectId  // ✅ ADD THIS
     });
     router.push(`/dashboard/checklists/receipt?${params.toString()}`);
-  }, [customer, router]);
+  }, [customer, projectId, router]);
 
   const handleCreatePaymentTerms = useCallback(() => {
     if (!customer?.id) {
@@ -1113,9 +1122,13 @@ export default function ProjectDetailsPage() {
       customerName: customer.name || "",
       customerAddress: customer.address || "",
       customerPhone: customer.phone || "",
+      customerEmail: customer.email || "",
+      type: "payment_terms",
+      source: "project",
+      projectId: projectId
     });
-    router.push(`/dashboard/checklists/payment-terms/create?${params.toString()}`);  // ✅ CHANGED
-  }, [customer, router]);
+    router.push(`/dashboard/checklists/payment-terms/?${params.toString()}`);
+  }, [customer, projectId, router]);
 
   const handleViewChecklist = useCallback((submission: FormSubmission) => {
     window.open(`/checklist-view?id=${submission.id}`, "_blank");
