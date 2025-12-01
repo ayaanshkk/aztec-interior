@@ -3220,7 +3220,10 @@ const handleConfirmDeleteFormDocument = async () => {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setQuoteToDelete({ id: doc.id, reference: doc.reference || doc.title });
+                          setQuoteToDelete({
+                            id: typeof doc.id === 'string' ? parseInt(doc.id) : doc.id, 
+                            reference: doc.reference || doc.title 
+                          });
                           setDeleteDialogOpen(true);
                         }}
                         disabled={deletingQuoteId === doc.id}
