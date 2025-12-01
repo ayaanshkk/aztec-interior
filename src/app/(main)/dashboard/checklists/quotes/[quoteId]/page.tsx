@@ -89,7 +89,54 @@ export default function QuoteDetailsPage() {
         handleDownloadPDF();
       }, 1000); // Small delay to ensure page is loaded
     }
-  }, [quoteId]);
+  }, [quoteId]);useEffect(() => {
+  console.log("Route params:", params);
+  console.log("Quote ID:", quoteId);
+
+  if (!quoteId) {
+    setError("No quote ID provided");
+    setLoading(false);
+    return;
+  }
+
+  // ✅ Define loadQuotation inside useEffect to avoid dependency issues
+  const loadQuotation = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const token = localStorage.getItem("auth_token");
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      console.log("Fetching quotation:", quoteId);
+
+      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}`, {
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to load quotation");
+      }
+
+      const data = await response.json();
+      console.log("Quotation loaded:", data);
+      setQuotation(data);
+    } catch (err) {
+      console.error("Error loading quotation:", err);
+      setError(err instanceof Error ? err.message : "Failed to load quotation");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadQuotation();
+}, [quoteId]); // ✅ Now loadQuotation is defined inside, so no dependency issue
 
   const loadQuotation = async () => {
     setLoading(true);
