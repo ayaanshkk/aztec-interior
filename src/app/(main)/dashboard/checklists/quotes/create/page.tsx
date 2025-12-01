@@ -29,20 +29,14 @@ const SuccessModal = ({
   onDownloadPdf,
   onGoBack,
   isDownloading,
-  approvalStatus,
-  userRole,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onDownloadPdf: () => void;
   onGoBack: () => void;
   isDownloading: boolean;
-  approvalStatus: string;
-  userRole?: string;
 }) => {
   if (!isOpen) return null;
-
-  const isPending = approvalStatus === "pending" && userRole !== "Manager";
 
   return (
     <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
@@ -50,43 +44,27 @@ const SuccessModal = ({
         <div className="text-center">
           <CheckCircle className="mx-auto mb-4 h-12 w-12 text-green-500" />
           <h3 className="mb-2 text-lg font-semibold text-gray-900">Quote Saved Successfully!</h3>
-
-          {isPending ? (
-            <>
-              <p className="mb-4 text-gray-600">Your quote has been saved and sent to the manager for approval.</p>
-              <div className="mb-4 border-l-4 border-yellow-500 bg-yellow-50 p-3 text-left">
-                <div className="flex items-start">
-                  <AlertCircle className="mt-0.5 mr-2 h-5 w-5 flex-shrink-0 text-yellow-600" />
-                  <p className="text-sm text-yellow-700">PDF download will be available after manager approval.</p>
-                </div>
-              </div>
-            </>
-          ) : (
-            <p className="mb-6 text-gray-600">
-              {userRole === "Manager" ? "Quote has been automatically approved." : "Quote is ready."} Would you like to
-              download the quote as a PDF?
-            </p>
-          )}
+          <p className="mb-6 text-gray-600">
+            Quote is ready. Would you like to download the quote as a PDF?
+          </p>
 
           <div className="flex flex-col space-y-3">
-            {!isPending && (
-              <Button onClick={onDownloadPdf} disabled={isDownloading} className="w-full">
-                {isDownloading ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
-                    Generating PDF...
-                  </>
-                ) : (
-                  <>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download PDF
-                  </>
-                )}
-              </Button>
-            )}
+            <Button onClick={onDownloadPdf} disabled={isDownloading} className="w-full">
+              {isDownloading ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+                  Generating PDF...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download PDF
+                </>
+              )}
+            </Button>
 
-            <Button onClick={onGoBack} variant={!isPending ? "outline" : "default"} className="w-full">
-              {!isPending ? "Go Back" : "Close"}
+            <Button onClick={onGoBack} variant="outline" className="w-full">
+              Go Back
             </Button>
           </div>
         </div>
@@ -130,10 +108,10 @@ export default function CreateQuotePage() {
   const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null);
 
   // Approval workflow state
-  const [submissionId, setSubmissionId] = useState<number | null>(null);
-  const [approvalStatus, setApprovalStatus] = useState<string>("pending");
-  const [rejectionReason, setRejectionReason] = useState<string>("");
-  const [statusMessage, setStatusMessage] = useState<string>("");
+  // const [submissionId, setSubmissionId] = useState<number | null>(null);
+  // const [approvalStatus, setApprovalStatus] = useState<string>("pending");
+  // const [rejectionReason, setRejectionReason] = useState<string>("");
+  // const [statusMessage, setStatusMessage] = useState<string>("");
 
   useEffect(() => {
     const customerIdParam = searchParams.get("customerId");
@@ -460,7 +438,7 @@ export default function CreateQuotePage() {
           }
         }}
         isDownloading={isDownloading}
-        approvalStatus={approvalStatus}
+        approvalStatus="approved" // Always approved
         userRole={user?.role}
       />
 
@@ -656,7 +634,7 @@ export default function CreateQuotePage() {
             </Button>
 
             <div className="flex items-center space-x-3">
-              <Button
+              {/* <Button
                 type="button"
                 variant="outline"
                 onClick={handleGenerateQuote}
@@ -665,7 +643,7 @@ export default function CreateQuotePage() {
               >
                 <FileText className="h-4 w-4" />
                 <span>Generate Quote</span>
-              </Button>
+              </Button> */}
 
               <Button type="submit" disabled={isSubmitting || !customerId || total <= 0}>
                 {isSubmitting ? "Saving..." : "Save Quote"}

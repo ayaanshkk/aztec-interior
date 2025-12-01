@@ -49,7 +49,7 @@ interface MaterialOrder {
   material_description: string;
   supplier_name: string | null;
   supplier_reference: string | null;
-  status: 'not_ordered' | 'ordered' | 'in_transit' | 'delivered' | 'delayed';
+  status: 'not_ordered' | 'ordered' | 'delivered' | 'delivered_to_customer' | 'in_stock';
   order_date: string | null;
   expected_delivery_date: string | null;
   actual_delivery_date: string | null;
@@ -438,20 +438,20 @@ export function ProductionMaterialsManagement() {
         icon: <FileText className="h-3 w-3" />,
         text: 'Ordered' 
       },
-      in_transit: { 
+      delivered: { 
         className: 'bg-yellow-100 text-yellow-700 border-yellow-300', 
         icon: <Truck className="h-3 w-3" />,
-        text: 'In Transit' 
-      },
-      delivered: { 
-        className: 'bg-green-100 text-green-700 border-green-300', 
-        icon: <CheckCircle className="h-3 w-3" />,
         text: 'Delivered' 
       },
-      delayed: { 
-        className: 'bg-red-100 text-red-700 border-red-300', 
-        icon: <AlertTriangle className="h-3 w-3" />,
-        text: 'Delayed' 
+      delivered_to_customer: { 
+        className: 'bg-green-100 text-green-700 border-green-300', 
+        icon: <CheckCircle className="h-3 w-3" />,
+        text: 'Delivered to Customer' 
+      },
+      in_stock: { 
+        className: 'bg-purple-100 text-purple-700 border-purple-300', 
+        icon: <Package className="h-3 w-3" />,
+        text: 'In Stock' 
       },
     };
 
@@ -497,9 +497,9 @@ export function ProductionMaterialsManagement() {
   // ✅ PERFORMANCE: Memoize stats calculation
   const stats = useMemo(() => ({
     ordered: materials.filter(m => m.status === 'ordered').length,
-    in_transit: materials.filter(m => m.status === 'in_transit').length,
     delivered: materials.filter(m => m.status === 'delivered').length,
-    delayed: materials.filter(m => m.status === 'delayed').length,
+    delivered_to_customer: materials.filter(m => m.status === 'delivered_to_customer').length,
+    in_stock: materials.filter(m => m.status === 'in_stock').length,
   }), [materials]);
 
   if (loading) {
@@ -725,7 +725,7 @@ export function ProductionMaterialsManagement() {
         </Dialog>
       </div>
 
-      {/* Statistics Cards - ✅ REMOVED "Not Ordered" */}
+      {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
@@ -743,8 +743,8 @@ export function ProductionMaterialsManagement() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">In Transit</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.in_transit}</p>
+                <p className="text-sm text-gray-600">Delivered</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.delivered}</p>
               </div>
               <Truck className="h-8 w-8 text-yellow-400" />
             </div>
@@ -755,8 +755,8 @@ export function ProductionMaterialsManagement() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Delivered</p>
-                <p className="text-2xl font-bold text-green-600">{stats.delivered}</p>
+                <p className="text-sm text-gray-600">Delivered to Customer</p>
+                <p className="text-2xl font-bold text-green-600">{stats.delivered_to_customer}</p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-400" />
             </div>
@@ -767,10 +767,10 @@ export function ProductionMaterialsManagement() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Delayed</p>
-                <p className="text-2xl font-bold text-red-600">{stats.delayed}</p>
+                <p className="text-sm text-gray-600">In Stock</p>
+                <p className="text-2xl font-bold text-purple-600">{stats.in_stock}</p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-red-400" />
+              <Package className="h-8 w-8 text-purple-400" />
             </div>
           </CardContent>
         </Card>
@@ -794,9 +794,9 @@ export function ProductionMaterialsManagement() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="ordered">Ordered</SelectItem>
-                <SelectItem value="in_transit">In Transit</SelectItem>
                 <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="delayed">Delayed</SelectItem>
+                <SelectItem value="delivered_to_customer">Delivered to Customer</SelectItem>
+                <SelectItem value="in_stock">In Stock</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -878,7 +878,7 @@ export function ProductionMaterialsManagement() {
                   </div>
 
                   {/* ✅ NEW: Status Update Buttons in Corner */}
-                  <div className="flex flex-col gap-2 min-w-[140px]">
+                  <div className="flex flex-col gap-2 min-w-[180px]">
                     <Button
                       size="sm"
                       variant={material.status === 'ordered' ? 'default' : 'outline'}
@@ -894,41 +894,41 @@ export function ProductionMaterialsManagement() {
                     
                     <Button
                       size="sm"
-                      variant={material.status === 'in_transit' ? 'default' : 'outline'}
-                      className={`justify-start ${material.status === 'in_transit' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}`}
+                      variant={material.status === 'delivered' ? 'default' : 'outline'}
+                      className={`justify-start ${material.status === 'delivered' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleUpdateMaterialStatus(material.id, 'in_transit');
+                        handleUpdateMaterialStatus(material.id, 'delivered');
                       }}
                     >
                       <Truck className="h-3 w-3 mr-1" />
-                      In Transit
-                    </Button>
-                    
-                    <Button
-                      size="sm"
-                      variant={material.status === 'delivered' ? 'default' : 'outline'}
-                      className={`justify-start ${material.status === 'delivered' ? 'bg-green-600 hover:bg-green-700' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUpdateMaterialStatus(material.id, 'delivered', new Date().toISOString());
-                      }}
-                    >
-                      <CheckCircle className="h-3 w-3 mr-1" />
                       Delivered
                     </Button>
                     
                     <Button
                       size="sm"
-                      variant={material.status === 'delayed' ? 'default' : 'outline'}
-                      className={`justify-start ${material.status === 'delayed' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-300 hover:bg-red-50'}`}
+                      variant={material.status === 'delivered_to_customer' ? 'default' : 'outline'}
+                      className={`justify-start ${material.status === 'delivered_to_customer' ? 'bg-green-600 hover:bg-green-700' : ''}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleUpdateMaterialStatus(material.id, 'delayed');
+                        handleUpdateMaterialStatus(material.id, 'delivered_to_customer', new Date().toISOString());
                       }}
                     >
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                      Delayed
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      To Customer
+                    </Button>
+                    
+                    <Button
+                      size="sm"
+                      variant={material.status === 'in_stock' ? 'default' : 'outline'}
+                      className={`justify-start ${material.status === 'in_stock' ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'text-purple-600 border-purple-300 hover:bg-purple-50'}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpdateMaterialStatus(material.id, 'in_stock');
+                      }}
+                    >
+                      <Package className="h-3 w-3 mr-1" />
+                      In Stock
                     </Button>
                   </div>
                 </div>
@@ -1091,9 +1091,9 @@ export function ProductionMaterialsManagement() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ordered">Ordered</SelectItem>
-                        <SelectItem value="in_transit">In Transit</SelectItem>
                         <SelectItem value="delivered">Delivered</SelectItem>
-                        <SelectItem value="delayed">Delayed</SelectItem>
+                        <SelectItem value="delivered_to_customer">Delivered to Customer</SelectItem>
+                        <SelectItem value="in_stock">In Stock</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

@@ -115,12 +115,12 @@ const allSidebarItems: NavGroup[] = [
         icon: Bot,
         roles: ["manager", "hr", "sales", "production"],
       },
-      {
-        title: "Approvals",
-        url: "/dashboard/approvals",
-        icon: CheckCircle,
-        roles: ["manager"],
-      },
+      // {
+      //   title: "Approvals",
+      //   url: "/dashboard/approvals",
+      //   icon: CheckCircle,
+      //   roles: ["manager"],
+      // },
       {
         title: "Notifications",
         url: "/dashboard/notifications",

@@ -81,6 +81,14 @@ export default function QuoteDetailsPage() {
       return;
     }
     loadQuotation();
+    
+    // ✅ Auto-download PDF if it's a newly generated quote
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('autoDownload') === 'true') {
+      setTimeout(() => {
+        handleDownloadPDF();
+      }, 1000); // Small delay to ensure page is loaded
+    }
   }, [quoteId]);
 
   const loadQuotation = async () => {

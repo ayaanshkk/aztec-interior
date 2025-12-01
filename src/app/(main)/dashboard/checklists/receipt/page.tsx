@@ -95,9 +95,9 @@ export default function ReceiptViewPage() {
   const [saveMessage, setSaveMessage] = useState("");
 
   // Approval workflow state
-  const [submissionId, setSubmissionId] = useState<number | null>(null);
-  const [approvalStatus, setApprovalStatus] = useState<string>("pending");
-  const [rejectionReason, setRejectionReason] = useState<string>("");
+  // const [submissionId, setSubmissionId] = useState<number | null>(null);
+  // const [approvalStatus, setApprovalStatus] = useState<string>("pending");
+  // const [rejectionReason, setRejectionReason] = useState<string>("");
 
   const displayDate = new Date(receiptDate).toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -117,7 +117,7 @@ export default function ReceiptViewPage() {
     balanceToPay: Number(balanceToPay),
     paymentMethod,
     paymentDescription,
-    submission_id: submissionId, // Include for download check
+    // submission_id: submissionId, // Include for download check
   });
 
   const handleSave = async () => {
@@ -137,8 +137,8 @@ export default function ReceiptViewPage() {
 
       if (response.ok) {
         // Store submission ID and approval status
-        setSubmissionId(result.form_submission_id);
-        setApprovalStatus(result.approval_status || "pending");
+        // setSubmissionId(result.form_submission_id);
+        // setApprovalStatus(result.approval_status || "pending");
 
         if (result.approval_status === "pending") {
           setSaveMessage("✅ Receipt saved and sent to manager for approval!");
@@ -158,41 +158,41 @@ export default function ReceiptViewPage() {
   };
 
   // Check approval status before download
-  const checkApprovalStatus = async () => {
-    if (!submissionId) {
-      setSaveMessage("⚠️ Please save the receipt first.");
-      return false;
-    }
+  // const checkApprovalStatus = async () => {
+  //   if (!submissionId) {
+  //     setSaveMessage("⚠️ Please save the receipt first.");
+  //     return false;
+  //   }
 
-    try {
-      const response = await fetch(`https://aztec-interior.onrender.com/approvals/status/${submissionId}`);
-      const data = await response.json();
+  //   try {
+  //     const response = await fetch(`https://aztec-interior.onrender.com/approvals/status/${submissionId}`);
+  //     const data = await response.json();
 
-      setApprovalStatus(data.approval_status);
-      setRejectionReason(data.rejection_reason || "");
+  //     setApprovalStatus(data.approval_status);
+  //     setRejectionReason(data.rejection_reason || "");
 
-      if (data.approval_status === "rejected") {
-        setSaveMessage(`❌ This receipt was rejected. Reason: ${data.rejection_reason}`);
-        return false;
-      } else if (data.approval_status === "pending") {
-        setSaveMessage("⚠️ This receipt is pending manager approval. You cannot download it yet.");
-        return false;
-      }
+  //     if (data.approval_status === "rejected") {
+  //       setSaveMessage(`❌ This receipt was rejected. Reason: ${data.rejection_reason}`);
+  //       return false;
+  //     } else if (data.approval_status === "pending") {
+  //       setSaveMessage("⚠️ This receipt is pending manager approval. You cannot download it yet.");
+  //       return false;
+  //     }
 
-      return true;
-    } catch (error) {
-      setSaveMessage("❌ Failed to check approval status.");
-      return false;
-    }
-  };
+  //     return true;
+  //   } catch (error) {
+  //     setSaveMessage("❌ Failed to check approval status.");
+  //     return false;
+  //   }
+  // };
 
   const handleDownloadPdf = async () => {
     // Check approval status first
-    const canDownload = await checkApprovalStatus();
-    if (!canDownload) {
-      setTimeout(() => setSaveMessage(""), 5000);
-      return;
-    }
+    // const canDownload = await checkApprovalStatus();
+    // if (!canDownload) {
+    //   setTimeout(() => setSaveMessage(""), 5000);
+    //   return;
+    // }
 
     setSaveMessage("⌛ Generating PDF on server...");
     const data = getReceiptData();
@@ -259,18 +259,13 @@ export default function ReceiptViewPage() {
           </Button>
           <Button
             onClick={handleDownloadPdf}
-            disabled={!submissionId || approvalStatus !== "approved"}
-            title={
-              approvalStatus !== "approved"
-                ? `Must be approved to download. Current status: ${approvalStatus}`
-                : "Download PDF"
-            }
+            title="Download PDF"
             variant="outline"
           >
             <Download className="mr-2 h-5 w-5" />
             Download
           </Button>
-          <Button onClick={handleSave} disabled={isSubmitting} title="Save/Submit for Approval">
+          <Button onClick={handleSave} disabled={isSubmitting} title="Save Receipt">
             <Save className="mr-2 h-5 w-5" />
             {isSubmitting ? "Saving..." : "Save"}
           </Button>
@@ -286,7 +281,7 @@ export default function ReceiptViewPage() {
       )}
 
       {/* Approval Status and Rejection Reason */}
-      <div className={`flex items-center space-x-3 rounded-lg border p-4 ${getStatusVariant()}`}>
+      {/* <div className={`flex items-center space-x-3 rounded-lg border p-4 ${getStatusVariant()}`}>
         <AlertCircle className="h-5 w-5 flex-shrink-0" />
         <div className="flex flex-col">
           <span className="font-semibold capitalize">Approval Status: {approvalStatus}</span>
@@ -296,7 +291,7 @@ export default function ReceiptViewPage() {
             </p>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* --- */}
 

@@ -2609,7 +2609,7 @@ export default function ChecklistViewPage() {
       <style jsx global>{`
         @media print {
           @page {
-            size: A4;
+            size: A4 portrait;
             margin: 8mm;
           }
           
@@ -2618,120 +2618,293 @@ export default function ChecklistViewPage() {
             -webkit-print-color-adjust: exact;
           }
           
-          /* Hide UI elements */
-          .print\\:hidden {
+          /* Hide non-printable elements */
+          .print\\:hidden,
+          aside,
+          header,
+          nav {
             display: none !important;
           }
           
-          /* Hide the entire header with buttons */
-          header {
-            display: none !important;
-          }
-          
-          /* Hide sidebar */
-          aside {
-            display: none !important;
-          }
-          
-          /* Make content full width */
-          .flex.flex-1.flex-col {
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-          
-          /* Compact spacing */
-          .mb-6 {
-            margin-bottom: 8px !important;
-          }
-          
-          .mb-4 {
-            margin-bottom: 6px !important;
-          }
-          
-          .p-6 {
-            padding: 8px !important;
-          }
-          
-          .p-8 {
-            padding: 12px !important;
-          }
-          
-          .space-y-4 > * + * {
-            margin-top: 6px !important;
-          }
-          
-          .space-y-3 > * + * {
-            margin-top: 4px !important;
-          }
-          
-          /* Compact text */
-          h2 {
-            font-size: 16px !important;
-            margin-bottom: 4px !important;
-          }
-          
-          h3 {
-            font-size: 13px !important;
-            margin-bottom: 4px !important;
-          }
-          
-          .text-xl {
-            font-size: 13px !important;
-          }
-          
-          .text-sm {
-            font-size: 10px !important;
-          }
-          
-          .text-xs {
-            font-size: 9px !important;
-          }
-          
-          /* Compact inputs */
-          input, textarea, select {
-            padding: 2px 4px !important;
-            font-size: 10px !important;
-            min-height: 24px !important;
-          }
-          
-          /* Compact grid gaps */
-          .gap-4 {
-            gap: 6px !important;
-          }
-          
-          .gap-3 {
-            gap: 4px !important;
-          }
-          
-          /* Force 2-column layout to stay on same page */
-          .lg\\:grid-cols-2 {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 8px !important;
-          }
-          
-          /* Keep sections together */
-          .rounded-lg.border-2 {
-            page-break-inside: avoid;
-          }
-          
-          /* Force page break before Terms & Signature */
-          .terms-page-break {
-            page-break-before: always !important;
-          }
-          
-          /* Compact signature section */
-          canvas, img[alt="Customer Signature"] {
-            max-height: 60px !important;
-          }
-          
-          /* Remove extra borders and shadows for print */
           .print\\:shadow-none {
             box-shadow: none !important;
           }
           
           .print\\:border-0 {
             border: 0 !important;
+          }
+          
+          /* Overall page scaling */
+          body, html {
+            font-size: 8px !important;
+          }
+          
+          /* Typography scaling */
+          h1 {
+            font-size: 16px !important;
+            margin-bottom: 2px !important;
+          }
+          
+          h2 {
+            font-size: 13px !important;
+            margin-bottom: 3px !important;
+          }
+          
+          h3 {
+            font-size: 10px !important;
+            margin-bottom: 4px !important;
+          }
+          
+          label {
+            font-size: 7px !important;
+            margin-bottom: 1px !important;
+            font-weight: 600 !important;
+          }
+          
+          input, select, textarea {
+            font-size: 7px !important;
+            padding: 1px 3px !important;
+            min-height: 18px !important;
+            height: 18px !important;
+            border: 1px solid #d1d5db !important;
+          }
+          
+          textarea {
+            height: 28px !important;
+            resize: none !important;
+          }
+          
+          /* Checkbox styling */
+          input[type="checkbox"] {
+            width: 10px !important;
+            height: 10px !important;
+            min-height: 10px !important;
+          }
+          
+          /* Spacing adjustments */
+          .space-y-6 > * + * {
+            margin-top: 6px !important;
+          }
+          
+          .space-y-4 > * + * {
+            margin-top: 4px !important;
+          }
+          
+          .space-y-3 > * + * {
+            margin-top: 3px !important;
+          }
+          
+          .space-y-2 > * + * {
+            margin-top: 2px !important;
+          }
+          
+          .gap-6 {
+            gap: 6px !important;
+          }
+          
+          .gap-4 {
+            gap: 4px !important;
+          }
+          
+          .gap-3 {
+            gap: 3px !important;
+          }
+          
+          .gap-2 {
+            gap: 2px !important;
+          }
+          
+          /* Padding adjustments */
+          .p-6 {
+            padding: 6px !important;
+          }
+          
+          .p-4 {
+            padding: 4px !important;
+          }
+          
+          .p-3 {
+            padding: 3px !important;
+          }
+          
+          .p-2 {
+            padding: 2px !important;
+          }
+          
+          /* Margin adjustments */
+          .mb-6 {
+            margin-bottom: 4px !important;
+          }
+          
+          .mb-4 {
+            margin-bottom: 3px !important;
+          }
+          
+          .mb-3 {
+            margin-bottom: 2px !important;
+          }
+          
+          .mb-2 {
+            margin-bottom: 2px !important;
+          }
+          
+          .mb-1 {
+            margin-bottom: 1px !important;
+          }
+          
+          .mt-6 {
+            margin-top: 4px !important;
+          }
+          
+          .mt-4 {
+            margin-top: 3px !important;
+          }
+          
+          .mt-3 {
+            margin-top: 2px !important;
+          }
+          
+          .mt-2 {
+            margin-top: 2px !important;
+          }
+          
+          /* Main form container */
+          .flex.flex-1.flex-col {
+            padding: 0 !important;
+            gap: 4px !important;
+          }
+          
+          /* Customer Information - Blue Section */
+          .rounded-lg.border-2.border-blue-200 {
+            margin-bottom: 4px !important;
+            page-break-inside: avoid;
+          }
+          
+          /* Kitchen: Force 2-column layout for main sections */
+          .grid.grid-cols-1.gap-6.lg\\:grid-cols-2 {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 6px !important;
+            page-break-inside: avoid;
+          }
+          
+          /* Left and Right column containers */
+          .space-y-6 {
+            gap: 4px !important;
+          }
+          
+          /* Individual colored sections */
+          .rounded-lg.border-2.border-green-200,
+          .rounded-lg.border-2.border-purple-200,
+          .rounded-lg.border-2.border-orange-200,
+          .rounded-lg.border-2.border-yellow-200,
+          .rounded-lg.border-2.border-pink-200 {
+            page-break-inside: avoid;
+            margin-bottom: 4px !important;
+          }
+          
+          /* Additional doors/handles sections */
+          .border-t.pt-4 {
+            padding-top: 3px !important;
+            margin-top: 3px !important;
+            border-top: 1px solid #d1d5db !important;
+          }
+          
+          /* Additional door/handle cards */
+          .rounded.border-2 {
+            padding: 3px !important;
+            margin-bottom: 3px !important;
+            page-break-inside: avoid;
+          }
+          
+          /* Buttons - hide or minimize */
+          button:not(.print\\:hidden) {
+            font-size: 6px !important;
+            padding: 1px 4px !important;
+            min-height: 16px !important;
+            height: 16px !important;
+          }
+          
+          /* Order buttons - hide in print */
+          button[class*="Package"] {
+            display: none !important;
+          }
+          
+          /* Terms and signature sections */
+          .rounded-lg.border-2.border-gray-300,
+          .rounded-lg.border-2.border-indigo-200 {
+            margin-top: 4px !important;
+            page-break-inside: avoid;
+          }
+          
+          /* Grid layouts within sections */
+          .grid.grid-cols-2,
+          .grid.grid-cols-3,
+          .grid.grid-cols-4,
+          .grid.grid-cols-5 {
+            gap: 3px !important;
+          }
+          
+          /* Appliance grids */
+          .grid-cols-\\[1fr_1fr_1fr\\],
+          .grid-cols-\\[1fr_1fr\\],
+          .grid-cols-\\[0\\.5fr_1fr_1fr_1fr\\],
+          .grid-cols-\\[0\\.5fr_1fr_1fr\\] {
+            gap: 2px !important;
+          }
+          
+          /* Submit button section - hide */
+          .border-t.pt-3.text-center {
+            display: none !important;
+          }
+          
+          /* Ensure colored backgrounds print */
+          .bg-blue-50,
+          .bg-green-50,
+          .bg-purple-50,
+          .bg-orange-50,
+          .bg-yellow-50,
+          .bg-pink-50,
+          .bg-gray-50,
+          .bg-gray-100,
+          .bg-indigo-50 {
+            print-color-adjust: exact !important;
+            -webkit-print-color-adjust: exact !important;
+          }
+          
+          /* Bedroom: Maintain 2-column layout */
+          .grid.grid-cols-1.gap-3.lg\\:grid-cols-2 {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 6px !important;
+          }
+          
+          /* Prevent orphaned sections */
+          .rounded-lg {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          
+          /* Title and subtitle */
+          form > h2:first-of-type {
+            text-align: center !important;
+            margin-bottom: 1px !important;
+          }
+          
+          form > p {
+            text-align: center !important;
+            margin-bottom: 4px !important;
+            font-size: 7px !important;
+          }
+          
+          /* Status messages - hide in print */
+          .rounded-lg.p-4.border {
+            display: none !important;
+          }
+          
+          /* Walk-in mode banner - hide in print */
+          .rounded-lg.border-2.border-blue-300 {
+            display: none !important;
           }
         }
       `}</style>

@@ -92,17 +92,62 @@ interface FormSubmission {
   created_by?: number;
 }
 
+interface Quotation {
+  id: number;
+  reference_number: string;
+  total: number;
+  status: string;
+  notes: string;
+  created_at: string;
+  items_count?: number;
+  project_id?: string;
+}
+
+interface Invoice {
+  id: number;
+  invoice_number: string;
+  total: number;
+  status: string;
+  created_at: string;
+  customer_id: string;
+  project_id?: string;
+}
+
+interface Receipt {
+  id: number;
+  receipt_type: string;
+  amount_paid: number;
+  total_paid_to_date: number;
+  balance_to_pay: number;
+  payment_date: string;
+  created_at: string;
+  customer_id: string;
+  project_id?: string;
+}
+
+interface PaymentTerms {
+  id: number;
+  terms_title: string;
+  total_amount: number;
+  created_at: string;
+  customer_id: string;
+  project_id?: string;
+}
+
 interface FinancialDocument {
-  id: string;
-  type: "invoice" | "proforma" | "receipt" | "deposit" | "final" | "terms";
+  id: string | number;
+  type: "quotation" | "invoice" | "proforma" | "receipt" | "deposit" | "final" | "payment_terms" | "terms";
   title: string;
+  reference?: string;
   total?: number;
   amount_paid?: number;
   balance?: number;
   created_at: string;
-  created_by: string;
+  created_by?: string;
+  status?: string;
   form_submission_id?: number;
   project_id?: string;
+  customer_id?: string;
 }
 
 interface DrawingDocument {
@@ -305,7 +350,7 @@ export default function CustomerDetailsPage() {
   const [formDocToDelete, setFormDocToDelete] = useState<FormDocument | null>(null);
   const [isDeletingFormDoc, setIsDeletingFormDoc] = useState(false);
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [financialDocs, setFinancialDocs] = useState<FinancialDocument[]>([]);
+  const [financialDocuments, setFinancialDocuments] = useState<FinancialDocument[]>([]);
   const [drawingDocuments, setDrawingDocuments] = useState<DrawingDocument[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -342,6 +387,11 @@ export default function CustomerDetailsPage() {
   const [showProjectSelectDialog, setShowProjectSelectDialog] = useState(false);
   const [draggedItem, setDraggedItem] = useState<{type: 'form' | 'drawing', id: string} | null>(null);
   const [dragOverProject, setDragOverProject] = useState<string | null>(null);
+  const [showQuoteGenerationDialog, setShowQuoteGenerationDialog] = useState(false);
+  const [checklistForQuote, setChecklistForQuote] = useState<{
+    type: string;
+    id: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -362,11 +412,27 @@ export default function CustomerDetailsPage() {
 
     try {
       // ✅ PARALLEL FETCH - All requests happen at once
-      const [customerRes, drawingsRes, formDocsRes] = await Promise.all([
+      const [
+        customerRes, 
+        drawingsRes, 
+        formDocsRes, 
+        quotationsRes,
+        invoicesRes,
+        receiptsRes,
+        paymentTermsRes
+      ] = await Promise.all([
         fetch(`https://aztec-interior.onrender.com/customers/${id}`, { headers }),
         fetch(`https://aztec-interior.onrender.com/files/drawings?customer_id=${id}`, { headers })
           .catch(() => null),
         fetch(`https://aztec-interior.onrender.com/files/forms?customer_id=${id}`, { headers })
+          .catch(() => null),
+        fetch(`https://aztec-interior.onrender.com/quotations?customer_id=${id}`, { headers })
+          .catch(() => null),
+        fetch(`https://aztec-interior.onrender.com/invoices?customer_id=${id}`, { headers })
+          .catch(() => null),
+        fetch(`https://aztec-interior.onrender.com/receipts?customer_id=${id}`, { headers })
+          .catch(() => null),
+        fetch(`https://aztec-interior.onrender.com/payment-terms?customer_id=${id}`, { headers })
           .catch(() => null),
       ]);
 
@@ -399,31 +465,127 @@ export default function CustomerDetailsPage() {
 
       setCustomer(normalizedCustomer);
 
-      // ✅ Process drawings - Filter out assigned files (only show unassigned)
+      // ✅ Process drawings
       if (drawingsRes && drawingsRes.ok) {
         const contentType = drawingsRes.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const drawingsData = await drawingsRes.json();
           if (Array.isArray(drawingsData)) {
-            // ✅ ONLY SHOW FILES WITHOUT project_id (unassigned files)
             const unassignedDrawings = drawingsData.filter(doc => !doc.project_id);
             setDrawingDocuments(unassignedDrawings);
           }
         }
       }
 
-      // ✅ Process form documents - Filter out assigned files
+      // ✅ Process form documents
       if (formDocsRes && formDocsRes.ok) {
         const contentType = formDocsRes.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const formDocsData = await formDocsRes.json();
           if (Array.isArray(formDocsData)) {
-            // ✅ ONLY SHOW FORMS WITHOUT project_id (unassigned forms)
             const unassignedForms = formDocsData.filter(form => !form.project_id);
             setFormDocuments(unassignedForms);
           }
         }
       }
+
+      // ✅ Process and combine all financial documents
+      const allFinancialDocs: FinancialDocument[] = [];
+
+      // Quotations
+      if (quotationsRes && quotationsRes.ok) {
+        const contentType = quotationsRes.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const quotationsData = await quotationsRes.json();
+          if (Array.isArray(quotationsData)) {
+            quotationsData.forEach((quote: Quotation) => {
+              allFinancialDocs.push({
+                id: quote.id,
+                type: 'quotation',
+                title: `Quotation ${quote.reference_number}`,
+                reference: quote.reference_number,
+                total: quote.total,
+                status: quote.status,
+                created_at: quote.created_at,
+                project_id: quote.project_id,
+              });
+            });
+          }
+        }
+      }
+
+      // Invoices
+      if (invoicesRes && invoicesRes.ok) {
+        const contentType = invoicesRes.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const invoicesData = await invoicesRes.json();
+          if (Array.isArray(invoicesData)) {
+            invoicesData.forEach((invoice: Invoice) => {
+              allFinancialDocs.push({
+                id: invoice.id,
+                type: invoice.invoice_number?.toLowerCase().includes('proforma') ? 'proforma' : 'invoice',
+                title: invoice.invoice_number || `Invoice #${invoice.id}`,
+                reference: invoice.invoice_number,
+                total: invoice.total,
+                status: invoice.status,
+                created_at: invoice.created_at,
+                project_id: invoice.project_id,
+              });
+            });
+          }
+        }
+      }
+
+      // Receipts
+      if (receiptsRes && receiptsRes.ok) {
+        const contentType = receiptsRes.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const receiptsData = await receiptsRes.json();
+          if (Array.isArray(receiptsData)) {
+            receiptsData.forEach((receipt: Receipt) => {
+              const receiptType = receipt.receipt_type?.toLowerCase() || 'receipt';
+              allFinancialDocs.push({
+                id: receipt.id,
+                type: receiptType.includes('deposit') ? 'deposit' : receiptType.includes('final') ? 'final' : 'receipt',
+                title: `${receipt.receipt_type || 'Receipt'} - ${formatDate(receipt.payment_date)}`,
+                reference: `#${receipt.id}`,
+                amount_paid: receipt.amount_paid,
+                balance: receipt.balance_to_pay,
+                created_at: receipt.created_at,
+                project_id: receipt.project_id,
+              });
+            });
+          }
+        }
+      }
+
+      // Payment Terms
+      if (paymentTermsRes && paymentTermsRes.ok) {
+        const contentType = paymentTermsRes.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const paymentTermsData = await paymentTermsRes.json();
+          if (Array.isArray(paymentTermsData)) {
+            paymentTermsData.forEach((terms: PaymentTerms) => {
+              allFinancialDocs.push({
+                id: terms.id,
+                type: 'payment_terms',
+                title: terms.terms_title || 'Payment Terms',
+                reference: `#${terms.id}`,
+                total: terms.total_amount,
+                created_at: terms.created_at,
+                project_id: terms.project_id,
+              });
+            });
+          }
+        }
+      }
+
+      // Sort by created date (newest first)
+      allFinancialDocs.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setFinancialDocuments(allFinancialDocs);
 
     } catch (error) {
       console.error("Error loading customer data:", error);
@@ -891,6 +1053,71 @@ const handleConfirmDeleteFormDocument = async () => {
     }
   };
 
+// ✅ FINANCIAL DOCUMENT HELPER FUNCTIONS - Define these BEFORE renderDrawingDocument
+  const getFinancialDocIcon = (type: string) => {
+    switch (type) {
+      case 'quotation':
+        return <FileText className="h-5 w-5 text-blue-600" />;
+      case 'invoice':
+        return <FileText className="h-5 w-5 text-indigo-600" />;
+      case 'proforma':
+        return <FileText className="h-5 w-5 text-purple-600" />;
+      case 'receipt':
+        return <Receipt className="h-5 w-5 text-green-600" />;
+      case 'deposit':
+        return <Receipt className="h-5 w-5 text-emerald-600" />;
+      case 'final':
+        return <Receipt className="h-5 w-5 text-teal-600" />;
+      case 'payment_terms':
+        return <DollarSign className="h-5 w-5 text-orange-600" />;
+      default:
+        return <FileText className="h-5 w-5 text-gray-600" />;
+    }
+  };
+
+  const getFinancialDocColor = (type: string) => {
+    switch (type) {
+      case 'quotation':
+        return 'from-blue-50 to-blue-100';
+      case 'invoice':
+        return 'from-indigo-50 to-indigo-100';
+      case 'proforma':
+        return 'from-purple-50 to-purple-100';
+      case 'receipt':
+        return 'from-green-50 to-green-100';
+      case 'deposit':
+        return 'from-emerald-50 to-emerald-100';
+      case 'final':
+        return 'from-teal-50 to-teal-100';
+      case 'payment_terms':
+        return 'from-orange-50 to-orange-100';
+      default:
+        return 'from-gray-50 to-gray-100';
+    }
+  };
+
+  const handleViewFinancialDocument = (doc: FinancialDocument) => {
+    switch (doc.type) {
+      case 'quotation':
+        window.open(`/dashboard/quotes/${doc.id}`, '_blank');
+        break;
+      case 'invoice':
+      case 'proforma':
+        window.open(`/dashboard/invoices/${doc.id}`, '_blank');
+        break;
+      case 'receipt':
+      case 'deposit':
+      case 'final':
+        window.open(`/dashboard/receipts/${doc.id}`, '_blank');
+        break;
+      case 'payment_terms':
+        window.open(`/dashboard/payment-terms/${doc.id}`, '_blank');
+        break;
+      default:
+        alert('Document viewer not available');
+    }
+  };
+
   const renderDrawingDocument = (doc: DrawingDocument) => {
     const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
     const docType =
@@ -1220,58 +1447,21 @@ const handleConfirmDeleteFormDocument = async () => {
       return type === "kitchen";
     });
 
-    // ✅ If checklist exists, ask user if they want to generate from it
+    // ✅ If checklist exists, show dialog
     if (bedroomChecklist || kitchenChecklist) {
       const checklistType = bedroomChecklist ? "bedroom" : "kitchen";
       const checklistId = bedroomChecklist?.id || kitchenChecklist?.id;
       
-      const generateFromChecklist = window.confirm(
-        `You have a ${checklistType} checklist on file. Would you like to:\n\n` +
-        `✅ YES - Generate quote from checklist (auto-extract items)\n` +
-        `❌ NO - Create blank quote manually`
-      );
-
-      if (generateFromChecklist) {
-        // Generate quote from checklist
-        try {
-          const token = localStorage.getItem("auth_token");
-          const response = await fetch(
-            `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${checklistId}`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-
-          if (response.ok) {
-            const data = await response.json();
-            alert(
-              `✅ Quote generated successfully!\n\n` +
-              `Reference: ${data.reference_number}\n` +
-              `Items: ${data.items_count}\n` +
-              `Type: ${data.checklist_type}\n\n` +
-              `Redirecting to quote editor...`
-            );
-            // Redirect to quote editor
-            router.push(`/dashboard/quotes/${data.quotation_id}/edit`);
-            return;
-          } else {
-            const error = await response.json();
-            alert(`Failed to generate quote: ${error.error || "Unknown error"}`);
-            return;
-          }
-        } catch (error) {
-          console.error("Error generating quote:", error);
-          alert("Network error: Could not generate quote");
-          return;
-        }
-      }
+      setChecklistForQuote({ type: checklistType, id: checklistId! });
+      setShowQuoteGenerationDialog(true);
+      return;
     }
 
-    // ✅ No checklist OR user chose to create blank quote
+    // ✅ No checklist - create blank quote
+    createBlankQuote();
+  };
+
+  const createBlankQuote = () => {
     const queryParams = new URLSearchParams({
       customerId: String(id),
       customerName: customer?.name || "",
@@ -1282,6 +1472,52 @@ const handleConfirmDeleteFormDocument = async () => {
       source: "customer",
     });
     router.push(`/dashboard/quotes/create?${queryParams.toString()}`);
+  };
+
+  const handleGenerateFromChecklist = async () => {
+    if (!checklistForQuote) return;
+
+    setShowQuoteGenerationDialog(false);
+    
+    try {
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch(
+        `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${checklistForQuote.id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // ✅ Open quote details page in new tab
+        window.open(`/dashboard/quotes/${data.quotation_id}`, '_blank');
+        
+        // ✅ Reload customer data to show new quote
+        await loadCustomerData();
+        
+        // Show success message
+        alert(
+          `✅ Quote generated successfully!\n\n` +
+          `Reference: ${data.reference_number}\n` +
+          `Items: ${data.items_count}\n` +
+          `Total: £${data.total.toFixed(2)}`
+        );
+      } else {
+        const error = await response.json();
+        alert(`Failed to generate quote: ${error.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Error generating quote:", error);
+      alert("Network error: Could not generate quote");
+    } finally {
+      setChecklistForQuote(null);
+    }
   };
 
   // const handleCreateJob = () => {
@@ -2797,9 +3033,9 @@ const handleConfirmDeleteFormDocument = async () => {
           {/* Form Submissions */}
           {customer.form_submissions && customer.form_submissions.length > 0 ? (
             <div>
-              <h3 className="mb-4 text-lg font-semibold text-gray-900">
+              {/* <h3 className="mb-4 text-lg font-semibold text-gray-900">
                 Form Submissions ({customer.form_submissions.length})
-              </h3>
+              </h3> */}
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {customer.form_submissions.map((submission) => (
                   <div key={submission.id}>{renderFormSubmission(submission)}</div>
@@ -2818,6 +3054,105 @@ const handleConfirmDeleteFormDocument = async () => {
             )
           )}
         </div>
+
+        {/* FINANCIAL DOCUMENTS SECTION - Only show if documents exist */}
+        {financialDocuments.length > 0 && (
+          <div className="mb-8 border-t border-gray-200 pt-8">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Financial Documents ({financialDocuments.length})
+              </h2>
+              <div className="text-sm text-gray-600">
+                {financialDocuments.filter(d => d.type === 'quotation').length} Quotation{financialDocuments.filter(d => d.type === 'quotation').length !== 1 ? 's' : ''} • {' '}
+                {financialDocuments.filter(d => d.type === 'invoice' || d.type === 'proforma').length} Invoice{financialDocuments.filter(d => d.type === 'invoice' || d.type === 'proforma').length !== 1 ? 's' : ''} • {' '}
+                {financialDocuments.filter(d => d.type === 'receipt' || d.type === 'deposit' || d.type === 'final').length} Receipt{financialDocuments.filter(d => d.type === 'receipt' || d.type === 'deposit' || d.type === 'final').length !== 1 ? 's' : ''}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {financialDocuments.map((doc) => (
+                <div
+                  key={`${doc.type}-${doc.id}`}
+                  className={`rounded-lg border bg-gradient-to-br ${getFinancialDocColor(doc.type)} p-6 shadow-sm transition-all duration-200 hover:shadow-md`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="mb-3 flex items-center space-x-3">
+                        <div className="rounded-lg bg-white p-2 shadow-sm">
+                          {getFinancialDocIcon(doc.type)}
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900 line-clamp-1">{doc.title}</h3>
+                          <p className="text-xs text-gray-600 capitalize">{doc.type.replace('_', ' ')}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        {doc.status && (
+                          <div className="flex items-center space-x-2">
+                            <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                              doc.status === 'Approved' || doc.status === 'Paid' ? 'bg-green-100 text-green-800' :
+                              doc.status === 'Draft' || doc.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                              doc.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {doc.status}
+                            </span>
+                          </div>
+                        )}
+
+                        {doc.total !== undefined && (
+                          <p className="text-sm text-gray-700">
+                            <span className="font-medium">Total:</span>{' '}
+                            <span className="font-semibold text-gray-900">£{doc.total.toFixed(2)}</span>
+                          </p>
+                        )}
+
+                        {doc.amount_paid !== undefined && doc.amount_paid > 0 && (
+                          <p className="text-sm text-green-700">
+                            <span className="font-medium">Paid:</span>{' '}
+                            <span className="font-semibold">£{doc.amount_paid.toFixed(2)}</span>
+                          </p>
+                        )}
+
+                        {doc.balance !== undefined && doc.balance > 0 && (
+                          <p className="text-sm text-red-700">
+                            <span className="font-medium">Balance:</span>{' '}
+                            <span className="font-semibold">£{doc.balance.toFixed(2)}</span>
+                          </p>
+                        )}
+
+                        <p className="text-xs text-gray-600">
+                          <Calendar className="mr-1 inline h-3 w-3" />
+                          {formatDate(doc.created_at)}
+                        </p>
+
+                        {doc.project_id && (
+                          <p className="text-xs text-blue-600">
+                            <Package className="mr-1 inline h-3 w-3" />
+                            Linked to project
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-end">
+                    <Button
+                      onClick={() => handleViewFinancialDocument(doc)}
+                      variant="outline"
+                      size="sm"
+                      className="w-full bg-white hover:bg-gray-50"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      View Details
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* PROJECT SELECTION DIALOG FOR UPLOADS */}
         <Dialog open={showProjectSelectDialog} onOpenChange={setShowProjectSelectDialog}>
@@ -3885,6 +4220,59 @@ const handleConfirmDeleteFormDocument = async () => {
               </div>
             )}
           </div>
+
+          {/* QUOTE GENERATION DIALOG */}
+          <Dialog open={showQuoteGenerationDialog} onOpenChange={setShowQuoteGenerationDialog}>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <div className="flex items-center justify-between">
+                  <DialogTitle className="text-xl font-semibold">Generate Quotation</DialogTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setShowQuoteGenerationDialog(false);
+                      setChecklistForQuote(null);
+                    }}
+                    className="h-8 w-8 rounded-full"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </DialogHeader>
+              
+              <div className="py-6">
+                <p className="mb-6 text-base text-gray-700">
+                  You have a <span className="font-semibold text-blue-600">{checklistForQuote?.type}</span> checklist on file.
+                </p>
+                <p className="text-sm text-gray-600">
+                  Would you like to generate a quote from this checklist (auto-extract items) or create a blank quote manually?
+                </p>
+              </div>
+
+              <DialogFooter className="flex flex-col space-y-2 sm:flex-row sm:space-x-2 sm:space-y-0">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowQuoteGenerationDialog(false);
+                    createBlankQuote();
+                    setChecklistForQuote(null);
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  No - Create Blank Quote
+                </Button>
+                <Button
+                  onClick={handleGenerateFromChecklist}
+                  className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto"
+                >
+                  <CheckSquare className="mr-2 h-4 w-4" />
+                  Yes - Generate from Checklist
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </DialogContent>
       </Dialog>
     </div>

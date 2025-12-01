@@ -76,30 +76,25 @@ const getNextInvoiceNumber = (lastNumber: string): string => {
 };
 
 export default function InvoicePage() {
-  // 1. User role state
-  const [userRole, setUserRole] = useState<string | null>(null);
+  // COMMENTED OUT: Approval workflow
+  // const [userRole, setUserRole] = useState<string | null>(null);
+  // const [submissionId, setSubmissionId] = useState<number | null>(null);
+  // const [approvalStatus, setApprovalStatus] = useState<string>("pending");
+  // const [rejectionReason, setRejectionReason] = useState<string>("");
 
-  // Initial approval status must be 'pending' or null, so it only changes after save/check
   const [invoiceNumber, setInvoiceNumber] = useState("INV-0001");
-  const [submissionId, setSubmissionId] = useState<number | null>(null);
-  const [approvalStatus, setApprovalStatus] = useState<string>("pending"); // Default to pending
-  const [rejectionReason, setRejectionReason] = useState<string>("");
 
-  // --- Role and Invoice Number Setup ---
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // Fetch the user role (e.g., from local storage)
-      const storedRole = localStorage.getItem("user_role");
-      setUserRole(storedRole || "manager"); // <<< MOCK: Replace 'manager' with a proper default/null
+      // COMMENTED OUT: User role fetching
+      // const storedRole = localStorage.getItem("user_role");
+      // setUserRole(storedRole || "manager");
 
       const lastUsedNumber = localStorage.getItem("lastInvoiceNumber") || "INV-0000";
       const nextNumber = getNextInvoiceNumber(lastUsedNumber);
       setInvoiceNumber(nextNumber);
-
-      // Note: We deliberately do NOT set approvalStatus here. It should be pending/unknown until saved.
     }
   }, []);
-  // ------------------------------------
 
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split("T")[0]);
   const [dueDate, setDueDate] = useState(() => {
@@ -177,8 +172,9 @@ export default function InvoicePage() {
       subTotal,
       vatAmount,
       totalAmount,
-      submission_id: submissionId,
-      userRole: userRole,
+      // COMMENTED OUT: Approval workflow fields
+      // submission_id: submissionId,
+      // userRole: userRole,
     }),
     [
       customer,
@@ -190,26 +186,26 @@ export default function InvoicePage() {
       subTotal,
       vatAmount,
       totalAmount,
-      submissionId,
-      userRole,
+      // submissionId,
+      // userRole,
     ],
   );
 
   const handleSave = async () => {
-    if (!userRole) {
-      setMessage("❌ User role not determined. Cannot save.");
-      return;
-    }
+    // COMMENTED OUT: User role check
+    // if (!userRole) {
+    //   setMessage("❌ User role not determined. Cannot save.");
+    //   return;
+    // }
 
     setIsSaving(true);
     setMessage("Saving invoice...");
 
-    // 🚨 CRITICAL CHANGE HERE: Optimistically set status for manager
-    // This ensures the status badge updates instantly before the network call resolves.
-    if (userRole === "manager") {
-      setApprovalStatus("approved");
-      setMessage("Saving invoice... (Auto-approving as Manager)");
-    }
+    // COMMENTED OUT: Optimistic approval status update
+    // if (userRole === "manager") {
+    //   setApprovalStatus("approved");
+    //   setMessage("Saving invoice... (Auto-approving as Manager)");
+    // }
 
     try {
       const token = localStorage.getItem("auth_token");
@@ -238,35 +234,27 @@ export default function InvoicePage() {
           localStorage.setItem("lastInvoiceNumber", invoiceNumber);
         }
 
-        // Set submission ID
-        setSubmissionId(data.form_submission_id);
+        // COMMENTED OUT: Submission ID and approval status
+        // setSubmissionId(data.form_submission_id);
+        // let newApprovalStatus = data.approval_status;
+        // if (!newApprovalStatus) {
+        //   newApprovalStatus = userRole === "manager" ? "approved" : "pending";
+        // }
+        // setApprovalStatus(newApprovalStatus);
 
-        // 🔄 FINAL STATUS CHECK: Update status from server, or use local 'approved' for manager
-        let newApprovalStatus = data.approval_status;
-        if (!newApprovalStatus) {
-          newApprovalStatus = userRole === "manager" ? "approved" : "pending";
-        }
-        setApprovalStatus(newApprovalStatus);
-
-        if (newApprovalStatus === "pending") {
-          setMessage("✅ Invoice saved and sent for approval!");
-        } else if (newApprovalStatus === "approved") {
-          setMessage("✅ Invoice saved and automatically **approved** (Manager role)!");
-        } else {
-          setMessage("✅ Invoice saved successfully!");
-        }
+        setMessage("✅ Invoice saved successfully!");
       } else {
-        // If save fails, revert optimistic change (only for manager)
-        if (userRole === "manager") {
-          setApprovalStatus("pending");
-        }
+        // COMMENTED OUT: Revert optimistic change
+        // if (userRole === "manager") {
+        //   setApprovalStatus("pending");
+        // }
         setMessage(`❌ Error: ${data.error || "Failed to save invoice."}`);
       }
     } catch (error) {
-      // If save fails, revert optimistic change (only for manager)
-      if (userRole === "manager") {
-        setApprovalStatus("pending");
-      }
+      // COMMENTED OUT: Revert optimistic change
+      // if (userRole === "manager") {
+      //   setApprovalStatus("pending");
+      // }
       setMessage("❌ Network error. Could not connect to server.");
     } finally {
       setIsSaving(false);
@@ -274,45 +262,46 @@ export default function InvoicePage() {
     }
   };
 
-  // Check approval status before download
-  const checkApprovalStatus = async () => {
-    if (approvalStatus === "approved") {
-      return true;
-    }
-
-    if (!submissionId) {
-      setMessage("⚠️ Please save the invoice first.");
-      return false;
-    }
-
-    try {
-      const response = await fetch(`https://aztec-interior.onrender.com/approvals/status/${submissionId}`);
-      const data = await response.json();
-
-      setApprovalStatus(data.approval_status);
-      setRejectionReason(data.rejection_reason || "");
-
-      if (data.approval_status === "rejected") {
-        setMessage(`❌ This invoice was rejected. Reason: ${data.rejection_reason}`);
-        return false;
-      } else if (data.approval_status === "pending") {
-        setMessage("⚠️ This invoice is pending manager approval. You cannot download it yet.");
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      setMessage("❌ Failed to check approval status.");
-      return false;
-    }
-  };
+  // COMMENTED OUT: Approval status check
+  // const checkApprovalStatus = async () => {
+  //   if (approvalStatus === "approved") {
+  //     return true;
+  //   }
+  //
+  //   if (!submissionId) {
+  //     setMessage("⚠️ Please save the invoice first.");
+  //     return false;
+  //   }
+  //
+  //   try {
+  //     const response = await fetch(`https://aztec-interior.onrender.com/approvals/status/${submissionId}`);
+  //     const data = await response.json();
+  //
+  //     setApprovalStatus(data.approval_status);
+  //     setRejectionReason(data.rejection_reason || "");
+  //
+  //     if (data.approval_status === "rejected") {
+  //       setMessage(`❌ This invoice was rejected. Reason: ${data.rejection_reason}`);
+  //       return false;
+  //     } else if (data.approval_status === "pending") {
+  //       setMessage("⚠️ This invoice is pending manager approval. You cannot download it yet.");
+  //       return false;
+  //     }
+  //
+  //     return true;
+  //   } catch (error) {
+  //     setMessage("❌ Failed to check approval status.");
+  //     return false;
+  //   }
+  // };
 
   const handleDownloadPdf = async () => {
-    const canDownload = await checkApprovalStatus();
-    if (!canDownload) {
-      setTimeout(() => setMessage(""), 5000);
-      return;
-    }
+    // COMMENTED OUT: Approval check
+    // const canDownload = await checkApprovalStatus();
+    // if (!canDownload) {
+    //   setTimeout(() => setMessage(""), 5000);
+    //   return;
+    // }
 
     setMessage("Generating PDF...");
     try {
@@ -352,16 +341,14 @@ export default function InvoicePage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 font-sans sm:p-8">
       <div className="mx-auto max-w-5xl">
-        {/* 3. Remove/Hide the save/download/print buttons from the top */}
         <div className="no-print mb-6 flex items-center justify-between">
           <Button variant="outline" onClick={() => window.history.back()}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
-          {/* Removed action buttons from here */}
         </div>
 
-        {/* 2. Approval Status Badge is now ONLY shown if a submissionId exists */}
-        {submissionId && (
+        {/* COMMENTED OUT: Approval Status Badge */}
+        {/* {submissionId && (
           <div
             className={`mb-4 rounded-lg border-l-4 p-3 ${
               approvalStatus === "approved"
@@ -395,7 +382,7 @@ export default function InvoicePage() {
               </p>
             )}
           </div>
-        )}
+        )} */}
 
         {message && (
           <div
@@ -414,7 +401,6 @@ export default function InvoicePage() {
         )}
 
         <Card className="rounded-xl shadow-lg print:border-0 print:shadow-none">
-          {/* ... CardHeader and CardContent remain the same */}
           <CardHeader className="rounded-t-xl bg-slate-800 p-8 text-white">
             <div className="flex items-start justify-between">
               <div>
@@ -564,10 +550,10 @@ export default function InvoicePage() {
               </div>
             </div>
           </CardContent>
-          {/* 4. Move action buttons to CardFooter for better flow and placement */}
+
           <CardFooter className="no-print flex items-center justify-between rounded-b-xl bg-gray-100 p-6">
             <div className="hidden flex-1 text-sm text-gray-500 sm:block">
-              <p>Draft Mode. Click "Save" to finalize and process the invoice.</p>
+              <p>Draft Mode. Click "Save" to finalize the invoice.</p>
             </div>
             <div className="flex space-x-2">
               <Button onClick={handleSave} disabled={isSaving} className="bg-slate-800 text-white hover:bg-slate-700">
@@ -582,7 +568,6 @@ export default function InvoicePage() {
             </div>
           </CardFooter>
 
-          {/* Original Bank Details footer now separate */}
           <CardFooter className="bg-gray-50 p-6 text-center text-xs text-gray-500">
             <div className="w-full">
               <p className="mb-1 font-semibold">Bank Transfer Details</p>
