@@ -292,10 +292,9 @@ export default function ProjectDetailsPage() {
   const [formToDelete, setFormToDelete] = useState<FormSubmission | null>(null);
   const [isDeletingForm, setIsDeletingForm] = useState(false);
 
-    const { toast } = useToast();
-    const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
-    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [quoteToDelete, setQuoteToDelete] = useState<{ id: number; reference: string } | null>(null);
+  const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [quoteToDelete, setQuoteToDelete] = useState<{ id: number; reference: string } | null>(null);
 
   // Task form state
   const [taskData, setTaskData] = useState({
