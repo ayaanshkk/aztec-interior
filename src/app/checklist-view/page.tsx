@@ -2610,7 +2610,7 @@ export default function ChecklistViewPage() {
         @media print {
           @page {
             size: A4 portrait;
-            margin: 8mm;
+            margin: 10mm;
           }
           
           body {
@@ -2621,56 +2621,63 @@ export default function ChecklistViewPage() {
           /* Hide non-printable elements */
           .print\\:hidden,
           aside,
-          header,
-          nav {
+          header:has(.sidebar-trigger),
+          nav,
+          .no-print {
             display: none !important;
           }
           
-          .print\\:shadow-none {
-            box-shadow: none !important;
+          /* Ensure main content is visible */
+          main,
+          .flex.flex-1.flex-col {
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
           
-          .print\\:border-0 {
-            border: 0 !important;
-          }
-          
-          /* Overall page scaling */
-          body, html {
-            font-size: 8px !important;
+          /* Show the form title prominently */
+          form > h2:first-of-type {
+            display: block !important;
+            page-break-after: avoid;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
           }
           
           /* Typography scaling */
+          * {
+            font-size: 9px !important;
+          }
+          
           h1 {
-            font-size: 16px !important;
-            margin-bottom: 2px !important;
+            font-size: 18px !important;
           }
           
           h2 {
-            font-size: 13px !important;
-            margin-bottom: 3px !important;
-          }
-          
-          h3 {
-            font-size: 10px !important;
+            font-size: 14px !important;
             margin-bottom: 4px !important;
           }
           
+          h3 {
+            font-size: 11px !important;
+            margin-bottom: 6px !important;
+          }
+          
           label {
-            font-size: 7px !important;
-            margin-bottom: 1px !important;
+            font-size: 8px !important;
+            margin-bottom: 2px !important;
             font-weight: 600 !important;
           }
           
           input, select, textarea {
-            font-size: 7px !important;
-            padding: 1px 3px !important;
-            min-height: 18px !important;
-            height: 18px !important;
+            font-size: 8px !important;
+            padding: 2px 4px !important;
+            min-height: 20px !important;
+            height: 20px !important;
             border: 1px solid #d1d5db !important;
           }
           
           textarea {
-            height: 28px !important;
+            height: 30px !important;
             resize: none !important;
           }
           
@@ -2694,10 +2701,6 @@ export default function ChecklistViewPage() {
             margin-top: 3px !important;
           }
           
-          .space-y-2 > * + * {
-            margin-top: 2px !important;
-          }
-          
           .gap-6 {
             gap: 6px !important;
           }
@@ -2710,152 +2713,43 @@ export default function ChecklistViewPage() {
             gap: 3px !important;
           }
           
-          .gap-2 {
-            gap: 2px !important;
-          }
-          
           /* Padding adjustments */
           .p-6 {
-            padding: 6px !important;
+            padding: 8px !important;
           }
           
           .p-4 {
-            padding: 4px !important;
+            padding: 6px !important;
           }
           
           .p-3 {
-            padding: 3px !important;
-          }
-          
-          .p-2 {
-            padding: 2px !important;
+            padding: 4px !important;
           }
           
           /* Margin adjustments */
           .mb-6 {
-            margin-bottom: 4px !important;
+            margin-bottom: 6px !important;
           }
           
           .mb-4 {
-            margin-bottom: 3px !important;
-          }
-          
-          .mb-3 {
-            margin-bottom: 2px !important;
+            margin-bottom: 4px !important;
           }
           
           .mb-2 {
             margin-bottom: 2px !important;
           }
           
-          .mb-1 {
-            margin-bottom: 1px !important;
-          }
-          
-          .mt-6 {
-            margin-top: 4px !important;
-          }
-          
-          .mt-4 {
-            margin-top: 3px !important;
-          }
-          
-          .mt-3 {
-            margin-top: 2px !important;
-          }
-          
-          .mt-2 {
-            margin-top: 2px !important;
-          }
-          
-          /* Main form container */
-          .flex.flex-1.flex-col {
-            padding: 0 !important;
-            gap: 4px !important;
-          }
-          
-          /* Customer Information - Blue Section */
-          .rounded-lg.border-2.border-blue-200 {
-            margin-bottom: 4px !important;
-            page-break-inside: avoid;
-          }
-          
-          /* Kitchen: Force 2-column layout for main sections */
+          /* Kitchen: Force 2-column layout */
           .grid.grid-cols-1.gap-6.lg\\:grid-cols-2 {
             display: grid !important;
             grid-template-columns: 1fr 1fr !important;
-            gap: 6px !important;
+            gap: 8px !important;
+          }
+          
+          /* Prevent page breaks inside sections */
+          .rounded-lg.border-2 {
             page-break-inside: avoid;
-          }
-          
-          /* Left and Right column containers */
-          .space-y-6 {
-            gap: 4px !important;
-          }
-          
-          /* Individual colored sections */
-          .rounded-lg.border-2.border-green-200,
-          .rounded-lg.border-2.border-purple-200,
-          .rounded-lg.border-2.border-orange-200,
-          .rounded-lg.border-2.border-yellow-200,
-          .rounded-lg.border-2.border-pink-200 {
-            page-break-inside: avoid;
-            margin-bottom: 4px !important;
-          }
-          
-          /* Additional doors/handles sections */
-          .border-t.pt-4 {
-            padding-top: 3px !important;
-            margin-top: 3px !important;
-            border-top: 1px solid #d1d5db !important;
-          }
-          
-          /* Additional door/handle cards */
-          .rounded.border-2 {
-            padding: 3px !important;
-            margin-bottom: 3px !important;
-            page-break-inside: avoid;
-          }
-          
-          /* Buttons - hide or minimize */
-          button:not(.print\\:hidden) {
-            font-size: 6px !important;
-            padding: 1px 4px !important;
-            min-height: 16px !important;
-            height: 16px !important;
-          }
-          
-          /* Order buttons - hide in print */
-          button[class*="Package"] {
-            display: none !important;
-          }
-          
-          /* Terms and signature sections */
-          .rounded-lg.border-2.border-gray-300,
-          .rounded-lg.border-2.border-indigo-200 {
-            margin-top: 4px !important;
-            page-break-inside: avoid;
-          }
-          
-          /* Grid layouts within sections */
-          .grid.grid-cols-2,
-          .grid.grid-cols-3,
-          .grid.grid-cols-4,
-          .grid.grid-cols-5 {
-            gap: 3px !important;
-          }
-          
-          /* Appliance grids */
-          .grid-cols-\\[1fr_1fr_1fr\\],
-          .grid-cols-\\[1fr_1fr\\],
-          .grid-cols-\\[0\\.5fr_1fr_1fr_1fr\\],
-          .grid-cols-\\[0\\.5fr_1fr_1fr\\] {
-            gap: 2px !important;
-          }
-          
-          /* Submit button section - hide */
-          .border-t.pt-3.text-center {
-            display: none !important;
+            break-inside: avoid;
           }
           
           /* Ensure colored backgrounds print */
@@ -2872,38 +2766,21 @@ export default function ChecklistViewPage() {
             -webkit-print-color-adjust: exact !important;
           }
           
-          /* Bedroom: Maintain 2-column layout */
+          /* Hide buttons and interactive elements */
+          button:not(.print\\:block) {
+            display: none !important;
+          }
+          
+          /* Bedroom: 2-column layout */
           .grid.grid-cols-1.gap-3.lg\\:grid-cols-2 {
             display: grid !important;
             grid-template-columns: 1fr 1fr !important;
             gap: 6px !important;
           }
           
-          /* Prevent orphaned sections */
-          .rounded-lg {
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-          
-          /* Title and subtitle */
-          form > h2:first-of-type {
-            text-align: center !important;
-            margin-bottom: 1px !important;
-          }
-          
-          form > p {
-            text-align: center !important;
-            margin-bottom: 4px !important;
-            font-size: 7px !important;
-          }
-          
-          /* Status messages - hide in print */
+          /* Status messages and banners */
+          .border-2.border-blue-300,
           .rounded-lg.p-4.border {
-            display: none !important;
-          }
-          
-          /* Walk-in mode banner - hide in print */
-          .rounded-lg.border-2.border-blue-300 {
             display: none !important;
           }
         }

@@ -2574,7 +2574,7 @@ export default function FormPage() {
     <style jsx global>{`
       @media print {
         @page {
-          size: A4;
+          size: A4 portrait;
           margin: 10mm;
         }
         
@@ -2583,16 +2583,170 @@ export default function FormPage() {
           -webkit-print-color-adjust: exact;
         }
         
-        .print\\:hidden {
+        /* Hide non-printable elements */
+        .print\\:hidden,
+        aside,
+        header:has(.sidebar-trigger),
+        nav,
+        .no-print {
           display: none !important;
         }
         
-        .print\\:shadow-none {
-          box-shadow: none !important;
+        /* Ensure main content is visible */
+        main,
+        .flex.flex-1.flex-col {
+          display: block !important;
+          padding: 0 !important;
+          margin: 0 !important;
         }
         
-        .print\\:border-0 {
-          border: 0 !important;
+        /* Show the form title prominently */
+        form > h2:first-of-type {
+          display: block !important;
+          page-break-after: avoid;
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+        }
+        
+        /* Typography scaling */
+        * {
+          font-size: 9px !important;
+        }
+        
+        h1 {
+          font-size: 18px !important;
+        }
+        
+        h2 {
+          font-size: 14px !important;
+          margin-bottom: 4px !important;
+        }
+        
+        h3 {
+          font-size: 11px !important;
+          margin-bottom: 6px !important;
+        }
+        
+        label {
+          font-size: 8px !important;
+          margin-bottom: 2px !important;
+          font-weight: 600 !important;
+        }
+        
+        input, select, textarea {
+          font-size: 8px !important;
+          padding: 2px 4px !important;
+          min-height: 20px !important;
+          height: 20px !important;
+          border: 1px solid #d1d5db !important;
+        }
+        
+        textarea {
+          height: 30px !important;
+          resize: none !important;
+        }
+        
+        /* Checkbox styling */
+        input[type="checkbox"] {
+          width: 10px !important;
+          height: 10px !important;
+          min-height: 10px !important;
+        }
+        
+        /* Spacing adjustments */
+        .space-y-6 > * + * {
+          margin-top: 6px !important;
+        }
+        
+        .space-y-4 > * + * {
+          margin-top: 4px !important;
+        }
+        
+        .space-y-3 > * + * {
+          margin-top: 3px !important;
+        }
+        
+        .gap-6 {
+          gap: 6px !important;
+        }
+        
+        .gap-4 {
+          gap: 4px !important;
+        }
+        
+        .gap-3 {
+          gap: 3px !important;
+        }
+        
+        /* Padding adjustments */
+        .p-6 {
+          padding: 8px !important;
+        }
+        
+        .p-4 {
+          padding: 6px !important;
+        }
+        
+        .p-3 {
+          padding: 4px !important;
+        }
+        
+        /* Margin adjustments */
+        .mb-6 {
+          margin-bottom: 6px !important;
+        }
+        
+        .mb-4 {
+          margin-bottom: 4px !important;
+        }
+        
+        .mb-2 {
+          margin-bottom: 2px !important;
+        }
+        
+        /* Kitchen: Force 2-column layout */
+        .grid.grid-cols-1.gap-6.lg\\:grid-cols-2 {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: 8px !important;
+        }
+        
+        /* Prevent page breaks inside sections */
+        .rounded-lg.border-2 {
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+        
+        /* Ensure colored backgrounds print */
+        .bg-blue-50,
+        .bg-green-50,
+        .bg-purple-50,
+        .bg-orange-50,
+        .bg-yellow-50,
+        .bg-pink-50,
+        .bg-gray-50,
+        .bg-gray-100,
+        .bg-indigo-50 {
+          print-color-adjust: exact !important;
+          -webkit-print-color-adjust: exact !important;
+        }
+        
+        /* Hide buttons and interactive elements */
+        button:not(.print\\:block) {
+          display: none !important;
+        }
+        
+        /* Bedroom: 2-column layout */
+        .grid.grid-cols-1.gap-3.lg\\:grid-cols-2 {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          gap: 6px !important;
+        }
+        
+        /* Status messages and banners */
+        .border-2.border-blue-300,
+        .rounded-lg.p-4.border {
+          display: none !important;
         }
       }
     `}</style>
