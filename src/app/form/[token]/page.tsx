@@ -983,7 +983,6 @@ export default function FormPage() {
               <h1 className="text-2xl font-bold text-gray-900">Installation Checklist</h1>
               <p className="text-sm text-gray-600">Complete installation verification form</p>
             </div>
-            {/* ✅ ADD THIS BUTTON */}
             <Button onClick={handleSavePDF} variant="outline" className="flex items-center gap-2">
               <Download className="h-4 w-4" />
               Print / Save as PDF
