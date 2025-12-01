@@ -1630,7 +1630,7 @@ const handleConfirmDeleteFormDocument = async () => {
       alert("You don't have permission to create invoices.");
       return;
     }
-    router.push(`/dashboard/checklists/invoices/create?${buildCustomerQuery()}`); // ✅ CHANGED
+    router.push(`/dashboard/checklists/invoice/?${params.toString()}`)
   };
 
   const handleCreateProformaInvoice = () => {
@@ -1646,7 +1646,7 @@ const handleConfirmDeleteFormDocument = async () => {
       alert("You don't have permission to create payment terms.");
       return;
     }
-    router.push(`/dashboard/checklists/payment-terms/create?${buildCustomerQuery()}`); // ✅ CHANGED
+    router.push(`/dashboard/checklists/payment-terms/?${params.toString()}`)
   };
 
   const handleCreateKitchenChecklist = async () => {

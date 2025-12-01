@@ -2582,29 +2582,44 @@ export default function FormPage() {
           -webkit-print-color-adjust: exact;
         }
         
-        /* Hide non-printable elements */
-        .print\\:hidden,
+        /* Hide ONLY sidebar, header, and buttons */
         aside,
-        header:has(.sidebar-trigger),
+        header,
         nav,
-        .no-print {
+        button,
+        .print\\:hidden {
           display: none !important;
         }
         
-        /* Ensure main content is visible */
+        /* FORCE main content to be visible */
         main,
-        .flex.flex-1.flex-col {
+        [role="main"],
+        .flex.flex-1.flex-col,
+        form {
           display: block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          position: static !important;
           padding: 0 !important;
           margin: 0 !important;
+          width: 100% !important;
         }
         
-        /* Show the form title prominently */
-        form > h2:first-of-type {
+        /* Show the form title */
+        h2 {
           display: block !important;
+          visibility: visible !important;
           page-break-after: avoid;
-          margin-top: 0 !important;
-          padding-top: 0 !important;
+        }
+        
+        /* Show all form sections */
+        div,
+        section,
+        .rounded-lg,
+        .border-2 {
+          display: block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
         }
         
         /* Typography scaling */
@@ -2730,22 +2745,11 @@ export default function FormPage() {
           -webkit-print-color-adjust: exact !important;
         }
         
-        /* Hide buttons and interactive elements */
-        button:not(.print\\:block) {
-          display: none !important;
-        }
-        
         /* Bedroom: 2-column layout */
         .grid.grid-cols-1.gap-3.lg\\:grid-cols-2 {
           display: grid !important;
           grid-template-columns: 1fr 1fr !important;
           gap: 6px !important;
-        }
-        
-        /* Status messages and banners */
-        .border-2.border-blue-300,
-        .rounded-lg.p-4.border {
-          display: none !important;
         }
       }
     `}</style>
