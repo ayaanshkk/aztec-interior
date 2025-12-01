@@ -71,7 +71,7 @@ const WARDROBE_WIDTHS = [400, 500, 600, 800, 1000, 1200];
 export default function EditQuotePage() {
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
+  // const { toast } = useToast();
   const quoteId = params?.id as string;
 
   const [quotation, setQuotation] = useState<Quotation | null>(null);
@@ -104,11 +104,7 @@ export default function EditQuotePage() {
       setQuotation(data);
     } catch (error) {
       console.error('Error loading quotation:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load quotation',
-        variant: 'destructive',
-      });
+      alert('❌ Failed to load quotation. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -211,10 +207,8 @@ export default function EditQuotePage() {
           total: data.new_total,
         });
 
-        toast({
-          title: 'Price Matched!',
-          description: `£${data.new_amount.toFixed(2)} - ${data.matched_item?.name}`,
-        });
+        alert(`✅ Price Matched! £${data.new_amount.toFixed(2)} - ${data.matched_item?.name}`);
+
       }
     } catch (error) {
       console.error('Error matching price:', error);
@@ -278,17 +272,12 @@ export default function EditQuotePage() {
         total: newTotal,
       });
 
-      toast({
-        title: 'Success',
-        description: 'Item deleted successfully',
-      });
+      alert('✅ Item deleted successfully!');
+
     } catch (error) {
       console.error('Error deleting item:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete item',
-        variant: 'destructive',
-      });
+      alert('❌ Failed to delete item. Please try again.');
+
     }
   };
 
@@ -335,19 +324,14 @@ export default function EditQuotePage() {
         }
       );
 
-      toast({
-        title: 'Success',
-        description: 'Quotation saved successfully',
-      });
+      alert('✅ Quotation saved successfully!');
+
 
       router.back();
     } catch (error) {
       console.error('Error saving:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save quotation',
-        variant: 'destructive',
-      });
+      alert('❌ Failed to save quotation. Please try again.');
+
     } finally {
       setSaving(false);
     }
