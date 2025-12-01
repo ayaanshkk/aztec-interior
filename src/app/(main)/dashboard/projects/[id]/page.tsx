@@ -265,6 +265,7 @@ export default function ProjectDetailsPage() {
   const [generating, setGenerating] = useState(false);
   const [financialDocuments, setFinancialDocuments] = useState<FinancialDocument[]>([]);
   const [showQuoteGenerationDialog, setShowQuoteGenerationDialog] = useState(false);
+  const [formSubmissions, setFormSubmissions] = useState<any[]>([]);
   const [checklistForQuote, setChecklistForQuote] = useState<{
     type: string;
     id: number;
