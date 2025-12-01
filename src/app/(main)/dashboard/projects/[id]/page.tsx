@@ -1611,19 +1611,21 @@ export default function ProjectDetailsPage() {
       </div>
 
       {/* FINANCIAL DOCUMENTS SECTION - Only show if documents exist */}
-      {financialDocuments.length > 0 && (
-        <div className="mb-8 border-t border-gray-200 pt-8">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Financial Documents ({financialDocuments.length})
-            </h2>
+      <div className="mb-8 border-t border-gray-200 pt-8 px-8">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900">
+            Financial Documents ({financialDocuments.length})
+          </h2>
+          {financialDocuments.length > 0 && (
             <div className="text-sm text-gray-600">
               {financialDocuments.filter(d => d.type === 'quotation').length} Quotation{financialDocuments.filter(d => d.type === 'quotation').length !== 1 ? 's' : ''} • {' '}
               {financialDocuments.filter(d => d.type === 'invoice' || d.type === 'proforma').length} Invoice{financialDocuments.filter(d => d.type === 'invoice' || d.type === 'proforma').length !== 1 ? 's' : ''} • {' '}
               {financialDocuments.filter(d => d.type === 'receipt' || d.type === 'deposit' || d.type === 'final').length} Receipt{financialDocuments.filter(d => d.type === 'receipt' || d.type === 'deposit' || d.type === 'final').length !== 1 ? 's' : ''}
             </div>
-          </div>
+          )}
+        </div>
 
+        {financialDocuments.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {financialDocuments.map((doc) => (
               <div
@@ -1699,8 +1701,16 @@ export default function ProjectDetailsPage() {
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-12 text-center">
+            <DollarSign className="mx-auto mb-6 h-16 w-16 text-gray-300" />
+            <h3 className="mb-4 text-xl font-semibold text-gray-900">No Financial Documents</h3>
+            <p className="mx-auto mb-8 max-w-2xl text-gray-600">
+              Create financial documents for this project using the Create dropdown above.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* ADD TASK DIALOG */}
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
