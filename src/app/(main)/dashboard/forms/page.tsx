@@ -147,13 +147,13 @@ const FormsAndChecklistsPage = () => {
         {
           label: "Remedial Action Checklist",
           icon: CheckSquare,
-          route: "/dashboard/checklists/remedial",
+          route: "/dashboard/remedial",
           type: "remedial" as const,
         },
         {
           label: "Internal Checklist",
           icon: CheckSquare,
-          route: "/dashboard/checklists/internal",
+          route: "/dashboard/internal",
           type: "general" as const,
         },
         {
@@ -174,10 +174,10 @@ const FormsAndChecklistsPage = () => {
         {
           label: "Quotation",
           icon: FileText,
-          route: "/dashboard/checklists/quotes/create",
+          route: "/dashboard/quotes/create",
           type: "quotation" as const,
         },
-        { label: "Invoice", icon: FileText, route: "/dashboard/checklists/invoice", type: "invoice" as const },
+        { label: "Invoice", icon: FileText, route: "/dashboard/invoice", type: "invoice" as const },
         {
           label: "Proforma Invoice",
           icon: FileText,
@@ -193,19 +193,19 @@ const FormsAndChecklistsPage = () => {
         {
           label: "Receipt",
           icon: Receipt,
-          route: "/dashboard/checklists/receipt",
+          route: "/dashboard/receipt",
           type: "receipt" as const,
         },
         {
           label: "Deposit Receipt",
           icon: Receipt,
-          route: "/dashboard/checklists/receipt",
+          route: "/dashboard/receipt",
           type: "deposit" as const,
         },
         {
           label: "Final Receipt",
           icon: Receipt,
-          route: "/dashboard/checklists/receipt",
+          route: "/dashboard/receipt",
           type: "final" as const,
         },
       ] as FormItem[],
