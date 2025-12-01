@@ -106,12 +106,7 @@ export default function CreateQuotePage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null);
-
-  // Approval workflow state
-  // const [submissionId, setSubmissionId] = useState<number | null>(null);
-  // const [approvalStatus, setApprovalStatus] = useState<string>("pending");
-  // const [rejectionReason, setRejectionReason] = useState<string>("");
-  // const [statusMessage, setStatusMessage] = useState<string>("");
+  const [statusMessage, setStatusMessage] = useState<string>("");
 
   useEffect(() => {
     const customerIdParam = searchParams.get("customerId");
