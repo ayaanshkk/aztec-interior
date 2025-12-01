@@ -59,8 +59,6 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-// ✅ ADD THIS - Toast hook
-import { useToast } from "@/components/ui/use-toast";
 
 // ... (keeping all your existing interfaces the same)
 interface Project {
@@ -1136,20 +1134,12 @@ const handleConfirmDeleteFormDocument = async () => {
 
       console.log('✅ Quotation deleted successfully');
       
-      // Reload the data to refresh the list
-      await loadCustomerData(); // or loadProjectData() for project page
+      await loadProjectData(); // or loadCustomerData() for customer page
       
-      toast({
-        title: 'Success',
-        description: 'Quotation deleted successfully',
-      });
+      alert('✅ Quotation deleted successfully!'); // ← Simple alert
     } catch (error) {
       console.error('❌ Error deleting quotation:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete quotation',
-        variant: 'destructive',
-      });
+      alert('❌ Failed to delete quotation. Please try again.'); // ← Simple alert
     } finally {
       setDeletingQuoteId(null);
       setDeleteDialogOpen(false);

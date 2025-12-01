@@ -52,7 +52,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/use-toast";
+// import { useToast } from "@/components/ui/use-toast";
 
 
 interface Project {
@@ -726,20 +726,12 @@ export default function ProjectDetailsPage() {
 
       console.log('✅ Quotation deleted successfully');
       
-      // Reload the project data to refresh the list
-      await loadProjectData();
+      await loadProjectData(); // or loadCustomerData() for customer page
       
-      toast({
-        title: 'Success',
-        description: 'Quotation deleted successfully',
-      });
+      alert('✅ Quotation deleted successfully!'); // ← Simple alert
     } catch (error) {
       console.error('❌ Error deleting quotation:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete quotation',
-        variant: 'destructive',
-      });
+      alert('❌ Failed to delete quotation. Please try again.'); // ← Simple alert
     } finally {
       setDeletingQuoteId(null);
       setDeleteDialogOpen(false);
