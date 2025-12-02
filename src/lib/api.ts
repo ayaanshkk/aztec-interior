@@ -1,21 +1,27 @@
-// 1. CENTRALIZED BASE CONFIGURATION
-const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://aztec-interior.onrender.com";
+// 1. CENTRALIZED BASE CONFIGURATION (LOCALHOST READY)
 
-// Auth uses Next.js API routes
+// Pick basePath normally
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
+// 🚀 NEW: Localhost backend for development
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+
+// Auth uses Next.js API routes (your frontend)
 const AUTH_API_ROOT = `${BASE_PATH}/api`;
 
-// Data uses external backend
+// Data uses backend API (now on localhost)
 const DATA_API_ROOT = BACKEND_URL;
 
-// 🔍 DEBUG: Log the configuration
-if (typeof window !== 'undefined') {
-  console.log('🌐 API Configuration:', {
+// 🔍 DEBUG LOG
+if (typeof window !== "undefined") {
+  console.log("🌐 API Configuration:", {
     BASE_PATH,
     AUTH_API_ROOT,
     DATA_API_ROOT,
   });
 }
+
 
 // ✅ Helper function to redirect to login with basePath support
 function redirectToLogin() {
