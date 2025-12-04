@@ -426,36 +426,13 @@ export default function CustomerDetailsPage() {
     }
 
     try {
-      // ✅ PARALLEL FETCH - All requests happen at once
-      const [
-        customerRes, 
-        drawingsRes, 
-        formDocsRes, 
-        quotationsRes,
-        invoicesRes,
-        receiptsRes,
-        paymentTermsRes
-      ] = await Promise.all([
-        fetch(`https://aztec-interior.onrender.com/customers/${id}`, { headers }),
-        fetch(`https://aztec-interior.onrender.com/files/drawings?customer_id=${id}`, { headers })
-          .catch(() => null),
-        fetch(`https://aztec-interior.onrender.com/files/forms?customer_id=${id}`, { headers })
-          .catch(() => null),
-        fetch(`https://aztec-interior.onrender.com/quotations?customer_id=${id}`, { headers })
-          .catch(() => null),
-        fetch(`https://aztec-interior.onrender.com/invoices?customer_id=${id}`, { headers })
-          .catch(() => null),
-        fetch(`https://aztec-interior.onrender.com/receipts?customer_id=${id}`, { headers })
-          .catch(() => null),
-        fetch(`https://aztec-interior.onrender.com/payment-terms?customer_id=${id}`, { headers })
-          .catch(() => null),
-      ]);
+      // ✅ Fetch customer data first
+      const customerRes = await fetch(`https://aztec-interior.onrender.com/customers/${id}`, { headers });
 
       if (!customerRes.ok) {
         throw new Error("Failed to load customer data");
       }
 
-      // Process customer data
       const customerData = await customerRes.json();
       
       // Normalize postcode
@@ -480,120 +457,124 @@ export default function CustomerDetailsPage() {
 
       setCustomer(normalizedCustomer);
 
-      // ✅ Process drawings
-      if (drawingsRes && drawingsRes.ok) {
-        const contentType = drawingsRes.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const drawingsData = await drawingsRes.json();
-          if (Array.isArray(drawingsData)) {
-            const unassignedDrawings = drawingsData.filter(doc => !doc.project_id);
-            setDrawingDocuments(unassignedDrawings);
+      // ✅ Helper function to safely fetch data
+      const fetchWithFallback = async (url: string) => {
+        try {
+          const response = await fetch(url, { headers });
+          if (!response.ok) {
+            console.warn(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+            return null;
           }
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            return await response.json();
+          }
+          console.warn(`Non-JSON response from ${url}`);
+          return null;
+        } catch (error) {
+          console.warn(`Error fetching ${url}:`, error);
+          return null;
         }
+      };
+
+      // ✅ PARALLEL FETCH with proper error handling
+      const [
+        drawingsData,
+        formDocsData,
+        quotationsData,
+        invoicesData,
+        receiptsData,
+        paymentTermsData
+      ] = await Promise.all([
+        fetchWithFallback(`https://aztec-interior.onrender.com/files/drawings?customer_id=${id}`),
+        fetchWithFallback(`https://aztec-interior.onrender.com/files/forms?customer_id=${id}`),
+        fetchWithFallback(`https://aztec-interior.onrender.com/quotations?customer_id=${id}`),
+        fetchWithFallback(`https://aztec-interior.onrender.com/invoices?customer_id=${id}`),
+        fetchWithFallback(`https://aztec-interior.onrender.com/receipts?customer_id=${id}`),
+        fetchWithFallback(`https://aztec-interior.onrender.com/payment-terms?customer_id=${id}`)
+      ]);
+
+      // ✅ Process drawings
+      if (drawingsData && Array.isArray(drawingsData)) {
+        const unassignedDrawings = drawingsData.filter(doc => !doc.project_id);
+        setDrawingDocuments(unassignedDrawings);
+      } else {
+        setDrawingDocuments([]);
       }
 
       // ✅ Process form documents
-      if (formDocsRes && formDocsRes.ok) {
-        const contentType = formDocsRes.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const formDocsData = await formDocsRes.json();
-          if (Array.isArray(formDocsData)) {
-            const unassignedForms = formDocsData.filter(form => !form.project_id);
-            setFormDocuments(unassignedForms);
-          }
-        }
+      if (formDocsData && Array.isArray(formDocsData)) {
+        const unassignedForms = formDocsData.filter(form => !form.project_id);
+        setFormDocuments(unassignedForms);
+      } else {
+        setFormDocuments([]);
       }
 
       // ✅ Process and combine all financial documents
       const allFinancialDocs: FinancialDocument[] = [];
 
       // Quotations
-      if (quotationsRes && quotationsRes.ok) {
-        const contentType = quotationsRes.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const quotationsData = await quotationsRes.json();
-          if (Array.isArray(quotationsData)) {
-            // ✅ SHOW ALL QUOTATIONS (don't filter by project_id)
-            quotationsData.forEach((quote: Quotation) => {
-              allFinancialDocs.push({
-                id: quote.id,
-                type: 'quotation',
-                title: `Quotation ${quote.reference_number}`,
-                reference: quote.reference_number,
-                total: quote.total,
-                status: quote.status,
-                created_at: quote.created_at,
-                project_id: quote.project_id,
-              });
-            });
-          }
-        }
+      if (quotationsData && Array.isArray(quotationsData)) {
+        quotationsData.forEach((quote: Quotation) => {
+          allFinancialDocs.push({
+            id: quote.id,
+            type: 'quotation',
+            title: `Quotation ${quote.reference_number}`,
+            reference: quote.reference_number,
+            total: quote.total,
+            status: quote.status,
+            created_at: quote.created_at,
+            project_id: quote.project_id,
+          });
+        });
       }
 
       // Invoices
-      if (invoicesRes && invoicesRes.ok) {
-        const contentType = invoicesRes.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const invoicesData = await invoicesRes.json();
-          if (Array.isArray(invoicesData)) {
-            invoicesData.forEach((invoice: Invoice) => {
-              allFinancialDocs.push({
-                id: invoice.id,
-                type: invoice.invoice_number?.toLowerCase().includes('proforma') ? 'proforma' : 'invoice',
-                title: invoice.invoice_number || `Invoice #${invoice.id}`,
-                reference: invoice.invoice_number,
-                total: invoice.total,
-                status: invoice.status,
-                created_at: invoice.created_at,
-                project_id: invoice.project_id,
-              });
-            });
-          }
-        }
+      if (invoicesData && Array.isArray(invoicesData)) {
+        invoicesData.forEach((invoice: Invoice) => {
+          allFinancialDocs.push({
+            id: invoice.id,
+            type: invoice.invoice_number?.toLowerCase().includes('proforma') ? 'proforma' : 'invoice',
+            title: invoice.invoice_number || `Invoice #${invoice.id}`,
+            reference: invoice.invoice_number,
+            total: invoice.total,
+            status: invoice.status,
+            created_at: invoice.created_at,
+            project_id: invoice.project_id,
+          });
+        });
       }
 
       // Receipts
-      if (receiptsRes && receiptsRes.ok) {
-        const contentType = receiptsRes.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const receiptsData = await receiptsRes.json();
-          if (Array.isArray(receiptsData)) {
-            receiptsData.forEach((receipt: Receipt) => {
-              const receiptType = receipt.receipt_type?.toLowerCase() || 'receipt';
-              allFinancialDocs.push({
-                id: receipt.id,
-                type: receiptType.includes('deposit') ? 'deposit' : receiptType.includes('final') ? 'final' : 'receipt',
-                title: `${receipt.receipt_type || 'Receipt'} - ${formatDate(receipt.payment_date)}`,
-                reference: `#${receipt.id}`,
-                amount_paid: receipt.amount_paid,
-                balance: receipt.balance_to_pay,
-                created_at: receipt.created_at,
-                project_id: receipt.project_id,
-              });
-            });
-          }
-        }
+      if (receiptsData && Array.isArray(receiptsData)) {
+        receiptsData.forEach((receipt: Receipt) => {
+          const receiptType = receipt.receipt_type?.toLowerCase() || 'receipt';
+          allFinancialDocs.push({
+            id: receipt.id,
+            type: receiptType.includes('deposit') ? 'deposit' : receiptType.includes('final') ? 'final' : 'receipt',
+            title: `${receipt.receipt_type || 'Receipt'} - ${formatDate(receipt.payment_date)}`,
+            reference: `#${receipt.id}`,
+            amount_paid: receipt.amount_paid,
+            balance: receipt.balance_to_pay,
+            created_at: receipt.created_at,
+            project_id: receipt.project_id,
+          });
+        });
       }
 
       // Payment Terms
-      if (paymentTermsRes && paymentTermsRes.ok) {
-        const contentType = paymentTermsRes.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const paymentTermsData = await paymentTermsRes.json();
-          if (Array.isArray(paymentTermsData)) {
-            paymentTermsData.forEach((terms: PaymentTerms) => {
-              allFinancialDocs.push({
-                id: terms.id,
-                type: 'payment_terms',
-                title: terms.terms_title || 'Payment Terms',
-                reference: `#${terms.id}`,
-                total: terms.total_amount,
-                created_at: terms.created_at,
-                project_id: terms.project_id,
-              });
-            });
-          }
-        }
+      if (paymentTermsData && Array.isArray(paymentTermsData)) {
+        paymentTermsData.forEach((terms: PaymentTerms) => {
+          allFinancialDocs.push({
+            id: terms.id,
+            type: 'payment_terms',
+            title: terms.terms_title || 'Payment Terms',
+            reference: `#${terms.id}`,
+            total: terms.total_amount,
+            created_at: terms.created_at,
+            project_id: terms.project_id,
+          });
+        });
       }
 
       // Sort by created date (newest first)
