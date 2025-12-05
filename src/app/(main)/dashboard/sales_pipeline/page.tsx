@@ -40,9 +40,10 @@ import {
   Lock,
   FolderOpen,
   X,
+  Clock,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { format, addDays, isWithinInterval } from "date-fns";
+import { format, addDays, isWithinInterval, differenceInDays } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { fetchWithAuth } from "@/lib/api";
 import { useRouter } from "next/navigation";
@@ -124,6 +125,18 @@ const getProjectTypeColor = (jobType: string | undefined) => {
   const firstType = jobType.split(",")[0].trim();
   
   return projectTypeColors[firstType as keyof typeof projectTypeColors] || projectTypeColors.Other;
+};
+
+// Helper function to calculate days in stage
+const calculateDaysInStage = (createdAt: string | null | undefined): number => {
+  if (!createdAt) return 0;
+  try {
+    const createdDate = new Date(createdAt);
+    const today = new Date();
+    return differenceInDays(today, createdDate);
+  } catch {
+    return 0;
+  }
 };
 
 type UserRole = "Manager" | "HR" | "Sales" | "Production" | "Staff";
@@ -1372,6 +1385,9 @@ export default function EnhancedPipelinePage() {
 
                               // Get color scheme based on project type
                               const colorScheme = getProjectTypeColor(feature.jobType);
+                              
+                              // Calculate days in stage
+                              const daysInStage = calculateDaysInStage(feature.customer.created_at);
 
                               return (
                                 <KanbanCard
@@ -1379,7 +1395,7 @@ export default function EnhancedPipelinePage() {
                                   id={feature.id}
                                   key={feature.id}
                                   name={feature.name}
-                                  className={`rounded-md border-2 ${colorScheme.border} ${colorScheme.bg} shadow-sm transition-all hover:shadow-md ${permissions.canDragDrop && isEditable ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-90"} p-3 overflow-hidden relative`}
+                                  className={`rounded-md border-2 ${colorScheme.border} ${colorScheme.bg} shadow-sm transition-all hover:shadow-md ${permissions.canDragDrop && isEditable ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-90"} p-3 overflow-hidden relative min-h-fit`}
                                   style={{ maxWidth: '100%', wordBreak: 'break-word' }}
                                 >
                                   <div className="space-y-2.5">
@@ -1417,6 +1433,22 @@ export default function EnhancedPipelinePage() {
                                       <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-600">
                                         <span className="font-medium">{feature.reference}</span>
                                       </div>
+
+                                      {/* Date Added and Days in Stage */}
+                                      {feature.customer.created_at && (
+                                        <div className="mt-1.5 space-y-0.5">
+                                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                                            <Calendar className="h-3 w-3 flex-shrink-0" />
+                                            <span>Added: {formatDate(feature.customer.created_at)}</span>
+                                          </div>
+                                          <div className="flex items-center gap-1.5 text-xs">
+                                            <Clock className="h-3 w-3 flex-shrink-0 text-orange-500" />
+                                            <span className="font-medium text-orange-600">
+                                              {daysInStage} {daysInStage === 1 ? 'day' : 'days'} in {feature.stage}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
 
                                     {/* Project Name (if it's a project item) */}
@@ -1596,6 +1628,7 @@ export default function EnhancedPipelinePage() {
             {/* Table Rows */}
             {filteredListItems.map((item) => {
               const isEditable = canUserEditItem(item);
+              const daysInStage = calculateDaysInStage(item.customer.created_at);
 
               return (
                 <Card
@@ -1623,6 +1656,13 @@ export default function EnhancedPipelinePage() {
                       )}
                       {item.customer.address && (
                         <div className="text-muted-foreground truncate text-xs">{item.customer.address}</div>
+                      )}
+                      {/* Days in Stage in List View */}
+                      {item.customer.created_at && (
+                        <div className="mt-1 flex items-center gap-1 text-xs text-orange-600">
+                          <Clock className="h-3 w-3" />
+                          <span className="font-medium">{daysInStage} {daysInStage === 1 ? 'day' : 'days'} in {item.stage}</span>
+                        </div>
                       )}
                     </div>
                     <div>{item.jobType && <Badge variant="outline">{item.jobType}</Badge>}</div>
@@ -1677,13 +1717,6 @@ export default function EnhancedPipelinePage() {
                                 Schedule
                               </DropdownMenuItem>
                             )}
-                          
-                          {/* {(item.type === "job" || item.type === "project") && (
-                            <DropdownMenuItem onClick={() => handleViewDocuments(item.id)}>
-                              <File className="mr-2 h-4 w-4" />
-                              View Documents
-                            </DropdownMenuItem>
-                          )} */}
                           
                           {/* NEW: Change Stage submenu - shows all available stages */}
                           {permissions.canEdit && isEditable && (
