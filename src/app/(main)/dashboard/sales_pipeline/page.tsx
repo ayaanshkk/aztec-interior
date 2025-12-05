@@ -30,7 +30,6 @@ import {
   Users,
   FileText,
   DollarSign,
-  Plus,
   UserPlus,
   Phone,
   MapPin,
@@ -47,6 +46,7 @@ import { format, addDays, isWithinInterval, differenceInDays } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { fetchWithAuth } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { CreateCustomerModal } from "@/components/CreateCustomerModal";
 
 // --- START OF STAGE AND ROLE DEFINITIONS ---
 
@@ -329,6 +329,9 @@ export default function EnhancedPipelinePage() {
     itemId: null,
   });
   const prevFeaturesRef = useRef<any[]>([]);
+  
+  // State for Create Customer Modal
+  const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] = useState(false);
   
   // Get user role and permissions
   const userRole = (user?.role || "Staff") as UserRole;
@@ -1107,14 +1110,6 @@ export default function EnhancedPipelinePage() {
     router.push(`/dashboard/customers/${cleanId}`);
   };
 
-  const handleCreateJob = () => {
-    if (!permissions.canCreate) {
-      alert("You don't have permission to create new jobs.");
-      return;
-    }
-    router.push("/dashboard/jobs");
-  };
-
   const handleCreateCustomer = () => {
     if (!permissions.canCreate) {
       alert("You don't have permission to create new customers.");
@@ -1234,9 +1229,9 @@ export default function EnhancedPipelinePage() {
           </Badge>
 
           {permissions.canCreate && (
-            <Button variant="outline" size="sm" onClick={handleCreateJob}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Job
+            <Button variant="outline" size="sm" onClick={() => setIsCreateCustomerModalOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              New Customer
             </Button>
           )}
         </div>
@@ -1859,6 +1854,16 @@ export default function EnhancedPipelinePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Create Customer Modal */}
+      <CreateCustomerModal
+        isOpen={isCreateCustomerModalOpen}
+        onClose={() => setIsCreateCustomerModalOpen(false)}
+        onCustomerCreated={async () => {
+          // Refetch pipeline data after customer is created
+          await refetchPipelineData();
+        }}
+      />
     </div>
   );
 }
