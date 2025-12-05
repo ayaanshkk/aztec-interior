@@ -46,7 +46,7 @@ import { format, addDays, isWithinInterval, differenceInDays } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { fetchWithAuth } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { CreateCustomerModal } from "@/components/CreateCustomerModal";
+import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 
 // --- START OF STAGE AND ROLE DEFINITIONS ---
 
