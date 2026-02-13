@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Plus, Trash2, FileText, Download, CheckCircle, AlertCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
+import { BACKEND_URL } from '@/lib/api';
 interface QuoteItem {
   id: string;
   item: string;
@@ -228,7 +229,7 @@ export default function CreateQuotePage() {
         customer_id: customerId,
       };
 
-      const response = await fetch("https://aztec-interior.onrender.com/quotations", {
+      const response = await fetch(`${BACKEND_URL}/quotations`, {
         method: "POST",
         headers: headers,
         body: JSON.stringify(formDataToSend),
@@ -328,7 +329,7 @@ export default function CreateQuotePage() {
 
       console.log("Sending quote data:", quoteData);
 
-      const response = await fetch("https://aztec-interior.onrender.com/quotations/generate-quote", {
+      const response = await fetch(`${BACKEND_URL}/quotations/generate-quote`, {
         method: "POST",
         headers: headers,
         body: JSON.stringify(quoteData),
@@ -392,7 +393,7 @@ export default function CreateQuotePage() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${savedQuoteId}/pdf`, {
+      const response = await fetch(`${BACKEND_URL}/quotations/${savedQuoteId}/pdf`, {
         method: "GET",
         headers: headers,
       });

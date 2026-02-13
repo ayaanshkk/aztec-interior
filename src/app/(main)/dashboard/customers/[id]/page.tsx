@@ -57,6 +57,7 @@ import {
   Loader2, // ✅ ADD THIS - for loading spinner
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { BACKEND_URL } from '@/lib/api';
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -427,7 +428,7 @@ export default function CustomerDetailsPage() {
 
     try {
       // ✅ Fetch customer data first
-      const customerRes = await fetch(`https://aztec-interior.onrender.com/customers/${id}`, { headers });
+      const customerRes = await fetch(`${BACKEND_URL}/customers/${id}`, { headers });
 
       if (!customerRes.ok) {
         throw new Error("Failed to load customer data");
@@ -478,6 +479,10 @@ export default function CustomerDetailsPage() {
       };
 
       // ✅ PARALLEL FETCH with proper error handling
+      // 🔍 DIAGNOSTIC: Log the fetch URLs
+      console.log('🔍 DIAGNOSTIC - Fetching data for customer:', id);
+      console.log('🔍 DIAGNOSTIC - Quotations URL:', `${BACKEND_URL}/quotations?customer_id=${id}`);
+      
       const [
         drawingsData,
         formDocsData,
@@ -486,13 +491,24 @@ export default function CustomerDetailsPage() {
         receiptsData,
         paymentTermsData
       ] = await Promise.all([
-        fetchWithFallback(`https://aztec-interior.onrender.com/files/drawings?customer_id=${id}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/files/forms?customer_id=${id}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/quotations?customer_id=${id}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/invoices?customer_id=${id}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/receipts?customer_id=${id}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/payment-terms?customer_id=${id}`)
+        fetchWithFallback(`${BACKEND_URL}/files/drawings?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/files/forms?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/quotations?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/invoices?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/receipts?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/payment-terms?customer_id=${id}`)
       ]);
+      
+      // 🔍 DIAGNOSTIC: Log what the backend returned
+      console.log('🔍 DIAGNOSTIC - Backend returned quotations:', {
+        count: quotationsData?.length || 0,
+        data: quotationsData?.map((q: any) => ({
+          id: q.id,
+          reference: q.reference_number,
+          customer_id: q.customer_id,
+          project_id: q.project_id
+        }))
+      });
 
       // ✅ Process drawings
       if (drawingsData && Array.isArray(drawingsData)) {
@@ -514,8 +530,19 @@ export default function CustomerDetailsPage() {
       const allFinancialDocs: FinancialDocument[] = [];
 
       // Quotations
+      console.log('🔍 DIAGNOSTIC - Processing quotations:', {
+        hasData: !!quotationsData,
+        isArray: Array.isArray(quotationsData),
+        count: quotationsData?.length || 0
+      });
       if (quotationsData && Array.isArray(quotationsData)) {
         quotationsData.forEach((quote: Quotation) => {
+          console.log('📦 DIAGNOSTIC - Adding quotation to financial docs:', {
+            id: quote.id,
+            reference: quote.reference_number,
+            project_id: quote.project_id,
+            total: quote.total
+          });
           allFinancialDocs.push({
             id: quote.id,
             type: 'quotation',
@@ -608,7 +635,7 @@ const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) 
       formData.append("file", file);
       formData.append("customer_id", id);
 
-      const response = await fetch("https://aztec-interior.onrender.com/files/forms", {
+      const response = await fetch(`${BACKEND_URL}/files/forms`, {
         method: "POST",
         headers: headers,
         body: formData,
@@ -686,9 +713,9 @@ const handleDrop = async (e: React.DragEvent, projectId: string) => {
     let endpoint = "";
     
     if (draggedItem.type === "form") {
-      endpoint = `https://aztec-interior.onrender.com/form-submissions/${draggedItem.id}`;
+      endpoint = `${BACKEND_URL}/form-submissions/${draggedItem.id}`;
     } else if (draggedItem.type === "drawing") {
-      endpoint = `https://aztec-interior.onrender.com/files/drawings/${draggedItem.id}`;
+      endpoint = `${BACKEND_URL}/files/drawings/${draggedItem.id}`;
     }
 
     const response = await fetch(endpoint, {
@@ -731,7 +758,6 @@ const handleDrop = async (e: React.DragEvent, projectId: string) => {
 };
 
 const handleViewFormDocument = (doc: FormDocument) => {
-  const BACKEND_URL = "https://aztec-interior.onrender.com";
   let viewUrl = doc.url;
 
   if (viewUrl && viewUrl.startsWith('http')) {
@@ -765,7 +791,7 @@ const handleConfirmDeleteFormDocument = async () => {
 
   try {
     const res = await fetch(
-      `https://aztec-interior.onrender.com/files/forms/${formDocToDelete.id}`,
+      `${BACKEND_URL}/files/forms/${formDocToDelete.id}`,
       { method: "DELETE", headers }
     );
 
@@ -818,7 +844,7 @@ const handleConfirmDeleteFormDocument = async () => {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     const deletePromises = Array.from(selectedDrawings).map(drawingId =>
-      fetch(`https://aztec-interior.onrender.com/files/drawings/${drawingId}`, {
+      fetch(`${BACKEND_URL}/files/drawings/${drawingId}`, {
         method: "DELETE",
         headers
       })
@@ -882,7 +908,7 @@ const handleConfirmDeleteFormDocument = async () => {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     const deletePromises = Array.from(selectedFormDocs).map(docId =>
-      fetch(`https://aztec-interior.onrender.com/files/forms/${docId}`, {
+      fetch(`${BACKEND_URL}/files/forms/${docId}`, {
         method: "DELETE",
         headers
       })
@@ -937,7 +963,7 @@ const handleConfirmDeleteFormDocument = async () => {
           formData.append("project_id", selectedProjectForUpload);
         }
 
-        const response = await fetch("https://aztec-interior.onrender.com/files/drawings", {
+        const response = await fetch(`${BACKEND_URL}/files/drawings`, {
           method: "POST",
           headers: headers,
           body: formData,
@@ -993,7 +1019,6 @@ const handleConfirmDeleteFormDocument = async () => {
   };
 
   const handleViewDrawing = (doc: DrawingDocument) => {
-    const BACKEND_URL = "https://aztec-interior.onrender.com";
     let viewUrl = doc.url;
 
     if (viewUrl && viewUrl.startsWith('http')) {
@@ -1028,7 +1053,7 @@ const handleConfirmDeleteFormDocument = async () => {
 
     try {
       const res = await fetch(
-        `https://aztec-interior.onrender.com/files/drawings/${drawingToDelete.id}`,
+        `${BACKEND_URL}/files/drawings/${drawingToDelete.id}`,
         { method: "DELETE", headers }
       );
 
@@ -1098,8 +1123,27 @@ const handleConfirmDeleteFormDocument = async () => {
     
     try {
       const token = localStorage.getItem('auth_token');
+      
+      // 🔍 DIAGNOSTIC: Log the deletion request details
+      console.log('🔍 DIAGNOSTIC - Delete Request:', {
+        customerId: id,
+        quoteId: quoteId,
+        url: `${BACKEND_URL}/quotations/${quoteId}`,
+        timestamp: new Date().toISOString()
+      });
+      
+      // 🔍 DIAGNOSTIC: Log current financial documents before deletion
+      console.log('🔍 DIAGNOSTIC - Financial docs BEFORE deletion:', {
+        totalDocs: financialDocuments.length,
+        quotations: financialDocuments.filter(d => d.type === 'quotation').map(d => ({
+          id: d.id,
+          reference: d.reference,
+          customer_id: d.customer_id
+        }))
+      });
+      
       const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}`,
+        `${BACKEND_URL}/quotations/${quoteId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1110,12 +1154,31 @@ const handleConfirmDeleteFormDocument = async () => {
       );
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('🔍 DIAGNOSTIC - Delete failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorBody: errorText
+        });
         throw new Error('Failed to delete quotation');
       }
 
       console.log('✅ Quotation deleted successfully');
       
-      await loadCustomerData(); 
+      // 🔍 DIAGNOSTIC: Log before reloading data
+      console.log('🔍 DIAGNOSTIC - About to reload customer data for customer:', id);
+      
+      await loadCustomerData();
+      
+      // 🔍 DIAGNOSTIC: Log financial documents after reload
+      console.log('🔍 DIAGNOSTIC - Financial docs AFTER reload:', {
+        totalDocs: financialDocuments.length,
+        quotations: financialDocuments.filter(d => d.type === 'quotation').map(d => ({
+          id: d.id,
+          reference: d.reference,
+          customer_id: d.customer_id
+        }))
+      });
       
       alert('✅ Quotation deleted successfully!'); // ← Simple alert
     } catch (error) {
@@ -1163,7 +1226,7 @@ const handleConfirmDeleteFormDocument = async () => {
       >
         <div className="flex items-start justify-between">
           <div className="flex flex-1 items-start space-x-4">
-            <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
+            <div className="rounded-xl bg-linear-to-br from-gray-50 to-gray-100 p-3">
               {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
             </div>
             <div className="min-w-0 flex-1">
@@ -1264,7 +1327,7 @@ const handleConfirmDeleteFormDocument = async () => {
     };
 
     try {
-      const response = await fetch(`https://aztec-interior.onrender.com/projects/${selectedProject.id}`, {
+      const response = await fetch(`${BACKEND_URL}/projects/${selectedProject.id}`, {
         method: "PUT",
         headers: headers,
         body: JSON.stringify(dataToSave),
@@ -1339,7 +1402,7 @@ const handleConfirmDeleteFormDocument = async () => {
 
     try {
       const response = await fetch(
-        `https://aztec-interior.onrender.com/form-submissions/${selectedForm.id}`,
+        `${BACKEND_URL}/form-submissions/${selectedForm.id}`,
         {
           method: "PUT",
           headers: {
@@ -1418,7 +1481,7 @@ const handleConfirmDeleteFormDocument = async () => {
 
     setGenerating(true);
     try {
-      const response = await fetch(`https://aztec-interior.onrender.com/customers/${id}/generate-form-link`, {
+      const response = await fetch(`${BACKEND_URL}/customers/${id}/generate-form-link`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1504,7 +1567,7 @@ const handleConfirmDeleteFormDocument = async () => {
       console.log("🔄 Generating quote from checklist:", checklistForQuote);
       
       const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${checklistForQuote.id}`,
+        `${BACKEND_URL}/quotations/generate-from-checklist/${checklistForQuote.id}`,
         {
           method: "POST",
           headers: {
@@ -1698,7 +1761,7 @@ const handleConfirmDeleteFormDocument = async () => {
 
     setGenerating(true);
     try {
-      const response = await fetch(`https://aztec-interior.onrender.com/customers/${id}/generate-form-link`, {
+      const response = await fetch(`${BACKEND_URL}/customers/${id}/generate-form-link`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1737,7 +1800,7 @@ const handleConfirmDeleteFormDocument = async () => {
 
     setGenerating(true);
     try {
-      const response = await fetch(`https://aztec-interior.onrender.com/customers/${id}/generate-form-link`, {
+      const response = await fetch(`${BACKEND_URL}/customers/${id}/generate-form-link`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1776,7 +1839,16 @@ const handleConfirmDeleteFormDocument = async () => {
   };
 
   const handleViewFinancialDoc = (doc: FinancialDocument) => {
+    console.log('🔍 DIAGNOSTIC - handleViewFinancialDoc called with:', {
+      type: doc.type,
+      id: doc.id,
+      title: doc.title
+    });
     switch (doc.type) {
+      case "quotation":
+        console.log('✅ DIAGNOSTIC - Quotation case matched, navigating to:', `/dashboard/quotes/${doc.id}`);
+        router.push(`/dashboard/quotes/${doc.id}`);
+        break;
       case "invoice":
         router.push(`/dashboard/invoices/${doc.id}`);
         break;
@@ -1792,6 +1864,7 @@ const handleConfirmDeleteFormDocument = async () => {
         router.push(`/dashboard/payment-terms/${doc.id}`);
         break;
       default:
+        console.log('❌ DIAGNOSTIC - No case for document type:', doc.type);
         alert("Viewing not yet implemented for this document type");
     }
   };
@@ -2265,7 +2338,7 @@ const handleConfirmDeleteFormDocument = async () => {
       >
         <div className="flex items-start justify-between">
           <div className="flex flex-1 items-start space-x-4">
-            <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-3">
+            <div className="rounded-xl bg-linear-to-br from-blue-50 to-indigo-50 p-3">
               {FINANCIAL_DOCUMENT_ICONS[doc.type] || <FileText className="h-5 w-5 text-gray-600" />}
             </div>
             <div className="min-w-0 flex-1">
@@ -2309,7 +2382,7 @@ const handleConfirmDeleteFormDocument = async () => {
     <div key={doc.id} className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
       <div className="flex items-start justify-between">
         <div className="flex flex-1 items-start space-x-4">
-          <div className="rounded-xl bg-gradient-to-br from-green-50 to-blue-50 p-3">
+          <div className="rounded-xl bg-linear-to-br from-green-50 to-blue-50 p-3">
             {FORM_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
           </div>
           <div className="min-w-0 flex-1">
@@ -2359,7 +2432,7 @@ const handleConfirmDeleteFormDocument = async () => {
     };
 
     try {
-      const response = await fetch(`https://aztec-interior.onrender.com/projects/${projectToDelete.id}`, {
+      const response = await fetch(`${BACKEND_URL}/projects/${projectToDelete.id}`, {
         method: "DELETE",
         headers: headers,
       });
@@ -2393,7 +2466,7 @@ const handleConfirmDeleteFormDocument = async () => {
         return;
       }
 
-      const response = await fetch(`https://aztec-interior.onrender.com/form-submissions/${formToDelete.id}`, {
+      const response = await fetch(`${BACKEND_URL}/form-submissions/${formToDelete.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -2752,7 +2825,7 @@ const handleConfirmDeleteFormDocument = async () => {
                 .map((project) => (
                   <div
                     key={project.id}
-                    className={`rounded-lg border bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
+                    className={`rounded-lg border bg-linear-to-br from-blue-50/50 to-indigo-50/30 p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
                       dragOverProject === project.id ? 'ring-2 ring-blue-500 bg-blue-100/50' : ''
                     }`}
                     onDragOver={(e) => handleDragOver(e, project.id)}
@@ -2793,7 +2866,7 @@ const handleConfirmDeleteFormDocument = async () => {
                           <p className="mt-2 text-xs text-blue-600 font-medium">Drop here to assign</p>
                         )}
                       </div>
-                      <div className="ml-4 flex flex-shrink-0 flex-col space-y-2">
+                      <div className="ml-4 flex shrink-0 flex-col space-y-2">
                         {canManageProjects() && (
                           <>
                             <Button
@@ -2923,7 +2996,7 @@ const handleConfirmDeleteFormDocument = async () => {
                           </div>
                         )}
                         <div className="flex flex-1 items-start space-x-4">
-                          <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
+                          <div className="rounded-xl bg-linear-to-br from-gray-50 to-gray-100 p-3">
                             {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
                           </div>
                           <div className="min-w-0 flex-1">
@@ -3041,7 +3114,7 @@ const handleConfirmDeleteFormDocument = async () => {
                             />
                           )}
                           <div className="flex flex-1 items-start space-x-4">
-                            <div className="rounded-xl bg-gradient-to-br from-green-50 to-blue-50 p-3">
+                            <div className="rounded-xl bg-linear-to-br from-green-50 to-blue-50 p-3">
                               {FORM_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
                             </div>
                             <div className="min-w-0 flex-1">
@@ -3119,7 +3192,7 @@ const handleConfirmDeleteFormDocument = async () => {
               {financialDocuments.map((doc) => (
                 <div
                   key={`${doc.type}-${doc.id}`}
-                  className={`rounded-lg border bg-gradient-to-br ${getFinancialDocColor(doc.type)} p-6 shadow-sm transition-all duration-200 hover:shadow-md`}
+                  className={`rounded-lg border bg-linear-to-br ${getFinancialDocColor(doc.type)} p-6 shadow-sm transition-all duration-200 hover:shadow-md`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -3493,7 +3566,7 @@ const handleConfirmDeleteFormDocument = async () => {
               {financialDocs.map((doc) => renderFinancialDocument(doc))}
             </div>
           ) : (
-            <div className="rounded-xl border-2 border-dashed border-blue-200 bg-gradient-to-r from-blue-50/60 to-indigo-50/60 p-12 text-center">
+            <div className="rounded-xl border-2 border-dashed border-blue-200 bg-linear-to-r from-blue-50/60 to-indigo-50/60 p-12 text-center">
               <DollarSign className="mx-auto mb-6 h-16 w-16 text-blue-400" />
               <h3 className="mb-4 text-xl font-semibold text-gray-900">No Financial Documents</h3>
               <p className="mx-auto mb-8 max-w-2xl text-gray-600">
@@ -3563,7 +3636,7 @@ const handleConfirmDeleteFormDocument = async () => {
 
           {selectedProject && (
             <div className="mt-6 space-y-6">
-              <section className="rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+              <section className="rounded-lg bg-linear-to-br from-blue-50 to-indigo-50 p-6">
                 <h3 className="mb-4 text-lg font-semibold text-gray-900">Project Overview</h3>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
@@ -4128,7 +4201,7 @@ const handleConfirmDeleteFormDocument = async () => {
                                         return (
                                           <div 
                                             key={index} 
-                                            className="group relative overflow-hidden rounded-lg border-2 border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:border-blue-300"
+                                            className="group relative overflow-hidden rounded-lg border-2 border-gray-200 bg-linear-to-br from-white to-gray-50 p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:border-blue-300"
                                           >
                                             {/* Header with appliance name and delete button */}
                                             <div className="mb-3 flex items-center justify-between border-b border-gray-200 pb-2">

@@ -3,6 +3,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BACKEND_URL } from '@/lib/api';
 
 export default function QuotePDFPage() {
   const params = useParams();
@@ -16,7 +17,7 @@ export default function QuotePDFPage() {
       try {
         const token = localStorage.getItem("auth_token");
         const response = await fetch(
-          `https://aztec-interior.onrender.com/quotations/${quoteId}/pdf`,
+          `${BACKEND_URL}/quotations/${quoteId}/pdf`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

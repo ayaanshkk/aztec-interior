@@ -56,11 +56,11 @@ const nextConfig = {
   },
   
   // ====================================================
-  // OPTIONAL: Fixes double-slash issues
+  // OPTIONAL: CSS Optimization (disabled due to preload warning)
   // ====================================================
-  experimental: {
-    optimizeCss: true,
-  },
+  // experimental: {
+  //   optimizeCss: true,
+  // },
 };
 
 export default nextConfig;

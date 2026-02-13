@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 import { CustomerProjectTimeline } from "@/components/materials/CustomerProjectTimeline";
 import { useAuth } from "@/contexts/AuthContext";
+import { BACKEND_URL } from '@/lib/api';
 
 // ---------------- Constants ----------------
 const CUSTOMERS_PER_PAGE = 25;
@@ -182,7 +183,7 @@ export default function CustomersPage() {
 
       console.log("🔄 Fetching customers...");
       
-      const response = await fetch("https://aztec-interior.onrender.com/customers", {
+      const response = await fetch(`${BACKEND_URL}/customers`, {
         headers,
       });
 
@@ -240,7 +241,7 @@ export default function CustomersPage() {
     try {
       const token = localStorage.getItem("auth_token");
       const response = await fetch(
-        `https://aztec-interior.onrender.com/customers/${customerId}/projects`,
+        `${BACKEND_URL}/customers/${customerId}/projects`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -414,7 +415,7 @@ export default function CustomersPage() {
 
     try {
       const token = localStorage.getItem("auth_token");
-      const res = await fetch(`https://aztec-interior.onrender.com/customers/${id}`, {
+      const res = await fetch(`${BACKEND_URL}/customers/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -617,7 +618,7 @@ export default function CustomersPage() {
                                 title={`No documents uploaded. Drawings: ${customer.drawing_count}, Forms: ${customer.form_count}, Form Documents: ${customer.form_document_count}`}
                                 className="flex items-center"
                               >
-                                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                                <AlertCircle className="h-5 w-5 text-red-500 shrink-0" />
                               </div>
                             )}
                             {isAccepted && (

@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -21,8 +20,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Save, Loader2, RefreshCw, Trash2 } from 'lucide-react';
-// import { useToast } from '@/components/ui/use-toast';
+import { ArrowLeft, Save, Loader2, Trash2 } from 'lucide-react';
+import { BACKEND_URL } from '@/lib/api';
+
+// =============================================================================
+// Types
+// =============================================================================
 
 interface QuoteItem {
   id: number;
@@ -34,7 +37,6 @@ interface QuoteItem {
   height?: number;
   depth?: number;
   amount: number;
-  needs_manual_pricing: boolean;
   price_list_item_id?: number;
 }
 
@@ -58,186 +60,356 @@ interface DimensionOption {
   item_name: string;
 }
 
-const DOOR_STYLES = [
-  { value: 'standard', label: 'Standard' },
-  { value: 'corner', label: 'Corner' },
-  { value: 'sliding', label: 'Sliding' },
-  { value: 'linen_press', label: 'Linen Press' },
-];
+// =============================================================================
+// Constants
+// =============================================================================
 
-// Common wardrobe dimensions
 const WARDROBE_WIDTHS = [400, 500, 600, 800, 1000, 1200];
+
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+const extractDoorStyleFromDescription = (description: string): string => {
+  if (!description) return 'standard';
+  const descLower = description.toLowerCase().trim();
+  if (descLower.startsWith('slab')) return 'slab';
+  if (descLower.startsWith('vinyl')) return 'vinyl';
+  if (descLower.startsWith('glazed')) return 'glazed';
+  if (descLower.startsWith('shaker')) return 'shaker';
+  if (descLower.includes('slab')) return 'slab';
+  if (descLower.includes('vinyl')) return 'vinyl';
+  if (descLower.includes('glazed')) return 'glazed';
+  if (descLower.includes('shaker')) return 'shaker';
+  return 'standard';
+};
+
+// =============================================================================
+// Main Component
+// =============================================================================
 
 export default function EditQuotePage() {
   const params = useParams();
   const router = useRouter();
-  // const { toast } = useToast();
   const quoteId = params?.id as string;
+
+  // =============================================================================
+  // Reactive State
+  // =============================================================================
 
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [matchingPrices, setMatchingPrices] = useState<Record<number, DimensionOption[]>>({});
+  const [pricesLoading, setPricesLoading] = useState<Record<number, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  // Refs
+  const loadedPriceOptionsRef = useRef<Set<number>>(new Set());
+  const isFirstLoadRef = useRef(true);
+
+  // =============================================================================
+  // Helper: Calculate Total from Items
+  // =============================================================================
+  
+  const recalcTotal = useCallback((items: QuoteItem[]): number => {
+    return items.reduce((sum, item) => sum + (item.amount * item.quantity), 0);
+  }, []);
+
+  // =============================================================================
+  // Load Quotation
+  // =============================================================================
 
   useEffect(() => {
+    const loadQuotation = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(
+          `${BACKEND_URL}/quotations/${quoteId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to load quotation');
+        }
+
+        const data = await response.json();
+        setQuotation(data);
+      } catch (err) {
+        console.error('❌ Error loading quotation:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load quotation');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (quoteId) {
       loadQuotation();
     }
   }, [quoteId]);
 
-  const loadQuotation = async () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+  // =============================================================================
+  // Fetch Matching Prices (Reactive)
+  // =============================================================================
 
-      if (!response.ok) throw new Error('Failed to load quotation');
-
-      const data = await response.json();
-      setQuotation(data);
-    } catch (error) {
-      console.error('Error loading quotation:', error);
-      alert('❌ Failed to load quotation. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchMatchingPrices = async (itemId: number, itemName: string, style?: string) => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}/available-prices?item_name=${encodeURIComponent(itemName)}&style=${style || 'standard'}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) return;
-
-      const data = await response.json();
-      setMatchingPrices(prev => ({ ...prev, [itemId]: data.options || [] }));
-    } catch (error) {
-      console.error('Error fetching prices:', error);
-    }
-  };
-
-  const handleDimensionChange = async (
+  const fetchMatchingPrices = useCallback(async (
     itemId: number,
-    field: 'width' | 'height' | 'depth',
-    value: number
-  ) => {
-    if (!quotation) return;
-
-    const updatedItems = quotation.items.map(item => {
-      if (item.id === itemId) {
-        return { ...item, [field]: value };
-      }
-      return item;
-    });
-
-    setQuotation({ ...quotation, items: updatedItems });
-
-    // Try to match price automatically
-    const item = updatedItems.find(i => i.id === itemId);
-    if (item && item.width && item.height && item.depth) {
-      await matchItemPrice(itemId, item.width, item.height, item.depth);
-    }
-  };
-
-  const matchItemPrice = async (
-    itemId: number,
-    width: number,
-    height: number,
-    depth: number
-  ) => {
+    itemName: string,
+    style?: string
+  ): Promise<DimensionOption[]> => {
     try {
       const token = localStorage.getItem('auth_token');
+      
+      setPricesLoading(prev => ({ ...prev, [itemId]: true }));
+
       const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}/match-prices`,
+        `${BACKEND_URL}/quotations/${quoteId}/available-prices?item_name=${encodeURIComponent(itemName)}&style=${style || 'standard'}`,
         {
-          method: 'POST',
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            item_id: itemId,
-            width,
-            height,
-            depth,
-          }),
         }
       );
 
       if (!response.ok) {
-        console.log('No exact match found for dimensions');
-        return;
+        return [];
       }
 
       const data = await response.json();
+      const options = data.options || [];
       
-      if (data.success && quotation) {
-        // Update the item with new price
-        const updatedItems = quotation.items.map(item => {
-          if (item.id === itemId) {
-            return {
-              ...item,
-              amount: data.new_amount,
-              needs_manual_pricing: false,
-              price_list_item_id: data.matched_item?.id,
-            };
-          }
-          return item;
-        });
-
-        setQuotation({
-          ...quotation,
-          items: updatedItems,
-          total: data.new_total,
-        });
-
-        alert(`✅ Price Matched! £${data.new_amount.toFixed(2)} - ${data.matched_item?.name}`);
-
-      }
+      setMatchingPrices(prev => ({ ...prev, [itemId]: options }));
+      return options;
     } catch (error) {
-      console.error('Error matching price:', error);
+      console.error('❌ Error fetching prices:', error);
+      return [];
+    } finally {
+      setPricesLoading(prev => ({ ...prev, [itemId]: false }));
     }
-  };
+  }, [quoteId]);
 
-  const handleManualPriceChange = (itemId: number, newPrice: number) => {
-    if (!quotation) return;
+  // =============================================================================
+  // Auto-Price Items on Load (Reactive Effect)
+  // =============================================================================
 
-    const updatedItems = quotation.items.map(item => {
-      if (item.id === itemId) {
-        return { ...item, amount: newPrice };
+  useEffect(() => {
+    if (!quotation || !isFirstLoadRef.current) return;
+    
+    isFirstLoadRef.current = false;
+
+    const autoPriceItems = async () => {
+      let hasUpdates = false;
+      
+      for (const item of quotation.items) {
+        if (item.amount > 0) continue; // Skip already priced items
+
+        const doorStyle = extractDoorStyleFromDescription(item.description);
+        const options = await fetchMatchingPrices(item.id, item.item, doorStyle);
+
+        if (options.length > 0) {
+          // Apply first (cheapest) option automatically
+          const firstOption = options[0];
+          
+          setQuotation(prev => {
+            if (!prev) return prev;
+            
+            const updatedItems = prev.items.map(i => {
+              if (i.id === item.id) {
+                return {
+                  ...i,
+                  amount: firstOption.price,
+                  price_list_item_id: firstOption.price_list_item_id,
+                };
+              }
+              return i;
+            });
+
+            const newTotal = recalcTotal(updatedItems);
+            
+            return { ...prev, items: updatedItems, total: newTotal };
+          });
+          
+          hasUpdates = true;
+        }
       }
-      return item;
+    };
+
+    autoPriceItems();
+  }, [quotation, fetchMatchingPrices]);
+
+  // =============================================================================
+  // Dimension Change Handler (Reactive)
+  // =============================================================================
+
+  const handleDimensionChange = useCallback(async (
+    itemId: number,
+    field: 'width' | 'height' | 'depth',
+    value: number | undefined
+  ) => {
+    setQuotation(prev => {
+      if (!prev) return prev;
+
+      const updatedItems = prev.items.map(item => {
+        if (item.id === itemId) {
+          return { ...item, [field]: value };
+        }
+        return item;
+      });
+
+      const newTotal = recalcTotal(updatedItems);
+
+      return { ...prev, items: updatedItems, total: newTotal };
     });
 
-    const newTotal = updatedItems.reduce(
-      (sum, item) => sum + item.amount * item.quantity,
-      0
-    );
+    // Fetch prices reactively when all dimensions are present
+    const currentItem = quotation?.items.find(i => i.id === itemId);
+    if (!currentItem) return;
 
-    setQuotation({
-      ...quotation,
-      items: updatedItems,
-      total: newTotal,
+    const newItem = { ...currentItem, [field]: value };
+    const hasAllDimensions = 
+      newItem.width && newItem.height && newItem.depth &&
+      newItem.width > 0 && newItem.height > 0 && newItem.depth > 0;
+
+    if (hasAllDimensions && !loadedPriceOptionsRef.current.has(itemId)) {
+      loadedPriceOptionsRef.current.add(itemId);
+      
+      const doorStyle = extractDoorStyleFromDescription(newItem.description);
+      const options = await fetchMatchingPrices(itemId, newItem.item, doorStyle);
+
+      if (options.length > 0) {
+        // Try exact match first
+        const match = options.find(
+          opt => opt.width === newItem.width && 
+                 opt.height === newItem.height && 
+                 opt.depth === newItem.depth
+        );
+
+        if (match) {
+          setQuotation(prev => {
+            if (!prev) return prev;
+
+            const updatedItems = prev.items.map(item => {
+              if (item.id === itemId) {
+                return {
+                  ...item,
+                  amount: match.price,
+                  price_list_item_id: match.price_list_item_id,
+                };
+              }
+              return item;
+            });
+
+            const newTotal = recalcTotal(updatedItems);
+
+            return { ...prev, items: updatedItems, total: newTotal };
+          });
+          return;
+        }
+
+        // Fallback: try backend matching
+        try {
+          const token = localStorage.getItem('auth_token');
+          const response = await fetch(
+            `${BACKEND_URL}/quotations/${quoteId}/match-prices`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                item_id: itemId,
+                width: newItem.width,
+                height: newItem.height,
+                depth: newItem.depth,
+                door_style: doorStyle,
+              }),
+            }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              setQuotation(prev => {
+                if (!prev) return prev;
+
+                const updatedItems = prev.items.map(item => {
+                  if (item.id === itemId) {
+                    return {
+                      ...item,
+                      amount: data.new_amount,
+                      price_list_item_id: data.matched_item?.id,
+                    };
+                  }
+                  return item;
+                });
+
+                const newTotal = recalcTotal(updatedItems);
+
+                return { ...prev, items: updatedItems, total: newTotal };
+              });
+            }
+          }
+        } catch (err) {
+          console.error('❌ Error matching price:', err);
+        }
+      }
+    }
+  }, [quotation, quoteId, fetchMatchingPrices]);
+
+  // =============================================================================
+  // Quantity Change Handler (Reactive)
+  // =============================================================================
+
+  const handleQuantityChange = useCallback((itemId: number, newQuantity: number) => {
+    setQuotation(prev => {
+      if (!prev) return prev;
+
+      const updatedItems = prev.items.map(item => {
+        if (item.id === itemId) {
+          return { ...item, quantity: Math.max(1, newQuantity) };
+        }
+        return item;
+      });
+
+      const newTotal = recalcTotal(updatedItems);
+
+      return { ...prev, items: updatedItems, total: newTotal };
     });
-  };
+  }, [recalcTotal]);
 
-  const handleDeleteItem = async (itemId: number) => {
+  // =============================================================================
+  // Manual Price Change Handler (Reactive)
+  // =============================================================================
+
+  const handleManualPriceChange = useCallback((itemId: number, newPrice: number) => {
+    setQuotation(prev => {
+      if (!prev) return prev;
+
+      const updatedItems = prev.items.map(item => {
+        if (item.id === itemId) {
+          return { ...item, amount: newPrice };
+        }
+        return item;
+      });
+
+      const newTotal = recalcTotal(updatedItems);
+
+      return { ...prev, items: updatedItems, total: newTotal };
+    });
+  }, [recalcTotal]);
+
+  // =============================================================================
+  // Delete Item Handler
+  // =============================================================================
+
+  const handleDeleteItem = useCallback(async (itemId: number) => {
     if (!quotation) return;
     
     if (!confirm('Are you sure you want to delete this item?')) {
@@ -247,7 +419,7 @@ export default function EditQuotePage() {
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}/items/${itemId}`,
+        `${BACKEND_URL}/quotations/${quoteId}/items/${itemId}`,
         {
           method: 'DELETE',
           headers: {
@@ -257,31 +429,29 @@ export default function EditQuotePage() {
         }
       );
 
-      if (!response.ok) throw new Error('Failed to delete item');
+      if (!response.ok) {
+        throw new Error('Failed to delete item');
+      }
 
-      // Remove item from local state
-      const updatedItems = quotation.items.filter(item => item.id !== itemId);
-      const newTotal = updatedItems.reduce(
-        (sum, item) => sum + item.amount * item.quantity,
-        0
-      );
+      setQuotation(prev => {
+        if (!prev) return prev;
 
-      setQuotation({
-        ...quotation,
-        items: updatedItems,
-        total: newTotal,
+        const updatedItems = prev.items.filter(item => item.id !== itemId);
+        const newTotal = recalcTotal(updatedItems);
+
+        return { ...prev, items: updatedItems, total: newTotal };
       });
-
-      alert('✅ Item deleted successfully!');
-
-    } catch (error) {
-      console.error('Error deleting item:', error);
+    } catch (err) {
+      console.error('❌ Error deleting item:', err);
       alert('❌ Failed to delete item. Please try again.');
-
     }
-  };
+  }, [quotation, quoteId, recalcTotal]);
 
-  const handleSave = async () => {
+  // =============================================================================
+  // Save Handler
+  // =============================================================================
+
+  const handleSave = useCallback(async () => {
     if (!quotation) return;
 
     setSaving(true);
@@ -290,8 +460,8 @@ export default function EditQuotePage() {
       
       // Update each item
       for (const item of quotation.items) {
-        await fetch(
-          `https://aztec-interior.onrender.com/quotations/${quoteId}/items/${item.id}`,
+        const response = await fetch(
+          `${BACKEND_URL}/quotations/${quoteId}/items/${item.id}`,
           {
             method: 'PUT',
             headers: {
@@ -307,11 +477,15 @@ export default function EditQuotePage() {
             }),
           }
         );
+
+        if (!response.ok) {
+          throw new Error(`Failed to update item: ${item.item}`);
+        }
       }
 
       // Update quotation total
-      await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}`,
+      const totalResponse = await fetch(
+        `${BACKEND_URL}/quotations/${quoteId}`,
         {
           method: 'PUT',
           headers: {
@@ -324,34 +498,73 @@ export default function EditQuotePage() {
         }
       );
 
+      if (!totalResponse.ok) {
+        throw new Error('Failed to update quotation total');
+      }
+
+      // Show success message and stay on page
       alert('✅ Quotation saved successfully!');
-
-
-      router.back();
-    } catch (error) {
-      console.error('Error saving:', error);
-      alert('❌ Failed to save quotation. Please try again.');
-
+      
+      // Optionally refresh the page to get updated data
+      window.location.reload();
+    } catch (err) {
+      console.error('❌ Error saving:', err);
+      alert('❌ Failed to save quotation. Please check console for details.');
     } finally {
       setSaving(false);
     }
-  };
+  }, [quotation, quoteId, router]);
+
+  // =============================================================================
+  // Memoized Calculations
+  // =============================================================================
+
+  const lineTotals = useMemo(() => {
+    if (!quotation) return {};
+    
+    return quotation.items.reduce((acc, item) => {
+      acc[item.id] = item.amount * item.quantity;
+      return acc;
+    }, {} as Record<number, number>);
+  }, [quotation]);
+
+  // =============================================================================
+  // Render Loading State
+  // =============================================================================
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading quotation...</span>
       </div>
     );
   }
 
-  if (!quotation) {
+  // =============================================================================
+  // Render Error State
+  // =============================================================================
+
+  if (error || !quotation) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p>Quotation not found</p>
+        <div className="text-center">
+          <p className="text-lg font-semibold mb-2">Quotation not found</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            {error || `Quote ID: ${quoteId || 'Missing'}`}
+          </p>
+          <Button onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Go Back
+          </Button>
+        </div>
       </div>
     );
   }
+
+  // =============================================================================
+  // Render Main UI
+  // =============================================================================
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -385,7 +598,7 @@ export default function EditQuotePage() {
       {/* Items Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Quote Items - Set Dimensions to Auto-Price</CardTitle>
+          <CardTitle>Quote Items</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -403,110 +616,124 @@ export default function EditQuotePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {quotation.items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.item}</TableCell>
-                  <TableCell className="text-sm">{item.description}</TableCell>
-                  
-                  {/* Width */}
-                  <TableCell>
-                    <Select
-                      value={item.width?.toString() || ''}
-                      onValueChange={(value) =>
-                        handleDimensionChange(item.id, 'width', parseInt(value))
-                      }
-                    >
-                      <SelectTrigger className="w-24">
-                        <SelectValue placeholder="Width" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WARDROBE_WIDTHS.map((w) => (
-                          <SelectItem key={w} value={w.toString()}>
-                            {w}mm
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
+              {quotation.items.map((item) => {
+                const isLoading = pricesLoading[item.id];
+                const lineTotal = lineTotals[item.id];
+                
+                return (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.item}</TableCell>
+                    <TableCell className="text-sm">{item.description}</TableCell>
+                    
+                    {/* Width */}
+                    <TableCell>
+                      <Select
+                        value={item.width?.toString() || ''}
+                        onValueChange={(value) =>
+                          handleDimensionChange(item.id, 'width', parseInt(value))
+                        }
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue placeholder="Width" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {WARDROBE_WIDTHS.map((w) => (
+                            <SelectItem key={w} value={w.toString()}>
+                              {w}mm
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
 
-                  {/* Height */}
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.height || ''}
-                      onChange={(e) =>
-                        handleDimensionChange(item.id, 'height', parseInt(e.target.value) || 0)
-                      }
-                      className="w-24"
-                      placeholder="Height"
-                    />
-                  </TableCell>
+                    {/* Height */}
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={item.height || ''}
+                        onChange={(e) =>
+                          handleDimensionChange(
+                            item.id,
+                            'height',
+                            e.target.value === '' ? undefined : parseInt(e.target.value, 10)
+                          )
+                        }
+                        className="w-24"
+                        placeholder="Height"
+                      />
+                    </TableCell>
 
-                  {/* Depth */}
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.depth || ''}
-                      onChange={(e) =>
-                        handleDimensionChange(item.id, 'depth', parseInt(e.target.value) || 0)
-                      }
-                      className="w-24"
-                      placeholder="Depth"
-                    />
-                  </TableCell>
+                    {/* Depth */}
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={item.depth || ''}
+                        onChange={(e) =>
+                          handleDimensionChange(
+                            item.id,
+                            'depth',
+                            e.target.value === '' ? undefined : parseInt(e.target.value, 10)
+                          )
+                        }
+                        className="w-24"
+                        placeholder="Depth"
+                      />
+                    </TableCell>
 
-                  {/* Quantity */}
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const newQty = parseInt(e.target.value) || 1;
-                        const updatedItems = quotation.items.map(i =>
-                          i.id === item.id ? { ...i, quantity: newQty } : i
-                        );
-                        const newTotal = updatedItems.reduce(
-                          (sum, i) => sum + i.amount * i.quantity,
-                          0
-                        );
-                        setQuotation({ ...quotation, items: updatedItems, total: newTotal });
-                      }}
-                      className="w-16"
-                      min={1}
-                    />
-                  </TableCell>
+                    {/* Quantity */}
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const newQty = parseInt(e.target.value) || 1;
+                          handleQuantityChange(item.id, newQty);
+                        }}
+                        className="w-16"
+                        min={1}
+                      />
+                    </TableCell>
 
-                  {/* Price */}
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.amount}
-                      onChange={(e) =>
-                        handleManualPriceChange(item.id, parseFloat(e.target.value) || 0)
-                      }
-                      className="w-24"
-                      step="0.01"
-                    />
-                  </TableCell>
+                    {/* Price */}
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={item.amount}
+                        onChange={(e) =>
+                          handleManualPriceChange(item.id, parseFloat(e.target.value) || 0)
+                        }
+                        className="w-24"
+                        step="0.01"
+                        placeholder="0.00"
+                      />
+                    </TableCell>
 
-                  {/* Line Total */}
-                  <TableCell className="font-semibold">
-                    £{(item.amount * item.quantity).toFixed(2)}
-                  </TableCell>
+                    {/* Line Total - Reactive */}
+                    <TableCell className="font-semibold">
+                      {isLoading ? (
+                        <span className="flex items-center text-yellow-600">
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Calculating...
+                        </span>
+                      ) : (
+                        `£${lineTotal.toFixed(2)}`
+                      )}
+                    </TableCell>
 
-                  {/* Delete Button */}
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    {/* Delete Button */}
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteItem(item.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
 

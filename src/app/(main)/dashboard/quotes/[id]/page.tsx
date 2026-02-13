@@ -16,6 +16,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import { BACKEND_URL } from '@/lib/api';
+
 interface QuoteItem {
   id: number;
   item: string;
@@ -88,7 +90,7 @@ export default function QuoteDetailsPage() {
 
       console.log("🔍 Fetching quotation:", quoteId);
 
-      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}`, {
+      const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}`, {
         headers,
       });
 
@@ -143,7 +145,7 @@ export default function QuoteDetailsPage() {
 
       console.log("📄 Downloading PDF for quotation:", quoteId);
 
-      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}/pdf`, {
+      const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}/pdf`, {
         headers,
       });
 
@@ -188,7 +190,7 @@ export default function QuoteDetailsPage() {
 
       console.log("🗑️ Deleting quotation:", quoteId);
 
-      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}`, {
+      const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}`, {
         method: "DELETE",
         headers,
       });
@@ -359,7 +361,7 @@ export default function QuoteDetailsPage() {
               </div>
               <div>
                 <p className="mb-1 text-sm font-medium text-gray-600">Customer ID</p>
-                <p className="font-mono text-base text-xs text-gray-900">{quotation.customer_id}</p>
+                <p className="font-mono text-xs text-gray-900">{quotation.customer_id}</p>
               </div>
             </div>
           </CardContent>

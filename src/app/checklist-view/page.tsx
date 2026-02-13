@@ -4,18 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Save, 
-  X, 
-  Trash2, 
-  ArrowLeft, 
-  Edit, 
-  PenTool, 
-  Upload,
-  Package,
-  Download,
-  FileText,
-} from "lucide-react";
+import { Save, X, Trash2, ArrowLeft, Edit, PenTool, Upload, Package, Download, FileText } from "lucide-react";
 import Link from "next/link";
 import {
   Dialog,
@@ -41,6 +30,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
 
+import { BACKEND_URL } from '@/lib/api';
 interface User {
   id: number;
   name: string;
@@ -197,7 +187,7 @@ export default function ChecklistViewPage() {
           Authorization: `Bearer ${token}`,
         };
 
-        const userResponse = await fetch("https://aztec-interior.onrender.com/users/me", { headers });
+        const userResponse = await fetch(`${BACKEND_URL}/users/me`, { headers });
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setUser(userData);
@@ -229,9 +219,15 @@ export default function ChecklistViewPage() {
         }
 
         const response = await fetch(
-          `https://aztec-interior.onrender.com/form-submissions/${formSubmissionId}`,
+          `${BACKEND_URL}/form-submissions/${formSubmissionId}`,
           { headers }
         );
+
+        // ✅ Handle 401 gracefully
+        if (response.status === 401) {
+          console.warn('⚠️ Checklist: Auth token expired');
+          throw new Error("Session expired. Please log in again.");
+        }
 
         if (!response.ok) {
           throw new Error("Failed to fetch form data");
@@ -267,6 +263,15 @@ export default function ChecklistViewPage() {
         setOriginalFormData(JSON.parse(JSON.stringify(parsedFormData)));
       } catch (err) {
         console.error("Error fetching form data:", err);
+        
+        // ✅ Handle session expiry
+        if (err instanceof Error && err.message.includes("Session expired")) {
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("auth_user");
+          window.location.href = "/login";
+          return;
+        }
+        
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
         setLoading(false);
@@ -278,6 +283,14 @@ export default function ChecklistViewPage() {
 
   const handleInputChange = (field: keyof FormData, value: any) => {
     if (!formData) return;
+
+    // DEBUG: Log when door_style changes
+    if (field === 'door_style') {
+      console.log(`🚪 DOOR STYLE CHANGED: from '${formData.door_style}' to '${value}'`);
+      console.log(`🚪 Current door_manufacturer: '${formData.door_manufacturer}'`);
+      console.log(`🚪 Current door_name: '${formData.door_name}'`);
+    }
+
     setFormData({ ...formData, [field]: value });
   };
 
@@ -372,7 +385,7 @@ export default function ChecklistViewPage() {
     try {
       const token = localStorage.getItem("auth_token");
       const response = await fetch(
-        `https://aztec-interior.onrender.com/form-submissions/${formSubmissionId}`,
+        `${BACKEND_URL}/form-submissions/${formSubmissionId}`,
         {
           method: "PUT",
           headers: {
@@ -415,7 +428,7 @@ export default function ChecklistViewPage() {
     try {
       const token = localStorage.getItem("auth_token");
       const response = await fetch(
-        `https://aztec-interior.onrender.com/form-submissions/${formSubmissionId}`,
+        `${BACKEND_URL}/form-submissions/${formSubmissionId}`,
         {
           method: "DELETE",
           headers: {
@@ -485,7 +498,7 @@ export default function ChecklistViewPage() {
     try {
       const token = localStorage.getItem("auth_token");
       const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${formSubmissionId}`,
+        `${BACKEND_URL}/quotations/generate-from-checklist/${formSubmissionId}`,
         {
           method: "POST",
           headers: {
@@ -497,18 +510,39 @@ export default function ChecklistViewPage() {
 
       if (response.ok) {
         const data = await response.json();
-        alert(
-          `✅ Quote generated successfully!\n\n` +
-          `Reference: ${data.reference_number}\n` +
-          `Items extracted: ${data.items_count}\n` +
-          `Type: ${data.checklist_type}`
-        );
         
-        // Open quote editor in new tab
-        window.open(
-          `/dashboard/quotes/${data.quotation_id}/edit?source=checklist`,
-          '_blank'
-        );
+        // Log for debugging
+        console.log("Quote generated:", data);
+        
+        if (data.quotation_id) {
+          const quoteUrl = `/dashboard/quotes/${data.quotation_id}/edit?source=checklist`;
+          
+          // Try to open in new tab BEFORE showing alert (to avoid popup blocker)
+          const newWindow = window.open(quoteUrl, '_blank');
+          
+          // Show success alert
+          alert(
+            `✅ Quote generated successfully!\n\n` +
+            `Reference: ${data.reference_number}\n` +
+            `Items extracted: ${data.items_count}\n` +
+            `Type: ${data.checklist_type}`
+          );
+          
+          // If popup was blocked, provide fallback
+          if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+            const shouldNavigate = window.confirm(
+              "Pop-up was blocked by your browser.\n\n" +
+              "Click OK to open the quote in this tab, or Cancel to stay here."
+            );
+            
+            if (shouldNavigate) {
+              router.push(quoteUrl);
+            }
+          }
+        } else {
+          console.error("No quotation_id in response:", data);
+          alert("Quote created but quotation ID is missing. Please check the quotes list.");
+        }
       } else {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
         alert(`Failed to generate quote: ${errorData.error}`);
@@ -518,7 +552,6 @@ export default function ChecklistViewPage() {
       alert("Network error: Could not generate quote");
     }
   };
-
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !isEditing) return;
     setIsDrawing(true);
@@ -671,7 +704,7 @@ export default function ChecklistViewPage() {
         status: 'ordered',
       };
 
-      const response = await fetch('https://aztec-interior.onrender.com/materials', {
+      const response = await fetch(`${BACKEND_URL}/materials`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1221,15 +1254,26 @@ export default function ChecklistViewPage() {
                               </div>
                             </div>
 
-                            {/* Cabinet Color (full width) */}
-                            <div>
-                              <label className="mb-1 block text-xs font-bold text-gray-600">Cabinet Color</label>
-                              <Input 
-                                value={door.cabinet_color || ""} 
-                                onChange={(e) => handleAdditionalDoorChange(idx, "cabinet_color", e.target.value)}
-                                readOnly={!isEditing}
-                                className="text-sm" 
-                              />
+                            {/* Cabinet Color and Worktop Color */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Cabinet Color</label>
+                                <Input 
+                                  value={door.cabinet_color || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "cabinet_color", e.target.value)}
+                                  readOnly={!isEditing}
+                                  className="text-sm" 
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Worktop Color</label>
+                                <Input 
+                                  value={door.worktop_color || ""} 
+                                  onChange={(e) => handleAdditionalDoorChange(idx, "worktop_color", e.target.value)}
+                                  readOnly={!isEditing}
+                                  className="text-sm" 
+                                />
+                              </div>
                             </div>
 
                             {/* Quantity and Remove Button */}
@@ -1810,6 +1854,7 @@ export default function ChecklistViewPage() {
                               <label className="mb-1 block text-sm font-bold text-gray-700">Door Name</label>
                               <Input 
                                 value={formData.door_name || ""} 
+                                
                                 onChange={(e) => handleInputChange("door_name", e.target.value)}
                                 readOnly={!isEditing} 
                                 className="bg-white" 
@@ -1937,6 +1982,27 @@ export default function ChecklistViewPage() {
                                     />
                                   </div>
                                 </>
+                              )}
+
+                              {/* Show Glazing Material if Glazed */}
+                              {door.door_style === "glazed" && (
+                                <div className="col-span-2">
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Glazing Material</label>
+                                  {isEditing ? (
+                                    <select
+                                      className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                      value={door.glazing_material || ""}
+                                      onChange={(e) => handleAdditionalDoorChange(idx, "glazing_material", e.target.value)}
+                                    >
+                                      <option value="">Select material</option>
+                                      <option value="vinyl">Vinyl</option>
+                                      <option value="aluminium">Aluminium</option>
+                                      <option value="N/A">N/A</option>
+                                    </select>
+                                  ) : (
+                                    <Input value={door.glazing_material || ""} readOnly className="text-sm" />
+                                  )}
+                                </div>
                               )}
                             </div>
 
@@ -2788,4 +2854,6 @@ export default function ChecklistViewPage() {
     </SidebarProvider>
   );
 }
+
+
 

@@ -51,6 +51,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         },
       });
 
+      // ✅ Handle 401 gracefully - token may be expired
+      if (response.status === 401) {
+        console.warn('⚠️ Notifications: Auth token expired or invalid');
+        return; // Don't spam - user needs to re-authenticate
+      }
+
       if (response.ok) {
         const data = await response.json();
         setNotifications(data);

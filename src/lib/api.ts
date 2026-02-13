@@ -95,14 +95,51 @@ export async function fetchPublic(path: string, options: RequestInit = {}) {
 }
 
 /**
- * Helper function to make authenticated API calls
+ * Helper function to refresh the auth token
+ * Returns a new token if refresh is successful, null otherwise
+ */
+async function refreshAuthToken(): Promise<string | null> {
+  try {
+    const refreshToken = localStorage.getItem("auth_refresh_token");
+    if (!refreshToken) {
+      console.warn("⚠️ No refresh token available");
+      return null;
+    }
+
+    const response = await fetch(`${DATA_API_ROOT}/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const newToken = data.token || data.access_token;
+      if (newToken) {
+        localStorage.setItem("auth_token", newToken);
+        console.log("✅ Token refreshed successfully");
+        return newToken;
+      }
+    }
+
+    console.warn("⚠️ Token refresh failed");
+    return null;
+  } catch (error) {
+    console.error("❌ Token refresh error:", error);
+    return null;
+  }
+}
+
+/**
+ * Helper function to make authenticated API calls with automatic token refresh
  * Used for data endpoints - calls external Render backend
  */
 export async function fetchWithAuth(path: string, options: RequestInit = {}) {
-  const token = localStorage.getItem("auth_token");
+  let token = localStorage.getItem("auth_token");
 
   const url = `${DATA_API_ROOT}${path.startsWith("/") ? "" : "/"}${path}`;
-
   console.log('📡 fetchWithAuth calling:', url);
 
   if (!token) {
@@ -123,9 +160,42 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
       headers,
     }, 30000);
 
-    // ✅ DON'T logout on 401 - mock auth setup
+    // If we got a 401, try to refresh the token and retry once
     if (response.status === 401) {
-      console.warn("⚠️ Got 401 from backend - continuing with mock auth");
+      console.warn("⚠️ Got 401, attempting token refresh...");
+      
+      // Try to refresh the token
+      const newToken = await refreshAuthToken();
+      
+      if (newToken) {
+        console.log("🔄 Retrying request with new token...");
+        
+        // Retry with new token
+        const newHeaders = {
+          ...headers,
+          Authorization: `Bearer ${newToken}`,
+        };
+        
+        const retryResponse = await fetchWithTimeout(url, {
+          ...options,
+          headers: newHeaders,
+        }, 30000);
+        
+        if (retryResponse.ok) {
+          return retryResponse;
+        }
+        
+        // If retry also fails, the token is really invalid
+        console.warn("⚠️ Retry with new token also failed");
+      }
+      
+      // Token refresh failed or no refresh token - redirect to login
+      console.warn("⚠️ Authentication failed - clearing auth state");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
+      
+      // Don't redirect immediately - let the component handle it gracefully
+      throw new Error("Session expired. Please log in again.");
     }
 
     return response;
@@ -416,3 +486,5 @@ export const api = {
     });
   },
 };
+// ✅ Export BACKEND_URL for components that need direct fetch access
+export { BACKEND_URL };
