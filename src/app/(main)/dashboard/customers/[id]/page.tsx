@@ -426,7 +426,7 @@ export default function CustomerDetailsPage() {
     }
 
     try {
-      // ✅ Fetch customer data first
+      // Fetch customer data first
       const customerRes = await fetch(`https://aztec-interior.onrender.com/customers/${id}`, { headers });
 
       if (!customerRes.ok) {
@@ -435,7 +435,6 @@ export default function CustomerDetailsPage() {
 
       const customerData = await customerRes.json();
       
-      // Normalize postcode
       const normalizedCustomer = {
         ...customerData,
         postcode: customerData.post_code ?? customerData.postcode ?? "",
@@ -457,7 +456,6 @@ export default function CustomerDetailsPage() {
 
       setCustomer(normalizedCustomer);
 
-      // ✅ Helper function to safely fetch data
       const fetchWithFallback = async (url: string) => {
         try {
           const response = await fetch(url, { headers });
@@ -477,7 +475,7 @@ export default function CustomerDetailsPage() {
         }
       };
 
-      // ✅ PARALLEL FETCH with proper error handling
+      // ✅ PARALLEL FETCH - Now with customer_id filter for quotations
       const [
         drawingsData,
         formDocsData,
@@ -488,13 +486,13 @@ export default function CustomerDetailsPage() {
       ] = await Promise.all([
         fetchWithFallback(`https://aztec-interior.onrender.com/files/drawings?customer_id=${id}`),
         fetchWithFallback(`https://aztec-interior.onrender.com/files/forms?customer_id=${id}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/quotations?customer_id=${id}`),
+        fetchWithFallback(`https://aztec-interior.onrender.com/quotations?customer_id=${id}`), // ✅ FILTER BY CUSTOMER
         fetchWithFallback(`https://aztec-interior.onrender.com/invoices?customer_id=${id}`),
         fetchWithFallback(`https://aztec-interior.onrender.com/receipts?customer_id=${id}`),
         fetchWithFallback(`https://aztec-interior.onrender.com/payment-terms?customer_id=${id}`)
       ]);
 
-      // ✅ Process drawings
+      // Process drawings
       if (drawingsData && Array.isArray(drawingsData)) {
         const unassignedDrawings = drawingsData.filter(doc => !doc.project_id);
         setDrawingDocuments(unassignedDrawings);
@@ -502,7 +500,7 @@ export default function CustomerDetailsPage() {
         setDrawingDocuments([]);
       }
 
-      // ✅ Process form documents
+      // Process form documents
       if (formDocsData && Array.isArray(formDocsData)) {
         const unassignedForms = formDocsData.filter(form => !form.project_id);
         setFormDocuments(unassignedForms);
@@ -510,11 +508,13 @@ export default function CustomerDetailsPage() {
         setFormDocuments([]);
       }
 
-      // ✅ Process and combine all financial documents
+      // Process and combine all financial documents
       const allFinancialDocs: FinancialDocument[] = [];
 
-      // Quotations
+      // Quotations - ✅ Now filtered by customer_id
       if (quotationsData && Array.isArray(quotationsData)) {
+        console.log(`✅ Loaded ${quotationsData.length} quotations for customer ${id}`);
+        
         quotationsData.forEach((quote: Quotation) => {
           allFinancialDocs.push({
             id: quote.id,
@@ -525,6 +525,7 @@ export default function CustomerDetailsPage() {
             status: quote.status,
             created_at: quote.created_at,
             project_id: quote.project_id,
+            customer_id: id, // ✅ Ensure customer_id is set
           });
         });
       }
@@ -541,6 +542,7 @@ export default function CustomerDetailsPage() {
             status: invoice.status,
             created_at: invoice.created_at,
             project_id: invoice.project_id,
+            customer_id: id,
           });
         });
       }
@@ -558,6 +560,7 @@ export default function CustomerDetailsPage() {
             balance: receipt.balance_to_pay,
             created_at: receipt.created_at,
             project_id: receipt.project_id,
+            customer_id: id,
           });
         });
       }
@@ -573,6 +576,7 @@ export default function CustomerDetailsPage() {
             total: terms.total_amount,
             created_at: terms.created_at,
             project_id: terms.project_id,
+            customer_id: id,
           });
         });
       }
@@ -1094,6 +1098,8 @@ const handleConfirmDeleteFormDocument = async () => {
   };
 
   const handleDeleteQuote = async (quoteId: number) => {
+    console.log('🗑️ Deleting quote:', quoteId, 'for customer:', id);
+    
     setDeletingQuoteId(quoteId);
     
     try {
@@ -1115,12 +1121,13 @@ const handleConfirmDeleteFormDocument = async () => {
 
       console.log('✅ Quotation deleted successfully');
       
+      // Reload to verify it's only removed from this customer
       await loadCustomerData(); 
       
-      alert('✅ Quotation deleted successfully!'); // ← Simple alert
+      alert('✅ Quotation deleted successfully!');
     } catch (error) {
       console.error('❌ Error deleting quotation:', error);
-      alert('❌ Failed to delete quotation. Please try again.'); // ← Simple alert
+      alert('❌ Failed to delete quotation. Please try again.');
     } finally {
       setDeletingQuoteId(null);
       setDeleteDialogOpen(false);

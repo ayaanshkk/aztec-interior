@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { fetchWithAuth } from "@/lib/api"; // Import the centralized API helper
+import { useAuth } from "@/contexts/AuthContext";
 
 // Define the structure for items
 interface FormItem {
@@ -33,6 +33,7 @@ interface Customer {
 
 const FormsAndChecklistsPage = () => {
   const router = useRouter();
+  const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedForm, setSelectedForm] = useState<FormItem | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
@@ -51,18 +52,48 @@ const FormsAndChecklistsPage = () => {
   const fetchCustomers = async () => {
     setLoadingCustomers(true);
     try {
-      // Use centralized fetchWithAuth
-      const response = await fetchWithAuth("customers");
+      const token = localStorage.getItem("auth_token");
+      
+      if (!token) {
+        console.error("No authentication token found");
+        setConfirmationMessage("⚠ Authentication required. Please log in.");
+        setLoadingCustomers(false);
+        return;
+      }
+
+      console.log("Token found:", token ? "Yes (length: " + token.length + ")" : "No");
+      console.log("User from context:", user);
+
+      // const response = await fetch("https://aztec-interior.onrender.com/customers", {
+      const response = await fetch("http://127.0.0.1:5000/customers", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      });
+
+      console.log("Response status:", response.status);
 
       if (response.ok) {
         const data = await response.json();
+        console.log("Customers fetched:", data.length);
         setCustomers(data);
+      } else if (response.status === 401) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Authentication failed. Token may be expired.", errorData);
+        console.log("Try checking your backend token validation");
+        setConfirmationMessage("⚠ Session expired. Please log in again.");
+        // Optionally redirect to login
+        // router.push("/login");
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error("Failed to fetch customers:", response.status, errorData);
+        setConfirmationMessage("⚠ Failed to load customers. Please try again.");
       }
     } catch (error) {
       console.error("Error fetching customers:", error);
+      setConfirmationMessage("⚠ Network error. Please check your connection.");
     } finally {
       setLoadingCustomers(false);
     }
@@ -88,10 +119,26 @@ const FormsAndChecklistsPage = () => {
     if (selectedForm?.type === "kitchen" || selectedForm?.type === "bedroom") {
       setGenerating(true);
       try {
-        const response = await fetchWithAuth(`customers/${customer.id}/generate-form-link`, {
-          method: "POST",
-          body: JSON.stringify({ formType: selectedForm.type }),
-        });
+        const token = localStorage.getItem("auth_token");
+        
+        if (!token) {
+          setConfirmationMessage("⚠ Authentication required. Please log in.");
+          setGenerating(false);
+          return;
+        }
+
+        const response = await fetch(
+          // `https://aztec-interior.onrender.com/customers/${customer.id}/generate-form-link`,
+          `http://127.0.0.1:5000/customers/${customer.id}/generate-form-link`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ formType: selectedForm.type }),
+          }
+        );
 
         if (response.ok) {
           const data = await response.json();
@@ -181,7 +228,7 @@ const FormsAndChecklistsPage = () => {
         {
           label: "Proforma Invoice",
           icon: FileText,
-          route: "/dashboard/checklists/invoice",
+          route: "/dashboard/proforma/create",
           type: "proforma" as const,
         },
         { label: "Payment Terms", icon: DollarSign, route: "/dashboard/payment-terms/create", type: "terms" as const },
