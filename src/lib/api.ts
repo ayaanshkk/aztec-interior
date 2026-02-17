@@ -3,9 +3,9 @@
 // Pick basePath normally
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
-// 🚀 NEW: Localhost backend for development
+// 🚀 Support both env var names for backward compatibility
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 // Auth uses Next.js API routes (your frontend)
 const AUTH_API_ROOT = `${BASE_PATH}/api`;
