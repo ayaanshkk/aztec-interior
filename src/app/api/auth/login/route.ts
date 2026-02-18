@@ -4,6 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 // Support both env var names for backward compatibility
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://aztec-interior.onrender.com';
 
+// 🔍 DIAGNOSTIC: Log environment variable resolution at module load time
+console.log('🔍 ENV DIAGNOSTIC: Environment variables at startup:', {
+  NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || '(not set)',
+  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '(not set)',
+  resolved_BACKEND_URL: BACKEND_URL,
+});
+
 // ✅ Helper function with timeout for Render cold starts
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 60000) {
   const controller = new AbortController();
