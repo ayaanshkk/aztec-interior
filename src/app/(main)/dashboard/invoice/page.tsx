@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { BACKEND_URL } from "@/lib/api";
 
 // --- CurrencyInput component remains the same ---
 
@@ -192,20 +193,8 @@ export default function InvoicePage() {
   );
 
   const handleSave = async () => {
-    // COMMENTED OUT: User role check
-    // if (!userRole) {
-    //   setMessage("❌ User role not determined. Cannot save.");
-    //   return;
-    // }
-
     setIsSaving(true);
     setMessage("Saving invoice...");
-
-    // COMMENTED OUT: Optimistic approval status update
-    // if (userRole === "manager") {
-    //   setApprovalStatus("approved");
-    //   setMessage("Saving invoice... (Auto-approving as Manager)");
-    // }
 
     try {
       const token = localStorage.getItem("auth_token");
@@ -218,7 +207,7 @@ export default function InvoicePage() {
 
       const invoiceData = getInvoiceData();
 
-      const response = await fetch("https://aztec-interior.onrender.com/invoices/save", {
+      const response = await fetch(`${BACKEND_URL}/invoices/save`, {  // ✅ FIXED - removed extra quote
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -234,27 +223,11 @@ export default function InvoicePage() {
           localStorage.setItem("lastInvoiceNumber", invoiceNumber);
         }
 
-        // COMMENTED OUT: Submission ID and approval status
-        // setSubmissionId(data.form_submission_id);
-        // let newApprovalStatus = data.approval_status;
-        // if (!newApprovalStatus) {
-        //   newApprovalStatus = userRole === "manager" ? "approved" : "pending";
-        // }
-        // setApprovalStatus(newApprovalStatus);
-
         setMessage("✅ Invoice saved successfully!");
       } else {
-        // COMMENTED OUT: Revert optimistic change
-        // if (userRole === "manager") {
-        //   setApprovalStatus("pending");
-        // }
         setMessage(`❌ Error: ${data.error || "Failed to save invoice."}`);
       }
     } catch (error) {
-      // COMMENTED OUT: Revert optimistic change
-      // if (userRole === "manager") {
-      //   setApprovalStatus("pending");
-      // }
       setMessage("❌ Network error. Could not connect to server.");
     } finally {
       setIsSaving(false);
@@ -296,16 +269,9 @@ export default function InvoicePage() {
   // };
 
   const handleDownloadPdf = async () => {
-    // COMMENTED OUT: Approval check
-    // const canDownload = await checkApprovalStatus();
-    // if (!canDownload) {
-    //   setTimeout(() => setMessage(""), 5000);
-    //   return;
-    // }
-
     setMessage("Generating PDF...");
     try {
-      const response = await fetch("https://aztec-interior.onrender.com/invoices/download-pdf", {
+      const response = await fetch(`${BACKEND_URL}/invoices/download-pdf`, {  // ✅ FIXED - removed extra quote
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(getInvoiceData()),

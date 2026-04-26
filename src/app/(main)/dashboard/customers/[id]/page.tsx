@@ -54,13 +54,13 @@ import {
   Package,
   Image,
   Upload,
-  Loader2, // ✅ ADD THIS - for loading spinner
+  Loader2, 
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { BACKEND_URL } from "@/lib/api";
 
-// ... (keeping all your existing interfaces the same)
 interface Project {
   id: string;
   project_name: string;
@@ -426,8 +426,9 @@ export default function CustomerDetailsPage() {
     }
 
     try {
-      // Fetch customer data first
-      const customerRes = await fetch(`https://aztec-interior.onrender.com/customers/${id}`, { headers });
+      // ✅ Fetch customer data first
+      const customerRes = await fetch(`${BACKEND_URL}/customers/${id}`, { headers });
+
 
       if (!customerRes.ok) {
         throw new Error("Failed to load customer data");
@@ -435,6 +436,7 @@ export default function CustomerDetailsPage() {
 
       const customerData = await customerRes.json();
       
+      // Normalize postcode
       const normalizedCustomer = {
         ...customerData,
         postcode: customerData.post_code ?? customerData.postcode ?? "",
@@ -456,6 +458,7 @@ export default function CustomerDetailsPage() {
 
       setCustomer(normalizedCustomer);
 
+      // ✅ Helper function to safely fetch data
       const fetchWithFallback = async (url: string) => {
         try {
           const response = await fetch(url, { headers });
@@ -475,7 +478,7 @@ export default function CustomerDetailsPage() {
         }
       };
 
-      // ✅ PARALLEL FETCH - Now with customer_id filter for quotations
+      // ✅ PARALLEL FETCH with proper error handling
       const [
         drawingsData,
         formDocsData,
@@ -484,15 +487,15 @@ export default function CustomerDetailsPage() {
         receiptsData,
         paymentTermsData
       ] = await Promise.all([
-        fetchWithFallback(`https://aztec-interior.onrender.com/files/drawings?customer_id=${id}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/files/forms?customer_id=${id}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/quotations?customer_id=${id}`), // ✅ FILTER BY CUSTOMER
-        fetchWithFallback(`https://aztec-interior.onrender.com/invoices?customer_id=${id}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/receipts?customer_id=${id}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/payment-terms?customer_id=${id}`)
+        fetchWithFallback(`${BACKEND_URL}/files/drawings?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/files/forms?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/quotations?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/invoices?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/receipts?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/payment-terms?customer_id=${id}`)
       ]);
 
-      // Process drawings
+      // ✅ Process drawings
       if (drawingsData && Array.isArray(drawingsData)) {
         const unassignedDrawings = drawingsData.filter(doc => !doc.project_id);
         setDrawingDocuments(unassignedDrawings);
@@ -500,7 +503,7 @@ export default function CustomerDetailsPage() {
         setDrawingDocuments([]);
       }
 
-      // Process form documents
+      // ✅ Process form documents
       if (formDocsData && Array.isArray(formDocsData)) {
         const unassignedForms = formDocsData.filter(form => !form.project_id);
         setFormDocuments(unassignedForms);
@@ -508,13 +511,11 @@ export default function CustomerDetailsPage() {
         setFormDocuments([]);
       }
 
-      // Process and combine all financial documents
+      // ✅ Process and combine all financial documents
       const allFinancialDocs: FinancialDocument[] = [];
 
-      // Quotations - ✅ Now filtered by customer_id
+      // Quotations
       if (quotationsData && Array.isArray(quotationsData)) {
-        console.log(`✅ Loaded ${quotationsData.length} quotations for customer ${id}`);
-        
         quotationsData.forEach((quote: Quotation) => {
           allFinancialDocs.push({
             id: quote.id,
@@ -525,7 +526,6 @@ export default function CustomerDetailsPage() {
             status: quote.status,
             created_at: quote.created_at,
             project_id: quote.project_id,
-            customer_id: id, // ✅ Ensure customer_id is set
           });
         });
       }
@@ -542,7 +542,6 @@ export default function CustomerDetailsPage() {
             status: invoice.status,
             created_at: invoice.created_at,
             project_id: invoice.project_id,
-            customer_id: id,
           });
         });
       }
@@ -560,7 +559,6 @@ export default function CustomerDetailsPage() {
             balance: receipt.balance_to_pay,
             created_at: receipt.created_at,
             project_id: receipt.project_id,
-            customer_id: id,
           });
         });
       }
@@ -576,7 +574,6 @@ export default function CustomerDetailsPage() {
             total: terms.total_amount,
             created_at: terms.created_at,
             project_id: terms.project_id,
-            customer_id: id,
           });
         });
       }
@@ -634,7 +631,7 @@ const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) 
         }
       }
     } catch (error) {
-      console.error(`Upload error:`, error);
+      console.error("Upload error:", error);
     }
   }
 
@@ -684,7 +681,7 @@ const handleDrop = async (e: React.DragEvent, projectId: string) => {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token) headers["Authorization"] = "Bearer " + token;
 
   try {
     let endpoint = "";
@@ -967,7 +964,7 @@ const handleConfirmDeleteFormDocument = async () => {
           }
         }
       } catch (error) {
-        console.error(`Upload error:`, error);
+        console.error("Upload error:", error);
       }
     }
 
@@ -1098,14 +1095,12 @@ const handleConfirmDeleteFormDocument = async () => {
   };
 
   const handleDeleteQuote = async (quoteId: number) => {
-    console.log('🗑️ Deleting quote:', quoteId, 'for customer:', id);
-    
     setDeletingQuoteId(quoteId);
     
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}`,
+        `${BACKEND_URL}/quotations/${quoteId}`,
         {
           method: 'DELETE',
           headers: {
@@ -1121,13 +1116,12 @@ const handleConfirmDeleteFormDocument = async () => {
 
       console.log('✅ Quotation deleted successfully');
       
-      // Reload to verify it's only removed from this customer
       await loadCustomerData(); 
       
-      alert('✅ Quotation deleted successfully!');
+      alert('✅ Quotation deleted successfully!'); // ← Simple alert
     } catch (error) {
       console.error('❌ Error deleting quotation:', error);
-      alert('❌ Failed to delete quotation. Please try again.');
+      alert('❌ Failed to delete quotation. Please try again.'); // ← Simple alert
     } finally {
       setDeletingQuoteId(null);
       setDeleteDialogOpen(false);

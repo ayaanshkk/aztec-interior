@@ -44,7 +44,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format, addDays, isWithinInterval, differenceInDays } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { fetchWithAuth } from "@/lib/api";
+import { fetchWithAuth, BACKEND_URL } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 
@@ -454,8 +454,7 @@ export default function EnhancedPipelinePage() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-        const pipelineResponse = await fetch(
-          "https://aztec-interior.onrender.com/pipeline",
+        const pipelineResponse = await fetch(`${BACKEND_URL}/pipeline`,
           {
             headers: {
               "Authorization": `Bearer ${token}`,

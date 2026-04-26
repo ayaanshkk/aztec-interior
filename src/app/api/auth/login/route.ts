@@ -1,50 +1,38 @@
 // src/app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
-
-// ✅ Helper function with timeout for Render cold starts
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 60000) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Request timeout - backend is taking too long (likely cold start)');
-    }
-    throw error;
-  }
-}
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
     
     console.log('🔄 Proxying login to backend:', { email, backend: BACKEND_URL });
-    console.log('⏳ Note: First request may take 30-60s if backend is sleeping...');
     
-    // ✅ Call backend with 60s timeout for cold starts
-    const response = await fetchWithTimeout(
-      `${BACKEND_URL}/auth/login`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout for localhost
+    
+    const response = await fetch(`${BACKEND_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-      60000 // 60 second timeout for Render cold starts
-    );
+      body: JSON.stringify({ email, password }),
+      signal: controller.signal,
+    });
 
+    clearTimeout(timeoutId);
     console.log('📡 Backend response status:', response.status);
+
+    if (response.status === 502 || response.status === 503) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Backend server is not responding. Make sure Flask is running on port 5000.' 
+        },
+        { status: 502 }
+      );
+    }
 
     let data;
     try {
@@ -77,33 +65,22 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('🚨 Login proxy error:', error);
     
-    // ✅ Better error messages for different scenarios
-    if (error.message.includes('timeout') || error.message.includes('cold start')) {
+    if (error.name === 'AbortError') {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Backend is waking up (cold start). Please wait 30 seconds and try again.' 
-        },
-        { status: 504 } // Gateway Timeout
+        { success: false, error: 'Request timeout. Is Flask running on port 5000?' },
+        { status: 504 }
       );
     }
     
-    if (error.cause?.code === 'ECONNREFUSED' || error.message.includes('ECONNREFUSED')) {
+    if (error.code === 'ECONNREFUSED' || error.message.includes('fetch')) {
       return NextResponse.json(
-        { success: false, error: 'Backend server is not responding. Please try again in a moment.' },
-        { status: 503 }
-      );
-    }
-    
-    if (error.message.includes('fetch')) {
-      return NextResponse.json(
-        { success: false, error: 'Cannot connect to backend. Please check your internet connection.' },
+        { success: false, error: 'Cannot connect to Flask backend. Start it with: python run.py' },
         { status: 503 }
       );
     }
     
     return NextResponse.json(
-      { success: false, error: 'Login failed due to server error. Please try again.' },
+      { success: false, error: 'Login failed due to server error' },
       { status: 500 }
     );
   }

@@ -52,6 +52,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { BACKEND_URL } from "@/lib/api";
 // import { useToast } from "@/components/ui/use-toast";
 
 
@@ -338,7 +339,7 @@ export default function ProjectDetailsPage() {
     try {
       // ✅ Fetch project first
       const projectRes = await fetch(
-        `https://aztec-interior.onrender.com/projects/${projectId}`, 
+        `${BACKEND_URL}/projects/${projectId}`, 
         { headers }
       );
 
@@ -353,9 +354,10 @@ export default function ProjectDetailsPage() {
       if (projectData.customer_id) {
         try {
           const customerRes = await fetch(
-            `https://aztec-interior.onrender.com/customers/${projectData.customer_id}`,
+            `${BACKEND_URL}/customers/${projectData.customer_id}`,
             { headers }
           );
+
           if (customerRes.ok) {
             const customerData = await customerRes.json();
             setCustomer(customerData);
@@ -394,12 +396,12 @@ export default function ProjectDetailsPage() {
         receiptsData,
         paymentTermsData
       ] = await Promise.all([
-        fetchWithFallback(`https://aztec-interior.onrender.com/form-submissions?project_id=${projectId}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/files/drawings?project_id=${projectId}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/quotations?project_id=${projectId}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/invoices?project_id=${projectId}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/receipts?project_id=${projectId}`),
-        fetchWithFallback(`https://aztec-interior.onrender.com/payment-terms?project_id=${projectId}`)
+        fetchWithFallback(`${BACKEND_URL}/form-submissions?project_id=${projectId}`),
+        fetchWithFallback(`${BACKEND_URL}/files/drawings?project_id=${projectId}`),
+        fetchWithFallback(`${BACKEND_URL}/quotations?project_id=${projectId}`),
+        fetchWithFallback(`${BACKEND_URL}/invoices?project_id=${projectId}`),
+        fetchWithFallback(`${BACKEND_URL}/receipts?project_id=${projectId}`),
+        fetchWithFallback(`${BACKEND_URL}/payment-terms?project_id=${projectId}`)
       ]);
 
       // ✅ Process forms
@@ -603,7 +605,7 @@ export default function ProjectDetailsPage() {
         formData.append("customer_id", project?.customer_id || "");
         formData.append("project_id", projectId);
 
-        const response = await fetch("https://aztec-interior.onrender.com/files/drawings", {
+        const response = await fetch(`${BACKEND_URL}/files/drawings`, {
           method: "POST",
           headers: headers,
           body: formData,
@@ -641,7 +643,6 @@ export default function ProjectDetailsPage() {
   }, [projectId, project?.customer_id]);
 
   const handleViewDrawing = useCallback((doc: DrawingDocument) => {
-    const BACKEND_URL = "https://aztec-interior.onrender.com";
     let viewUrl = doc.url;
 
     if (viewUrl && viewUrl.startsWith("http")) {
@@ -673,7 +674,7 @@ export default function ProjectDetailsPage() {
 
     try {
       const res = await fetch(
-        `https://aztec-interior.onrender.com/files/drawings/${drawingToDelete.id}`,
+        `${BACKEND_URL}/files/drawings/${drawingToDelete.id}`,
         { method: "DELETE", headers }
       );
 
@@ -716,7 +717,7 @@ export default function ProjectDetailsPage() {
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}`,
+        `${BACKEND_URL}/quotations/${quoteId}`,
         {
           method: 'DELETE',
           headers: {
@@ -753,7 +754,7 @@ export default function ProjectDetailsPage() {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     try {
-      const response = await fetch("https://aztec-interior.onrender.com/tasks", {
+      const response = await fetch(`${BACKEND_URL}/tasks`, {
         method: "POST",
         headers: headers,
         body: JSON.stringify({
@@ -793,7 +794,7 @@ export default function ProjectDetailsPage() {
 
     setGenerating(true);
     try {
-      const res = await fetch("https://aztec-interior.onrender.com/form-tokens", {
+      const res = await fetch(`${BACKEND_URL}/form-tokens`, {
         method: "POST",
         headers,
         body: JSON.stringify({
@@ -856,7 +857,7 @@ export default function ProjectDetailsPage() {
     setGenerating(true);
     try {
       const response = await fetch(
-        `https://aztec-interior.onrender.com/customers/${customer.id}/generate-form-link`,
+        `${BACKEND_URL}/customers/${customer.id}/generate-form-link`,
         {
           method: "POST",
           headers: {
@@ -904,7 +905,7 @@ export default function ProjectDetailsPage() {
     setGenerating(true);
     try {
       const response = await fetch(
-        `https://aztec-interior.onrender.com/customers/${customer.id}/generate-form-link`,
+        `${BACKEND_URL}/customers/${customer.id}/generate-form-link`,
         {
           method: "POST",
           headers: {
@@ -1032,7 +1033,7 @@ export default function ProjectDetailsPage() {
     try {
       const token = localStorage.getItem("auth_token");
       const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${checklistForQuote.id}`,
+        `${BACKEND_URL}/quotations/generate-from-checklist/${checklistForQuote.id}`,
         {
           method: "POST",
           headers: {
@@ -1255,7 +1256,7 @@ const handleCreateInvoice = useCallback(() => {
 
     try {
       const res = await fetch(
-        `https://aztec-interior.onrender.com/form-submissions/${formToDelete.id}`,
+        `${BACKEND_URL}/form-submissions/${formToDelete.id}`,
         { 
           method: "DELETE", 
           headers 

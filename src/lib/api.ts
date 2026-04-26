@@ -1,49 +1,31 @@
-// 1. CENTRALIZED BASE CONFIGURATION (SMART URL DETECTION)
+// 1. CENTRALIZED BASE CONFIGURATION (LOCALHOST READY)
 
 // Pick basePath normally
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
-// 🚀 SMART BACKEND URL DETECTION
-// Priority:
-// 1. NEXT_PUBLIC_BACKEND_URL (manual override for any environment)
-// 2. In development (NODE_ENV === 'development') → use localhost
-// 3. In production → use production URL
-const getBackendUrl = () => {
-  // Manual override takes highest priority
-  if (process.env.NEXT_PUBLIC_BACKEND_URL) {
-    return process.env.NEXT_PUBLIC_BACKEND_URL;
-  }
-  
-  // Auto-detect based on environment
-  const isDevelopment = process.env.NODE_ENV === "development";
-  
-  if (isDevelopment) {
-    // Development mode → use localhost
-    return "http://localhost:5000";
-  } else {
-    // Production mode → use production URL
-    return "https://aztec-interior.onrender.com";
-  }
-};
-
-const BACKEND_URL = getBackendUrl();
+// 🚀 NEW: Localhost backend for development
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
 // Auth uses Next.js API routes (your frontend)
 const AUTH_API_ROOT = `${BASE_PATH}/api`;
 
-// Data uses backend API
+// Data uses backend API (now on localhost)
 const DATA_API_ROOT = BACKEND_URL;
+
+// ✅ EXPORT BACKEND_URL FOR USE IN COMPONENTS
+export { BACKEND_URL };
 
 // 🔍 DEBUG LOG
 if (typeof window !== "undefined") {
   console.log("🌐 API Configuration:", {
-    NODE_ENV: process.env.NODE_ENV,
     BASE_PATH,
     AUTH_API_ROOT,
     DATA_API_ROOT,
-    BACKEND_URL,
+    BACKEND_URL, 
   });
 }
+
 
 // ✅ Helper function to redirect to login with basePath support
 function redirectToLogin() {
@@ -118,7 +100,7 @@ export async function fetchPublic(path: string, options: RequestInit = {}) {
 
 /**
  * Helper function to make authenticated API calls
- * Used for data endpoints - calls external backend (auto-detects URL)
+ * Used for data endpoints - calls external Render backend
  */
 export async function fetchWithAuth(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem("auth_token");
@@ -213,7 +195,7 @@ export const api = {
     return handleApiResponse(response);
   },
 
-  // DATA ENDPOINTS (use fetchWithAuth - calls backend with auto URL detection)
+  // DATA ENDPOINTS (use fetchWithAuth - calls Render backend)
   async getCustomers() {
     return deduplicateRequest('getCustomers', async () => {
       try {

@@ -197,7 +197,7 @@ export default function ChecklistViewPage() {
           Authorization: `Bearer ${token}`,
         };
 
-        const userResponse = await fetch("https://aztec-interior.onrender.com/users/me", { headers });
+        const userResponse = await fetch(`${BACKEND_URL}/users/me", { headers });
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setUser(userData);
@@ -442,80 +442,82 @@ export default function ChecklistViewPage() {
   };
 
   const handleGenerateQuote = async () => {
-      if (!formSubmissionId || !formData) return;
+    if (!formSubmissionId || !formData) return;
+    
+    // Intelligently detect form type from the data
+    const detectFormType = (): string => {
+      if (formData.form_type) {
+        return formData.form_type.toLowerCase().includes("kitchen") ? "kitchen" : "bedroom";
+      }
       
-      // Intelligently detect form type from the data
-      const detectFormType = (): string => {
-        if (formData.form_type) {
-          return formData.form_type.toLowerCase().includes("kitchen") ? "kitchen" : "bedroom";
-        }
-        
-        const hasKitchenFields = !!(
-          formData.worktop_material_type || 
-          formData.appliances?.length || 
-          formData.sink_details ||
-          formData.integ_fridge_make
-        );
-        
-        const hasBedroomFields = !!(
-          formData.bedside_cabinets_type ||
-          formData.mirror_type ||
-          formData.dresser_desk ||
-          formData.soffit_lights_type
-        );
-        
-        if (hasKitchenFields && !hasBedroomFields) return "kitchen";
-        if (hasBedroomFields && !hasKitchenFields) return "bedroom";
-        
-        return "bedroom";
-      };
-      
-      const detectedType = detectFormType();
-      
-      const confirmGenerate = window.confirm(
-        `Generate a quotation from this ${detectedType} checklist?\n\n` +
-        `This will automatically extract all materials and create a draft quote.\n\n` +
-        `Customer: ${formData.customer_name || 'N/A'}`
+      // Fallback: detect from fields present
+      const hasKitchenFields = !!(
+        formData.worktop_material_type || 
+        formData.appliances?.length || 
+        formData.sink_details ||
+        formData.integ_fridge_make
       );
       
-      if (!confirmGenerate) return;
-
-      try {
-        const token = localStorage.getItem("auth_token");
-        const response = await fetch(
-          `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${formSubmissionId}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          
-          // Show success message
-          alert(
-            `✅ Quote generated successfully!\n\n` +
-            `Reference: ${data.reference_number}\n` +
-            `Items extracted: ${data.items_count}\n` +
-            `Type: ${data.checklist_type}`
-          );
-          
-          // Open quote editor in new tab with customer_id
-          const quoteUrl = `/dashboard/quotes/${data.quotation_id}/edit?source=checklist&customerId=${data.customer_id}`;
-          window.open(quoteUrl, '_blank');
-        } else {
-          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-          alert(`Failed to generate quote: ${errorData.error}`);
-        }
-      } catch (error) {
-        console.error("Error generating quote:", error);
-        alert("Network error: Could not generate quote");
-      }
+      const hasBedroomFields = !!(
+        formData.bedside_cabinets_type ||
+        formData.mirror_type ||
+        formData.dresser_desk ||
+        formData.soffit_lights_type
+      );
+      
+      if (hasKitchenFields && !hasBedroomFields) return "kitchen";
+      if (hasBedroomFields && !hasKitchenFields) return "bedroom";
+      
+      // Default to bedroom if unclear
+      return "bedroom";
     };
+    
+    const detectedType = detectFormType();
+    
+    const confirmGenerate = window.confirm(
+      `Generate a quotation from this ${detectedType} checklist?\n\n` +
+      `This will automatically extract all materials and create a draft quote.\n\n` +
+      `Customer: ${formData.customer_name || 'N/A'}`
+    );
+    
+    if (!confirmGenerate) return;
+
+    try {
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch(
+        `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${formSubmissionId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(
+          `✅ Quote generated successfully!\n\n` +
+          `Reference: ${data.reference_number}\n` +
+          `Items extracted: ${data.items_count}\n` +
+          `Type: ${data.checklist_type}`
+        );
+        
+        // Open quote editor in new tab
+        window.open(
+          `/dashboard/quotes/${data.quotation_id}/edit?source=checklist`,
+          '_blank'
+        );
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        alert(`Failed to generate quote: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error generating quote:", error);
+      alert("Network error: Could not generate quote");
+    }
+  };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !isEditing) return;

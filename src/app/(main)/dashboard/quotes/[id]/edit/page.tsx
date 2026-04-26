@@ -7,6 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -14,7 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Save, Loader2, Trash2, Plus } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+// import { useToast } from '@/components/ui/use-toast';
 
 interface QuoteItem {
   id: number;
@@ -22,8 +30,12 @@ interface QuoteItem {
   description: string;
   color: string;
   quantity: number;
+  width?: number;
+  height?: number;
+  depth?: number;
   amount: number;
   needs_manual_pricing: boolean;
+  price_list_item_id?: number;
 }
 
 interface Quotation {
@@ -31,21 +43,41 @@ interface Quotation {
   reference_number: string;
   customer_id: string;
   customer_name: string;
-  customer_address: string;
-  customer_phone: string;
   total: number;
   status: string;
+  notes: string;
   items: QuoteItem[];
 }
+
+interface DimensionOption {
+  width: number;
+  height: number;
+  depth: number;
+  price: number;
+  price_list_item_id: number;
+  item_name: string;
+}
+
+const DOOR_STYLES = [
+  { value: 'standard', label: 'Standard' },
+  { value: 'corner', label: 'Corner' },
+  { value: 'sliding', label: 'Sliding' },
+  { value: 'linen_press', label: 'Linen Press' },
+];
+
+// Common wardrobe dimensions
+const WARDROBE_WIDTHS = [400, 500, 600, 800, 1000, 1200];
 
 export default function EditQuotePage() {
   const params = useParams();
   const router = useRouter();
+  // const { toast } = useToast();
   const quoteId = params?.id as string;
 
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [matchingPrices, setMatchingPrices] = useState<Record<number, DimensionOption[]>>({});
 
   useEffect(() => {
     if (quoteId) {
@@ -69,30 +101,132 @@ export default function EditQuotePage() {
       if (!response.ok) throw new Error('Failed to load quotation');
 
       const data = await response.json();
-      console.log('✅ Quote loaded:', data);
       setQuotation(data);
     } catch (error) {
       console.error('Error loading quotation:', error);
       alert('❌ Failed to load quotation. Please try again.');
-      router.back();
     } finally {
       setLoading(false);
     }
   };
 
-  const handleItemChange = (itemId: number, field: keyof QuoteItem, value: any) => {
+  const fetchMatchingPrices = async (itemId: number, itemName: string, style?: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(
+        `https://aztec-interior.onrender.com/quotations/${quoteId}/available-prices?item_name=${encodeURIComponent(itemName)}&style=${style || 'standard'}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      setMatchingPrices(prev => ({ ...prev, [itemId]: data.options || [] }));
+    } catch (error) {
+      console.error('Error fetching prices:', error);
+    }
+  };
+
+  const handleDimensionChange = async (
+    itemId: number,
+    field: 'width' | 'height' | 'depth',
+    value: number
+  ) => {
     if (!quotation) return;
 
-    const updatedItems = quotation.items.map((item) => {
+    const updatedItems = quotation.items.map(item => {
       if (item.id === itemId) {
         return { ...item, [field]: value };
       }
       return item;
     });
 
-    // Recalculate total
+    setQuotation({ ...quotation, items: updatedItems });
+
+    // Try to match price automatically
+    const item = updatedItems.find(i => i.id === itemId);
+    if (item && item.width && item.height && item.depth) {
+      await matchItemPrice(itemId, item.width, item.height, item.depth);
+    }
+  };
+
+  const matchItemPrice = async (
+    itemId: number,
+    width: number,
+    height: number,
+    depth: number
+  ) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(
+        `https://aztec-interior.onrender.com/quotations/${quoteId}/match-prices`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            item_id: itemId,
+            width,
+            height,
+            depth,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        console.log('No exact match found for dimensions');
+        return;
+      }
+
+      const data = await response.json();
+      
+      if (data.success && quotation) {
+        // Update the item with new price
+        const updatedItems = quotation.items.map(item => {
+          if (item.id === itemId) {
+            return {
+              ...item,
+              amount: data.new_amount,
+              needs_manual_pricing: false,
+              price_list_item_id: data.matched_item?.id,
+            };
+          }
+          return item;
+        });
+
+        setQuotation({
+          ...quotation,
+          items: updatedItems,
+          total: data.new_total,
+        });
+
+        alert(`✅ Price Matched! £${data.new_amount.toFixed(2)} - ${data.matched_item?.name}`);
+
+      }
+    } catch (error) {
+      console.error('Error matching price:', error);
+    }
+  };
+
+  const handleManualPriceChange = (itemId: number, newPrice: number) => {
+    if (!quotation) return;
+
+    const updatedItems = quotation.items.map(item => {
+      if (item.id === itemId) {
+        return { ...item, amount: newPrice };
+      }
+      return item;
+    });
+
     const newTotal = updatedItems.reduce(
-      (sum, item) => sum + (item.amount * item.quantity),
+      (sum, item) => sum + item.amount * item.quantity,
       0
     );
 
@@ -103,50 +237,32 @@ export default function EditQuotePage() {
     });
   };
 
-  const addItem = () => {
+  const handleDeleteItem = async (itemId: number) => {
     if (!quotation) return;
-
-    const newItem: QuoteItem = {
-      id: Date.now(),
-      item: '',
-      description: '',
-      color: '',
-      quantity: 1,
-      amount: 0,
-      needs_manual_pricing: true,
-    };
-
-    setQuotation({
-      ...quotation,
-      items: [...quotation.items, newItem],
-    });
-  };
-
-  const removeItem = async (itemId: number) => {
-    if (!quotation) return;
-    if (!confirm('Remove this item?')) return;
+    
+    if (!confirm('Are you sure you want to delete this item?')) {
+      return;
+    }
 
     try {
       const token = localStorage.getItem('auth_token');
-      
-      if (itemId < 1000000) {
-        const response = await fetch(
-          `https://aztec-interior.onrender.com/quotations/${quoteId}/items/${itemId}`,
-          {
-            method: 'DELETE',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+      const response = await fetch(
+        `https://aztec-interior.onrender.com/quotations/${quoteId}/items/${itemId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-        if (!response.ok) throw new Error('Failed to delete item');
-      }
+      if (!response.ok) throw new Error('Failed to delete item');
 
-      const updatedItems = quotation.items.filter((item) => item.id !== itemId);
+      // Remove item from local state
+      const updatedItems = quotation.items.filter(item => item.id !== itemId);
       const newTotal = updatedItems.reduce(
-        (sum, item) => sum + (item.amount * item.quantity),
+        (sum, item) => sum + item.amount * item.quantity,
         0
       );
 
@@ -156,10 +272,12 @@ export default function EditQuotePage() {
         total: newTotal,
       });
 
-      alert('✅ Item removed!');
+      alert('✅ Item deleted successfully!');
+
     } catch (error) {
       console.error('Error deleting item:', error);
-      alert('❌ Failed to delete item');
+      alert('❌ Failed to delete item. Please try again.');
+
     }
   };
 
@@ -169,63 +287,51 @@ export default function EditQuotePage() {
     setSaving(true);
     try {
       const token = localStorage.getItem('auth_token');
-
-      console.log('💾 Saving quote:', quotation);
+      
+      // Update each item
+      for (const item of quotation.items) {
+        await fetch(
+          `https://aztec-interior.onrender.com/quotations/${quoteId}/items/${item.id}`,
+          {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              width: item.width,
+              height: item.height,
+              depth: item.depth,
+              amount: item.amount,
+              quantity: item.quantity,
+            }),
+          }
+        );
+      }
 
       // Update quotation total
-      const quoteResponse = await fetch(
+      await fetch(
         `https://aztec-interior.onrender.com/quotations/${quoteId}`,
         {
           method: 'PUT',
           headers: {
-            'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            status: quotation.status,
             total: quotation.total,
           }),
         }
       );
 
-      if (!quoteResponse.ok) throw new Error('Failed to update quote');
+      alert('✅ Quotation saved successfully!');
 
-      // Update each existing item
-      for (const item of quotation.items) {
-        if (item.id < 1000000) {
-          console.log(`💾 Updating item ${item.id}:`, item);
-          
-          await fetch(
-            `https://aztec-interior.onrender.com/quotations/${quoteId}/items/${item.id}`,
-            {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                item: item.item,
-                description: item.description,
-                color: item.color,
-                quantity: item.quantity,
-                amount: item.amount,
-              }),
-            }
-          );
-        }
-      }
 
-      alert('✅ Quote saved successfully!');
-      
-      // Redirect to customer page
-      if (quotation.customer_id) {
-        router.push(`/dashboard/customers/${quotation.customer_id}`);
-      } else {
-        router.back();
-      }
+      router.back();
     } catch (error) {
-      console.error('Error saving quote:', error);
-      alert('❌ Failed to save quote');
+      console.error('Error saving:', error);
+      alert('❌ Failed to save quotation. Please try again.');
+
     } finally {
       setSaving(false);
     }
@@ -248,7 +354,7 @@ export default function EditQuotePage() {
   }
 
   return (
-    <div className="container mx-auto max-w-6xl space-y-6 py-6">
+    <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -256,10 +362,8 @@ export default function EditQuotePage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">
-              Edit Quote - {quotation.reference_number}
-            </h1>
-            <p className="text-muted-foreground">{quotation.customer_name}</p>
+            <h1 className="text-3xl font-bold">Edit Quotation {quotation.reference_number}</h1>
+            <p className="text-muted-foreground">Customer: {quotation.customer_name}</p>
           </div>
         </div>
 
@@ -281,119 +385,141 @@ export default function EditQuotePage() {
       {/* Items Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Quote Items</CardTitle>
-            <Button onClick={addItem} variant="outline" size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
-            </Button>
-          </div>
+          <CardTitle>Quote Items - Set Dimensions to Auto-Price</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[150px]">Item</TableHead>
-                  <TableHead className="min-w-[200px]">Description</TableHead>
-                  <TableHead className="min-w-[100px]">Color</TableHead>
-                  <TableHead className="w-[80px]">Qty</TableHead>
-                  <TableHead className="w-[120px]">Unit Price (£)</TableHead>
-                  <TableHead className="w-[120px]">Total (£)</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Item</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Width (mm)</TableHead>
+                <TableHead>Height (mm)</TableHead>
+                <TableHead>Depth (mm)</TableHead>
+                <TableHead>Qty</TableHead>
+                <TableHead>Price (£)</TableHead>
+                <TableHead>Line Total</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {quotation.items.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="font-medium">{item.item}</TableCell>
+                  <TableCell className="text-sm">{item.description}</TableCell>
+                  
+                  {/* Width */}
+                  <TableCell>
+                    <Select
+                      value={item.width?.toString() || ''}
+                      onValueChange={(value) =>
+                        handleDimensionChange(item.id, 'width', parseInt(value))
+                      }
+                    >
+                      <SelectTrigger className="w-24">
+                        <SelectValue placeholder="Width" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WARDROBE_WIDTHS.map((w) => (
+                          <SelectItem key={w} value={w.toString()}>
+                            {w}mm
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+
+                  {/* Height */}
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={item.height || ''}
+                      onChange={(e) =>
+                        handleDimensionChange(item.id, 'height', parseInt(e.target.value) || 0)
+                      }
+                      className="w-24"
+                      placeholder="Height"
+                    />
+                  </TableCell>
+
+                  {/* Depth */}
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={item.depth || ''}
+                      onChange={(e) =>
+                        handleDimensionChange(item.id, 'depth', parseInt(e.target.value) || 0)
+                      }
+                      className="w-24"
+                      placeholder="Depth"
+                    />
+                  </TableCell>
+
+                  {/* Quantity */}
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const newQty = parseInt(e.target.value) || 1;
+                        const updatedItems = quotation.items.map(i =>
+                          i.id === item.id ? { ...i, quantity: newQty } : i
+                        );
+                        const newTotal = updatedItems.reduce(
+                          (sum, i) => sum + i.amount * i.quantity,
+                          0
+                        );
+                        setQuotation({ ...quotation, items: updatedItems, total: newTotal });
+                      }}
+                      className="w-16"
+                      min={1}
+                    />
+                  </TableCell>
+
+                  {/* Price */}
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={item.amount}
+                      onChange={(e) =>
+                        handleManualPriceChange(item.id, parseFloat(e.target.value) || 0)
+                      }
+                      className="w-24"
+                      step="0.01"
+                    />
+                  </TableCell>
+
+                  {/* Line Total */}
+                  <TableCell className="font-semibold">
+                    £{(item.amount * item.quantity).toFixed(2)}
+                  </TableCell>
+
+                  {/* Delete Button */}
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteItem(item.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {quotation.items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <Input
-                        value={item.item}
-                        onChange={(e) =>
-                          handleItemChange(item.id, 'item', e.target.value)
-                        }
-                        placeholder="Item name"
-                        className="min-w-[140px]"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={item.description}
-                        onChange={(e) =>
-                          handleItemChange(item.id, 'description', e.target.value)
-                        }
-                        placeholder="Description"
-                        className="min-w-[180px]"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        value={item.color}
-                        onChange={(e) =>
-                          handleItemChange(item.id, 'color', e.target.value)
-                        }
-                        placeholder="Color"
-                        className="min-w-[90px]"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          handleItemChange(
-                            item.id,
-                            'quantity',
-                            parseInt(e.target.value) || 1
-                          )
-                        }
-                        className="w-[70px]"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={item.amount}
-                        onChange={(e) =>
-                          handleItemChange(
-                            item.id,
-                            'amount',
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                        className="w-[110px]"
-                      />
-                    </TableCell>
-                    <TableCell className="font-semibold">
-                      £{(item.amount * item.quantity).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeItem(item.id)}
-                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
 
           {/* Total */}
           <div className="mt-6 flex justify-end">
-            <div className="w-64 space-y-2">
-              <div className="flex justify-between border-t pt-2 text-2xl font-bold">
-                <span>Total:</span>
-                <span>£{quotation.total.toFixed(2)}</span>
-              </div>
-            </div>
+            <Card className="w-64">
+              <CardContent className="pt-6">
+                <div className="flex justify-between text-2xl font-bold">
+                  <span>Total:</span>
+                  <span>£{quotation.total.toFixed(2)}</span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </CardContent>
       </Card>

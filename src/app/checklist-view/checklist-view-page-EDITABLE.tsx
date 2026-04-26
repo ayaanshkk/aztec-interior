@@ -30,6 +30,8 @@ import {
   X as CloseIcon
 } from "lucide-react";
 import Link from "next/link";
+import { BACKEND_URL } from "@/lib/api";
+
 
 interface User {
   id: number;

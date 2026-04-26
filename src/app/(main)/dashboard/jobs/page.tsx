@@ -90,7 +90,7 @@ export default function JobsPage() {
 
       while (retryCount <= maxRetries) {
         try {
-          response = await fetch("https://aztec-interior.onrender.com/jobs", {
+          response = await fetch(`${BACKEND_URL}/jobs", {
             headers,
             signal: AbortSignal.timeout(15000), // 15 second timeout
           });

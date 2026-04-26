@@ -21,6 +21,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
+import { BACKEND_URL } from "@/lib/api";
 
 interface Appliance {
   make: string;
@@ -300,7 +301,7 @@ function OrderMaterialsDialog({
 
       const token = localStorage.getItem('token');
 
-      const response = await fetch('https://aztec-interior.onrender.com/materials', {
+      const response = await fetch(`${BACKEND_URL}/materials`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -987,7 +988,7 @@ export default function FormPage() {
     setSubmitStatus({ type: null, message: "" });
 
     try {
-      const response = await fetch("https://aztec-interior.onrender.com/submit-customer-form", {
+      const response = await fetch(`${BACKEND_URL}/submit-customer-form`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

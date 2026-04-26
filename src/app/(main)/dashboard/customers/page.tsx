@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 import { CustomerProjectTimeline } from "@/components/materials/CustomerProjectTimeline";
 import { useAuth } from "@/contexts/AuthContext";
+import { BACKEND_URL } from "@/lib/api";
 
 // ---------------- Constants ----------------
 const CUSTOMERS_PER_PAGE = 25;
@@ -180,17 +181,20 @@ export default function CustomersPage() {
       const token = localStorage.getItem("auth_token");
       const headers: HeadersInit = { Authorization: `Bearer ${token}` };
 
-      console.log("🔄 Fetching customers...");
+      console.log("Fetching customers from:", `${BACKEND_URL}/customers`);
       
-      const response = await fetch("https://aztec-interior.onrender.com/customers", {
+      const response = await fetch(`${BACKEND_URL}/customers`, {
         headers,
       });
 
-      if (!response.ok) throw new Error("Failed to fetch customers");
+      if (!response.ok) {
+        console.error(`Customers API returned ${response.status}`);
+        throw new Error(`Failed to fetch customers: ${response.status}`);
+      }
 
       const data = await response.json();
 
-      console.log(`✅ Customers received: ${data.length} customers`);
+      console.log(`Customers received: ${data.length} customers`);
 
       // Map the data
       const customersWithData = data.map((c: any) => {
@@ -211,13 +215,13 @@ export default function CustomersPage() {
       setAllCustomers(customersWithData);
 
       const endTime = performance.now();
-      console.log(`⏱️ Page loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+      console.log(`Page loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
-      // ✅ DEBUG: Log Accepted stage customers
+      // DEBUG: Log Accepted stage customers
       const acceptedCustomers = customersWithData.filter((c: Customer) => 
         (c.stage || "").trim().toLowerCase() === "accepted"
       );
-      console.log(`🟣 Found ${acceptedCustomers.length} customers in Accepted stage:`, 
+      console.log(`Found ${acceptedCustomers.length} customers in Accepted stage:`, 
         acceptedCustomers.map((c: Customer) => c.name)
       );
 
@@ -240,7 +244,7 @@ export default function CustomersPage() {
     try {
       const token = localStorage.getItem("auth_token");
       const response = await fetch(
-        `https://aztec-interior.onrender.com/customers/${customerId}/projects`,
+        `${BACKEND_URL}/customers/${customerId}/projects`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -414,7 +418,7 @@ export default function CustomersPage() {
 
     try {
       const token = localStorage.getItem("auth_token");
-      const res = await fetch(`https://aztec-interior.onrender.com/customers/${id}`, {
+      const res = await fetch(`${BACKEND_URL}/customers/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
