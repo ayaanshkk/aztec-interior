@@ -197,7 +197,7 @@ export default function ChecklistViewPage() {
           Authorization: `Bearer ${token}`,
         };
 
-        const userResponse = await fetch(`${BACKEND_URL}/users/me", { headers });
+        const userResponse = await fetch("https://aztec-interior.onrender.com/users/me", { headers });
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setUser(userData);

@@ -3,34 +3,29 @@
 // Pick basePath normally
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
-// 🚀 NEW: Localhost backend for development
+// 🚀 Backend URL (localhost for dev, production for deployed)
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
 
-// Auth uses Next.js API routes (your frontend)
-const AUTH_API_ROOT = `${BASE_PATH}/api`;
-
-// Data uses backend API (now on localhost)
-const DATA_API_ROOT = BACKEND_URL;
+// All API calls now go to the backend (no Next.js API routes)
+const API_ROOT = `${BACKEND_URL}/api`;
 
 // ✅ EXPORT BACKEND_URL FOR USE IN COMPONENTS
-export { BACKEND_URL };
+export { BACKEND_URL, API_ROOT };
 
 // 🔍 DEBUG LOG
 if (typeof window !== "undefined") {
   console.log("🌐 API Configuration:", {
     BASE_PATH,
-    AUTH_API_ROOT,
-    DATA_API_ROOT,
-    BACKEND_URL, 
+    API_ROOT,
+    BACKEND_URL,
   });
 }
 
-
 // ✅ Helper function to redirect to login with basePath support
 function redirectToLogin() {
-  if (typeof window !== 'undefined') {
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  if (typeof window !== "undefined") {
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
     window.location.href = `${basePath}/login`;
   }
 }
@@ -39,15 +34,12 @@ function redirectToLogin() {
 const pendingRequests = new Map<string, Promise<any>>();
 
 function deduplicateRequest<T>(key: string, requestFn: () => Promise<T>): Promise<T> {
-  // If request is already pending, return existing promise
   if (pendingRequests.has(key)) {
     console.log(`♻️ Reusing pending request: ${key}`);
     return pendingRequests.get(key)!;
   }
 
-  // Create new request
   const promise = requestFn().finally(() => {
-    // Clean up after request completes
     pendingRequests.delete(key);
   });
 
@@ -55,22 +47,24 @@ function deduplicateRequest<T>(key: string, requestFn: () => Promise<T>): Promis
   return promise;
 }
 
-// ✅ INCREASED TIMEOUT: 30s for slow Render backend (handles cold starts)
+// ✅ INCREASED TIMEOUT: 30s for slow backend (handles cold starts)
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 30000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
-  
+
   try {
     const response = await fetch(url, {
       ...options,
-      signal: controller.signal
+      signal: controller.signal,
     });
     clearTimeout(id);
     return response;
   } catch (error: any) {
     clearTimeout(id);
-    if (error.name === 'AbortError') {
-      throw new Error(`Request timeout after ${timeout}ms - server is taking too long to respond`);
+    if (error.name === "AbortError") {
+      throw new Error(
+        `Request timeout after ${timeout}ms - server is taking too long to respond`
+      );
     }
     throw error;
   }
@@ -78,19 +72,19 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout 
 
 /**
  * Helper function for PUBLIC API calls (no authentication required)
- * Used for login/register - calls Next.js API routes
+ * Used for login/register
  */
 export async function fetchPublic(path: string, options: RequestInit = {}) {
-  const url = `${AUTH_API_ROOT}${path.startsWith("/") ? "" : "/"}${path}`;
+  const url = `${API_ROOT}${path.startsWith("/") ? "" : "/"}${path}`;
 
-  console.log('📡 fetchPublic calling:', url);
+  console.log("📡 fetchPublic calling:", url);
 
   const headers = {
     "Content-Type": "application/json",
     ...options.headers,
   };
 
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     ...options,
     headers,
   });
@@ -100,17 +94,17 @@ export async function fetchPublic(path: string, options: RequestInit = {}) {
 
 /**
  * Helper function to make authenticated API calls
- * Used for data endpoints - calls external Render backend
  */
 export async function fetchWithAuth(path: string, options: RequestInit = {}) {
-  const token = localStorage.getItem("auth_token");
+  const token = localStorage.getItem("token"); // Changed from "auth_token"
 
-  const url = `${DATA_API_ROOT}${path.startsWith("/") ? "" : "/"}${path}`;
+  const url = `${API_ROOT}${path.startsWith("/") ? "" : "/"}${path}`;
 
-  console.log('📡 fetchWithAuth calling:', url);
+  console.log("📡 fetchWithAuth calling:", url);
 
   if (!token) {
     console.error("No auth token found");
+    redirectToLogin();
     throw new Error("Not authenticated");
   }
 
@@ -121,22 +115,31 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
   };
 
   try {
-    // ✅ Increased timeout to 30s for Render cold starts
-    const response = await fetchWithTimeout(url, {
-      ...options,
-      headers,
-    }, 30000);
+    const response = await fetchWithTimeout(
+      url,
+      {
+        ...options,
+        headers,
+      },
+      30000
+    );
 
-    // ✅ DON'T logout on 401 - mock auth setup
+    // Handle 401 - redirect to login
     if (response.status === 401) {
-      console.warn("⚠️ Got 401 from backend - continuing with mock auth");
+      console.warn("⚠️ Got 401 - token expired or invalid");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      redirectToLogin();
+      throw new Error("Authentication expired");
     }
 
     return response;
   } catch (error: any) {
-    if (error.name === 'AbortError' || error.message.includes('timeout')) {
-      console.error("⏱️ Request timeout - backend not responding (likely cold start)");
-      throw new Error("Request timeout - the server is taking too long. Please try again.");
+    if (error.name === "AbortError" || error.message.includes("timeout")) {
+      console.error("⏱️ Request timeout - backend not responding");
+      throw new Error(
+        "Request timeout - the server is taking too long. Please try again."
+      );
     }
     throw error;
   }
@@ -144,12 +147,6 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
 
 // ✅ Helper to handle API responses gracefully
 async function handleApiResponse(response: Response) {
-  // For 401s, return empty data instead of throwing
-  if (response.status === 401) {
-    console.warn("⚠️ 401 response - returning empty data for mock auth");
-    return { data: [], error: "Backend authentication in progress" };
-  }
-
   if (response.ok) {
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
@@ -170,253 +167,224 @@ async function handleApiResponse(response: Response) {
   }
 }
 
-// Example usage functions
+// API methods
 export const api = {
-  // AUTH ENDPOINTS (use fetchPublic - calls Next.js API routes)
-  async login(email: string, password: string) {
-    const response = await fetchPublic("/auth/login", {
+  // ============================================
+  // AUTH ENDPOINTS (username/password)
+  // ============================================
+  async login(username: string, password: string) {
+    const response = await fetchPublic("/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
     return handleApiResponse(response);
   },
 
-  async register(userData: {
-    email: string;
-    password: string;
-    first_name: string;
-    last_name: string;
-    role?: string;
-  }) {
-    const response = await fetchPublic("/auth/register", {
+  async register(inviteData: { token: string; password: string }) {
+    const response = await fetchPublic("/register", {
       method: "POST",
-      body: JSON.stringify(userData),
+      body: JSON.stringify(inviteData),
     });
     return handleApiResponse(response);
   },
 
-  // DATA ENDPOINTS (use fetchWithAuth - calls Render backend)
+  async getCurrentUser() {
+    const response = await fetchWithAuth("/me");
+    return handleApiResponse(response);
+  },
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    const response = await fetchWithAuth("/change-password", {
+      method: "POST",
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
+    return handleApiResponse(response);
+  },
+
+  // ============================================
+  // CUSTOMER ENDPOINTS
+  // ============================================
   async getCustomers() {
-    return deduplicateRequest('getCustomers', async () => {
-      try {
-        const response = await fetchWithAuth("/customers");
-        return await handleApiResponse(response);
-      } catch (error) {
-        console.warn("⚠️ getCustomers failed, returning empty data");
-        return { customers: [] };
-      }
+    return deduplicateRequest("getCustomers", async () => {
+      const response = await fetchWithAuth("/customers");
+      return handleApiResponse(response);
     });
   },
 
-  async getJobs() {
-    return deduplicateRequest('getJobs', async () => {
-      try {
-        const response = await fetchWithAuth("/jobs");
-        return await handleApiResponse(response);
-      } catch (error) {
-        console.warn("⚠️ getJobs failed, returning empty data");
-        return { jobs: [] };
-      }
-    });
+  async getCustomer(customerId: string) {
+    const response = await fetchWithAuth(`/customers/${customerId}`);
+    return handleApiResponse(response);
   },
 
-  async getPipeline() {
-    return deduplicateRequest('getPipeline', async () => {
-      try {
-        const response = await fetchWithAuth("/pipeline");
-        return await handleApiResponse(response);
-      } catch (error) {
-        console.warn("⚠️ getPipeline failed, returning empty data");
-        return { pipeline: [] };
-      }
-    });
-  },
-
-  async updateCustomerStage(customerId: string, stage: string, reason: string, updatedBy: string) {
-    const response = await fetchWithAuth(`/customers/${customerId}/stage`, {
-      method: "PATCH",
-      body: JSON.stringify({ stage, reason, updated_by: updatedBy }),
+  async createCustomer(customerData: any) {
+    const response = await fetchWithAuth("/customers", {
+      method: "POST",
+      body: JSON.stringify(customerData),
     });
     return handleApiResponse(response);
   },
 
-  async updateJobStage(jobId: string, stage: string, reason: string, updatedBy: string) {
-    const response = await fetchWithAuth(`/jobs/${jobId}/stage`, {
-      method: "PATCH",
-      body: JSON.stringify({ stage, reason, updated_by: updatedBy }),
+  async updateCustomer(customerId: string, customerData: any) {
+    const response = await fetchWithAuth(`/customers/${customerId}`, {
+      method: "PUT",
+      body: JSON.stringify(customerData),
     });
     return handleApiResponse(response);
   },
 
-  // ✅ ASSIGNMENT ENDPOINTS (Schedule Page) - WITH DEDUPLICATION
+  async deleteCustomer(customerId: string) {
+    const response = await fetchWithAuth(`/customers/${customerId}`, {
+      method: "DELETE",
+    });
+    return handleApiResponse(response);
+  },
+
+  // ============================================
+  // PROJECT ENDPOINTS
+  // ============================================
+  async getProjects() {
+    return deduplicateRequest("getProjects", async () => {
+      const response = await fetchWithAuth("/projects");
+      return handleApiResponse(response);
+    });
+  },
+
+  async getProject(projectId: number) {
+    const response = await fetchWithAuth(`/projects/${projectId}`);
+    return handleApiResponse(response);
+  },
+
+  async createProject(projectData: any) {
+    const response = await fetchWithAuth("/projects", {
+      method: "POST",
+      body: JSON.stringify(projectData),
+    });
+    return handleApiResponse(response);
+  },
+
+  async updateProject(projectId: number, projectData: any) {
+    const response = await fetchWithAuth(`/projects/${projectId}`, {
+      method: "PUT",
+      body: JSON.stringify(projectData),
+    });
+    return handleApiResponse(response);
+  },
+
+  async updateProjectStage(projectId: number, stageId: number) {
+    const response = await fetchWithAuth(`/projects/${projectId}/stage`, {
+      method: "PATCH",
+      body: JSON.stringify({ stage_id: stageId }),
+    });
+    return handleApiResponse(response);
+  },
+
+  // ============================================
+  // MATERIALS ENDPOINTS
+  // ============================================
+  async getMaterials(filters?: { client_id?: number; status?: string }) {
+    const params = new URLSearchParams();
+    if (filters?.client_id) params.append("client_id", filters.client_id.toString());
+    if (filters?.status) params.append("status", filters.status);
+    
+    const queryString = params.toString() ? `?${params.toString()}` : "";
+    const response = await fetchWithAuth(`/materials${queryString}`);
+    return handleApiResponse(response);
+  },
+
+  async createMaterial(materialData: any) {
+    const response = await fetchWithAuth("/materials", {
+      method: "POST",
+      body: JSON.stringify(materialData),
+    });
+    return handleApiResponse(response);
+  },
+
+  async updateMaterial(materialId: number, materialData: any) {
+    const response = await fetchWithAuth(`/materials/${materialId}`, {
+      method: "PATCH",
+      body: JSON.stringify(materialData),
+    });
+    return handleApiResponse(response);
+  },
+
+  // ============================================
+  // NOTIFICATIONS ENDPOINTS
+  // ============================================
+  async getNotifications() {
+    return deduplicateRequest("getNotifications", async () => {
+      const response = await fetchWithAuth("/notifications");
+      return handleApiResponse(response);
+    });
+  },
+
+  async markNotificationRead(notificationId: number) {
+    const response = await fetchWithAuth(`/notifications/${notificationId}/read`, {
+      method: "PATCH",
+    });
+    return handleApiResponse(response);
+  },
+
+  async markAllNotificationsRead() {
+    const response = await fetchWithAuth("/notifications/mark-all-read", {
+      method: "PATCH",
+    });
+    return handleApiResponse(response);
+  },
+
+  // ============================================
+  // QUOTATIONS ENDPOINTS
+  // ============================================
+  async getQuotations(filters?: { client_id?: number; project_id?: number }) {
+    const params = new URLSearchParams();
+    if (filters?.client_id) params.append("client_id", filters.client_id.toString());
+    if (filters?.project_id) params.append("project_id", filters.project_id.toString());
+    
+    const queryString = params.toString() ? `?${params.toString()}` : "";
+    const response = await fetchWithAuth(`/quotations${queryString}`);
+    return handleApiResponse(response);
+  },
+
+  async generateQuotationFromChecklist(formSubmissionId: number) {
+    const response = await fetchWithAuth(
+      `/quotations/generate-from-checklist/${formSubmissionId}`,
+      { method: "POST" }
+    );
+    return handleApiResponse(response);
+  },
+
+  // ============================================
+  // ASSIGNMENTS ENDPOINTS (Schedule)
+  // ============================================
   async getAssignments() {
-    return deduplicateRequest('getAssignments', async () => {
-      try {
-        console.log("📋 Fetching assignments...");
-        const response = await fetchWithAuth("/assignments");
-        
-        if (!response.ok) {
-          console.error(`❌ Assignments API returned ${response.status}`);
-          throw new Error(`Failed to fetch assignments: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log(`✅ Got ${data.length} assignments`);
-        return data;
-      } catch (error) {
-        console.error("❌ getAssignments failed:", error);
-        throw error;
-      }
-    });
-  },
-
-  async getAvailableJobs() {
-    return deduplicateRequest('getAvailableJobs', async () => {
-      try {
-        console.log("🔨 Fetching available jobs...");
-        const response = await fetchWithAuth("/jobs/available");
-        
-        if (!response.ok) {
-          console.warn(`⚠️ Jobs API returned ${response.status}`);
-          return []; // Return empty array instead of throwing
-        }
-        
-        const data = await response.json();
-        console.log(`✅ Got ${data.length} jobs`);
-        return data;
-      } catch (error) {
-        console.warn("⚠️ getAvailableJobs failed (non-critical):", error);
-        return []; // Return empty array for graceful degradation
-      }
-    });
-  },
-
-  async getActiveCustomers() {
-    return deduplicateRequest('getActiveCustomers', async () => {
-      try {
-        console.log("👥 Fetching active customers...");
-        const response = await fetchWithAuth("/customers/active");
-        
-        if (!response.ok) {
-          console.warn(`⚠️ Customers API returned ${response.status}`);
-          return []; // Return empty array instead of throwing
-        }
-        
-        const data = await response.json();
-        console.log(`✅ Got ${data.length} customers`);
-        return data;
-      } catch (error) {
-        console.warn("⚠️ getActiveCustomers failed (non-critical):", error);
-        return []; // Return empty array for graceful degradation
-      }
+    return deduplicateRequest("getAssignments", async () => {
+      const response = await fetchWithAuth("/assignments");
+      return handleApiResponse(response);
     });
   },
 
   async createAssignment(assignmentData: any) {
-    try {
-      console.log("📝 Creating assignment:", assignmentData);
-      console.log("⏳ This may take up to 30 seconds if the server is waking up...");
-      
-      const response = await fetchWithAuth("/assignments", {
-        method: "POST",
-        body: JSON.stringify(assignmentData),
-      });
-      
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Failed to create assignment: ${response.status}`);
-        } else {
-          const errorText = await response.text();
-          console.error("Non-JSON error response:", errorText);
-          throw new Error(`Server error: ${response.status}. Please try again.`);
-        }
-      }
-      
-      const result = await response.json();
-      console.log("✅ Assignment created:", result.assignment?.id || result.id);
-      return result.assignment || result;
-    } catch (error: any) {
-      console.error("❌ createAssignment failed:", error);
-      if (error.message.includes('timeout')) {
-        throw new Error('The server is taking too long to respond. This might be because the server is waking up. Please try again in a moment.');
-      }
-      throw error;
-    }
+    const response = await fetchWithAuth("/assignments", {
+      method: "POST",
+      body: JSON.stringify(assignmentData),
+    });
+    return handleApiResponse(response);
   },
 
   async updateAssignment(assignmentId: string, assignmentData: any) {
-    try {
-      console.log(`📝 Updating assignment ${assignmentId}:`, assignmentData);
-      const response = await fetchWithAuth(`/assignments/${assignmentId}`, {
-        method: "PUT",
-        body: JSON.stringify(assignmentData),
-      });
-      
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to update assignment");
-        } else {
-          throw new Error(`Server error: ${response.status}`);
-        }
-      }
-      
-      const result = await response.json();
-      console.log("✅ Assignment updated:", result.assignment?.id || result.id);
-      return result.assignment || result;
-    } catch (error) {
-      console.error("❌ updateAssignment failed:", error);
-      throw error;
-    }
+    const response = await fetchWithAuth(`/assignments/${assignmentId}`, {
+      method: "PUT",
+      body: JSON.stringify(assignmentData),
+    });
+    return handleApiResponse(response);
   },
 
   async deleteAssignment(assignmentId: string) {
-    try {
-      console.log(`🗑️ Deleting assignment ${assignmentId}`);
-      const response = await fetchWithAuth(`/assignments/${assignmentId}`, {
-        method: "DELETE",
-      });
-      
-      if (!response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to delete assignment");
-        } else {
-          throw new Error(`Server error: ${response.status}`);
-        }
-      }
-      
-      console.log("✅ Assignment deleted");
-      return true;
-    } catch (error) {
-      console.error("❌ deleteAssignment failed:", error);
-      throw error;
-    }
-  },
-
-  async getAssignmentsByDateRange(startDate: string, endDate: string) {
-    return deduplicateRequest(`getAssignmentsByDateRange-${startDate}-${endDate}`, async () => {
-      try {
-        console.log(`📅 Fetching assignments from ${startDate} to ${endDate}`);
-        const response = await fetchWithAuth(
-          `/assignments/by-date-range?start_date=${startDate}&end_date=${endDate}`
-        );
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch assignments by date range: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log(`✅ Got ${data.length} assignments in range`);
-        return data;
-      } catch (error) {
-        console.error("❌ getAssignmentsByDateRange failed:", error);
-        throw error;
-      }
+    const response = await fetchWithAuth(`/assignments/${assignmentId}`, {
+      method: "DELETE",
     });
+    return handleApiResponse(response);
   },
 };

@@ -61,14 +61,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   if (!currentUser) return null;
 
-  // ✅ Debug: Log the user role
+  // ✅ Get filtered sidebar items - pass role directly (getSidebarItems handles case-insensitive)
+  const sidebarItems = getSidebarItems(currentUser.role || "");
+
   console.log("Current user role:", currentUser.role);
-  console.log("Full user object:", currentUser);
-
-  // ✅ Get filtered sidebar items - with fallback to show all if role doesn't match
-  const userRole = currentUser.role?.toLowerCase();
-  const sidebarItems = getSidebarItems(userRole);
-
   console.log("Filtered sidebar items:", sidebarItems);
 
   return (

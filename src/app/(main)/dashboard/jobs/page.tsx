@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { fetchWithAuth } from "@/lib/api";
+import { fetchWithAuth, BACKEND_URL } from "@/lib/api";
 import JobStageBadge from "@/components/JobStageBadge"; // ✅ Import the badge component
 
 const JOB_TYPES = ["Kitchen", "Bedroom", "Wardrobe", "Remedial", "Other"];
@@ -71,12 +71,12 @@ export default function JobsPage() {
     try {
       const token = localStorage.getItem("auth_token");
       if (!token) {
-        console.error("❌ No auth token found");
+        console.error("ERROR: No auth token found");
         setLoading(false);
         return;
       }
 
-      console.log("🔄 Fetching tasks...");
+      console.log("Fetching tasks...");
       
       const headers: HeadersInit = { 
         Authorization: `Bearer ${token}`,
@@ -90,7 +90,7 @@ export default function JobsPage() {
 
       while (retryCount <= maxRetries) {
         try {
-          response = await fetch(`${BACKEND_URL}/jobs", {
+          response = await fetch(`${BACKEND_URL}/jobs`, {
             headers,
             signal: AbortSignal.timeout(15000), // 15 second timeout
           });
@@ -103,7 +103,7 @@ export default function JobsPage() {
           if (response.status === 408 || response.status >= 500) {
             retryCount++;
             if (retryCount <= maxRetries) {
-              console.log(`⏳ Retry ${retryCount}/${maxRetries} for tasks...`);
+              console.log(`Retry ${retryCount}/${maxRetries} for tasks...`);
               await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
               continue;
             }
@@ -115,7 +115,7 @@ export default function JobsPage() {
           if (error.name === 'AbortError' || error.name === 'TimeoutError') {
             if (retryCount < maxRetries) {
               retryCount++;
-              console.log(`⏳ Timeout - Retry ${retryCount}/${maxRetries} for tasks...`);
+              console.log(`Timeout - Retry ${retryCount}/${maxRetries} for tasks...`);
               await new Promise(resolve => setTimeout(resolve, 2000));
               continue;
             }
@@ -188,7 +188,7 @@ export default function JobsPage() {
         prev.map((j) => (j.id === jobId ? { ...j, work_stage: updatedJob.work_stage } : j))
       );
       
-      console.log(`✅ Updated task ${jobId} work stage to ${newWorkStage}`);
+      console.log(`Updated task ${jobId} work stage to ${newWorkStage}`);
     } catch (error) {
       console.error("Error updating work stage:", error);
       alert(`Failed to update work stage: ${error instanceof Error ? error.message : 'Please try again'}`);

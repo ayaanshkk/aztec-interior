@@ -65,74 +65,68 @@ const allSidebarItems: NavGroup[] = [
         title: "Dashboard",
         url: "/dashboard/default",
         icon: Home,
-        roles: ["manager", "hr", "sales", "production"],
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {
         title: "Sales Pipeline",
         url: "/dashboard/sales_pipeline",
         icon: Briefcase,
-        roles: ["manager", "hr", "sales", "production"],
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {
         title: "Customers",
         url: "/dashboard/customers",
         icon: Users,
-        roles: ["manager", "hr", "sales", "production"],
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {
         title: "Tasks",
         url: "/dashboard/jobs",
         icon: Briefcase,
-        roles: ["manager", "hr", "production"],
+        roles: ["Platform Admin", "Production Team"],
       },
       {
         title: "Orders",
         url: "/dashboard/materials",
         icon: Package,
-        roles: ["manager", "hr", "production"],
+        roles: ["Platform Admin", "Production Team"],
       },
       {
         title: "Schedule",
         url: "/dashboard/schedule",
         icon: Calendar,
-        roles: ["manager", "hr", "sales", "production"],
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {
         title: "Forms/Checklists",
         url: "/dashboard/forms",
         icon: FileText,
-        roles: ["manager", "hr", "sales", "production"],
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {
         title: "Appliance Catalogue",
         url: "/dashboard/appliances",
         icon: Forklift,
-        roles: ["manager", "hr", "production"],
+        roles: ["Platform Admin", "Production Team"],
       },
       {
         title: "Chatbot",
         url: "/dashboard/chatbot",
         icon: Bot,
-        roles: ["manager", "hr", "sales", "production"],
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
-      // {
-      //   title: "Approvals",
-      //   url: "/dashboard/approvals",
-      //   icon: CheckCircle,
-      //   roles: ["manager"],
-      // },
       {
         title: "Notifications",
         url: "/dashboard/notifications",
         icon: Bell,
-        roles: ["manager", "hr", "sales", "production"],
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
         // Badge will be set dynamically - don't hardcode it here
       },
       {
         title: "Settings",
         url: "/dashboard/settings",
         icon: Settings,
-        roles: ["manager", "hr", "sales", "production"],
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
     ],
   },
@@ -140,7 +134,10 @@ const allSidebarItems: NavGroup[] = [
 
 // Filter sidebar items based on user role and optionally set notification badge
 export const getSidebarItems = (userRole: string, notificationCount?: number): NavGroup[] => {
-  const normalizedRole = userRole?.toLowerCase();
+  if (!userRole) return [];
+  
+  const normalizedRole = userRole.toLowerCase();
+  
   return allSidebarItems
     .map((group) => ({
       ...group,
@@ -148,8 +145,8 @@ export const getSidebarItems = (userRole: string, notificationCount?: number): N
         .filter((item) => {
           // If no roles defined, show to everyone
           if (!item.roles || item.roles.length === 0) return true;
-          // Check if user's role is in the allowed roles
-          return item.roles.includes(userRole);
+          // Check if user's role is in the allowed roles (case-insensitive)
+          return item.roles.some(role => role.toLowerCase() === normalizedRole);
         })
         .map((item) => {
           // Update notification badge count dynamically
@@ -165,5 +162,5 @@ export const getSidebarItems = (userRole: string, notificationCount?: number): N
     .filter((group) => group.items.length > 0); // Remove empty groups
 };
 
-// For backwards compatibility, export default items (manager view shows all)
-export const sidebarItems = getSidebarItems("manager");
+// For backwards compatibility, export default items (platform admin view shows all)
+export const sidebarItems = getSidebarItems("Platform Admin");

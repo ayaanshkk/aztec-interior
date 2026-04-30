@@ -32,7 +32,6 @@ import {
 import Link from "next/link";
 import { BACKEND_URL } from "@/lib/api";
 
-
 interface User {
   id: number;
   name: string;

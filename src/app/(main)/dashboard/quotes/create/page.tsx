@@ -394,7 +394,6 @@ export default function CreateQuotePage() {
       }
 
       const response = await fetch(`${BACKEND_URL}/quotations/${savedQuoteId}/pdf`, {
-
         method: "GET",
         headers: headers,
       });
