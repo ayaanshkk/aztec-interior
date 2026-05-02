@@ -14,7 +14,7 @@ export default function QuotePDFPage() {
 
     const fetchPDF = async () => {
       try {
-        const token = localStorage.getItem("auth_token");
+        const token = localStorage.getItem("token");
         const response = await fetch(
           `https://aztec-interior.onrender.com/quotations/${quoteId}/pdf`,
           {

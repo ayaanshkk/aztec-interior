@@ -197,7 +197,7 @@ export default function InvoicePage() {
     setMessage("Saving invoice...");
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
 
       if (!token) {
         setMessage("❌ You must be logged in to save invoices.");

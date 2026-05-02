@@ -170,7 +170,7 @@ export default function CreateProjectPage() {
     setError(null);
     setLoading(true);
 
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
 
     if (!token) {
       setError("Authentication error: Your session has expired. Please log in again.");

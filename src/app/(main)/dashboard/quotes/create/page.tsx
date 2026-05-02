@@ -202,7 +202,7 @@ export default function CreateQuotePage() {
     setIsSubmitting(true);
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
       };
@@ -295,7 +295,7 @@ export default function CreateQuotePage() {
       setLoading(true);
       setStatusMessage("⏳ Generating quote...");
 
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
       };
@@ -386,7 +386,7 @@ export default function CreateQuotePage() {
     setIsDownloading(true);
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const headers: HeadersInit = {};
 
       if (token) {

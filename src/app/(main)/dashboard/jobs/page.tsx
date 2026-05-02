@@ -69,7 +69,7 @@ export default function JobsPage() {
     const startTime = performance.now();
     
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       if (!token) {
         console.error("ERROR: No auth token found");
         setLoading(false);

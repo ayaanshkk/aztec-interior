@@ -90,7 +90,7 @@ export default function DataImportComponent({ onImportComplete, trigger }: DataI
 
       // Use the centralized API_ROOT for file upload
       // Note: For FormData, we don't set Content-Type header (browser sets it with boundary)
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
 
       const response = await fetch(`${API_ROOT}/import/upload`, {
         method: "POST",
@@ -156,7 +156,7 @@ export default function DataImportComponent({ onImportComplete, trigger }: DataI
   const pollImportStatus = async (importId: number) => {
     try {
       // Use the centralized API_ROOT for polling
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
 
       const response = await fetch(`${API_ROOT}/import/${importId}/status`, {
         headers: {

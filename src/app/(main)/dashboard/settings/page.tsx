@@ -96,7 +96,7 @@ export default function SettingsPage() {
     setIsLoadingUser(true);
     try {
       // Get the token with correct key
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       
       if (!token) {
         console.error("No auth_token found in localStorage");
@@ -137,7 +137,7 @@ export default function SettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       if (!token) {
         console.warn("No auth token found, cannot fetch users.");
         return;
@@ -200,7 +200,7 @@ export default function SettingsPage() {
 
   const saveCompanySettings = async () => {
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       if (!token) throw new Error("Not authenticated");
 
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -272,7 +272,7 @@ export default function SettingsPage() {
     setIsSubmitting(true);
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       if (!token) throw new Error("Not authenticated");
 
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -366,7 +366,7 @@ export default function SettingsPage() {
     }
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       if (!token) throw new Error("Not authenticated");
 
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -411,7 +411,7 @@ export default function SettingsPage() {
     if (!user) return;
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       if (!token) throw new Error("Not authenticated");
 
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -459,7 +459,7 @@ export default function SettingsPage() {
     if (!confirm("Are you sure you want to delete this user?")) return;
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       if (!token) throw new Error("Not authenticated");
 
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
@@ -496,7 +496,7 @@ export default function SettingsPage() {
     updateUser(id, "is_active", newStatus);
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       if (!token) throw new Error("Not authenticated");
 
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';

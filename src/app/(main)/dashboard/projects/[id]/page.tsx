@@ -330,7 +330,7 @@ export default function ProjectDetailsPage() {
     setLoading(true);
     setError(null);
     
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers = {
       "Content-Type": "application/json",
       ...(token && { "Authorization": `Bearer ${token}` })
@@ -592,7 +592,7 @@ export default function ProjectDetailsPage() {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -668,7 +668,7 @@ export default function ProjectDetailsPage() {
   const handleConfirmDeleteDrawing = useCallback(async () => {
     if (!drawingToDelete || isDeletingDrawing) return;
     setIsDeletingDrawing(true);
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -747,7 +747,7 @@ export default function ProjectDetailsPage() {
   };
 
   const handleAddTask = useCallback(async () => {
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {
       "Content-Type": "application/json",
     };
@@ -788,7 +788,7 @@ export default function ProjectDetailsPage() {
   }, [taskData, projectId, project, customer]);
 
   const generateToken = useCallback(async (type: string) => {
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = { "Content-Type": "application/json" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -1031,7 +1031,7 @@ export default function ProjectDetailsPage() {
     setShowQuoteGenerationDialog(false);
     
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `${BACKEND_URL}/quotations/generate-from-checklist/${checklistForQuote.id}`,
         {
@@ -1248,7 +1248,7 @@ const handleCreateInvoice = useCallback(() => {
     if (!formToDelete || isDeletingForm) return;
     
     setIsDeletingForm(true);
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {
       "Content-Type": "application/json",
     };

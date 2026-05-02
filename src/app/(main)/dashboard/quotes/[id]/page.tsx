@@ -77,7 +77,7 @@ export default function QuoteDetailsPage() {
     setError("");
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
       };
@@ -134,7 +134,7 @@ export default function QuoteDetailsPage() {
   const handleDownloadPDF = async () => {
     setDownloading(true);
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const headers: HeadersInit = {};
 
       if (token) {
@@ -177,7 +177,7 @@ export default function QuoteDetailsPage() {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const headers: HeadersInit = {
         "Content-Type": "application/json",
       };

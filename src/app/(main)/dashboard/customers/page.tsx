@@ -178,7 +178,7 @@ export default function CustomersPage() {
     const startTime = performance.now();
     
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const headers: HeadersInit = { Authorization: `Bearer ${token}` };
 
       console.log("Fetching customers from:", `${BACKEND_URL}/customers`);
@@ -242,7 +242,7 @@ export default function CustomersPage() {
     setLoadingProjects(prev => ({ ...prev, [customerId]: true }));
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `${BACKEND_URL}/customers/${customerId}/projects`,
         {
@@ -417,7 +417,7 @@ export default function CustomersPage() {
     if (!window.confirm("Are you sure you want to delete this customer?")) return;
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const res = await fetch(`${BACKEND_URL}/customers/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },

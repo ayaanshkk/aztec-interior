@@ -416,7 +416,7 @@ export default function CustomerDetailsPage() {
   const loadCustomerData = async () => {
     setLoading(true);
 
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {
       "Content-Type": "application/json",
     };
@@ -488,7 +488,7 @@ export default function CustomerDetailsPage() {
         paymentTermsData
       ] = await Promise.all([
         fetchWithFallback(`${BACKEND_URL}/files/drawings?customer_id=${id}`),
-        fetchWithFallback(`${BACKEND_URL}/files/forms?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/customers/${id}/forms`),
         fetchWithFallback(`${BACKEND_URL}/quotations?customer_id=${id}`),
         fetchWithFallback(`${BACKEND_URL}/invoices?customer_id=${id}`),
         fetchWithFallback(`${BACKEND_URL}/receipts?customer_id=${id}`),
@@ -505,10 +505,27 @@ export default function CustomerDetailsPage() {
 
       // ✅ Process form documents
       if (formDocsData && Array.isArray(formDocsData)) {
-        const unassignedForms = formDocsData.filter(form => !form.project_id);
-        setFormDocuments(unassignedForms);
+        const formSubmissions = formDocsData.filter(form => {
+          return form && form.id && form.form_data;
+        });
+        
+        // Add to customer.form_submissions
+        setCustomer(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            form_submissions: formSubmissions
+          };
+        });
       } else {
-        setFormDocuments([]);
+        console.log("No form submissions or invalid format");
+        setCustomer(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            form_submissions: []
+          };
+        });
       }
 
       // ✅ Process and combine all financial documents
@@ -597,7 +614,7 @@ const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) 
   const files = event.target.files;
   if (!files || files.length === 0) return;
 
-  const token = localStorage.getItem("auth_token");
+  const token = localStorage.getItem("token");
   const headers: HeadersInit = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -677,7 +694,7 @@ const handleDrop = async (e: React.DragEvent, projectId: string) => {
 
   if (!draggedItem) return;
 
-  const token = localStorage.getItem("auth_token");
+  const token = localStorage.getItem("token");
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
@@ -760,7 +777,7 @@ const handleConfirmDeleteFormDocument = async () => {
   if (!formDocToDelete) return;
   setIsDeletingFormDoc(true);
   
-  const token = localStorage.getItem("auth_token");
+  const token = localStorage.getItem("token");
   const headers: HeadersInit = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -814,7 +831,7 @@ const handleConfirmDeleteFormDocument = async () => {
 
   const handleConfirmBulkDeleteDrawings = async () => {
     setIsBulkDeleting(true);
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -878,7 +895,7 @@ const handleConfirmDeleteFormDocument = async () => {
 
   const handleConfirmBulkDeleteFormDocs = async () => {
     setIsBulkDeleting(true);
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -918,7 +935,7 @@ const handleConfirmDeleteFormDocument = async () => {
     const files = fileInputRef.current?.files;
     if (!files || files.length === 0) return;
 
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {};
 
     if (token) {
@@ -1023,7 +1040,7 @@ const handleConfirmDeleteFormDocument = async () => {
     if (!drawingToDelete) return;
 
     setIsDeletingDrawing(true);
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -1187,7 +1204,7 @@ const handleConfirmDeleteFormDocument = async () => {
   };
 
   const loadProjectData = async (projectId: string) => {
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {
       "Content-Type": "application/json",
     };
@@ -1251,7 +1268,7 @@ const handleConfirmDeleteFormDocument = async () => {
     if (!selectedProject || isSavingProject) return;
 
     setIsSavingProject(true);
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {
       "Content-Type": "application/json",
     };
@@ -1336,7 +1353,7 @@ const handleConfirmDeleteFormDocument = async () => {
     if (!selectedForm || !editFormData || isSavingForm) return;
 
     setIsSavingForm(true);
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
 
     try {
       const response = await fetch(
@@ -1500,7 +1517,7 @@ const handleConfirmDeleteFormDocument = async () => {
     setShowQuoteGenerationDialog(false);
     
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       
       console.log("🔄 Generating quote from checklist:", checklistForQuote);
       
@@ -2354,7 +2371,7 @@ const handleConfirmDeleteFormDocument = async () => {
     if (!projectToDelete || isDeletingProject) return;
 
     setIsDeletingProject(true);
-    const token = localStorage.getItem("auth_token");
+    const token = localStorage.getItem("token");
     const headers: HeadersInit = {
       "Authorization": `Bearer ${token}`,
     };
@@ -2387,7 +2404,7 @@ const handleConfirmDeleteFormDocument = async () => {
     if (!formToDelete || !canDelete()) return;
     setIsDeleting(true);
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       if (!token) {
         alert("You must be logged in to delete form submissions");
         setIsDeleting(false);

@@ -163,7 +163,7 @@ export default function ChecklistViewPage() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const token = localStorage.getItem("auth_token");
+        const token = localStorage.getItem("token");
         if (!token) {
           router.push("/login");
           return;
@@ -196,7 +196,7 @@ export default function ChecklistViewPage() {
 
     const fetchFormData = async () => {
       try {
-        const token = localStorage.getItem("auth_token");
+        const token = localStorage.getItem("token");
         const headers: HeadersInit = {
           "Content-Type": "application/json",
         };
@@ -397,7 +397,7 @@ export default function ChecklistViewPage() {
 
     setIsSaving(true);
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `https://aztec-interior.onrender.com/form-submissions/${formSubmissionId}`,
         {
@@ -440,7 +440,7 @@ export default function ChecklistViewPage() {
 
     setIsDeleting(true);
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = localStorage.getItem("token");
       const response = await fetch(
         `https://aztec-interior.onrender.com/form-submissions/${formSubmissionId}`,
         {
