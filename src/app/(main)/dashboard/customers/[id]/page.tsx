@@ -16,7 +16,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-// ✅ ADD THIS - AlertDialog import
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +26,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -54,7 +59,10 @@ import {
   Package,
   Image,
   Upload,
-  Loader2, 
+  Loader2,
+  User,
+  FolderOpen,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Label } from "@/components/ui/label";
@@ -105,8 +113,9 @@ interface FormSubmission {
 }
 
 interface Quotation {
-  id: number;
-  reference_number: string;
+  id?: number;
+  quotation_id?: number;
+  reference_number?: string;
   total: number;
   status: string;
   notes: string;
@@ -180,7 +189,6 @@ interface FormDocument {
   customer_id: string;
 }
 
-// ... (keeping all your existing constants the same - FIELD_LABELS, FINANCIAL_FIELDS, etc.)
 const FIELD_LABELS: Record<string, string> = {
   customer_name: "Customer Name",
   customer_phone: "Phone Number",
@@ -286,7 +294,6 @@ const PROJECT_STAGES = [
   "Other",
 ];
 
-// ... (keeping all your helper functions the same)
 const formatDate = (dateString: string) => {
   if (!dateString) return "—";
   try {
@@ -350,7 +357,7 @@ export default function CustomerDetailsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formFileInputRef = useRef<HTMLInputElement>(null);
   
-  // NEW: Bulk delete states
+  const [activeTab, setActiveTab] = useState("contact");
   const [selectedDrawings, setSelectedDrawings] = useState<Set<string>>(new Set());
   const [selectedFormDocs, setSelectedFormDocs] = useState<Set<string>>(new Set());
   const [showBulkDeleteDrawingsDialog, setShowBulkDeleteDrawingsDialog] = useState(false);
@@ -426,9 +433,7 @@ export default function CustomerDetailsPage() {
     }
 
     try {
-      // ✅ Fetch customer data first
       const customerRes = await fetch(`${BACKEND_URL}/customers/${id}`, { headers });
-
 
       if (!customerRes.ok) {
         throw new Error("Failed to load customer data");
@@ -436,13 +441,11 @@ export default function CustomerDetailsPage() {
 
       const customerData = await customerRes.json();
       
-      // Normalize postcode
       const normalizedCustomer = {
         ...customerData,
         postcode: customerData.post_code ?? customerData.postcode ?? "",
       };
 
-      // Check permissions
       if (user?.role === "Sales" && customerData.created_by !== user.id && customerData.salesperson !== user.name) {
         setHasAccess(true);
       } else if (user?.role === "Staff") {
@@ -458,7 +461,6 @@ export default function CustomerDetailsPage() {
 
       setCustomer(normalizedCustomer);
 
-      // ✅ Helper function to safely fetch data
       const fetchWithFallback = async (url: string) => {
         try {
           const response = await fetch(url, { headers });
@@ -478,7 +480,6 @@ export default function CustomerDetailsPage() {
         }
       };
 
-      // ✅ PARALLEL FETCH with proper error handling
       const [
         drawingsData,
         formDocsData,
@@ -495,7 +496,6 @@ export default function CustomerDetailsPage() {
         fetchWithFallback(`${BACKEND_URL}/payment-terms?customer_id=${id}`)
       ]);
 
-      // ✅ Process drawings
       if (drawingsData && Array.isArray(drawingsData)) {
         const unassignedDrawings = drawingsData.filter(doc => !doc.project_id);
         setDrawingDocuments(unassignedDrawings);
@@ -503,13 +503,11 @@ export default function CustomerDetailsPage() {
         setDrawingDocuments([]);
       }
 
-      // ✅ Process form documents
       if (formDocsData && Array.isArray(formDocsData)) {
         const formSubmissions = formDocsData.filter(form => {
           return form && form.id && form.form_data;
         });
         
-        // Add to customer.form_submissions
         setCustomer(prev => {
           if (!prev) return prev;
           return {
@@ -528,16 +526,25 @@ export default function CustomerDetailsPage() {
         });
       }
 
-      // ✅ Process and combine all financial documents
       const allFinancialDocs: FinancialDocument[] = [];
 
-      // Quotations
       if (quotationsData && Array.isArray(quotationsData)) {
+        console.log('📊 Raw quotations data:', quotationsData);
+        
         quotationsData.forEach((quote: Quotation) => {
+          console.log('Processing quote:', quote);
+          
+          const quoteId = quote.id || quote.quotation_id || quote.reference_number;
+          
+          if (!quoteId) {
+            console.warn('⚠️ Skipping quote with no ID:', quote);
+            return;
+          }
+          
           allFinancialDocs.push({
-            id: quote.id,
+            id: quoteId,
             type: 'quotation',
-            title: `Quotation ${quote.reference_number}`,
+            title: `Quotation ${quote.reference_number || quoteId}`,
             reference: quote.reference_number,
             total: quote.total,
             status: quote.status,
@@ -547,7 +554,6 @@ export default function CustomerDetailsPage() {
         });
       }
 
-      // Invoices
       if (invoicesData && Array.isArray(invoicesData)) {
         invoicesData.forEach((invoice: Invoice) => {
           allFinancialDocs.push({
@@ -563,7 +569,6 @@ export default function CustomerDetailsPage() {
         });
       }
 
-      // Receipts
       if (receiptsData && Array.isArray(receiptsData)) {
         receiptsData.forEach((receipt: Receipt) => {
           const receiptType = receipt.receipt_type?.toLowerCase() || 'receipt';
@@ -580,7 +585,6 @@ export default function CustomerDetailsPage() {
         });
       }
 
-      // Payment Terms
       if (paymentTermsData && Array.isArray(paymentTermsData)) {
         paymentTermsData.forEach((terms: PaymentTerms) => {
           allFinancialDocs.push({
@@ -595,7 +599,6 @@ export default function CustomerDetailsPage() {
         });
       }
 
-      // Sort by created date (newest first)
       allFinancialDocs.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
@@ -610,200 +613,192 @@ export default function CustomerDetailsPage() {
     }
   };
 
-const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-  const files = event.target.files;
-  if (!files || files.length === 0) return;
+  const handleFormFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
-  const token = localStorage.getItem("token");
-  const headers: HeadersInit = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+    const token = localStorage.getItem("token");
+    const headers: HeadersInit = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const uploadedDocs: FormDocument[] = [];
+    const uploadedDocs: FormDocument[] = [];
 
-  for (const file of Array.from(files)) {
+    for (const file of Array.from(files)) {
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("customer_id", id);
+
+        const response = await fetch("https://aztec-interior.onrender.com/files/forms", {
+          method: "POST",
+          headers: headers,
+          body: formData,
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.form_document && data.form_document.id) {
+            const newDoc: FormDocument = {
+              id: data.form_document.id,
+              filename: data.form_document.filename || file.name,
+              url: data.form_document.url || data.form_document.file_url,
+              type: data.form_document.type || "other",
+              created_at: data.form_document.created_at || new Date().toISOString(),
+              customer_id: id,
+            };
+
+            uploadedDocs.push(newDoc);
+          }
+        }
+      } catch (error) {
+        console.error("Upload error:", error);
+      }
+    }
+
+    if (uploadedDocs.length > 0) {
+      setFormDocuments(prev => {
+        const updated = [...uploadedDocs, ...prev];
+        return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      });
+    }
+
+    if (event.target) event.target.value = "";
+  };
+
+  const handleUploadFormDocument = () => {
+    if (formFileInputRef.current) {
+      formFileInputRef.current.click();
+    }
+  };
+
+  const handleDragStart = (type: 'form' | 'drawing', id: string) => {
+    setDraggedItem({ type, id });
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDragOverProject(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, projectId: string) => {
+    e.preventDefault();
+    setDragOverProject(projectId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverProject(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, projectId: string) => {
+    e.preventDefault();
+    setDragOverProject(null);
+
+    if (!draggedItem) return;
+
+    const token = localStorage.getItem("token");
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    if (token) headers["Authorization"] = "Bearer " + token;
+
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("customer_id", id);
+      let endpoint = "";
+      
+      if (draggedItem.type === "form") {
+        endpoint = `https://aztec-interior.onrender.com/form-submissions/${draggedItem.id}`;
+      } else if (draggedItem.type === "drawing") {
+        endpoint = `https://aztec-interior.onrender.com/files/drawings/${draggedItem.id}`;
+      }
 
-      const response = await fetch("https://aztec-interior.onrender.com/files/forms", {
-        method: "POST",
+      const response = await fetch(endpoint, {
+        method: "PATCH",
         headers: headers,
-        body: formData,
+        body: JSON.stringify({ project_id: projectId }),
       });
 
       if (response.ok) {
-        const data = await response.json();
-        if (data.form_document && data.form_document.id) {
-          const newDoc: FormDocument = {
-            id: data.form_document.id,
-            filename: data.form_document.filename || file.name,
-            url: data.form_document.url || data.form_document.file_url,
-            type: data.form_document.type || "other",
-            created_at: data.form_document.created_at || new Date().toISOString(),
-            customer_id: id,
-          };
-
-          uploadedDocs.push(newDoc);
+        if (draggedItem.type === "drawing") {
+          setDrawingDocuments(prev => 
+            prev.filter(doc => doc.id !== draggedItem.id)
+          );
+        } else if (draggedItem.type === "form") {
+          setCustomer(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              form_submissions: prev.form_submissions.filter(
+                form => String(form.id) !== draggedItem.id
+              )
+            };
+          });
         }
+      } else {
+        const error = await response.json().catch(() => ({ error: "Failed to assign" }));
+        alert(`Error: ${error.error || error.message || "Failed to assign to project"}`);
       }
     } catch (error) {
-      console.error("Upload error:", error);
+      console.error("Error assigning to project:", error);
+      alert("Network error");
     }
-  }
 
-  // ✅ UPDATE STATE IN ONE GO
-  if (uploadedDocs.length > 0) {
-    setFormDocuments(prev => {
-      const updated = [...uploadedDocs, ...prev];
-      return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    });
-  }
-
-  if (event.target) event.target.value = "";
-};
-
-const handleUploadFormDocument = () => {
-  if (formFileInputRef.current) {
-    formFileInputRef.current.click();
-  }
-};
-
-// NEW: Drag and drop handlers
-const handleDragStart = (type: 'form' | 'drawing', id: string) => {
-  setDraggedItem({ type, id });
-};
-
-const handleDragEnd = () => {
-  setDraggedItem(null);
-  setDragOverProject(null);
-};
-
-const handleDragOver = (e: React.DragEvent, projectId: string) => {
-  e.preventDefault();
-  setDragOverProject(projectId);
-};
-
-const handleDragLeave = () => {
-  setDragOverProject(null);
-};
-
-const handleDrop = async (e: React.DragEvent, projectId: string) => {
-  e.preventDefault();
-  setDragOverProject(null);
-
-  if (!draggedItem) return;
-
-  const token = localStorage.getItem("token");
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
+    setDraggedItem(null);
   };
-  if (token) headers["Authorization"] = "Bearer " + token;
 
-  try {
-    let endpoint = "";
-    
-    if (draggedItem.type === "form") {
-      endpoint = `https://aztec-interior.onrender.com/form-submissions/${draggedItem.id}`;
-    } else if (draggedItem.type === "drawing") {
-      endpoint = `https://aztec-interior.onrender.com/files/drawings/${draggedItem.id}`;
+  const handleViewFormDocument = (doc: FormDocument) => {
+    const BACKEND_URL = "https://aztec-interior.onrender.com";
+    let viewUrl = doc.url;
+
+    if (viewUrl && viewUrl.startsWith('http')) {
+      window.open(viewUrl, "_blank");
+      return;
     }
 
-    const response = await fetch(endpoint, {
-      method: "PATCH",
-      headers: headers,
-      body: JSON.stringify({ project_id: projectId }),
-    });
-
-    if (response.ok) {
-      // ✅ REMOVE FILE FROM LOCAL STATE - IT NOW BELONGS TO THE PROJECT
-      if (draggedItem.type === "drawing") {
-        setDrawingDocuments(prev => 
-          prev.filter(doc => doc.id !== draggedItem.id)
-        );
-      } else if (draggedItem.type === "form") {
-        setCustomer(prev => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            form_submissions: prev.form_submissions.filter(
-              form => String(form.id) !== draggedItem.id
-            )
-          };
-        });
-      }
-      
-      // ✅ Optional: Show success message
-      // alert("File assigned to project successfully!");
-      
-    } else {
-      const error = await response.json().catch(() => ({ error: "Failed to assign" }));
-      alert(`Error: ${error.error || error.message || "Failed to assign to project"}`);
+    if (viewUrl && !viewUrl.startsWith('http')) {
+      viewUrl = `${BACKEND_URL}${viewUrl.startsWith('/') ? viewUrl : '/' + viewUrl}`;
+    } else if (!viewUrl) {
+      alert("Error: Form document URL is missing or invalid.");
+      return;
     }
-  } catch (error) {
-    console.error("Error assigning to project:", error);
-    alert("Network error");
-  }
 
-  setDraggedItem(null);
-};
-
-const handleViewFormDocument = (doc: FormDocument) => {
-  const BACKEND_URL = "https://aztec-interior.onrender.com";
-  let viewUrl = doc.url;
-
-  if (viewUrl && viewUrl.startsWith('http')) {
     window.open(viewUrl, "_blank");
-    return;
-  }
+  };
 
-  if (viewUrl && !viewUrl.startsWith('http')) {
-    viewUrl = `${BACKEND_URL}${viewUrl.startsWith('/') ? viewUrl : '/' + viewUrl}`;
-  } else if (!viewUrl) {
-    alert("Error: Form document URL is missing or invalid.");
-    return;
-  }
+  const handleDeleteFormDocument = async (doc: FormDocument) => {
+    if (isDeletingFormDoc) return;
+    setFormDocToDelete(doc);
+    setShowDeleteFormDocDialog(true);
+  };
 
-  window.open(viewUrl, "_blank");
-};
+  const handleConfirmDeleteFormDocument = async () => {
+    if (!formDocToDelete) return;
+    setIsDeletingFormDoc(true);
+    
+    const token = localStorage.getItem("token");
+    const headers: HeadersInit = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
 
-const handleDeleteFormDocument = async (doc: FormDocument) => {
-  if (isDeletingFormDoc) return;
-  setFormDocToDelete(doc);
-  setShowDeleteFormDocDialog(true);
-};
+    try {
+      const res = await fetch(
+        `https://aztec-interior.onrender.com/files/forms/${formDocToDelete.id}`,
+        { method: "DELETE", headers }
+      );
 
-const handleConfirmDeleteFormDocument = async () => {
-  if (!formDocToDelete) return;
-  setIsDeletingFormDoc(true);
-  
-  const token = localStorage.getItem("token");
-  const headers: HeadersInit = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  try {
-    const res = await fetch(
-      `https://aztec-interior.onrender.com/files/forms/${formDocToDelete.id}`,
-      { method: "DELETE", headers }
-    );
-
-    if (res.ok) {
-      setFormDocuments((prev) => prev.filter((d) => d.id !== formDocToDelete.id));
-      setShowDeleteFormDocDialog(false);
-      setFormDocToDelete(null);
-    } else {
-      const err = await res.json().catch(() => ({ error: "Server error" }));
-      alert(`Failed to delete: ${err.error}`);
+      if (res.ok) {
+        setFormDocuments((prev) => prev.filter((d) => d.id !== formDocToDelete.id));
+        setShowDeleteFormDocDialog(false);
+        setFormDocToDelete(null);
+      } else {
+        const err = await res.json().catch(() => ({ error: "Server error" }));
+        alert(`Failed to delete: ${err.error}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Network error");
+    } finally {
+      setIsDeletingFormDoc(false);
     }
-  } catch (e) {
-    console.error(e);
-    alert("Network error");
-  } finally {
-    setIsDeletingFormDoc(false);
-  }
-};
+  };
 
-  // NEW: Bulk delete handlers for drawings
   const handleToggleDrawingSelection = (drawingId: string) => {
     setSelectedDrawings(prev => {
       const newSet = new Set(prev);
@@ -855,7 +850,6 @@ const handleConfirmDeleteFormDocument = async () => {
     }
   };
 
-  // NEW: Bulk delete handlers for form documents
   const handleToggleFormDocSelection = (docId: string) => {
     setSelectedFormDocs(prev => {
       const newSet = new Set(prev);
@@ -926,9 +920,7 @@ const handleConfirmDeleteFormDocument = async () => {
       return;
     }
 
-    // Show project selection dialog
     setShowProjectSelectDialog(true);
-    // Files will be processed in handleConfirmProjectUpload
   };
 
   const handleConfirmProjectUpload = async () => {
@@ -974,7 +966,6 @@ const handleConfirmDeleteFormDocument = async () => {
               project_id: data.drawing.project_id,
             };
 
-            // ✅ Only add to state if NO project_id (unassigned)
             if (!newDoc.project_id) {
               uploadedDocs.push(newDoc);
             }
@@ -985,7 +976,6 @@ const handleConfirmDeleteFormDocument = async () => {
       }
     }
 
-    // ✅ UPDATE STATE - Only unassigned files
     if (uploadedDocs.length > 0) {
       setDrawingDocuments(prev => {
         const updated = [...uploadedDocs, ...prev];
@@ -995,7 +985,6 @@ const handleConfirmDeleteFormDocument = async () => {
       });
     }
 
-    // Clean up
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -1068,7 +1057,6 @@ const handleConfirmDeleteFormDocument = async () => {
     }
   };
 
-// ✅ FINANCIAL DOCUMENT HELPER FUNCTIONS - Define these BEFORE renderDrawingDocument
   const getFinancialDocIcon = (type: string) => {
     switch (type) {
       case 'quotation':
@@ -1112,10 +1100,25 @@ const handleConfirmDeleteFormDocument = async () => {
   };
 
   const handleDeleteQuote = async (quoteId: number) => {
+    if (!quoteId || isNaN(quoteId)) {
+      console.error('Cannot delete: Invalid quote ID:', quoteId);
+      alert('Error: Cannot delete quotation - invalid ID');
+      setDeleteDialogOpen(false);
+      setQuoteToDelete(null);
+      return;
+    }
+    
     setDeletingQuoteId(quoteId);
     
+    console.log(`🗑️ Attempting to delete quote ID: ${quoteId}`);
+    
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+      
       const response = await fetch(
         `${BACKEND_URL}/quotations/${quoteId}`,
         {
@@ -1126,19 +1129,20 @@ const handleConfirmDeleteFormDocument = async () => {
           },
         }
       );
-
+  
       if (!response.ok) {
-        throw new Error('Failed to delete quotation');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to delete quotation (${response.status})`);
       }
-
+  
       console.log('✅ Quotation deleted successfully');
       
       await loadCustomerData(); 
       
-      alert('✅ Quotation deleted successfully!'); // ← Simple alert
+      alert('✅ Quotation deleted successfully!');
     } catch (error) {
       console.error('❌ Error deleting quotation:', error);
-      alert('❌ Failed to delete quotation. Please try again.'); // ← Simple alert
+      alert(`❌ Failed to delete quotation: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setDeletingQuoteId(null);
       setDeleteDialogOpen(false);
@@ -1227,7 +1231,6 @@ const handleConfirmDeleteFormDocument = async () => {
   };
 
   const handleEditProject = (projectId: string) => {
-    // Check for permission before editing
     if (!canManageProjects()) {
       alert("You do not have permission to edit projects.");
       return;
@@ -1304,18 +1307,13 @@ const handleConfirmDeleteFormDocument = async () => {
     }
   };
 
-  // --- NEW PERMISSIVE FUNCTION (For Project Creation/Editing) ---
   const canManageProjects = (): boolean => {
     if (!user || !user.role) return false;
     
-    // Allow Manager, HR, Production, and Sales to manage projects
     const allowedRoles = ['Manager', 'HR', 'Production', 'Sales'];
     return allowedRoles.some(role => role.toLowerCase() === user.role.toLowerCase());
   };
 
-  // -------------------------------------------------------------
-
-  // Add permission check function
   const canEditForm = (submission: FormSubmission): boolean => {
     if (!user) return false;
     
@@ -1325,7 +1323,6 @@ const handleConfirmDeleteFormDocument = async () => {
     return allowedRoles.includes(user.role) || isCreator;
   };
 
-  // Add function to handle edit button click
   const handleEditForm = (submission: FormSubmission) => {
     if (!canEditForm(submission)) {
       alert("You don't have permission to edit this form.");
@@ -1348,7 +1345,6 @@ const handleConfirmDeleteFormDocument = async () => {
     }
   };
 
-  // Add function to save edited form
   const handleSaveEditedForm = async () => {
     if (!selectedForm || !editFormData || isSavingForm) return;
 
@@ -1373,7 +1369,7 @@ const handleConfirmDeleteFormDocument = async () => {
         setShowFormDialog(false);
         setIsEditingForm(false);
         setEditFormData(null);
-        loadCustomerData(); // Reload data to show updated form
+        loadCustomerData();
       } else {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
         alert(`Failed to update form: ${errorData.error}`);
@@ -1386,7 +1382,6 @@ const handleConfirmDeleteFormDocument = async () => {
     }
   };
 
-  // Add function to handle field changes
   const handleFormFieldChange = (fieldName: string, value: any) => {
     setEditFormData((prev: any) => ({
       ...prev,
@@ -1486,7 +1481,6 @@ const handleConfirmDeleteFormDocument = async () => {
       return;
     }
 
-    // ✅ CHECK: Does customer have bedroom or kitchen checklist?
     const bedroomChecklist = customer?.form_submissions?.find((form) => {
       const type = getFormType(form);
       return type === "bedroom";
@@ -1497,7 +1491,6 @@ const handleConfirmDeleteFormDocument = async () => {
       return type === "kitchen";
     });
 
-    // ✅ If checklist exists, show dialog
     if (bedroomChecklist || kitchenChecklist) {
       const checklistType = bedroomChecklist ? "bedroom" : "kitchen";
       const checklistId = bedroomChecklist?.id || kitchenChecklist?.id;
@@ -1507,7 +1500,6 @@ const handleConfirmDeleteFormDocument = async () => {
       return;
     }
 
-    // ✅ No checklist - create blank quote
     createBlankQuote();
   };
 
@@ -1539,17 +1531,14 @@ const handleConfirmDeleteFormDocument = async () => {
         
         console.log("✅ Quote data received:", data);
         
-        // ✅ CRITICAL: Reload customer data BEFORE opening new tab
         console.log("🔄 Reloading customer data...");
         await loadCustomerData();
         console.log("✅ Customer data reloaded");
         
-        // ✅ Open quote DETAILS page (not PDF) in new tab
         const detailsUrl = `/dashboard/quotes/${data.quotation_id}`;
         console.log("🔗 Opening quote details:", detailsUrl);
         window.open(detailsUrl, '_blank');
         
-        // Show success message
         alert(
           `✅ Quote ${data.message?.includes('already exists') ? 'opened' : 'generated'} successfully!\n\n` +
           `Reference: ${data.reference_number}\n` +
@@ -1581,29 +1570,6 @@ const handleConfirmDeleteFormDocument = async () => {
     });
     router.push(`/dashboard/quotes/create?${queryParams.toString()}`);
   };
-
-  // const handleCreateJob = () => {
-  //   if (user?.role === "Sales") {
-  //     alert("Sales users cannot directly create jobs. Jobs are created from accepted quotes.");
-  //     return;
-  //   }
-  //   const queryParams = new URLSearchParams({
-  //     customerId: String(id),
-  //     customerName: customer?.name || "",
-  //     customerAddress: customer?.address || "",
-  //     customerPhone: customer?.phone || "",
-  //     customerEmail: customer?.email || "",
-  //   });
-  //   router.push(`/dashboard/jobs/create?${queryParams.toString()}`);
-  // };
-
-  // const handleCreateChecklist = () => {
-  //   if (!canEdit()) {
-  //     alert("You don't have permission to create checklists for this customer.");
-  //     return;
-  //   }
-  //   router.push(`/dashboard/checklists/create?customerId=${id}`);
-  // };
 
   const buildCustomerQuery = () => {
     const qp = new URLSearchParams({
@@ -1692,7 +1658,7 @@ const handleConfirmDeleteFormDocument = async () => {
       alert("You don't have permission to create invoices.");
       return;
     }
-    router.push(`/dashboard/checklists/invoice/?${params.toString()}`)
+    router.push(`/dashboard/checklists/invoice/?${buildCustomerQuery()}`)
   };
 
   const handleCreateProformaInvoice = () => {
@@ -1700,7 +1666,7 @@ const handleConfirmDeleteFormDocument = async () => {
       alert("You don't have permission to create invoices.");
       return;
     }
-    router.push(`/dashboard/checklists/invoices/create?type=proforma&${buildCustomerQuery()}`); // ✅ CHANGED
+    router.push(`/dashboard/checklists/invoices/create?type=proforma&${buildCustomerQuery()}`);
   };
 
   const handleCreatePaymentTerms = () => {
@@ -1708,7 +1674,7 @@ const handleConfirmDeleteFormDocument = async () => {
       alert("You don't have permission to create payment terms.");
       return;
     }
-    router.push(`/dashboard/checklists/payment-terms/?${params.toString()}`)
+    router.push(`/dashboard/checklists/payment-terms/?${buildCustomerQuery()}`)
   };
 
   const handleCreateKitchenChecklist = async () => {
@@ -2174,12 +2140,10 @@ const handleConfirmDeleteFormDocument = async () => {
 
   const handleViewChecklist = (submission: FormSubmission) => {
     const formType = getFormType(submission);
-    // For checklists (bedroom/kitchen), open in new tab
     if (formType === "bedroom" || formType === "kitchen") {
       const viewUrl = `/checklist-view?id=${submission.id}`;
       window.open(viewUrl, "_blank");
     } else {
-      // For other forms, open in dialog
       setSelectedForm(submission);
       setIsEditingForm(false);
       setShowFormDialog(true);
@@ -2318,45 +2282,53 @@ const handleConfirmDeleteFormDocument = async () => {
   };
 
   const renderFormDocument = (doc: FormDocument) => {
-  const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
-  const docType = doc.type || 
-    (fileExtension === "pdf" ? "pdf" : 
-     ["xlsx", "xls", "csv"].includes(fileExtension) ? "excel" : "other");
+    const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
+    const docType = doc.type || 
+      (fileExtension === "pdf" ? "pdf" : 
+      ["xlsx", "xls", "csv"].includes(fileExtension) ? "excel" : "other");
 
-  return (
-    <div key={doc.id} className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
-      <div className="flex items-start justify-between">
-        <div className="flex flex-1 items-start space-x-4">
-          <div className="rounded-xl bg-gradient-to-br from-green-50 to-blue-50 p-3">
-            {FORM_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
-            <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
-          </div>
-        </div>
-        <div className="ml-6 flex items-center space-x-2">
-          <Button onClick={() => handleViewFormDocument(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
-            <Eye className="h-4 w-4" />
-            <span>View</span>
-          </Button>
+    return (
+      <div key={doc.id} className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
+        <div className="flex items-start justify-between">
           {canEdit() && (
-            <Button
-              onClick={() => handleDeleteFormDocument(doc)}
-              disabled={isDeletingFormDoc}
-              variant="outline"
-              size="sm"
-              className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span>Delete</span>
-            </Button>
+            <div className="mr-3">
+              <Checkbox
+                checked={selectedFormDocs.has(doc.id)}
+                onCheckedChange={() => handleToggleFormDocSelection(doc.id)}
+              />
+            </div>
           )}
+          <div className="flex flex-1 items-start space-x-4">
+            <div className="rounded-xl bg-gradient-to-br from-green-50 to-blue-50 p-3">
+              {FORM_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
+              <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
+            </div>
+          </div>
+          <div className="ml-6 flex items-center space-x-2">
+            <Button onClick={() => handleViewFormDocument(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
+              <Eye className="h-4 w-4" />
+              <span>View</span>
+            </Button>
+            {canEdit() && (
+              <Button
+                onClick={() => handleDeleteFormDocument(doc)}
+                disabled={isDeletingFormDoc}
+                variant="outline"
+                size="sm"
+                className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete</span>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   const handleDeleteProject = (project: Project) => {
     if (!canManageProjects()) {
@@ -2387,7 +2359,6 @@ const handleConfirmDeleteFormDocument = async () => {
         throw new Error(errorData.error || `Failed to delete project (status: ${response.status})`);
       }
 
-      // Update UI state and reload customer data
       setShowDeleteProjectDialog(false);
       setProjectToDelete(null);
       alert(`Project "${projectToDelete.project_name}" deleted successfully!`);
@@ -2435,7 +2406,6 @@ const handleConfirmDeleteFormDocument = async () => {
     }
   };
 
-  // Error state
   if (error) {
     return (
       <div className="container mx-auto p-6">
@@ -2451,11 +2421,9 @@ const handleConfirmDeleteFormDocument = async () => {
     );
   }
 
-  // Loading state
   if (loading) {
     return (
       <div className="container mx-auto space-y-8 p-6">
-        {/* Header Skeleton */}
         <div className="flex items-center justify-between">
           <div className="h-10 w-64 bg-gray-200 rounded animate-pulse" />
           <div className="flex gap-2">
@@ -2463,8 +2431,6 @@ const handleConfirmDeleteFormDocument = async () => {
             <div className="h-10 w-24 bg-gray-200 rounded animate-pulse" />
           </div>
         </div>
-
-        {/* Contact Info Skeleton */}
         <div className="rounded-lg border bg-white p-6 shadow-sm">
           <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mb-6" />
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -2473,26 +2439,6 @@ const handleConfirmDeleteFormDocument = async () => {
                 <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
                 <div className="h-6 w-full bg-gray-100 rounded animate-pulse" />
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Projects Skeleton */}
-        <div className="rounded-lg border bg-white p-6 shadow-sm">
-          <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-4" />
-          <div className="grid gap-4 md:grid-cols-2">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-32 bg-gray-100 rounded animate-pulse" />
-            ))}
-          </div>
-        </div>
-
-        {/* Drawings Skeleton */}
-        <div className="rounded-lg border bg-white p-6 shadow-sm">
-          <div className="h-6 w-40 bg-gray-200 rounded animate-pulse mb-4" />
-          <div className="grid gap-4 md:grid-cols-2">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 bg-gray-100 rounded animate-pulse" />
             ))}
           </div>
         </div>
@@ -2511,7 +2457,7 @@ const handleConfirmDeleteFormDocument = async () => {
   ])).filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50">
       <input
         type="file"
         ref={fileInputRef}
@@ -2530,43 +2476,46 @@ const handleConfirmDeleteFormDocument = async () => {
         style={{ display: "none" }}
       />
 
+      {/* Header */}
       <div className="border-b border-gray-200 bg-white px-8 py-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => router.push("/dashboard/customers")}
-              className="flex cursor-pointer items-center text-gray-500 hover:text-gray-700"
+              className="h-10 w-10"
             >
               <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Client Details</h1>
+              <p className="text-sm text-gray-500">ID: {customer.id}</p>
             </div>
-            <h1 className="text-3xl font-semibold text-gray-900">Customer Details</h1>
           </div>
           <div className="flex items-center space-x-3">
             {canEdit() && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="flex items-center p-2" aria-label="Create">
+                  <Button variant="outline" className="flex items-center gap-2">
                     <Plus className="h-4 w-4" />
+                    <span>Create</span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  {/* Project Creation uses the permissive canManageProjects() */}
-                  <DropdownMenuItem onClick={handleCreateProject} className="flex items-center space-x-2" disabled={!canManageProjects()}>
-                    <Briefcase className="h-4 w-4" />
-                    <span>New Project</span>
-                  </DropdownMenuItem>
-
+                  {canManageProjects() && (
+                    <DropdownMenuItem onClick={handleCreateProject} className="flex items-center space-x-2">
+                      <Briefcase className="h-4 w-4" />
+                      <span>New Project</span>
+                    </DropdownMenuItem>
+                  )}
                   {user?.role !== "Sales" && (
                     <DropdownMenuItem onClick={handleCreateRemedialChecklist} className="flex items-center space-x-2">
                       <CheckSquare className="h-4 w-4" />
                       <span>Remedial Action Checklist</span>
                     </DropdownMenuItem>
                   )}
-                  {/* <DropdownMenuItem onClick={handleCreateChecklist} className="flex items-center space-x-2">
-                    <CheckSquare className="h-4 w-4" />
-                    <span>Checklist</span>
-                  </DropdownMenuItem> */}
                   <DropdownMenuItem onClick={handleCreateQuote} className="flex items-center space-x-2">
                     <FileText className="h-4 w-4" />
                     <span>Quotation</span>
@@ -2628,1068 +2577,905 @@ const handleConfirmDeleteFormDocument = async () => {
         </div>
       </div>
 
+      {/* Tabs */}
       <div className="px-8 py-6">
-        <div className="relative mb-8">
-          <div className="mb-6 flex items-center justify-between pt-6">
-            <h2 className="text-xl font-semibold text-gray-900">Contact Information</h2>
-            <div className="flex items-center space-x-4">
-              {customer.date_of_measure && (
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <Calendar className="h-4 w-4" />
-                  <span>Measure: {formatDate(customer.date_of_measure)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">Name</span>
-                <span className="mt-1 text-base font-medium text-gray-900">{customer.name || "—"}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">
-                  Phone <span className="text-red-500">*</span>
-                </span>
-                <span className="mt-1 text-base text-gray-900">{customer.phone || "—"}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">Email</span>
-                <span className="mt-1 text-base text-gray-900">{customer.email || "—"}</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">
-                  Address <span className="text-red-500">*</span>
-                </span>
-                <span className="mt-1 text-base text-gray-900">{customer.address || "—"}</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">
-                  Postcode <span className="text-red-500">*</span>
-                </span>
-                <div className="mt-1">
-                  {customer.postcode ? (
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                      <span className="rounded bg-gray-100 px-2 py-1 font-mono text-sm text-gray-900">
-                        {customer.postcode}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-base text-gray-900">—</span>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">Preferred Contact</span>
-                <div className="mt-1">
-                  {customer.preferred_contact_method ? (
-                    <div className="flex items-center space-x-2">
-                      {getContactMethodIcon(customer.preferred_contact_method)}
-                      <span className="text-base text-gray-900">{customer.preferred_contact_method}</span>
-                    </div>
-                  ) : (
-                    <span className="text-base text-gray-900">—</span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">Project Type</span>
-                <div className="mt-1">
-                  {allProjectTypes.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {Array.from(new Set(allProjectTypes)).map((type, index) => (
-                        <span
-                          key={index}
-                          className={`inline-flex rounded-full px-2 py-1 text-sm font-semibold ${getProjectTypeColor(type)}`}
-                        >
-                          {type}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-base text-gray-900">—</span>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">Pipeline Stage</span>
-                <div className="mt-1">
-                  {customer.projects && customer.projects.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {customer.projects.map((project, index) => (
-                        <span
-                          key={index}
-                          className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${getStageColor(project.stage)}`}
-                        >
-                          {project.stage}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-base text-gray-900">—</span>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-gray-500">Customer Since</span>
-                <span className="mt-1 text-base text-gray-900">{formatDate(customer.created_at)}</span>
-              </div>
-            </div>
-          </div>
-          {customer.notes && !customer.notes.includes("Stage changed from") && (
-            <div className="mt-6">
-              <span className="text-sm font-medium text-gray-500">Notes</span>
-              <div className="mt-2 rounded-lg bg-gray-50 p-3">
-                <span className="text-base whitespace-pre-wrap text-gray-900">{customer.notes}</span>
-              </div>
-            </div>
-          )}
-        </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+            <TabsTrigger value="contact" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Customer Information
+            </TabsTrigger>
+            <TabsTrigger value="forms" className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              Checklists
+            </TabsTrigger>
+            <TabsTrigger value="drawings" className="flex items-center gap-2">
+              <Image className="h-4 w-4" />
+              Drawings
+            </TabsTrigger>
+            <TabsTrigger value="projects" className="flex items-center gap-2">
+              <FolderOpen className="h-4 w-4" />
+              Projects ({customer.projects?.length || 0})
+            </TabsTrigger>
+            <TabsTrigger value="financial" className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              Financial Documents
+            </TabsTrigger>
+          </TabsList>
 
-        {/* PROJECTS SECTION */}
-        <div className="mb-8 border-t border-gray-200 pt-8">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Projects ({customer.projects?.length || 0})</h2>
-            {canManageProjects() && (
-              <Button onClick={handleCreateProject} className="flex items-center space-x-2">
-                <Plus className="h-4 w-4" />
-                <span>New Project</span>
-              </Button>
-            )}
-          </div>
-
-          {customer.projects && customer.projects.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {customer.projects
-                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                .map((project) => (
-                  <div
-                    key={project.id}
-                    className={`rounded-lg border bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
-                      dragOverProject === project.id ? 'ring-2 ring-blue-500 bg-blue-100/50' : ''
-                    }`}
-                    onDragOver={(e) => handleDragOver(e, project.id)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, project.id)}
-                  >
-                    {/* Rest of your project card code stays the same */}
-                    <div className="flex items-start justify-between">
-                      <div className="min-w-0 flex-1 pr-4">
-                        <div className="mb-2 flex items-center space-x-2">
-                          <Package className="h-5 w-5 text-blue-600" />
-                          <h3 className="truncate text-lg font-semibold text-gray-900">{project.project_name}</h3>
+          {/* Customer Information Tab */}
+          <TabsContent value="contact" className="mt-6 space-y-6">
+            <div className="rounded-lg border bg-white p-6 shadow-sm">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Contact Information</h2>
+                <div className="flex items-center space-x-4">
+                  {customer.date_of_measure && (
+                    <div className="flex items-center space-x-2 text-sm text-gray-600">
+                      <Calendar className="h-4 w-4" />
+                      <span>Measure: {formatDate(customer.date_of_measure)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-500">Name</span>
+                    <span className="mt-1 text-base font-medium text-gray-900">{customer.name || "—"}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-500">
+                      Phone <span className="text-red-500">*</span>
+                    </span>
+                    <span className="mt-1 text-base text-gray-900">{customer.phone || "—"}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-500">Email</span>
+                    <span className="mt-1 text-base text-gray-900">{customer.email || "—"}</span>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-500">
+                      Address <span className="text-red-500">*</span>
+                    </span>
+                    <span className="mt-1 text-base text-gray-900">{customer.address || "—"}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-500">
+                      Postcode <span className="text-red-500">*</span>
+                    </span>
+                    <div className="mt-1">
+                      {customer.postcode ? (
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="h-4 w-4 text-gray-400" />
+                          <span className="rounded bg-gray-100 px-2 py-1 font-mono text-sm text-gray-900">
+                            {customer.postcode}
+                          </span>
                         </div>
-                        <div className="mt-3 space-y-2">
-                          <div className="flex items-center space-x-2">
+                      ) : (
+                        <span className="text-base text-gray-900">—</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-500">Preferred Contact</span>
+                    <div className="mt-1">
+                      {customer.preferred_contact_method ? (
+                        <div className="flex items-center space-x-2">
+                          {getContactMethodIcon(customer.preferred_contact_method)}
+                          <span className="text-base text-gray-900">{customer.preferred_contact_method}</span>
+                        </div>
+                      ) : (
+                        <span className="text-base text-gray-900">—</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-500">Project Type</span>
+                    <div className="mt-1">
+                      {allProjectTypes.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {Array.from(new Set(allProjectTypes)).map((type, index) => (
                             <span
-                              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getProjectTypeColor(project.project_type)}`}
+                              key={index}
+                              className={`inline-flex rounded-full px-2 py-1 text-sm font-semibold ${getProjectTypeColor(type)}`}
                             >
-                              {project.project_type}
+                              {type}
                             </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-base text-gray-900">—</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-500">Pipeline Stage</span>
+                    <div className="mt-1">
+                      {customer.projects && customer.projects.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {customer.projects.map((project, index) => (
                             <span
-                              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStageColor(project.stage)}`}
+                              key={index}
+                              className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${getStageColor(project.stage)}`}
                             >
                               {project.stage}
                             </span>
-                          </div>
-                          <p className="text-sm text-gray-600">
-                            <Calendar className="mr-1 inline h-3 w-3" />
-                            Measure: {formatDate(project.date_of_measure || "")}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            <FileText className="mr-1 inline h-3 w-3" />
-                            {project.form_count} Form{project.form_count !== 1 ? "s" : ""}
-                          </p>
+                          ))}
                         </div>
-                        {project.notes && <p className="mt-3 line-clamp-2 text-sm text-gray-500">{project.notes}</p>}
-                        {dragOverProject === project.id && (
-                          <p className="mt-2 text-xs text-blue-600 font-medium">Drop here to assign</p>
-                        )}
-                      </div>
-                      <div className="ml-4 flex flex-shrink-0 flex-col space-y-2">
-                        {canManageProjects() && (
-                          <>
-                            <Button
-                              onClick={() => handleEditProject(project.id)}
-                              variant="default"
-                              size="sm"
-                              className="flex items-center space-x-2"
-                            >
-                              <Edit className="h-4 w-4" />
-                              <span>Edit Project</span>
-                            </Button>
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteProject(project);
-                              }}
-                              variant="destructive"
-                              size="sm"
-                              className="flex items-center space-x-2 bg-red-600 hover:bg-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              <span>Delete</span>
-                            </Button>
-                          </>
-                        )}
-                        <Button
-                          onClick={() => window.open(`/dashboard/projects/${project.id}`, '_blank')}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center space-x-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span>View Details</span>
-                        </Button>
-                      </div>
+                      ) : (
+                        <span className="text-base text-gray-900">—</span>
+                      )}
                     </div>
                   </div>
-                ))}
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-500">Customer Since</span>
+                    <span className="mt-1 text-base text-gray-900">{formatDate(customer.created_at)}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {customer.notes && !customer.notes.includes("Stage changed from") && (
+                <div className="mt-6">
+                  <span className="text-sm font-medium text-gray-500">Notes</span>
+                  <div className="mt-2 rounded-lg bg-gray-50 p-3">
+                    <span className="text-base whitespace-pre-wrap text-gray-900">{customer.notes}</span>
+                  </div>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="rounded-lg bg-gray-50 p-8 text-center text-gray-500">
-              <Package className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-              <h3 className="mb-2 text-lg font-medium text-gray-900">No Projects Yet</h3>
-              <p className="text-sm">Create a new project to track specific kitchen/bedroom work.</p>
-            </div>
-          )}
-        </div>
+          </TabsContent>
 
-        {/* DRAWINGS & LAYOUTS SECTION - NO GROUPING, JUST SIMPLE LIST */}
-        <div className="mb-8 border-t border-gray-200 pt-8">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Drawings & Layouts ({drawingDocuments.length})</h2>
-            <div className="flex items-center space-x-2">
-              {canEdit() && selectedDrawings.size > 0 && (
-                <>
+          {/* Forms Tab */}
+          <TabsContent value="forms" className="mt-6 space-y-6">
+            <div className="rounded-lg border bg-white p-6 shadow-sm">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Checklist Submissions</h2>
+                {canEdit() && (
                   <Button
-                    onClick={handleBulkDeleteDrawings}
-                    variant="destructive"
-                    className="flex items-center space-x-2"
+                    onClick={handleUploadFormDocument}
+                    className="flex items-center space-x-2 bg-gray-900 hover:bg-gray-800"
                   >
-                    <Trash2 className="h-4 w-4" />
-                    <span>Delete Selected ({selectedDrawings.size})</span>
+                    <Upload className="h-4 w-4" />
+                    <span>Upload Document</span>
                   </Button>
-                  <Button
-                    onClick={() => setSelectedDrawings(new Set())}
-                    variant="outline"
-                  >
-                    Clear Selection
-                  </Button>
-                </>
-              )}
-              {canEdit() && drawingDocuments.length > 0 && (
-                <Checkbox
-                  checked={selectedDrawings.size === drawingDocuments.length && drawingDocuments.length > 0}
-                  onCheckedChange={handleSelectAllDrawings}
-                />
-              )}
-              {canEdit() && (
-                <Button
-                  onClick={handleUploadDrawing}
-                  className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
-                >
-                  <Upload className="h-4 w-4" />
-                  <span>Upload File</span>
-                </Button>
-              )}
-            </div>
-          </div>
+                )}
+              </div>
 
-          {drawingDocuments.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {drawingDocuments
-                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                .map((doc) => {
-                  const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
-                  const docType = doc.type || (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
-                  const isAssignedToProject = !!doc.project_id;
-
-                  return (
-                    <div
-                      key={doc.id}
-                      draggable={!isAssignedToProject && canEdit()}
-                      onDragStart={() => !isAssignedToProject && canEdit() && handleDragStart('drawing', doc.id)}
-                      onDragEnd={handleDragEnd}
-                      className={`rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
-                        !isAssignedToProject && canEdit() ? 'cursor-move hover:border-blue-400' : ''
-                      } ${draggedItem?.type === 'drawing' && draggedItem?.id === doc.id ? 'opacity-50' : ''}`}
-                    >
-                      <div className="flex items-start justify-between">
-                        {canEdit() && (
-                          <div className="mr-3 flex flex-col items-center">
-                            <Checkbox
-                              checked={selectedDrawings.has(doc.id)}
-                              onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
-                              className="mb-2"
-                            />
-                            {!isAssignedToProject && (
-                              <svg 
-                                className="h-5 w-5 text-gray-400" 
-                                fill="none" 
-                                stroke="currentColor" 
-                                viewBox="0 0 24 24"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                              </svg>
-                            )}
-                          </div>
-                        )}
-                        <div className="flex flex-1 items-start space-x-4">
-                          <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
-                            {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
-                            <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
-                            {isAssignedToProject ? (
-                              <span className="mt-1 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                                <Package className="mr-1 h-3 w-3" />
-                                Assigned to project
-                              </span>
-                            ) : (
-                              canEdit() && (
-                                <p className="mt-1 text-xs text-blue-600">← Drag to assign to project</p>
-                              )
-                            )}
-                          </div>
-                        </div>
-                        <div className="ml-6 flex items-center space-x-2">
-                          <Button onClick={() => handleViewDrawing(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
-                            <Eye className="h-4 w-4" />
-                            <span>View</span>
+              {/* Uploaded Form Documents */}
+              {formDocuments.length > 0 && (
+                <div className="mb-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Uploaded Documents ({formDocuments.length})
+                    </h3>
+                    <div className="flex items-center space-x-2">
+                      {canEdit() && selectedFormDocs.size > 0 && (
+                        <>
+                          <Button
+                            onClick={handleBulkDeleteFormDocs}
+                            variant="destructive"
+                            className="flex items-center space-x-2"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>Delete Selected ({selectedFormDocs.size})</span>
                           </Button>
-                          {canEdit() && (
-                            <Button
-                              onClick={() => handleDeleteDrawing(doc)}
-                              disabled={isDeletingDrawing}
-                              variant="outline"
-                              size="sm"
-                              className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
+                          <Button
+                            onClick={() => setSelectedFormDocs(new Set())}
+                            variant="outline"
+                          >
+                            Clear Selection
+                          </Button>
+                        </>
+                      )}
+                      {canEdit() && formDocuments.length > 0 && (
+                        <Checkbox
+                          checked={selectedFormDocs.size === formDocuments.length && formDocuments.length > 0}
+                          onCheckedChange={handleSelectAllFormDocs}
+                        />
+                      )}
                     </div>
-                  );
-                })}
-            </div>
-          ) : (
-            <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-8 text-center">
-              <Image className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-              <h3 className="mb-2 text-lg font-medium text-gray-900">No Drawings or Layouts</h3>
-              <p className="text-sm text-gray-600">Upload CADs, sketches, photos, or client documentation here.</p>
-            </div>
-          )}
-        </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    {formDocuments
+                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                      .map(renderFormDocument)}
+                  </div>
+                </div>
+              )}
 
-        {/* FORM SUBMISSIONS SECTION */}
-        <div className="mb-8 border-t border-gray-200 pt-8">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Checklist Submissions</h2>
-            {canEdit() && (
-              <Button
-                onClick={handleUploadFormDocument}
-                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700"
-              >
-                <Upload className="h-4 w-4" />
-                <span>Upload Document</span>
-              </Button>
-            )}
-          </div>
+              {/* Form Submissions */}
+              {customer.form_submissions && customer.form_submissions.length > 0 ? (
+                <div>
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    {customer.form_submissions.map((submission) => (
+                      <div key={submission.id}>{renderFormSubmission(submission)}</div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                !formDocuments.length && (
+                  <div className="rounded-lg bg-gray-50 p-8 text-center text-gray-500">
+                    <CheckSquare className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+                    <h3 className="mb-2 text-lg font-medium text-gray-900">No Form Submissions</h3>
+                    <p className="text-sm">
+                      Generate a form link, create a checklist, or upload documents to collect customer information.
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
+          </TabsContent>
 
-          {/* Uploaded Form Documents */}
-          {formDocuments.length > 0 && (
-            <div className="mb-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Uploaded Documents ({formDocuments.length})
-                </h3>
+          {/* Drawings Tab */}
+          <TabsContent value="drawings" className="mt-6 space-y-6">
+            <div className="rounded-lg border bg-white p-6 shadow-sm">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Drawings & Layouts ({drawingDocuments.length})</h2>
                 <div className="flex items-center space-x-2">
-                  {canEdit() && selectedFormDocs.size > 0 && (
+                  {canEdit() && selectedDrawings.size > 0 && (
                     <>
                       <Button
-                        onClick={handleBulkDeleteFormDocs}
+                        onClick={handleBulkDeleteDrawings}
                         variant="destructive"
                         className="flex items-center space-x-2"
                       >
                         <Trash2 className="h-4 w-4" />
-                        <span>Delete Selected ({selectedFormDocs.size})</span>
+                        <span>Delete Selected ({selectedDrawings.size})</span>
                       </Button>
                       <Button
-                        onClick={() => setSelectedFormDocs(new Set())}
+                        onClick={() => setSelectedDrawings(new Set())}
                         variant="outline"
                       >
                         Clear Selection
                       </Button>
                     </>
                   )}
-                  {canEdit() && formDocuments.length > 0 && (
+                  {canEdit() && drawingDocuments.length > 0 && (
                     <Checkbox
-                      checked={selectedFormDocs.size === formDocuments.length && formDocuments.length > 0}
-                      onCheckedChange={handleSelectAllFormDocs}
+                      checked={selectedDrawings.size === drawingDocuments.length && drawingDocuments.length > 0}
+                      onCheckedChange={handleSelectAllDrawings}
                     />
+                  )}
+                  {canEdit() && (
+                    <Button
+                      onClick={handleUploadDrawing}
+                      className="flex items-center space-x-2 bg-gray-900 hover:bg-gray-800"
+                    >
+                      <Upload className="h-4 w-4" />
+                      <span>Upload File</span>
+                    </Button>
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {formDocuments
-                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                  .map((doc) => {
-                    const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
-                    const docType = doc.type || 
-                      (fileExtension === "pdf" ? "pdf" : 
-                       ["xlsx", "xls", "csv"].includes(fileExtension) ? "excel" : "other");
 
-                    return (
-                      <div key={doc.id} className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md">
-                        <div className="flex items-start justify-between">
-                          {canEdit() && (
-                            <Checkbox
-                              checked={selectedFormDocs.has(doc.id)}
-                              onCheckedChange={() => handleToggleFormDocSelection(doc.id)}
-                              className="mr-4 mt-1"
-                            />
-                          )}
-                          <div className="flex flex-1 items-start space-x-4">
-                            <div className="rounded-xl bg-gradient-to-br from-green-50 to-blue-50 p-3">
-                              {FORM_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
+              {drawingDocuments.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                  {drawingDocuments
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .map((doc) => {
+                      const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
+                      const docType = doc.type || (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
+                      const isAssignedToProject = !!doc.project_id;
+
+                      return (
+                        <div
+                          key={doc.id}
+                          draggable={!isAssignedToProject && canEdit()}
+                          onDragStart={() => !isAssignedToProject && canEdit() && handleDragStart('drawing', doc.id)}
+                          onDragEnd={handleDragEnd}
+                          className={`rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
+                            !isAssignedToProject && canEdit() ? 'cursor-move hover:border-blue-400' : ''
+                          } ${draggedItem?.type === 'drawing' && draggedItem?.id === doc.id ? 'opacity-50' : ''}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            {canEdit() && (
+                              <div className="mr-3 flex flex-col items-center">
+                                <Checkbox
+                                  checked={selectedDrawings.has(doc.id)}
+                                  onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
+                                  className="mb-2"
+                                />
+                                {!isAssignedToProject && (
+                                  <svg 
+                                    className="h-5 w-5 text-gray-400" 
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                                  </svg>
+                                )}
+                              </div>
+                            )}
+                            <div className="flex flex-1 items-start space-x-4">
+                              <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
+                                {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
+                                <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
+                                {isAssignedToProject ? (
+                                  <span className="mt-1 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                                    <Package className="mr-1 h-3 w-3" />
+                                    Assigned to project
+                                  </span>
+                                ) : (
+                                  canEdit() && (
+                                    <p className="mt-1 text-xs text-blue-600">← Drag to assign to project</p>
+                                  )
+                                )}
+                              </div>
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
-                              <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
+                            <div className="ml-6 flex items-center space-x-2">
+                              <Button onClick={() => handleViewDrawing(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
+                                <Eye className="h-4 w-4" />
+                                <span>View</span>
+                              </Button>
+                              {canEdit() && (
+                                <Button
+                                  onClick={() => handleDeleteDrawing(doc)}
+                                  disabled={isDeletingDrawing}
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
-                          <div className="ml-6 flex items-center space-x-2">
-                            <Button onClick={() => handleViewFormDocument(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-12 text-center">
+                  <Image className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+                  <h3 className="mb-2 text-lg font-medium text-gray-900">No Drawings or Layouts</h3>
+                  <p className="mb-4 text-sm text-gray-600">Upload CADs, sketches, photos, or client documentation here.</p>
+                  {canEdit() && (
+                    <Button
+                      onClick={handleUploadDrawing}
+                      className="flex items-center space-x-2 bg-gray-900 hover:bg-gray-800"
+                    >
+                      <Upload className="h-4 w-4" />
+                      <span>Upload File</span>
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Projects Tab */}
+          <TabsContent value="projects" className="mt-6 space-y-6">
+            <div className="rounded-lg border bg-white p-6 shadow-sm">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Projects ({customer.projects?.length || 0})</h2>
+                {canManageProjects() && (
+                  <Button onClick={handleCreateProject} className="flex items-center space-x-2 bg-gray-900 hover:bg-gray-800">
+                    <Plus className="h-4 w-4" />
+                    <span>New Project</span>
+                  </Button>
+                )}
+              </div>
+
+              {customer.projects && customer.projects.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  {customer.projects
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .map((project) => (
+                      <div
+                        key={project.id}
+                        className={`rounded-lg border bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
+                          dragOverProject === project.id ? 'ring-2 ring-blue-500 bg-blue-100/50' : ''
+                        }`}
+                        onDragOver={(e) => handleDragOver(e, project.id)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, project.id)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="min-w-0 flex-1 pr-4">
+                            <div className="mb-2 flex items-center space-x-2">
+                              <Package className="h-5 w-5 text-blue-600" />
+                              <h3 className="truncate text-lg font-semibold text-gray-900">{project.project_name}</h3>
+                            </div>
+                            <div className="mt-3 space-y-2">
+                              <div className="flex items-center space-x-2">
+                                <span
+                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getProjectTypeColor(project.project_type)}`}
+                                >
+                                  {project.project_type}
+                                </span>
+                                <span
+                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStageColor(project.stage)}`}
+                                >
+                                  {project.stage}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                <Calendar className="mr-1 inline h-3 w-3" />
+                                Measure: {formatDate(project.date_of_measure || "")}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                <FileText className="mr-1 inline h-3 w-3" />
+                                {project.form_count} Form{project.form_count !== 1 ? "s" : ""}
+                              </p>
+                            </div>
+                            {project.notes && <p className="mt-3 line-clamp-2 text-sm text-gray-500">{project.notes}</p>}
+                            {dragOverProject === project.id && (
+                              <p className="mt-2 text-xs text-blue-600 font-medium">Drop here to assign</p>
+                            )}
+                          </div>
+                          <div className="ml-4 flex flex-shrink-0 flex-col space-y-2">
+                            {canManageProjects() && (
+                              <>
+                                <Button
+                                  onClick={() => handleEditProject(project.id)}
+                                  variant="default"
+                                  size="sm"
+                                  className="flex items-center space-x-2 bg-gray-900 hover:bg-gray-800"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                  <span>Edit</span>
+                                </Button>
+                                <Button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteProject(project);
+                                  }}
+                                  variant="destructive"
+                                  size="sm"
+                                  className="flex items-center space-x-2"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  <span>Delete</span>
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              onClick={() => window.open(`/dashboard/projects/${project.id}`, '_blank')}
+                              variant="outline"
+                              size="sm"
+                              className="flex items-center space-x-2"
+                            >
                               <Eye className="h-4 w-4" />
                               <span>View</span>
                             </Button>
-                            {canEdit() && (
-                              <Button
-                                onClick={() => handleDeleteFormDocument(doc)}
-                                disabled={isDeletingFormDoc}
-                                variant="outline"
-                                size="sm"
-                                className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="rounded-lg bg-gray-50 p-8 text-center text-gray-500">
+                  <Package className="mx-auto mb-4 h-12 w-12 text-gray-300" />
+                  <h3 className="mb-2 text-lg font-medium text-gray-900">No Projects Yet</h3>
+                  <p className="text-sm">Create a new project to track specific kitchen/bedroom work.</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Financial Documents Tab */}
+          <TabsContent value="financial" className="mt-6 space-y-6">
+            <div className="rounded-lg border bg-white p-6 shadow-sm">
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">
+                  Financial Documents ({financialDocuments.length})
+                </h2>
+                {financialDocuments.length > 0 && (
+                  <div className="text-sm text-gray-600">
+                    {financialDocuments.filter(d => d.type === 'quotation').length} Quotation{financialDocuments.filter(d => d.type === 'quotation').length !== 1 ? 's' : ''} • {' '}
+                    {financialDocuments.filter(d => d.type === 'invoice' || d.type === 'proforma').length} Invoice{financialDocuments.filter(d => d.type === 'invoice' || d.type === 'proforma').length !== 1 ? 's' : ''} • {' '}
+                    {financialDocuments.filter(d => d.type === 'receipt' || d.type === 'deposit' || d.type === 'final').length} Receipt{financialDocuments.filter(d => d.type === 'receipt' || d.type === 'deposit' || d.type === 'final').length !== 1 ? 's' : ''}
+                  </div>
+                )}
+              </div>
+
+              {financialDocuments.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {financialDocuments.map((doc) => (
+                    <div
+                      key={`${doc.type}-${doc.id}`}
+                      className={`rounded-lg border bg-gradient-to-br ${getFinancialDocColor(doc.type)} p-6 shadow-sm transition-all duration-200 hover:shadow-md`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="mb-3 flex items-center space-x-3">
+                            <div className="rounded-lg bg-white p-2 shadow-sm">
+                              {getFinancialDocIcon(doc.type)}
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-gray-900 line-clamp-1">{doc.title}</h3>
+                              <p className="text-xs text-gray-600 capitalize">{doc.type.replace('_', ' ')}</p>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            {doc.status && (
+                              <div className="flex items-center space-x-2">
+                                <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                                  doc.status === 'Approved' || doc.status === 'Paid' ? 'bg-green-100 text-green-800' :
+                                  doc.status === 'Draft' || doc.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  doc.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {doc.status}
+                                </span>
+                              </div>
+                            )}
+
+                            {doc.total !== undefined && (
+                              <p className="text-sm text-gray-700">
+                                <span className="font-medium">Total:</span>{' '}
+                                <span className="font-semibold text-gray-900">£{doc.total.toFixed(2)}</span>
+                              </p>
+                            )}
+
+                            {doc.amount_paid !== undefined && doc.amount_paid > 0 && (
+                              <p className="text-sm text-green-700">
+                                <span className="font-medium">Paid:</span>{' '}
+                                <span className="font-semibold">£{doc.amount_paid.toFixed(2)}</span>
+                              </p>
+                            )}
+
+                            {doc.balance !== undefined && doc.balance > 0 && (
+                              <p className="text-sm text-red-700">
+                                <span className="font-medium">Balance:</span>{' '}
+                                <span className="font-semibold">£{doc.balance.toFixed(2)}</span>
+                              </p>
+                            )}
+
+                            <p className="text-xs text-gray-600">
+                              <Calendar className="mr-1 inline h-3 w-3" />
+                              {formatDate(doc.created_at)}
+                            </p>
+
+                            {doc.project_id && (
+                              <p className="text-xs text-blue-600">
+                                <Package className="mr-1 inline h-3 w-3" />
+                                Linked to project
+                              </p>
                             )}
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
 
-          {/* Form Submissions */}
-          {customer.form_submissions && customer.form_submissions.length > 0 ? (
-            <div>
-              {/* <h3 className="mb-4 text-lg font-semibold text-gray-900">
-                Form Submissions ({customer.form_submissions.length})
-              </h3> */}
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {customer.form_submissions.map((submission) => (
-                  <div key={submission.id}>{renderFormSubmission(submission)}</div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            !formDocuments.length && (
-              <div className="rounded-lg bg-gray-50 p-8 text-center text-gray-500">
-                <CheckSquare className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-                <h3 className="mb-2 text-lg font-medium text-gray-900">No Form Submissions</h3>
-                <p className="text-sm">
-                  Generate a form link, create a checklist, or upload documents to collect customer information.
-                </p>
-              </div>
-            )
-          )}
-        </div>
-
-        {/* FINANCIAL DOCUMENTS SECTION - Only show if documents exist */}
-        <div className="mb-8 border-t border-gray-200 pt-8">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Financial Documents ({financialDocuments.length})
-            </h2>
-            {financialDocuments.length > 0 && (
-              <div className="text-sm text-gray-600">
-                {financialDocuments.filter(d => d.type === 'quotation').length} Quotation{financialDocuments.filter(d => d.type === 'quotation').length !== 1 ? 's' : ''} • {' '}
-                {financialDocuments.filter(d => d.type === 'invoice' || d.type === 'proforma').length} Invoice{financialDocuments.filter(d => d.type === 'invoice' || d.type === 'proforma').length !== 1 ? 's' : ''} • {' '}
-                {financialDocuments.filter(d => d.type === 'receipt' || d.type === 'deposit' || d.type === 'final').length} Receipt{financialDocuments.filter(d => d.type === 'receipt' || d.type === 'deposit' || d.type === 'final').length !== 1 ? 's' : ''}
-              </div>
-            )}
-          </div>
-
-          {financialDocuments.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {financialDocuments.map((doc) => (
-                <div
-                  key={`${doc.type}-${doc.id}`}
-                  className={`rounded-lg border bg-gradient-to-br ${getFinancialDocColor(doc.type)} p-6 shadow-sm transition-all duration-200 hover:shadow-md`}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="mb-3 flex items-center space-x-3">
-                        <div className="rounded-lg bg-white p-2 shadow-sm">
-                          {getFinancialDocIcon(doc.type)}
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-gray-900 line-clamp-1">{doc.title}</h3>
-                          <p className="text-xs text-gray-600 capitalize">{doc.type.replace('_', ' ')}</p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        {doc.status && (
-                          <div className="flex items-center space-x-2">
-                            <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                              doc.status === 'Approved' || doc.status === 'Paid' ? 'bg-green-100 text-green-800' :
-                              doc.status === 'Draft' || doc.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                              doc.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {doc.status}
-                            </span>
-                          </div>
+                      <div className="mt-4 flex items-center gap-2">
+                        <Button
+                          onClick={() => handleViewFinancialDocument(doc)}
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 bg-white hover:bg-gray-50"
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          View
+                        </Button>
+                        
+                        {doc.type === 'quotation' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const quoteId = typeof doc.id === 'string' ? parseInt(doc.id) : doc.id;
+                              
+                              if (!quoteId || isNaN(quoteId)) {
+                                console.error('Invalid quote ID:', doc.id);
+                                alert('Error: Cannot delete quotation - invalid ID');
+                                return;
+                              }
+                              
+                              setQuoteToDelete({
+                                id: quoteId,
+                                reference: doc.reference || doc.title 
+                              });
+                              setDeleteDialogOpen(true);
+                            }}
+                            disabled={deletingQuoteId === doc.id}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                          >
+                            {deletingQuoteId === doc.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
                         )}
-
-                        {doc.total !== undefined && (
-                          <p className="text-sm text-gray-700">
-                            <span className="font-medium">Total:</span>{' '}
-                            <span className="font-semibold text-gray-900">£{doc.total.toFixed(2)}</span>
-                          </p>
-                        )}
-
-                        {doc.amount_paid !== undefined && doc.amount_paid > 0 && (
-                          <p className="text-sm text-green-700">
-                            <span className="font-medium">Paid:</span>{' '}
-                            <span className="font-semibold">£{doc.amount_paid.toFixed(2)}</span>
-                          </p>
-                        )}
-
-                        {doc.balance !== undefined && doc.balance > 0 && (
-                          <p className="text-sm text-red-700">
-                            <span className="font-medium">Balance:</span>{' '}
-                            <span className="font-semibold">£{doc.balance.toFixed(2)}</span>
-                          </p>
-                        )}
-
-                        <p className="text-xs text-gray-600">
-                          <Calendar className="mr-1 inline h-3 w-3" />
-                          {formatDate(doc.created_at)}
-                        </p>
-
-                        {doc.project_id && (
-                          <p className="text-xs text-blue-600">
-                            <Package className="mr-1 inline h-3 w-3" />
-                            Linked to project
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center gap-2">
-                    <Button
-                      onClick={() => handleViewFinancialDocument(doc)}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 bg-white hover:bg-gray-50"
-                    >
-                      <Eye className="mr-2 h-4 w-4" />
-                      View Details
-                    </Button>
-                    
-                    {/* Delete Button - ONLY for quotations */}
-                    {doc.type === 'quotation' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setQuoteToDelete({
-                            id: typeof doc.id === 'string' ? parseInt(doc.id) : doc.id, 
-                            reference: doc.reference || doc.title 
-                          });
-                          setDeleteDialogOpen(true);
-                        }}
-                        disabled={deletingQuoteId === doc.id}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                      >
-                        {deletingQuoteId === doc.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-12 text-center">
-              <DollarSign className="mx-auto mb-6 h-16 w-16 text-gray-300" />
-              <h3 className="mb-4 text-xl font-semibold text-gray-900">No Financial Documents</h3>
-              <p className="mx-auto mb-8 max-w-2xl text-gray-600">
-                Create invoices, receipts, quotes, or payment terms to track this customer's financial activity.
-              </p>
-              {canCreateFinancialDocs() && (
-                <div className="flex flex-wrap justify-center gap-4">
-                  <Button onClick={handleCreateQuote} className="flex items-center space-x-2">
-                    <FileText className="h-4 w-4" />
-                    <span>Create Quotation</span>
-                  </Button>
-                  <Button onClick={handleCreateInvoice} variant="outline" className="flex items-center space-x-2">
-                    <FileText className="h-4 w-4" />
-                    <span>Create Invoice</span>
-                  </Button>
-                  <Button onClick={handleCreateReceipt} variant="outline" className="flex items-center space-x-2">
-                    <Receipt className="h-4 w-4" />
-                    <span>Create Receipt</span>
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Quotation</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete quotation "{quoteToDelete?.reference}"? 
-                This action cannot be undone and will permanently remove the quotation and all its items.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={deletingQuoteId !== null}>
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  if (quoteToDelete) {
-                    handleDeleteQuote(quoteToDelete.id);
-                  }
-                }}
-                disabled={deletingQuoteId !== null}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                {deletingQuoteId !== null ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  'Delete Quotation'
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* PROJECT SELECTION DIALOG FOR UPLOADS */}
-        <Dialog open={showProjectSelectDialog} onOpenChange={setShowProjectSelectDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Select Project for Upload</DialogTitle>
-              <DialogDescription>
-                Choose which project these drawings belong to, or leave unassigned for general documents.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div
-                onClick={() => setSelectedProjectForUpload(null)}
-                className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
-                  selectedProjectForUpload === null
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  <Image className="h-5 w-5 text-gray-600" />
-                  <div>
-                    <h4 className="font-semibold text-gray-900">General Documents</h4>
-                    <p className="text-sm text-gray-600">Not linked to any specific project</p>
-                  </div>
-                </div>
-              </div>
-
-              {customer?.projects && customer.projects.length > 0 && (
-                <>
-                  <div className="text-sm font-medium text-gray-700">Or select a project:</div>
-                  {customer.projects.map((project) => (
-                    <div
-                      key={project.id}
-                      onClick={() => setSelectedProjectForUpload(project.id)}
-                      className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
-                        selectedProjectForUpload === project.id
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <Package className="h-5 w-5 text-blue-600" />
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900">{project.project_name}</h4>
-                          <div className="mt-1 flex items-center space-x-2">
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getProjectTypeColor(project.project_type)}`}>
-                              {project.project_type}
-                            </span>
-                            <span className="text-xs text-gray-500">{project.stage}</span>
-                          </div>
-                        </div>
                       </div>
                     </div>
                   ))}
-                </>
+                </div>
+              ) : (
+                <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-12 text-center">
+                  <DollarSign className="mx-auto mb-6 h-16 w-16 text-gray-300" />
+                  <h3 className="mb-4 text-xl font-semibold text-gray-900">No Financial Documents</h3>
+                  <p className="mx-auto mb-8 max-w-2xl text-gray-600">
+                    Create invoices, receipts, quotes, or payment terms to track this customer's financial activity.
+                  </p>
+                </div>
               )}
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => {
-                setShowProjectSelectDialog(false);
-                setSelectedProjectForUpload(null);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-              }}>
-                Cancel
-              </Button>
-              <Button onClick={handleConfirmProjectUpload}>
-                Upload to {selectedProjectForUpload === null ? "General" : "Selected Project"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* DELETE FORM DOCUMENT DIALOG */}
-        <Dialog open={showDeleteFormDocDialog} onOpenChange={setShowDeleteFormDocDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delete Form Document</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete <strong>{formDocToDelete?.filename}</strong>? This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDeleteFormDocDialog(false)} disabled={isDeletingFormDoc}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleConfirmDeleteFormDocument}
-                disabled={isDeletingFormDoc}
-                className="bg-red-600 text-white hover:bg-red-700"
-              >
-                {isDeletingFormDoc ? "Deleting..." : "Delete"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* BULK DELETE DRAWINGS DIALOG */}
-        <Dialog open={showBulkDeleteDrawingsDialog} onOpenChange={setShowBulkDeleteDrawingsDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delete Multiple Drawings</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete {selectedDrawings.size} selected drawing(s)? This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowBulkDeleteDrawingsDialog(false)}
-                disabled={isBulkDeleting}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleConfirmBulkDeleteDrawings}
-                disabled={isBulkDeleting}
-                className="bg-red-600 text-white hover:bg-red-700"
-              >
-                {isBulkDeleting ? "Deleting..." : `Delete ${selectedDrawings.size} Files`}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* BULK DELETE FORM DOCUMENTS DIALOG */}
-        <Dialog open={showBulkDeleteFormDocsDialog} onOpenChange={setShowBulkDeleteFormDocsDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delete Multiple Documents</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete {selectedFormDocs.size} selected document(s)? This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowBulkDeleteFormDocsDialog(false)}
-                disabled={isBulkDeleting}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleConfirmBulkDeleteFormDocs}
-                disabled={isBulkDeleting}
-                className="bg-red-600 text-white hover:bg-red-700"
-              >
-                {isBulkDeleting ? "Deleting..." : `Delete ${selectedFormDocs.size} Files`}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* JOBS SECTION
-        <div className="mb-8 border-t border-gray-200 pt-8">
-          <h2 className="mb-6 text-xl font-semibold text-gray-900">Tasks</h2>
-          {jobs.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {jobs.map((job) => (
-                <div key={job.id} className="rounded-lg border bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="mb-2 flex items-center space-x-3">
-                        <h3 className="font-semibold text-gray-900">{job.job_reference || `Job #${job.id}`}</h3>
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${getStageColor(job.stage)}`}
-                        >
-                          {job.stage}
-                        </span>
-                      </div>
-                      <p className="mb-1 text-sm text-gray-500">Type: {job.type}</p>
-                      <p className="text-sm text-gray-500">Created: {formatDate(job.created_at)}</p>
-                      {job.quote_price && (
-                        <p className="mt-1 text-sm text-gray-600">Quote Price: £{job.quote_price.toFixed(2)}</p>
-                      )}
-                    </div>
-                    <Button
-                      onClick={() => handleViewJob(job.id)}
-                      variant="outline"
-                      className="ml-6 flex items-center space-x-2 px-4"
-                    >
-                      <Briefcase className="h-4 w-4" />
-                      <span>View Job</span>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-lg bg-gray-50 p-8 text-center text-gray-500">
-              <Briefcase className="mx-auto mb-4 h-12 w-12 text-gray-300" />
-              <h3 className="mb-2 text-lg font-medium text-gray-900">No Jobs</h3>
-              <p className="mb-4">Jobs are created from accepted quotations.</p>
-            </div>
-          )}
-        </div>
-
-        {/* FINANCIAL DOCUMENTS SECTION */}
-        {/* <div className="border-t border-gray-200 pt-8">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Financial Documents</h2>
-            <div className="text-sm font-medium text-gray-500">
-              {financialDocs.length} document{financialDocs.length !== 1 ? "s" : ""}
-            </div>
-          </div>
-          {financialDocs.length > 0 ? (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {financialDocs.map((doc) => renderFinancialDocument(doc))}
-            </div>
-          ) : (
-            <div className="rounded-xl border-2 border-dashed border-blue-200 bg-gradient-to-r from-blue-50/60 to-indigo-50/60 p-12 text-center">
-              <DollarSign className="mx-auto mb-6 h-16 w-16 text-blue-400" />
-              <h3 className="mb-4 text-xl font-semibold text-gray-900">No Financial Documents</h3>
-              <p className="mx-auto mb-8 max-w-2xl text-gray-600">
-                Create invoices, receipts, quotes, or payment terms to track this customer's financial activity.
-              </p>
-              <div className="flex flex-wrap justify-center gap-4">
-                {canCreateFinancialDocs() && (
-                  <>
-                    <Button onClick={handleCreateInvoice} className="flex items-center space-x-2">
-                      <FileText className="h-4 w-4" />
-                      <span>Create Invoice</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleCreateProformaInvoice}
-                      className="flex items-center space-x-2"
-                    >
-                      <FileText className="h-4 w-4" />
-                      <span>Proforma Invoice</span>
-                    </Button>
-                    <Button variant="outline" onClick={handleCreateReceipt} className="flex items-center space-x-2">
-                      <Receipt className="h-4 w-4" />
-                      <span>Receipt</span>
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </div> */}
+          </TabsContent>
+        </Tabs>
       </div>
+            
+      {/* Delete Quotation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Quotation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete quotation "{quoteToDelete?.reference}"? 
+              This action cannot be undone and will permanently remove the quotation and all its items.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingQuoteId !== null}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!quoteToDelete) {
+                  console.error('No quote selected for deletion');
+                  alert('Error: No quote selected');
+                  return;
+                }
+                
+                if (!quoteToDelete.id || isNaN(quoteToDelete.id)) {
+                  console.error('Invalid quote ID:', quoteToDelete);
+                  alert('Error: Invalid quote ID');
+                  return;
+                }
+                
+                console.log('Deleting quote ID:', quoteToDelete.id);
+                handleDeleteQuote(quoteToDelete.id);
+              }}
+              disabled={deletingQuoteId !== null}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deletingQuoteId !== null ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Quotation'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {/* Dialogs remain the same as in your original code */}
-      {/* PROJECT DETAILS DIALOG */}
-      <Dialog open={showProjectDialog} onOpenChange={setShowProjectDialog}>
-        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+      {/* PROJECT SELECTION DIALOG FOR UPLOADS */}
+      <Dialog open={showProjectSelectDialog} onOpenChange={setShowProjectSelectDialog}>
+        <DialogContent>
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle className="flex items-center space-x-2 text-2xl font-bold">
-                  <Package className="h-6 w-6 text-blue-600" />
-                  <span>{selectedProject?.project_name}</span>
-                </DialogTitle>
-                <DialogDescription className="mt-2">
-                  Detailed view of project information, forms, and documents
-                </DialogDescription>
-              </div>
-              <div className="flex items-center space-x-2">
-                {/* Edit Button inside dialog now uses canManageProjects() */}
-                {canManageProjects() && (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => selectedProject && handleEditProject(selectedProject.id)}
-                    className="flex items-center space-x-2"
-                  >
-                    <Edit className="h-4 w-4" />
-                    <span>Edit</span>
-                  </Button>
-                )}
-                <Button variant="ghost" size="icon" onClick={() => setShowProjectDialog(false)}>
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
+            <DialogTitle>Select Project for Upload</DialogTitle>
+            <DialogDescription>
+              Choose which project these drawings belong to, or leave unassigned for general documents.
+            </DialogDescription>
           </DialogHeader>
-
-          {selectedProject && (
-            <div className="mt-6 space-y-6">
-              <section className="rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
-                <h3 className="mb-4 text-lg font-semibold text-gray-900">Project Overview</h3>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <span className="text-sm text-gray-600">Project Type</span>
-                    <div className="mt-1">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${getProjectTypeColor(selectedProject.project_type)}`}
-                      >
-                        {selectedProject.project_type}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-600">Current Stage</span>
-                    <div className="mt-1">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${getStageColor(selectedProject.stage)}`}
-                      >
-                        {selectedProject.stage}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-600">Measure Date</span>
-                    <p className="mt-1 text-gray-900">{formatDate(selectedProject.date_of_measure || "")}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-gray-600">Created</span>
-                    <p className="mt-1 text-gray-900">{formatDate(selectedProject.created_at)}</p>
-                  </div>
+          <div className="space-y-4 py-4">
+            <div
+              onClick={() => setSelectedProjectForUpload(null)}
+              className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
+                selectedProjectForUpload === null
+                  ? "border-blue-500 bg-blue-50"
+                  : "border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <Image className="h-5 w-5 text-gray-600" />
+                <div>
+                  <h4 className="font-semibold text-gray-900">General Documents</h4>
+                  <p className="text-sm text-gray-600">Not linked to any specific project</p>
                 </div>
-                {selectedProject.notes && (
-                  <div className="mt-4">
-                    <span className="text-sm text-gray-600">Notes</span>
-                    <p className="mt-1 rounded bg-white p-3 text-gray-900">{selectedProject.notes}</p>
-                  </div>
-                )}
-              </section>
-
-              <section>
-                <h3 className="mb-4 text-lg font-semibold text-gray-900">Forms ({projectForms.length})</h3>
-                {projectForms.length > 0 ? (
-                  <div className="space-y-3">
-                    {projectForms.map((form) => (
-                      <div
-                        key={form.id}
-                        className="flex items-center justify-between rounded-lg border bg-white p-4 transition hover:bg-gray-50"
-                      >
-                        <div>
-                          <h4 className="font-medium text-gray-900">{getFormTitle(form)}</h4>
-                          <p className="text-sm text-gray-500">Submitted: {formatDate(form.submitted_at)}</p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedForm(form);
-                            setShowFormDialog(true);
-                            setFormType(getFormType(form));
-                          }}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-lg bg-gray-50 p-8 text-center">
-                    <CheckSquare className="mx-auto mb-3 h-10 w-10 text-gray-300" />
-                    <p className="text-gray-500">No forms submitted for this project yet</p>
-                  </div>
-                )}
-              </section>
-
-              <section>
-                <h3 className="mb-4 text-lg font-semibold text-gray-900">Financial Documents ({projectDocs.length})</h3>
-                {projectDocs.length > 0 ? (
-                  <div className="space-y-3">
-                    {projectDocs.map((doc) => (
-                      <div
-                        key={doc.id}
-                        className="flex items-center justify-between rounded-lg border bg-white p-4 transition hover:bg-gray-50"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="rounded bg-blue-50 p-2">{FINANCIAL_DOCUMENT_ICONS[doc.type]}</div>
-                          <div>
-                            <h4 className="font-medium text-gray-900">{doc.title}</h4>
-                            <p className="text-sm text-gray-500">Created: {formatDate(doc.created_at)}</p>
-                            {doc.total && <p className="text-sm font-medium text-blue-600">£{doc.total.toFixed(2)}</p>}
-                          </div>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={() => handleViewFinancialDoc(doc)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-lg bg-gray-50 p-8 text-center">
-                    <FileText className="mx-auto mb-3 h-10 w-10 text-gray-300" />
-                    <p className="text-gray-500">No financial documents for this project yet</p>
-                  </div>
-                )}
-              </section>
+              </div>
             </div>
-          )}
+
+            {customer?.projects && customer.projects.length > 0 && (
+              <>
+                <div className="text-sm font-medium text-gray-700">Or select a project:</div>
+                {customer.projects.map((project) => (
+                  <div
+                    key={project.id}
+                    onClick={() => setSelectedProjectForUpload(project.id)}
+                    className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
+                      selectedProjectForUpload === project.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <Package className="h-5 w-5 text-blue-600" />
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900">{project.project_name}</h4>
+                        <div className="mt-1 flex items-center space-x-2">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getProjectTypeColor(project.project_type)}`}>
+                            {project.project_type}
+                          </span>
+                          <span className="text-xs text-gray-500">{project.stage}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowProjectSelectDialog(false);
+              setSelectedProjectForUpload(null);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmProjectUpload}>
+              Upload to {selectedProjectForUpload === null ? "General" : "Selected Project"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE FORM DOCUMENT DIALOG */}
+      <Dialog open={showDeleteFormDocDialog} onOpenChange={setShowDeleteFormDocDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Form Document</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{formDocToDelete?.filename}</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteFormDocDialog(false)} disabled={isDeletingFormDoc}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDeleteFormDocument}
+              disabled={isDeletingFormDoc}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isDeletingFormDoc ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* BULK DELETE DRAWINGS DIALOG */}
+      <Dialog open={showBulkDeleteDrawingsDialog} onOpenChange={setShowBulkDeleteDrawingsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Multiple Drawings</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedDrawings.size} selected drawing(s)? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowBulkDeleteDrawingsDialog(false)}
+              disabled={isBulkDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmBulkDeleteDrawings}
+              disabled={isBulkDeleting}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isBulkDeleting ? "Deleting..." : `Delete ${selectedDrawings.size} Files`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* BULK DELETE FORM DOCUMENTS DIALOG */}
+      <Dialog open={showBulkDeleteFormDocsDialog} onOpenChange={setShowBulkDeleteFormDocsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Multiple Documents</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedFormDocs.size} selected document(s)? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowBulkDeleteFormDocsDialog(false)}
+              disabled={isBulkDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmBulkDeleteFormDocs}
+              disabled={isBulkDeleting}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isBulkDeleting ? "Deleting..." : `Delete ${selectedFormDocs.size} Files`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* FORM LINK DIALOG */}
+      <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{formType === "kitchen" ? "Kitchen" : "Bedroom"} Checklist Form Link Generated</DialogTitle>
+            <DialogDescription>
+              Share this link with {customer?.name} to fill out the {formType === "kitchen" ? "kitchen" : "bedroom"}{" "}
+              checklist form. The form data will be linked to their existing customer record.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2">
+            <Input value={generatedLink} readOnly className="flex-1" />
+            <Button onClick={copyToClipboard} variant="outline">
+              {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {linkCopied ? "Copied!" : "Copy"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE DRAWING DIALOG */}
+      <Dialog open={showDeleteDrawingDialog} onOpenChange={setShowDeleteDrawingDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Drawing</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{drawingToDelete?.filename}</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDrawingDialog(false)}
+              disabled={isDeletingDrawing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDeleteDrawing}
+              disabled={isDeletingDrawing}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isDeletingDrawing ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE FORM DIALOG */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Form Submission</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this form submission? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteForm}
+              disabled={isDeleting}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -3832,595 +3618,56 @@ const handleConfirmDeleteFormDocument = async () => {
         </DialogContent>
       </Dialog>
 
-      {/* FORM LINK DIALOG */}
-      <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
-        <DialogContent>
+      {/* QUOTE GENERATION DIALOG */}
+      <Dialog open={showQuoteGenerationDialog} onOpenChange={setShowQuoteGenerationDialog}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{formType === "kitchen" ? "Kitchen" : "Bedroom"} Checklist Form Link Generated</DialogTitle>
-            <DialogDescription>
-              Share this link with {customer?.name} to fill out the {formType === "kitchen" ? "kitchen" : "bedroom"}{" "}
-              checklist form. The form data will be linked to their existing customer record.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center space-x-2">
-            <Input value={generatedLink} readOnly className="flex-1" />
-            <Button onClick={copyToClipboard} variant="outline">
-              {linkCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {linkCopied ? "Copied!" : "Copy"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* DELETE DRAWING DIALOG */}
-      <Dialog open={showDeleteDrawingDialog} onOpenChange={setShowDeleteDrawingDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Drawing</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete <strong>{drawingToDelete?.filename}</strong>? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteDrawingDialog(false)}
-              disabled={isDeletingDrawing}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmDeleteDrawing}
-              disabled={isDeletingDrawing}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              {isDeletingDrawing ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* DELETE FORM DIALOG */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Form Submission</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this form submission? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleDeleteForm}
-              disabled={isDeleting}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* FORM DIALOG - WITH EDIT FUNCTIONALITY */}
-      <Dialog open={showFormDialog} onOpenChange={(open) => {
-        setShowFormDialog(open);
-        if (!open) {
-          setIsEditingForm(false);
-          setEditFormData(null);
-        }
-      }}>
-        <DialogContent className="h-[85vh] w-[85vw] max-w-none overflow-hidden rounded-lg p-0">
-          <div className="flex items-start justify-between border-b bg-white px-6 py-4">
-            <div>
-              <DialogTitle className="text-lg font-semibold">
-                {isEditingForm ? "Edit " : ""}{selectedForm ? getFormTitle(selectedForm) : "Form Submission"}
-              </DialogTitle>
-              <DialogDescription className="text-sm text-gray-500">
-                Submitted: {selectedForm ? formatDate(selectedForm.submitted_at) : "—"}
-              </DialogDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              {isEditingForm && (
-                <Button
-                  onClick={handleSaveEditedForm}
-                  disabled={isSavingForm}
-                  className="flex items-center space-x-2"
-                >
-                  <Check className="h-4 w-4" />
-                  <span>{isSavingForm ? "Saving..." : "Save Changes"}</span>
-                </Button>
-              )}
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-xl font-semibold">Generate Quotation</DialogTitle>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => {
-                  setShowFormDialog(false);
-                  setIsEditingForm(false);
-                  setEditFormData(null);
+                  setShowQuoteGenerationDialog(false);
+                  setChecklistForQuote(null);
                 }}
+                className="h-8 w-8 rounded-full"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </Button>
             </div>
-          </div>
-          <div className="h-[calc(85vh-72px)] overflow-auto bg-gray-50 p-6">
-            {selectedForm ? (
-              (() => {
-                let rawData: Record<string, any> = {};
-                try {
-                  rawData = isEditingForm && editFormData 
-                    ? editFormData 
-                    : (typeof selectedForm.form_data === "string"
-                        ? JSON.parse(selectedForm.form_data)
-                        : selectedForm.form_data || {});
-                } catch {
-                  rawData = selectedForm.form_data || {};
-                }
-
-                const currentFormType = getFormType(selectedForm);
-
-                if (currentFormType === "remedial") {
-                  return renderRemedialForm(rawData);
-                }
-
-                if (currentFormType === "document") {
-                  return renderReceiptData(rawData);
-                }
-
-                const inferredType = (rawData.form_type || "").toString().toLowerCase().includes("bed")
-                  ? "bedroom"
-                  : (rawData.form_type || "").toString().toLowerCase().includes("kitchen")
-                    ? "kitchen"
-                    : (formType || "").toLowerCase();
-
-                const displayed = new Set<string>();
-
-                const keys = Object.keys(rawData).filter((k) => {
-                  const low = k.toLowerCase();
-                  if (
-                    low.includes("customer_id") ||
-                    low === "customerid" ||
-                    low === "customer id" ||
-                    low === "form_type" ||
-                    low === "checklisttype"
-                  )
-                    return false;
-                  if (typeof rawData[k] === "string" && isUUID(rawData[k])) return false;
-                  if (rawData[k] === null || rawData[k] === undefined || rawData[k] === "") return false;
-
-                  return true;
-                });
-
-                const customerInfoFields = ["customer_name", "customer_phone", "customer_address", "room"];
-                const designFields = [
-                  "fitting_style",
-                  "door_style",  // Added
-                  "glazing_material",  // Added
-                  "door_color",
-                  "drawer_color",
-                  "end_panel_color",
-                  "plinth_filler_color",
-                  "cabinet_color",
-                  "worktop_color",
-                  "handles_code",  // Added
-                  "handles_quantity",  // Added
-                  "handles_size",  // Added
-                  "floor_protection",  // Added (from bedroom section)
-                ];
-                const termsFields = ["terms_date", "gas_electric_info", "appliance_promotion_info"];
-                const signatureFields = ["signature_data", "signature_date"];
-                const bedroomFields = [
-                  "bedside_cabinets_type",
-                  "bedside_cabinets_qty",
-                  "dresser_desk",
-                  "dresser_desk_details",
-                  "internal_mirror",
-                  "internal_mirror_details",
-                  "mirror_type",
-                  "mirror_qty",
-                  "soffit_lights_type",
-                  "soffit_lights_color",
-                  "gable_lights_light_color",
-                  "gable_lights_light_qty",
-                  "gable_lights_profile_color",
-                  "gable_lights_profile_qty",
-                  "other_accessories",
-                  "floor_protection",
-                ];
-                const kitchenFields = [
-                  "worktop_features",
-                  "worktop_other_details",
-                  "worktop_size",
-                  "under_wall_unit_lights_color",
-                  "under_wall_unit_lights_profile",
-                  "under_worktop_lights_color",
-                  "kitchen_accessories",
-                  "sink_details",
-                  "tap_details",
-                  "other_appliances",
-                  "appliances",
-                ];
-                const auxiliaryFields = ["sink_tap_customer_owned", "appliances_customer_owned"];
-
-                // NEW: EditableRow component for edit mode
-                const EditableRow: React.FC<{ label: string; value: any; name: string }> = ({ label, value, name }) => {
-                  if (!isEditingForm) {
-                    return <Row label={label} value={value} name={name} />;
-                  }
-
-                  // Don't allow editing signature fields
-                  if (name === "signature_data" || name === "signature_date") {
-                    return <Row label={label} value={value} name={name} />;
-                  }
-
-                  // Handle arrays (like floor_protection, worktop_features)
-                  if (Array.isArray(value)) {
-                    return (
-                      <div className="grid grid-cols-1 items-start gap-4 border-b py-3 last:border-b-0 md:grid-cols-3">
-                        <div className="md:col-span-1">
-                          <div className="text-sm font-medium text-gray-700">{label}</div>
-                        </div>
-                        <div className="md:col-span-2">
-                          <Input
-                            value={value.join(", ") || ""}
-                            onChange={(e) => {
-                              const newValue = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
-                              handleFormFieldChange(name, newValue);
-                            }}
-                            className="w-full"
-                            placeholder="Comma-separated values"
-                          />
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Render editable input
-                  return (
-                    <div className="grid grid-cols-1 items-start gap-4 border-b py-3 last:border-b-0 md:grid-cols-3">
-                      <div className="md:col-span-1">
-                        <div className="text-sm font-medium text-gray-700">{label}</div>
-                      </div>
-                      <div className="md:col-span-2">
-                        <Input
-                          key={`${name}-${value}`}  // Add key to force re-render
-                          defaultValue={value || ""}  // Changed from value to defaultValue
-                          onBlur={(e) => handleFormFieldChange(name, e.target.value)}  // Changed from onChange to onBlur
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                  );
-                };
-
-                const renderSection = (title: string, fields: string[], typeCondition?: string) => {
-                  if (typeCondition && inferredType !== typeCondition) return null;
-
-                  const sectionKeys = fields.filter((k) => keys.includes(k));
-                  if (sectionKeys.length === 0) return null;
-
-                  return (
-                    <section>
-                      <h3 className="text-md mb-3 font-semibold text-gray-900">{title}</h3>
-                      <div className="rounded-lg bg-white p-4 shadow-sm">
-                        {sectionKeys.map((k) => {
-                          displayed.add(k);
-
-                          if (inferredType === "kitchen") {
-                            const sinkTapOwned = String(rawData.sink_tap_customer_owned).trim().toLowerCase() === "yes";
-                            const appliancesOwned = String(rawData.appliances_customer_owned).trim().toLowerCase() === "yes";
-
-                            if ((k === "sink_details" || k === "tap_details") && sinkTapOwned) {
-                              return <EditableRow key={k} label={humanizeLabel(k)} value="Customer Owned" name={k} />;
-                            }
-                            if ((k === "other_appliances" || k === "appliances") && appliancesOwned) {
-                              return <EditableRow key={k} label={humanizeLabel(k)} value="Customer Owned" name={k} />;
-                            }
-
-                            if (k === "appliances" && Array.isArray(rawData[k])) {
-                              const appliances = rawData[k].filter((app: any) => app.make || app.model || app.quantity || app.details || app.order_date);
-                              
-                              if (appliances.length === 0 && !isEditingForm) {
-                                return <EditableRow key={k} label={humanizeLabel(k)} value="—" name={k} />;
-                              }
-
-                              const standardAppliances = ["Oven", "Microwave", "Washing Machine", "HOB", "Extractor", "INTG Dishwasher"];
-
-                              return (
-                                <div key={k} className="grid grid-cols-1 items-start gap-4 border-b py-3 last:border-b-0 md:grid-cols-3">
-                                  <div className="md:col-span-1">
-                                    <div className="text-sm font-medium text-gray-700">{humanizeLabel(k)}</div>
-                                  </div>
-                                  <div className="md:col-span-2">
-                                    <div className="space-y-4">
-                                      {appliances.map((app: any, index: number) => {
-                                        const hasNewFormat = app.make || app.model || app.quantity;
-                                        const hasOldFormat = app.details;
-                                        const applianceLabel = index < standardAppliances.length 
-                                          ? standardAppliances[index] 
-                                          : `Appliance ${index + 1}`;
-
-                                        return (
-                                          <div 
-                                            key={index} 
-                                            className="group relative overflow-hidden rounded-lg border-2 border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 shadow-sm transition-all duration-200 hover:shadow-md hover:border-blue-300"
-                                          >
-                                            {/* Header with appliance name and delete button */}
-                                            <div className="mb-3 flex items-center justify-between border-b border-gray-200 pb-2">
-                                              <div className="flex items-center space-x-2">
-                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                                                  <Package className="h-4 w-4" />
-                                                </div>
-                                                <h4 className="text-base font-bold text-gray-900">{applianceLabel}</h4>
-                                              </div>
-                                              {isEditingForm && (
-                                                <Button
-                                                  type="button"
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() => handleDeleteAppliance(k, index)}
-                                                  className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                >
-                                                  <Trash2 className="h-4 w-4 mr-1" />
-                                                  <span className="text-xs">Delete</span>
-                                                </Button>
-                                              )}
-                                            </div>
-                                            
-                                            {isEditingForm ? (
-                                              <div className="space-y-3">
-                                                {/* Make Field */}
-                                                <div className="flex items-center gap-3">
-                                                  <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-50 text-blue-600">
-                                                    <span className="text-xs font-bold">M</span>
-                                                  </div>
-                                                  <div className="flex-1">
-                                                    <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">Make</label>
-                                                    <Input
-                                                      key={`make-${index}-${app.make}`}
-                                                      defaultValue={app.make || ""}
-                                                      onBlur={(e) => {
-                                                        const updatedAppliances = [...rawData[k]];
-                                                        updatedAppliances[index] = { ...updatedAppliances[index], make: e.target.value };
-                                                        handleFormFieldChange(k, updatedAppliances);
-                                                      }}
-                                                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                                                      placeholder="Enter appliance make"
-                                                    />
-                                                  </div>
-                                                </div>
-
-                                                {/* Model Field */}
-                                                <div className="flex items-center gap-3">
-                                                  <div className="flex h-6 w-6 items-center justify-center rounded bg-green-50 text-green-600">
-                                                    <span className="text-xs font-bold">#</span>
-                                                  </div>
-                                                  <div className="flex-1">
-                                                    <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">Model</label>
-                                                    <Input
-                                                      key={`model-${index}-${app.model}`}
-                                                      defaultValue={app.model || ""}
-                                                      onBlur={(e) => {
-                                                        const updatedAppliances = [...rawData[k]];
-                                                        updatedAppliances[index] = { ...updatedAppliances[index], model: e.target.value };
-                                                        handleFormFieldChange(k, updatedAppliances);
-                                                      }}
-                                                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                                                      placeholder="Enter model number"
-                                                    />
-                                                  </div>
-                                                </div>
-
-                                                {/* Order Date Field (if exists) */}
-                                                {app.order_date !== undefined && (
-                                                  <div className="flex items-center gap-3">
-                                                    <div className="flex h-6 w-6 items-center justify-center rounded bg-purple-50 text-purple-600">
-                                                      <Calendar className="h-3 w-3" />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                      <label className="mb-1 block text-xs font-semibold text-gray-600 uppercase tracking-wide">Order Date</label>
-                                                      <Input
-                                                        type="date"
-                                                        key={`order_date-${index}-${app.order_date}`}
-                                                        defaultValue={formatDateForInput(app.order_date)}
-                                                        onBlur={(e) => {
-                                                          const updatedAppliances = [...rawData[k]];
-                                                          updatedAppliances[index] = { ...updatedAppliances[index], order_date: e.target.value };
-                                                          handleFormFieldChange(k, updatedAppliances);
-                                                        }}
-                                                        className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                                                      />
-                                                    </div>
-                                                  </div>
-                                                )}
-                                              </div>
-                                            ) : (
-                                              <div className="space-y-2">
-                                                {hasNewFormat ? (
-                                                  <>
-                                                    {app.make && (
-                                                      <div className="flex items-center gap-3">
-                                                        <div className="flex h-6 w-6 items-center justify-center rounded bg-blue-50 text-blue-600">
-                                                          <span className="text-xs font-bold">M</span>
-                                                        </div>
-                                                        <div className="flex-1">
-                                                          <span className="block text-xs font-medium text-gray-500">Make</span>
-                                                          <span className="text-sm font-semibold text-gray-900">{app.make}</span>
-                                                        </div>
-                                                      </div>
-                                                    )}
-                                                    {app.model && (
-                                                      <div className="flex items-center gap-3">
-                                                        <div className="flex h-6 w-6 items-center justify-center rounded bg-green-50 text-green-600">
-                                                          <span className="text-xs font-bold">#</span>
-                                                        </div>
-                                                        <div className="flex-1">
-                                                          <span className="block text-xs font-medium text-gray-500">Model</span>
-                                                          <span className="text-sm font-semibold text-gray-900">{app.model}</span>
-                                                        </div>
-                                                      </div>
-                                                    )}
-                                                    {app.order_date && (
-                                                      <div className="flex items-center gap-3">
-                                                        <div className="flex h-6 w-6 items-center justify-center rounded bg-purple-50 text-purple-600">
-                                                          <Calendar className="h-3 w-3" />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                          <span className="block text-xs font-medium text-gray-500">Order Date</span>
-                                                          <span className="text-sm font-semibold text-gray-900">{formatDate(app.order_date)}</span>
-                                                        </div>
-                                                      </div>
-                                                    )}
-                                                  </>
-                                                ) : hasOldFormat ? (
-                                                  <>
-                                                    <div className="rounded-md bg-gray-100 p-3">
-                                                      <p className="text-sm text-gray-900">{app.details}</p>
-                                                    </div>
-                                                    {app.order_date && (
-                                                      <div className="flex items-center gap-3">
-                                                        <div className="flex h-6 w-6 items-center justify-center rounded bg-purple-50 text-purple-600">
-                                                          <Calendar className="h-3 w-3" />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                          <span className="block text-xs font-medium text-gray-500">Order Date</span>
-                                                          <span className="text-sm font-semibold text-gray-900">{formatDate(app.order_date)}</span>
-                                                        </div>
-                                                      </div>
-                                                    )}
-                                                  </>
-                                                ) : (
-                                                  <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3">
-                                                    <p className="text-sm text-yellow-800 flex items-center">
-                                                      <AlertCircle className="h-4 w-4 mr-2" />
-                                                      No details provided
-                                                    </p>
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            }
-                          }
-
-                          if (k === "signature_data" && rawData[k]) {
-                            return (
-                              <div
-                                key={k}
-                                className="grid grid-cols-1 items-start gap-4 border-b py-3 last:border-b-0 md:grid-cols-3"
-                              >
-                                <div className="md:col-span-1">
-                                  <div className="text-sm font-medium text-gray-700">{humanizeLabel(k)}</div>
-                                </div>
-                                <div className="md:col-span-2">
-                                  <div className="rounded-md border bg-gray-50 p-2">
-                                    <img src={rawData[k]} alt="Signature" className="max-h-40 w-full object-contain" />
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          }
-
-                          return <EditableRow key={k} label={humanizeLabel(k)} value={rawData[k]} name={k} />;
-                        })}
-                      </div>
-                    </section>
-                  );
-                };
-
-                // And the return statement that uses renderSection:
-                return (
-                  <div className="space-y-6">
-                    {renderSection("Customer Information", customerInfoFields)}
-                    {renderSection("Design Specifications", designFields)}
-                    {renderSection("Bedroom Specifications", bedroomFields, "bedroom")}
-                    {renderSection("Kitchen Specifications", kitchenFields, "kitchen")}
-                    {renderSection("Terms & Information", termsFields)}
-                    {renderSection("Customer Signature", signatureFields)}
-
-                    {keys.filter((k) => !displayed.has(k) && !auxiliaryFields.includes(k)).length > 0 && (
-                      <section>
-                        <h3 className="text-md mb-3 font-semibold text-gray-900">Additional Information</h3>
-                        <div className="rounded-lg bg-white p-4 shadow-sm">
-                          {keys
-                            .filter((k) => !displayed.has(k) && !auxiliaryFields.includes(k))
-                            .map((k) => (
-                              <EditableRow key={k} label={humanizeLabel(k)} value={rawData[k]} name={k} />
-                            ))}
-                        </div>
-                      </section>
-                    )}
-                  </div>
-                );
-              })()
-            ) : (
-              <div className="py-8 text-center text-gray-500">
-                <p>No form selected or data available.</p>
-              </div>
-            )}
+          </DialogHeader>
+          
+          <div className="py-6">
+            <p className="mb-6 text-base text-gray-700">
+              You have a <span className="font-semibold text-blue-600">{checklistForQuote?.type}</span> checklist on file.
+            </p>
+            <p className="text-sm text-gray-600">
+              Would you like to generate a quote from this checklist (auto-extract items) or create a blank quote manually?
+            </p>
           </div>
 
-          {/* QUOTE GENERATION DIALOG */}
-          <Dialog open={showQuoteGenerationDialog} onOpenChange={setShowQuoteGenerationDialog}>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <div className="flex items-center justify-between">
-                  <DialogTitle className="text-xl font-semibold">Generate Quotation</DialogTitle>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      setShowQuoteGenerationDialog(false);
-                      setChecklistForQuote(null);
-                    }}
-                    className="h-8 w-8 rounded-full"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </DialogHeader>
-              
-              <div className="py-6">
-                <p className="mb-6 text-base text-gray-700">
-                  You have a <span className="font-semibold text-blue-600">{checklistForQuote?.type}</span> checklist on file.
-                </p>
-                <p className="text-sm text-gray-600">
-                  Would you like to generate a quote from this checklist (auto-extract items) or create a blank quote manually?
-                </p>
-              </div>
-
-              <DialogFooter className="flex flex-col space-y-2 sm:flex-row sm:space-x-2 sm:space-y-0">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowQuoteGenerationDialog(false);
-                    createBlankQuote();
-                    setChecklistForQuote(null);
-                  }}
-                  className="w-full sm:w-auto"
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  No - Create Blank Quote
-                </Button>
-                <Button
-                  onClick={handleGenerateFromChecklist}
-                  className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto"
-                >
-                  <CheckSquare className="mr-2 h-4 w-4" />
-                  Yes - Generate from Checklist
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <DialogFooter className="flex flex-col space-y-2 sm:flex-row sm:space-x-2 sm:space-y-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowQuoteGenerationDialog(false);
+                createBlankQuote();
+                setChecklistForQuote(null);
+              }}
+              className="w-full sm:w-auto"
+            >
+              <X className="mr-2 h-4 w-4" />
+              No - Create Blank Quote
+            </Button>
+            <Button
+              onClick={handleGenerateFromChecklist}
+              className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto"
+            >
+              <CheckSquare className="mr-2 h-4 w-4" />
+              Yes - Generate from Checklist
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
