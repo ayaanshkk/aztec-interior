@@ -567,11 +567,9 @@ export default function CustomersPage() {
                     {h}
                   </th>
                 ))}
-                {(user?.role === "Manager" || user?.role === "HR") && (
-                  <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                    Salesperson
-                  </th>
-                )}
+                <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                  Salesperson
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                   Project Types
                 </th>
@@ -728,11 +726,9 @@ export default function CustomersPage() {
                           )}
                         </td>
 
-                        {(user?.role === "Manager" || user?.role === "HR") && (
-                          <td className="px-6 py-4 text-sm text-gray-900">
-                            {customer.salesperson || "—"}
-                          </td>
-                        )}
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {customer.salesperson || "—"}
+                        </td>
 
                         <td className="px-6 py-4 whitespace-nowrap">
                           {customer.project_types && customer.project_types.length > 0 ? (

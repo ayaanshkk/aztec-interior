@@ -1,350 +1,245 @@
-'use client';
-
-import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { ArrowLeft, Save, Loader2, RefreshCw, Trash2 } from 'lucide-react';
-// import { useToast } from '@/components/ui/use-toast';
-
-interface QuoteItem {
-  id: number;
-  item: string;
-  description: string;
-  color: string;
-  quantity: number;
-  width?: number;
-  height?: number;
-  depth?: number;
-  amount: number;
-  needs_manual_pricing: boolean;
-  price_list_item_id?: number;
-}
-
-interface Quotation {
-  id: number;
-  reference_number: string;
-  customer_id: string;
-  customer_name: string;
-  total: number;
-  status: string;
-  notes: string;
-  items: QuoteItem[];
-}
-
-interface DimensionOption {
-  width: number;
-  height: number;
-  depth: number;
-  price: number;
-  price_list_item_id: number;
-  item_name: string;
-}
-
-const DOOR_STYLES = [
-  { value: 'standard', label: 'Standard' },
-  { value: 'corner', label: 'Corner' },
-  { value: 'sliding', label: 'Sliding' },
-  { value: 'linen_press', label: 'Linen Press' },
-];
-
-// Common wardrobe dimensions
-const WARDROBE_WIDTHS = [400, 500, 600, 800, 1000, 1200];
-
+"use client";
+ 
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Save, Trash2, Plus, Eye } from "lucide-react";
+ 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+ 
 export default function EditQuotePage() {
   const params = useParams();
   const router = useRouter();
-  // const { toast } = useToast();
-  const quoteId = params?.id as string;
-
-  const [quotation, setQuotation] = useState<Quotation | null>(null);
+  const quoteId = params.id as string;
+ 
+  const [quotation, setQuotation] = useState<any>(null);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [matchingPrices, setMatchingPrices] = useState<Record<number, DimensionOption[]>>({});
+  const [quoteDoorType, setQuoteDoorType] = useState<string>(''); 
 
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP',
+    }).format(value);
+  };
+ 
   useEffect(() => {
-    if (quoteId) {
-      loadQuotation();
-    }
+    fetchQuotation();
   }, [quoteId]);
-
-  const loadQuotation = async () => {
+ 
+  const fetchQuotation = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+ 
+      if (response.ok) {
+        const data = await response.json();
+        setQuotation(data);
+        
+        const itemsWithTotals = (data.items || []).map((item: any) => ({
+          ...item,
+          quantity: item.quantity || 1,
+          amount: item.amount || 0,
+          width: item.width || undefined,
+          height: item.height || undefined,
+          depth: item.depth || undefined,
+          line_total: (item.quantity || 1) * (item.amount || 0),
+        }));
+        setItems(itemsWithTotals);
+        
+        // ✅ EXTRACT DOOR TYPE from first Door item
+        const doorItem = itemsWithTotals.find((item: any) => 
+          item.item?.toLowerCase().includes('door')
+        );
+        
+        if (doorItem) {
+          // "Door - Basic Slab" → "Basic Slab"
+          const doorTypeMatch = doorItem.item?.match(/Door\s*-\s*(.+)/i);
+          if (doorTypeMatch) {
+            const extractedDoorType = doorTypeMatch[1].trim();
+            setQuoteDoorType(extractedDoorType);
+            console.log(`✅ Extracted door type: ${extractedDoorType}`);
+          }
         }
-      );
-
-      if (!response.ok) throw new Error('Failed to load quotation');
-
-      const data = await response.json();
-      setQuotation(data);
+      } else {
+        alert("Failed to load quotation");
+      }
     } catch (error) {
-      console.error('Error loading quotation:', error);
-      alert('❌ Failed to load quotation. Please try again.');
+      console.error("Error fetching quotation:", error);
+      alert("Error loading quotation");
     } finally {
       setLoading(false);
     }
   };
-
-  const fetchMatchingPrices = async (itemId: number, itemName: string, style?: string) => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}/available-prices?item_name=${encodeURIComponent(itemName)}&style=${style || 'standard'}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) return;
-
-      const data = await response.json();
-      setMatchingPrices(prev => ({ ...prev, [itemId]: data.options || [] }));
-    } catch (error) {
-      console.error('Error fetching prices:', error);
-    }
-  };
-
-  const handleDimensionChange = async (
-    itemId: number,
-    field: 'width' | 'height' | 'depth',
-    value: number
-  ) => {
-    if (!quotation) return;
-
-    const updatedItems = quotation.items.map(item => {
-      if (item.id === itemId) {
-        return { ...item, [field]: value };
-      }
-      return item;
-    });
-
-    setQuotation({ ...quotation, items: updatedItems });
-
-    // Try to match price automatically
-    const item = updatedItems.find(i => i.id === itemId);
-    if (item && item.width && item.height && item.depth) {
-      await matchItemPrice(itemId, item.width, item.height, item.depth);
-    }
-  };
-
-  const matchItemPrice = async (
-    itemId: number,
-    width: number,
-    height: number,
-    depth: number
-  ) => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}/match-prices`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            item_id: itemId,
-            width,
-            height,
-            depth,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        console.log('No exact match found for dimensions');
-        return;
-      }
-
-      const data = await response.json();
-      
-      if (data.success && quotation) {
-        // Update the item with new price
-        const updatedItems = quotation.items.map(item => {
-          if (item.id === itemId) {
-            return {
-              ...item,
-              amount: data.new_amount,
-              needs_manual_pricing: false,
-              price_list_item_id: data.matched_item?.id,
-            };
-          }
-          return item;
-        });
-
-        setQuotation({
-          ...quotation,
-          items: updatedItems,
-          total: data.new_total,
-        });
-
-        alert(`✅ Price Matched! £${data.new_amount.toFixed(2)} - ${data.matched_item?.name}`);
-
-      }
-    } catch (error) {
-      console.error('Error matching price:', error);
-    }
-  };
-
-  const handleManualPriceChange = (itemId: number, newPrice: number) => {
-    if (!quotation) return;
-
-    const updatedItems = quotation.items.map(item => {
-      if (item.id === itemId) {
-        return { ...item, amount: newPrice };
-      }
-      return item;
-    });
-
-    const newTotal = updatedItems.reduce(
-      (sum, item) => sum + item.amount * item.quantity,
-      0
-    );
-
-    setQuotation({
-      ...quotation,
-      items: updatedItems,
-      total: newTotal,
-    });
-  };
-
-  const handleDeleteItem = async (itemId: number) => {
-    if (!quotation) return;
-    
-    if (!confirm('Are you sure you want to delete this item?')) {
+ 
+  // ============================================================================
+  // SMART AUTO-FILL - Uses door type for ALL items
+  // ============================================================================
+  const handleDescriptionChange = async (index: number, value: string) => {
+    // Update description immediately
+    const updatedItems = [...items];
+    updatedItems[index].description = value;
+    setItems(updatedItems);
+ 
+    // Skip if description is too short
+    if (!value || value.length < 3) {
       return;
     }
-
+ 
+    // ✅ Use the global door type (extracted from "Door - Basic Slab")
+    const doorTypeToUse = quoteDoorType || 'Basic Slab'; // Default to Basic Slab if not found
+ 
+    console.log(`🔍 Auto-fill triggered: "${value}" with door type: ${doorTypeToUse}`);
+ 
+    // Call backend for smart auto-price lookup
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}/items/${itemId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error('Failed to delete item');
-
-      // Remove item from local state
-      const updatedItems = quotation.items.filter(item => item.id !== itemId);
-      const newTotal = updatedItems.reduce(
-        (sum, item) => sum + item.amount * item.quantity,
-        0
-      );
-
-      setQuotation({
-        ...quotation,
-        items: updatedItems,
-        total: newTotal,
+      const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+      
+      const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "X-Tenant-ID": tenantId,
+        },
+        body: JSON.stringify({
+          description: value,
+          door_type: doorTypeToUse,  // ← Use global door type
+        }),
       });
-
-      alert('✅ Item deleted successfully!');
-
+ 
+      const data = await response.json();
+ 
+      if (data.found) {
+        // Auto-fill price, width, height, depth
+        const updatedItems = [...items];
+        updatedItems[index] = {
+          ...updatedItems[index],
+          amount: data.price,
+          width: data.width,
+          height: data.height,
+          depth: data.depth,
+          line_total: data.price * (updatedItems[index].quantity || 1),
+          price_list_item_id: data.pricelist_id,
+        };
+        setItems(updatedItems);
+ 
+        console.log(`✅ Auto-filled: ${data.item_name} - £${data.price}`);
+        console.log(`   Dimensions: ${data.width}×${data.height}×${data.depth}mm`);
+      } else {
+        console.log("❌ No pricing found:", data.error);
+      }
     } catch (error) {
-      console.error('Error deleting item:', error);
-      alert('❌ Failed to delete item. Please try again.');
-
+      console.error("Auto-price lookup failed:", error);
     }
   };
-
+ 
+  const handleItemChange = (index: number, field: string, value: any) => {
+    const updatedItems = [...items];
+    updatedItems[index] = {
+      ...updatedItems[index],
+      [field]: value,
+    };
+ 
+    // Recalculate line total when quantity or amount changes
+    if (field === 'quantity' || field === 'amount') {
+      const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItems[index].quantity || 1;
+      const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItems[index].amount || 0;
+      updatedItems[index].line_total = qty * amount;
+    }
+ 
+    setItems(updatedItems);
+  };
+ 
+  const handleAddItem = () => {
+    setItems([
+      ...items,
+      {
+        item: "",
+        description: "",
+        color: "",
+        quantity: 1,
+        amount: 0,
+        line_total: 0,
+      },
+    ]);
+  };
+ 
+  const handleRemoveItem = (index: number) => {
+    if (confirm("Remove this item?")) {
+      setItems(items.filter((_, i) => i !== index));
+    }
+  };
+ 
   const handleSave = async () => {
-    if (!quotation) return;
-
+    if (saving) return;
+ 
     setSaving(true);
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem("token");
       
-      // Update each item
-      for (const item of quotation.items) {
-        await fetch(
-          `https://aztec-interior.onrender.com/quotations/${quoteId}/items/${item.id}`,
-          {
-            method: 'PUT',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              width: item.width,
-              height: item.height,
-              depth: item.depth,
-              amount: item.amount,
-              quantity: item.quantity,
-            }),
-          }
-        );
+      const subtotal = items.reduce((sum, item) => sum + ((item.amount || 0) * (item.quantity || 1)), 0);
+      const vat = subtotal * 0.20;
+      const total = subtotal + vat;
+ 
+      const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          items: items.map(item => ({
+            item: item.item,
+            description: item.description,
+            color: item.color,
+            quantity: item.quantity || 1,
+            amount: item.amount || 0,
+            width: item.width,
+            height: item.height,
+            depth: item.depth,
+          })),
+          subtotal,
+          vat,
+          total,
+        }),
+      });
+ 
+      if (response.ok) {
+        alert("✅ Quotation saved successfully!");
+        router.push(`/dashboard/quotes/${quoteId}`);
+      } else {
+        const error = await response.json();
+        alert(`❌ Failed to save: ${error.error || 'Unknown error'}`);
       }
-
-      // Update quotation total
-      await fetch(
-        `https://aztec-interior.onrender.com/quotations/${quoteId}`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            total: quotation.total,
-          }),
-        }
-      );
-
-      alert('✅ Quotation saved successfully!');
-
-
-      router.back();
     } catch (error) {
-      console.error('Error saving:', error);
-      alert('❌ Failed to save quotation. Please try again.');
-
+      console.error("Error saving quotation:", error);
+      alert("❌ Error saving quotation");
     } finally {
       setSaving(false);
     }
   };
-
+ 
+  const handleViewQuote = () => {
+    router.push(`/dashboard/quotes/${quoteId}`);
+  };
+ 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <p>Loading quotation...</p>
       </div>
     );
   }
-
+ 
   if (!quotation) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -352,177 +247,273 @@ export default function EditQuotePage() {
       </div>
     );
   }
-
+ 
+  const subtotal = items.reduce((sum, item) => sum + ((item.amount || 0) * (item.quantity || 1)), 0);
+  const vat = subtotal * 0.20;
+  const total = subtotal + vat;
+ 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">Edit Quotation {quotation.reference_number}</h1>
-            <p className="text-muted-foreground">Customer: {quotation.customer_name}</p>
+      <div className="border-b bg-gray-50 px-8 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => router.back()}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Edit Quotation {quotation.reference_number}</h1>
+              <p className="text-sm text-gray-600">
+                Customer: {quotation.customer_name}
+                {quoteDoorType && <span className="ml-4 text-blue-600">Door Type: {quoteDoorType}</span>}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleViewQuote} variant="outline">
+              <Eye className="mr-2 h-4 w-4" />
+              View Quote
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              <Save className="mr-2 h-4 w-4" />
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Quotation Form */}
+      <div className="mx-auto max-w-6xl px-8 py-8">
+        {/* Company Header */}
+        <div className="mb-8 text-center">
+          <div className="mb-4 text-4xl font-bold tracking-wider text-gray-800">
+            AZTEC INTERIORS
           </div>
         </div>
 
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="mr-2 h-4 w-4" />
-              Save Changes
-            </>
-          )}
-        </Button>
-      </div>
+        {/* Company Registration Details */}
+        <div className="mb-6 space-y-1 bg-green-200 p-3 text-sm">
+          <p className="font-semibold">Registered to England No 5246881</p>
+          <p className="font-semibold">VAT Reg No.686 8010 72</p>
+        </div>
 
-      {/* Items Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quote Items - Set Dimensions to Auto-Price</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Width (mm)</TableHead>
-                <TableHead>Height (mm)</TableHead>
-                <TableHead>Depth (mm)</TableHead>
-                <TableHead>Qty</TableHead>
-                <TableHead>Price (£)</TableHead>
-                <TableHead>Line Total</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {quotation.items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.item}</TableCell>
-                  <TableCell className="text-sm">{item.description}</TableCell>
-                  
-                  {/* Width */}
-                  <TableCell>
-                    <Select
-                      value={item.width?.toString() || ''}
-                      onValueChange={(value) =>
-                        handleDimensionChange(item.id, 'width', parseInt(value))
-                      }
-                    >
-                      <SelectTrigger className="w-24">
-                        <SelectValue placeholder="Width" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {WARDROBE_WIDTHS.map((w) => (
-                          <SelectItem key={w} value={w.toString()}>
-                            {w}mm
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
+        <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
+          <p className="font-semibold">Acc name : Aztec Interiors Leicester LTD</p>
+          <p className="font-semibold">Bank : HSBC</p>
+          <p className="font-semibold">s/code: 40 28 06</p>
+          <p className="font-semibold">acc no: 43820343</p>
+        </div>
 
-                  {/* Height */}
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.height || ''}
-                      onChange={(e) =>
-                        handleDimensionChange(item.id, 'height', parseInt(e.target.value) || 0)
-                      }
-                      className="w-24"
-                      placeholder="Height"
-                    />
-                  </TableCell>
+        <div className="mb-6 bg-gray-100 p-3 text-sm">
+          <p>Please use your name and/or road name as reference:</p>
+        </div>
 
-                  {/* Depth */}
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.depth || ''}
-                      onChange={(e) =>
-                        handleDimensionChange(item.id, 'depth', parseInt(e.target.value) || 0)
-                      }
-                      className="w-24"
-                      placeholder="Depth"
-                    />
-                  </TableCell>
+        {/* Quotation Title */}
+        <h1 className="mb-6 text-center text-2xl font-bold">QUOTATION</h1>
 
-                  {/* Quantity */}
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const newQty = parseInt(e.target.value) || 1;
-                        const updatedItems = quotation.items.map(i =>
-                          i.id === item.id ? { ...i, quantity: newQty } : i
-                        );
-                        const newTotal = updatedItems.reduce(
-                          (sum, i) => sum + i.amount * i.quantity,
-                          0
-                        );
-                        setQuotation({ ...quotation, items: updatedItems, total: newTotal });
-                      }}
-                      className="w-16"
-                      min={1}
-                    />
-                  </TableCell>
+        {/* Customer Information */}
+        <div className="mb-6">
+          <table className="w-full border-collapse">
+            <tbody>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50" style={{ width: '20%' }}>DATE:</td>
+                <td className="border border-black px-3 py-2">{new Date().toLocaleDateString('en-GB')}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">NAME:</td>
+                <td className="border border-black px-3 py-2">{quotation.customer_name}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ADDRESS:</td>
+                <td className="border border-black px-3 py-2">{quotation.customer_address || '—'}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">TEL:</td>
+                <td className="border border-black px-3 py-2">{quotation.customer_phone || '—'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-                  {/* Price */}
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.amount}
-                      onChange={(e) =>
-                        handleManualPriceChange(item.id, parseFloat(e.target.value) || 0)
-                      }
-                      className="w-24"
-                      step="0.01"
-                    />
-                  </TableCell>
-
-                  {/* Line Total */}
-                  <TableCell className="font-semibold">
-                    £{(item.amount * item.quantity).toFixed(2)}
-                  </TableCell>
-
-                  {/* Delete Button */}
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteItem(item.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-
-          {/* Total */}
-          <div className="mt-6 flex justify-end">
-            <Card className="w-64">
-              <CardContent className="pt-6">
-                <div className="flex justify-between text-2xl font-bold">
-                  <span>Total:</span>
-                  <span>£{quotation.total.toFixed(2)}</span>
-                </div>
-              </CardContent>
-            </Card>
+        {/* Items Table */}
+        <div className="mb-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-lg font-bold">Quote Items</h3>
+            <Button onClick={handleAddItem} size="sm" variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-white">
+                  <th className="border border-black px-3 py-2 text-left font-bold" style={{ minWidth: '150px' }}>ITEM</th>
+                  <th className="border border-black px-3 py-2 text-left font-bold" style={{ minWidth: '200px' }}>DESCRIPTION</th>
+                  <th className="border border-black px-3 py-2 text-left font-bold" style={{ minWidth: '100px' }}>COLOUR</th>
+                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '60px' }}>QTY</th>
+                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '80px' }}>WIDTH</th>
+                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '80px' }}>HEIGHT</th>
+                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '80px' }}>DEPTH</th>
+                  <th className="border border-black px-3 py-2 text-right font-bold" style={{ minWidth: '80px' }}>PRICE</th>
+                  <th className="border border-black px-3 py-2 text-right font-bold" style={{ minWidth: '100px' }}>AMOUNT</th>
+                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '60px' }}>ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, index) => (
+                  <tr key={index}>
+                    <td className="border border-black p-2">
+                      <Input
+                        value={item.item}
+                        onChange={(e) => handleItemChange(index, "item", e.target.value)}
+                        placeholder="Item name"
+                        className="border-none focus-visible:ring-0 min-w-[140px]"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        value={item.description}
+                        onChange={(e) => handleDescriptionChange(index, e.target.value)}
+                        placeholder="e.g., Base Unit 150mm wide"
+                        className="border-none focus-visible:ring-0 min-w-[190px]"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        value={item.color}
+                        onChange={(e) => handleItemChange(index, "color", e.target.value)}
+                        placeholder="Colour"
+                        className="border-none focus-visible:ring-0 min-w-[90px]"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                        className="border-none text-center focus-visible:ring-0 w-[50px]"
+                        min="1"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        type="number"
+                        value={item.width || ''}
+                        onChange={(e) => handleItemChange(index, "width", e.target.value)}
+                        placeholder="—"
+                        className="border-none text-center focus-visible:ring-0 w-[70px]"
+                        min="0"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        type="number"
+                        value={item.height || ''}
+                        onChange={(e) => handleItemChange(index, "height", e.target.value)}
+                        placeholder="—"
+                        className="border-none text-center focus-visible:ring-0 w-[70px]"
+                        min="0"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        type="number"
+                        value={item.depth || ''}
+                        onChange={(e) => handleItemChange(index, "depth", e.target.value)}
+                        placeholder="—"
+                        className="border-none text-center focus-visible:ring-0 w-[70px]"
+                        min="0"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={item.amount}
+                        onChange={(e) => handleItemChange(index, "amount", e.target.value)}
+                        className="border-none text-right focus-visible:ring-0 min-w-[70px]"
+                        min="0"
+                        placeholder="0.00"
+                      />
+                    </td>
+                    <td className="border border-black px-3 py-2 text-right font-semibold">
+                      {formatCurrency((item.amount || 0) * (item.quantity || 1))}
+                    </td>
+                    <td className="border border-black p-2 text-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveItem(index)}
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                
+                {items.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="border border-black px-3 py-8 text-center text-gray-500">
+                      No items yet. Click "Add Item" to get started.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Totals */}
+        <div className="mb-6 flex justify-end">
+          <table className="border-collapse" style={{ width: '40%' }}>
+            <tbody>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotal)}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">VAT</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(vat)}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-bold bg-gray-50">TOTAL</td>
+                <td className="border border-black px-3 py-2 text-right font-bold">{formatCurrency(total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Payment Terms */}
+        <div className="mb-6 space-y-2 text-sm">
+          <p className="font-semibold">Only Bacs or Cash will be accepted on Delivery and Completion</p>
+          <p className="font-semibold">
+            NOTE: If you wish to proceed with this quote, you will be required to make the full payment upfront
+          </p>
+        </div>
+
+        <div className="mb-8 text-sm font-semibold text-red-600">
+          <p>Please sign here to confirm.</p>
+        </div>
+
+        {/* Signature Section */}
+        <div className="space-y-4 text-sm">
+          <div className="flex items-center">
+            <span className="mr-2">Customer Signature:</span>
+            <span className="border-b border-dotted border-black flex-1"></span>
+          </div>
+          <div className="flex items-center">
+            <span className="mr-2">Customer Name:</span>
+            <span className="border-b border-dotted border-black flex-1"></span>
+          </div>
+          <div className="flex items-center">
+            <span className="mr-2">Date:</span>
+            <span className="border-b border-dotted border-black flex-1"></span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

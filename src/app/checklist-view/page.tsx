@@ -41,6 +41,8 @@ import {
 } from "@/components/ui/sidebar";
 import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+
 interface User {
   id: number;
   name: string;
@@ -56,6 +58,7 @@ interface Appliance {
 
 interface AdditionalDoor {
   door_style: string;
+  door_type: string;
   door_color: string;
   door_manufacturer?: string;
   door_name?: string;
@@ -79,6 +82,7 @@ interface FormData {
   completion_date: string;
   deposit_date: string;
   door_style: string;
+  door_type: string;
   door_manufacturer: string;
   door_name: string;
   glazing_material: string;
@@ -197,7 +201,7 @@ export default function ChecklistViewPage() {
           Authorization: `Bearer ${token}`,
         };
 
-        const userResponse = await fetch("https://aztec-interior.onrender.com/users/me", { headers });
+        const userResponse = await fetch(`${BACKEND_URL}/api/users/me`, { headers });
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setUser(userData);
@@ -229,7 +233,7 @@ export default function ChecklistViewPage() {
         }
 
         const response = await fetch(
-          `https://aztec-interior.onrender.com/form-submissions/${formSubmissionId}`,
+          `${BACKEND_URL}/api/form/form-submissions/${formSubmissionId}`,
           { headers }
         );
 
@@ -372,7 +376,7 @@ export default function ChecklistViewPage() {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `https://aztec-interior.onrender.com/form-submissions/${formSubmissionId}`,
+        `${BACKEND_URL}/api/form/form-submissions/${formSubmissionId}`,
         {
           method: "PUT",
           headers: {
@@ -415,7 +419,7 @@ export default function ChecklistViewPage() {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `https://aztec-interior.onrender.com/form-submissions/${formSubmissionId}`,
+        `${BACKEND_URL}/api/form/form-submissions/${formSubmissionId}`,
         {
           method: "DELETE",
           headers: {
@@ -484,38 +488,45 @@ export default function ChecklistViewPage() {
 
     try {
       const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+      
+      // ✅ CORRECTED: Use /api/quotations/ prefix
       const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${formSubmissionId}`,
+        `${BACKEND_URL}/quotations/generate-from-checklist/${formSubmissionId}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
+            "X-Tenant-ID": tenantId,
           },
         }
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        alert(
-          `✅ Quote generated successfully!\n\n` +
-          `Reference: ${data.reference_number}\n` +
-          `Items extracted: ${data.items_count}\n` +
-          `Type: ${data.checklist_type}`
-        );
-        
-        // Open quote editor in new tab
-        window.open(
-          `/dashboard/quotes/${data.quotation_id}/edit?source=checklist`,
-          '_blank'
-        );
-      } else {
+      if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        alert(`Failed to generate quote: ${errorData.error}`);
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
+
+      const data = await response.json();
+      alert(
+        `✅ Quote generated successfully!\n\n` +
+        `Reference: ${data.reference_number}\n` +
+        `Items extracted: ${data.items_count}\n` +
+        `Auto-priced: ${data.matched_items}\n` +
+        `Manual pricing needed: ${data.manual_items}\n` +
+        `Total: £${data.total.toFixed(2)}\n` +
+        `Type: ${data.checklist_type}`
+      );
+      
+      // Open quote editor in new tab
+      window.open(
+        `/dashboard/quotes/${data.quotation_id}/edit?source=checklist`,
+        '_blank'
+      );
     } catch (error) {
       console.error("Error generating quote:", error);
-      alert("Network error: Could not generate quote");
+      alert(`Failed to generate quote: ${error instanceof Error ? error.message : "Network error"}`);
     }
   };
 
@@ -980,8 +991,8 @@ export default function ChecklistViewPage() {
                       />
                     </div>
                     <div className="space-y-4">
-                      {/* Dynamic Grid based on door style */}
-                      <div className="grid gap-4 grid-cols-2">
+                      {/* Dynamic Grid based on door style - NOW 3 COLUMNS */}
+                      <div className="grid gap-4 grid-cols-3">
                         <div>
                           <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
                           {isEditing ? (
@@ -993,7 +1004,6 @@ export default function ChecklistViewPage() {
                               <option value="">Select door style</option>
                               <option value="vinyl">Vinyl</option>
                               <option value="slab">Slab</option>
-                              <option value="glazed">Glazed</option>
                               <option value="shaker">Shaker</option>
                               <option value="N/A">N/A</option>
                             </select>
@@ -1001,6 +1011,26 @@ export default function ChecklistViewPage() {
                             <Input value={formData.door_style || ""} readOnly className="bg-white" />
                           )}
                         </div>
+                        
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Door Type</label>
+                          {isEditing ? (
+                            <select
+                              className="w-full rounded-md border border-gray-300 bg-white p-2"
+                              value={formData.door_type || ""}
+                              onChange={(e) => handleInputChange("door_type", e.target.value)}
+                            >
+                              <option value="">Select door type</option>
+                              <option value="Basic Slab">Basic slab frnt door (2250 H) / drawer</option>
+                              <option value="Acrylic Gloss/Matt">Acrylic gloss/Matt</option>
+                              <option value="Vinyl">Vinyl doors</option>
+                              <option value="Black Glass">Black Glass</option>
+                            </select>
+                          ) : (
+                            <Input value={formData.door_type || ""} readOnly className="bg-white" />
+                          )}
+                        </div>
+                        
                         <div>
                           <label className="mb-1 block text-sm font-bold text-gray-700">Door Color</label>
                           <Input 
@@ -1047,7 +1077,7 @@ export default function ChecklistViewPage() {
 
                         {/* Conditional: Glazing Material - if Glazed */}
                         {formData.door_style === "glazed" && (
-                          <div className="col-span-2">
+                          <div className="col-span-3">
                             <label className="mb-1 block text-sm font-bold text-gray-700">Glazing Material</label>
                             {isEditing ? (
                               <select
@@ -1112,8 +1142,8 @@ export default function ChecklistViewPage() {
                         </div>
                         {formData.additional_doors && formData.additional_doors.map((door, idx) => (
                           <div key={idx} className="mb-3 space-y-3 rounded border-2 border-green-300 bg-white p-4">
-                            {/* Door Style and Door Color + Conditional Fields */}
-                            <div className="grid grid-cols-2 gap-3">
+                            {/* Door Style, Type, and Color - 3 columns */}
+                            <div className="grid grid-cols-3 gap-3">
                               <div>
                                 <label className="mb-1 block text-xs font-bold text-gray-600">Door Style</label>
                                 {isEditing ? (
@@ -1133,6 +1163,26 @@ export default function ChecklistViewPage() {
                                   <Input value={door.door_style || ""} readOnly className="text-sm" />
                                 )}
                               </div>
+                              
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Door Type</label>
+                                {isEditing ? (
+                                  <select
+                                    className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                    value={door.door_type || ""}
+                                    onChange={(e) => handleAdditionalDoorChange(idx, "door_type", e.target.value)}
+                                  >
+                                    <option value="">Select type</option>
+                                    <option value="Basic Slab">Basic slab frnt door</option>
+                                    <option value="Acrylic Gloss/Matt">Acrylic gloss/Matt</option>
+                                    <option value="Vinyl">Vinyl doors</option>
+                                    <option value="Black Glass">Black Glass</option>
+                                  </select>
+                                ) : (
+                                  <Input value={door.door_type || ""} readOnly className="text-sm" />
+                                )}
+                              </div>
+                              
                               <div>
                                 <label className="mb-1 block text-xs font-bold text-gray-600">Door Color</label>
                                 <Input 
@@ -1142,62 +1192,62 @@ export default function ChecklistViewPage() {
                                   className="text-sm" 
                                 />
                               </div>
+                            </div>
 
-                              {/* Show Door Manufacturer and Door Name if Vinyl */}
-                              {door.door_style === "vinyl" && (
-                                <>
-                                  <div>
-                                    <label className="mb-1 block text-xs font-bold text-gray-600">Door Manufacturer</label>
-                                    {isEditing ? (
-                                      <select
-                                        className="w-full rounded-md border border-gray-300 p-2 text-sm"
-                                        value={door.door_manufacturer || ""}
-                                        onChange={(e) => handleAdditionalDoorChange(idx, "door_manufacturer", e.target.value)}
-                                      >
-                                        <option value="">Select manufacturer</option>
-                                        <option value="Integral">Integral</option>
-                                        <option value="Trade mouldings">Trade mouldings</option>
-                                        <option value="Hpp">Hpp</option>
-                                        <option value="Uform">Uform</option>
-                                        <option value="Other">Other</option>
-                                      </select>
-                                    ) : (
-                                      <Input value={door.door_manufacturer || ""} readOnly className="text-sm" />
-                                    )}
-                                  </div>
-                                  <div>
-                                    <label className="mb-1 block text-xs font-bold text-gray-600">Door Name</label>
-                                    <Input 
-                                      value={door.door_name || ""} 
-                                      onChange={(e) => handleAdditionalDoorChange(idx, "door_name", e.target.value)}
-                                      readOnly={!isEditing}
-                                      className="text-sm" 
-                                    />
-                                  </div>
-                                </>
-                              )}
-
-                              {/* Show Glazing Material if Glazed */}
-                              {door.door_style === "glazed" && (
-                                <div className="col-span-2">
-                                  <label className="mb-1 block text-xs font-bold text-gray-600">Glazing Material</label>
+                            {/* Show Door Manufacturer and Door Name if Vinyl */}
+                            {door.door_style === "vinyl" && (
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Door Manufacturer</label>
                                   {isEditing ? (
                                     <select
                                       className="w-full rounded-md border border-gray-300 p-2 text-sm"
-                                      value={door.glazing_material || ""}
-                                      onChange={(e) => handleAdditionalDoorChange(idx, "glazing_material", e.target.value)}
+                                      value={door.door_manufacturer || ""}
+                                      onChange={(e) => handleAdditionalDoorChange(idx, "door_manufacturer", e.target.value)}
                                     >
-                                      <option value="">Select material</option>
-                                      <option value="vinyl">Vinyl</option>
-                                      <option value="aluminium">Aluminium</option>
-                                      <option value="N/A">N/A</option>
+                                      <option value="">Select manufacturer</option>
+                                      <option value="Integral">Integral</option>
+                                      <option value="Trade mouldings">Trade mouldings</option>
+                                      <option value="Hpp">Hpp</option>
+                                      <option value="Uform">Uform</option>
+                                      <option value="Other">Other</option>
                                     </select>
                                   ) : (
-                                    <Input value={door.glazing_material || ""} readOnly className="text-sm" />
+                                    <Input value={door.door_manufacturer || ""} readOnly className="text-sm" />
                                   )}
                                 </div>
-                              )}
-                            </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Door Name</label>
+                                  <Input 
+                                    value={door.door_name || ""} 
+                                    onChange={(e) => handleAdditionalDoorChange(idx, "door_name", e.target.value)}
+                                    readOnly={!isEditing}
+                                    className="text-sm" 
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Show Glazing Material if Glazed */}
+                            {door.door_style === "glazed" && (
+                              <div className="col-span-2">
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Glazing Material</label>
+                                {isEditing ? (
+                                  <select
+                                    className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                    value={door.glazing_material || ""}
+                                    onChange={(e) => handleAdditionalDoorChange(idx, "glazing_material", e.target.value)}
+                                  >
+                                    <option value="">Select material</option>
+                                    <option value="vinyl">Vinyl</option>
+                                    <option value="aluminium">Aluminium</option>
+                                    <option value="N/A">N/A</option>
+                                  </select>
+                                ) : (
+                                  <Input value={door.glazing_material || ""} readOnly className="text-sm" />
+                                )}
+                              </div>
+                            )}
 
                             {/* Panel Color and Plinth/Filler Color */}
                             <div className="grid grid-cols-2 gap-3">

@@ -51,8 +51,8 @@ const FormsAndChecklistsPage = () => {
   const fetchCustomers = async () => {
     setLoadingCustomers(true);
     try {
-      // Use centralized fetchWithAuth
-      const response = await fetchWithAuth("customers");
+      // Remove 'api/' prefix since fetchWithAuth adds it automatically
+      const response = await fetchWithAuth("form/customers");
 
       if (response.ok) {
         const data = await response.json();
@@ -88,7 +88,8 @@ const FormsAndChecklistsPage = () => {
     if (selectedForm?.type === "kitchen" || selectedForm?.type === "bedroom") {
       setGenerating(true);
       try {
-        const response = await fetchWithAuth(`customers/${customer.id}/generate-form-link`, {
+        // Fixed path: add 'form/' prefix to match the blueprint
+        const response = await fetchWithAuth(`form/customers/${customer.id}/generate-form-link`, {
           method: "POST",
           body: JSON.stringify({ formType: selectedForm.type }),
         });

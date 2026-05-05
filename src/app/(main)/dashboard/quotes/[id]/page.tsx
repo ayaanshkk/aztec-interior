@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, Printer, CheckCircle, Clock, XCircle, AlertCircle, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Printer, Trash2, Loader2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,19 +15,27 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+
 interface QuoteItem {
   id: number;
   item: string;
   description: string;
   color: string;
   amount: number;
+  quantity?: number;
 }
 
 interface Quote {
   id: number;
+  reference_number?: string;
   customer_id: string;
   customer_name: string;
+  customer_address?: string;
+  customer_phone?: string;
   total: number;
+  subtotal?: number;
+  vat?: number;
   status: string;
   notes: string;
   created_at: string;
@@ -37,12 +44,12 @@ interface Quote {
 }
 
 const formatDate = (dateString: string) => {
-  if (!dateString) return "—";
+  if (!dateString) return "";
   try {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-GB", {
       day: "2-digit",
-      month: "long",
+      month: "2-digit",
       year: "numeric",
     });
   } catch {
@@ -51,17 +58,12 @@ const formatDate = (dateString: string) => {
 };
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-  }).format(amount || 0);
+  return `£${(amount || 0).toFixed(2)}`;
 };
 
 export default function QuoteDetailsPage() {
   const params = useParams();
   const router = useRouter();
-
-  // Handle both [id] and [quoteId] route parameters
   const quoteId = params?.id as string;
 
   const [quotation, setQuotation] = useState<Quote | null>(null);
@@ -71,7 +73,6 @@ export default function QuoteDetailsPage() {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  // ✅ Define loadQuotation once before useEffect
   const loadQuotation = async () => {
     setLoading(true);
     setError("");
@@ -86,9 +87,7 @@ export default function QuoteDetailsPage() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      console.log("🔍 Fetching quotation:", quoteId);
-
-      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}`, {
+      const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}`, {
         headers,
       });
 
@@ -97,23 +96,16 @@ export default function QuoteDetailsPage() {
       }
 
       const data = await response.json();
-      console.log("✅ Quotation loaded:", data);
-      console.log("💰 Total:", data.total);
-      console.log("📦 Items:", data.items);
       setQuotation(data);
     } catch (err) {
-      console.error("❌ Error loading quotation:", err);
+      console.error("Error loading quotation:", err);
       setError(err instanceof Error ? err.message : "Failed to load quotation");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Single useEffect
   useEffect(() => {
-    console.log("🎬 Route params:", params);
-    console.log("🔑 Quote ID:", quoteId);
-
     if (!quoteId) {
       setError("No quote ID provided");
       setLoading(false);
@@ -121,14 +113,6 @@ export default function QuoteDetailsPage() {
     }
 
     loadQuotation();
-    
-    // Auto-download PDF if it's a newly generated quote
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('autoDownload') === 'true') {
-      setTimeout(() => {
-        handleDownloadPDF();
-      }, 1000);
-    }
   }, [quoteId]);
 
   const handleDownloadPDF = async () => {
@@ -141,9 +125,7 @@ export default function QuoteDetailsPage() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      console.log("📄 Downloading PDF for quotation:", quoteId);
-
-      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}/pdf`, {
+      const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}/pdf`, {
         headers,
       });
 
@@ -152,10 +134,7 @@ export default function QuoteDetailsPage() {
         throw new Error(errorData.error || "Failed to generate PDF");
       }
 
-      // Get the blob
       const blob = await response.blob();
-
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -164,10 +143,8 @@ export default function QuoteDetailsPage() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-
-      console.log("✅ PDF downloaded successfully");
     } catch (err) {
-      console.error("❌ Error downloading PDF:", err);
+      console.error("Error downloading PDF:", err);
       alert(`Failed to download PDF: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       setDownloading(false);
@@ -186,9 +163,7 @@ export default function QuoteDetailsPage() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      console.log("🗑️ Deleting quotation:", quoteId);
-
-      const response = await fetch(`https://aztec-interior.onrender.com/quotations/${quoteId}`, {
+      const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}`, {
         method: "DELETE",
         headers,
       });
@@ -198,12 +173,9 @@ export default function QuoteDetailsPage() {
         throw new Error(errorData.error || "Failed to delete quotation");
       }
 
-      console.log("✅ Quotation deleted successfully");
-
-      // Navigate back to customer details or quotes list
       router.back();
     } catch (err) {
-      console.error("❌ Error deleting quotation:", err);
+      console.error("Error deleting quotation:", err);
       alert(`Failed to delete quotation: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       setDeleting(false);
@@ -215,52 +187,19 @@ export default function QuoteDetailsPage() {
     window.print();
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "approved":
-        return <CheckCircle className="h-5 w-5 text-green-600" />;
-      case "pending":
-      case "draft":
-        return <Clock className="h-5 w-5 text-yellow-600" />;
-      case "rejected":
-        return <XCircle className="h-5 w-5 text-red-600" />;
-      default:
-        return <AlertCircle className="h-5 w-5 text-gray-600" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "approved":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "pending":
-      case "draft":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "rejected":
-        return "bg-red-100 text-red-800 border-red-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-gray-900"></div>
-          <p className="text-gray-600">Loading quotation...</p>
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-600" />
       </div>
     );
   }
 
   if (error || !quotation) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-white">
         <div className="text-center">
-          <XCircle className="mx-auto mb-4 h-12 w-12 text-red-500" />
-          <h2 className="mb-2 text-xl font-semibold text-gray-900">Error Loading Quotation</h2>
-          <p className="mb-4 text-gray-600">{error || "Quotation not found"}</p>
+          <p className="mb-4 text-red-600">{error || "Quotation not found"}</p>
           <Button onClick={() => router.back()}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Go Back
@@ -270,32 +209,29 @@ export default function QuoteDetailsPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header - Print Hidden */}
-      <div className="border-b bg-white px-8 py-4 print:hidden">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={() => router.back()}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Quotation #{quotation.id}</h1>
-              <p className="text-sm text-gray-600">Created {formatDate(quotation.created_at)}</p>
-            </div>
-          </div>
+  // Calculate VAT and subtotal
+  const subtotal = quotation.subtotal || quotation.items.reduce((sum, item) => sum + (item.amount * (item.quantity || 1)), 0);
+  const vat = quotation.vat || (subtotal * 0.20);
+  const total = quotation.total || (subtotal + vat);
 
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Print-hidden action bar */}
+      <div className="border-b bg-gray-50 px-8 py-4 print:hidden">
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
           <div className="flex items-center space-x-3">
-            <Button variant="outline" onClick={handlePrint} className="border-gray-300">
+            <Button variant="outline" onClick={handlePrint}>
               <Printer className="mr-2 h-4 w-4" />
               Print
             </Button>
-
             <Button
               variant="outline"
               onClick={handleDownloadPDF}
               disabled={downloading}
-              className="border-blue-300 text-blue-600 hover:bg-blue-50"
             >
               {downloading ? (
                 <>
@@ -309,12 +245,11 @@ export default function QuoteDetailsPage() {
                 </>
               )}
             </Button>
-
             <Button
               variant="outline"
               onClick={() => setShowDeleteDialog(true)}
               disabled={deleting}
-              className="border-red-300 text-red-600 hover:bg-red-50"
+              className="text-red-600 hover:bg-red-50"
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
@@ -323,141 +258,154 @@ export default function QuoteDetailsPage() {
         </div>
       </div>
 
-      {/* Print-only header */}
-      <div className="mb-6 hidden border-b-2 border-gray-800 px-8 pt-6 pb-4 print:block">
-        <div className="text-center">
-          <h1 className="mb-2 text-3xl font-bold">QUOTATION</h1>
-          <p className="text-lg text-gray-700">Quotation #{quotation.id}</p>
-          <p className="mt-1 text-sm text-gray-600">{formatDate(quotation.created_at)}</p>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="mx-auto max-w-5xl px-8 py-6">
-        {/* Status Badge */}
-        {quotation.status && (
-          <div className="mb-6 flex items-center space-x-3">
-            <div
-              className={`inline-flex items-center space-x-2 rounded-md border px-4 py-2 ${getStatusColor(quotation.status)}`}
-            >
-              {getStatusIcon(quotation.status)}
-              <span className="font-semibold capitalize">{quotation.status}</span>
-            </div>
+      {/* Quotation Content */}
+      <div className="mx-auto max-w-4xl px-8 py-8">
+        {/* Company Logo & Header */}
+        <div className="mb-8 text-center">
+          <div className="mb-4 text-4xl font-bold tracking-wider text-gray-800">
+            AZTEC INTERIORS
           </div>
-        )}
+        </div>
+
+        {/* Company Registration Details */}
+        <div className="mb-6 space-y-1 bg-green-200 p-3 text-sm">
+          <p className="font-semibold">Registered to England No 5246881</p>
+          <p className="font-semibold">VAT Reg No.686 8010 72</p>
+        </div>
+
+        <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
+          <p className="font-semibold">Acc name : Aztec Interiors Leicester LTD</p>
+          <p className="font-semibold">Bank : HSBC</p>
+          <p className="font-semibold">s/code: 40 28 06</p>
+          <p className="font-semibold">acc no: 43820343</p>
+        </div>
+
+        <div className="mb-6 bg-gray-100 p-3 text-sm">
+          <p>Please use your name and/or road name as reference:</p>
+        </div>
+
+        {/* Quotation Title */}
+        <h1 className="mb-6 text-center text-2xl font-bold">QUOTATION</h1>
 
         {/* Customer Information */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Customer Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div>
-                <p className="mb-1 text-sm font-medium text-gray-600">Customer Name</p>
-                <p className="text-base text-gray-900">{quotation.customer_name || "—"}</p>
-              </div>
-              <div>
-                <p className="mb-1 text-sm font-medium text-gray-600">Customer ID</p>
-                <p className="font-mono text-base text-xs text-gray-900">{quotation.customer_id}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="mb-6">
+          <table className="w-full border-collapse">
+            <tbody>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold" style={{ width: '20%' }}>DATE:</td>
+                <td className="border border-black px-3 py-2">{formatDate(quotation.created_at)}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold">NAME:</td>
+                <td className="border border-black px-3 py-2">{quotation.customer_name}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold">ADDRESS:</td>
+                <td className="border border-black px-3 py-2">{quotation.customer_address || '—'}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold">TEL:</td>
+                <td className="border border-black px-3 py-2" style={{ width: '50%' }}>{quotation.customer_phone || '—'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-        {/* Quote Items */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Quote Items</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {quotation.items && quotation.items.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                        Item
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                        Description
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
-                        Color
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase">
-                        Amount
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
-                    {quotation.items.map((item, index) => (
-                      <tr key={item.id || index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.item || "—"}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{item.description || "—"}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{item.color || "—"}</td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                          {formatCurrency(item.amount)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="py-8 text-center text-gray-500">No items in this quotation</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Quote Summary */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Quote Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
-                <span className="text-lg font-medium text-gray-600">Total Amount</span>
-                <span className="text-3xl font-bold text-gray-900">{formatCurrency(quotation.total)}</span>
-              </div>
-
-              {quotation.notes && (
-                <div className="pt-3">
-                  <p className="mb-2 text-sm font-medium text-gray-600">Notes</p>
-                  <p className="rounded-md bg-gray-50 p-3 whitespace-pre-wrap text-gray-900">{quotation.notes}</p>
-                </div>
+        {/* Quote Items Table */}
+        <div className="mb-6">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-white">
+                <th className="border border-black px-3 py-2 text-left font-bold">ITEM</th>
+                <th className="border border-black px-3 py-2 text-left font-bold">DESCRIPTION</th>
+                <th className="border border-black px-3 py-2 text-left font-bold">COLOUR</th>
+                <th className="border border-black px-3 py-2 text-right font-bold">AMOUNT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {quotation.items && quotation.items.length > 0 ? (
+                quotation.items.map((item, index) => (
+                  <tr key={item.id || index}>
+                    <td className="border border-black px-3 py-6">{item.item}</td>
+                    <td className="border border-black px-3 py-6">{item.description || ''}</td>
+                    <td className="border border-black px-3 py-6">{item.color || ''}</td>
+                    <td className="border border-black px-3 py-6 text-right">{formatCurrency(item.amount * (item.quantity || 1))}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="border border-black px-3 py-6" colSpan={4}>No items</td>
+                </tr>
               )}
-            </div>
-          </CardContent>
-        </Card>
+              
+              {/* Empty rows for spacing */}
+              {[...Array(Math.max(0, 5 - (quotation.items?.length || 0)))].map((_, i) => (
+                <tr key={`empty-${i}`}>
+                  <td className="border border-black px-3 py-6">&nbsp;</td>
+                  <td className="border border-black px-3 py-6">&nbsp;</td>
+                  <td className="border border-black px-3 py-6">&nbsp;</td>
+                  <td className="border border-black px-3 py-6">&nbsp;</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-        {/* Metadata */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quotation Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div>
-                <p className="mb-1 text-sm font-medium text-gray-600">Quotation Number</p>
-                <p className="text-base font-semibold text-gray-900">#{quotation.id}</p>
-              </div>
-              <div>
-                <p className="mb-1 text-sm font-medium text-gray-600">Status</p>
-                <p className="text-base font-medium text-gray-900 capitalize">{quotation.status || "Draft"}</p>
-              </div>
-              <div>
-                <p className="mb-1 text-sm font-medium text-gray-600">Created Date</p>
-                <p className="text-base text-gray-900">{formatDate(quotation.created_at)}</p>
-              </div>
-              <div>
-                <p className="mb-1 text-sm font-medium text-gray-600">Last Updated</p>
-                <p className="text-base text-gray-900">{formatDate(quotation.updated_at)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Totals */}
+        <div className="mb-6 flex justify-end">
+          <table className="border-collapse" style={{ width: '40%' }}>
+            <tbody>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold">SUB TOTAL</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotal)}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold">VAT</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(vat)}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-bold">TOTAL</td>
+                <td className="border border-black px-3 py-2 text-right font-bold">{formatCurrency(total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Payment Terms */}
+        <div className="mb-6 space-y-2 text-sm">
+          <p className="font-semibold">Only Bacs or Cash will be accepted on Delivery and Completion</p>
+          <p className="font-semibold">
+            NOTE: If you wish to proceed with this quote, you will be required to make the full payment upfront
+          </p>
+        </div>
+
+        <div className="mb-8 text-sm font-semibold text-red-600">
+          <p>Please sign here to confirm.</p>
+        </div>
+
+        {/* Signature Section */}
+        <div className="space-y-4 text-sm">
+          <div className="flex items-center">
+            <span className="mr-2">Customer Signature:</span>
+            <span className="border-b border-dotted border-black flex-1"></span>
+          </div>
+          <div className="flex items-center">
+            <span className="mr-2">Customer Name:</span>
+            <span className="border-b border-dotted border-black flex-1"></span>
+          </div>
+          <div className="flex items-center">
+            <span className="mr-2">Date:</span>
+            <span className="border-b border-dotted border-black flex-1"></span>
+          </div>
+        </div>
+
+        {/* Notes */}
+        {quotation.notes && (
+          <div className="mt-8 border-t border-gray-300 pt-4">
+            <p className="mb-2 font-semibold text-sm">Notes:</p>
+            <p className="text-sm whitespace-pre-wrap">{quotation.notes}</p>
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Dialog */}
@@ -466,12 +414,16 @@ export default function QuoteDetailsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Quotation</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete Quotation #{quotation.id}? This action cannot be undone.
+              Are you sure you want to delete this quotation? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
               {deleting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -486,13 +438,10 @@ export default function QuoteDetailsPage() {
       </AlertDialog>
 
       {/* Print Styles */}
-      <style jsx>{`
+      <style jsx global>{`
         @media print {
           .print\\:hidden {
             display: none !important;
-          }
-          .print\\:block {
-            display: block !important;
           }
           body {
             print-color-adjust: exact;
@@ -500,6 +449,7 @@ export default function QuoteDetailsPage() {
           }
           @page {
             margin: 1cm;
+            size: A4;
           }
         }
       `}</style>
