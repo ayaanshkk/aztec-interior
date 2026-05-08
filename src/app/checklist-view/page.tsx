@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
 
 interface User {
   id: number;
@@ -682,7 +682,7 @@ export default function ChecklistViewPage() {
         status: 'ordered',
       };
 
-      const response = await fetch('https://aztec-interior.onrender.com/materials', {
+      const response = await fetch('${BACKEND_URL}/materials', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -24,6 +24,8 @@ import {
   type LucideIcon,
   Bot,
   Bell,
+  DollarSign,
+  PoundSterlingIcon,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -110,6 +112,13 @@ const allSidebarItems: NavGroup[] = [
         roles: ["Platform Admin", "Production Team"],
       },
       {
+        title: "Price List",
+        url: "/dashboard/pricelist",
+        icon: PoundSterlingIcon,
+        roles: ["Platform Admin"],
+        isNew: true, // Show "New" badge for visibility
+      },
+      {
         title: "Chatbot",
         url: "/dashboard/chatbot",
         icon: Bot,
@@ -120,7 +129,6 @@ const allSidebarItems: NavGroup[] = [
         url: "/dashboard/notifications",
         icon: Bell,
         roles: ["Platform Admin", "Salesperson", "Production Team"],
-        // Badge will be set dynamically - don't hardcode it here
       },
       {
         title: "Settings",

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+
 // ControlledCurrencyInput component definition remains the same
 const ControlledCurrencyInput = ({ value, onChange, className, placeholder }: any) => {
   const [localValue, setLocalValue] = useState(value);
@@ -129,7 +131,7 @@ export default function ReceiptViewPage() {
     const data = getReceiptData();
 
     try {
-      const response = await fetch(`https://aztec-interior.onrender.com/receipts/save`, {
+      const response = await fetch(`${BACKEND_URL}/receipts/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -167,7 +169,7 @@ export default function ReceiptViewPage() {
   //   }
 
   //   try {
-  //     const response = await fetch(`https://aztec-interior.onrender.com/approvals/status/${submissionId}`);
+  //     const response = await fetch(`${BACKEND_URL}/approvals/status/${submissionId}`);
   //     const data = await response.json();
 
   //     setApprovalStatus(data.approval_status);
@@ -200,7 +202,7 @@ export default function ReceiptViewPage() {
     const data = getReceiptData();
 
     try {
-      const response = await fetch(`https://aztec-interior.onrender.com/receipts/download-pdf`, {
+      const response = await fetch(`${BACKEND_URL}/receipts/download-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

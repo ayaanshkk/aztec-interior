@@ -810,27 +810,27 @@ export default function ProjectDetailsPage() {
         let formUrl = "";
 
         if (type === "kitchen") {
-          formUrl = `https://aztec-interior.onrender.com/kitchen-checklist?token=${newToken}`;
+          formUrl = `${BACKEND_URL}/kitchen-checklist?token=${newToken}`;
         } else if (type === "bedroom") {
-          formUrl = `https://aztec-interior.onrender.com/bedroom-checklist?token=${newToken}`;
+          formUrl = `${BACKEND_URL}/bedroom-checklist?token=${newToken}`;
         } else if (type === "remedial") {
-          formUrl = `https://aztec-interior.onrender.com/remedial-checklist?token=${newToken}`;
+          formUrl = `${BACKEND_URL}/remedial-checklist?token=${newToken}`;
         } else if (type === "checklist") {
-          formUrl = `https://aztec-interior.onrender.com/checklist-form?token=${newToken}`;
+          formUrl = `${BACKEND_URL}/checklist-form?token=${newToken}`;
         } else if (type === "quotation") {
-          formUrl = `https://aztec-interior.onrender.com/quotation?token=${newToken}`;
+          formUrl = `${BACKEND_URL}/quotation?token=${newToken}`;
         } else if (type === "invoice") {
-          formUrl = `https://aztec-interior.onrender.com/invoice?token=${newToken}`;
+          formUrl = `${BACKEND_URL}/invoice?token=${newToken}`;
         } else if (type === "proforma") {
-          formUrl = `https://aztec-interior.onrender.com/proforma-invoice?token=${newToken}`;
+          formUrl = `${BACKEND_URL}/proforma-invoice?token=${newToken}`;
         } else if (type === "receipt") {
-          formUrl = `https://aztec-interior.onrender.com/receipt?token=${newToken}`;
+          formUrl = `${BACKEND_URL}/receipt?token=${newToken}`;
         } else if (type === "deposit") {
-          formUrl = `https://aztec-interior.onrender.com/deposit-receipt?token=${newToken}`;
+          formUrl = `${BACKEND_URL}/deposit-receipt?token=${newToken}`;
         } else if (type === "final") {
-          formUrl = `https://aztec-interior.onrender.com/final-receipt?token=${newToken}`;
+          formUrl = `${BACKEND_URL}/final-receipt?token=${newToken}`;
         } else if (type === "payment") {
-          formUrl = `https://aztec-interior.onrender.com/payment-terms?token=${newToken}`;
+          formUrl = `${BACKEND_URL}/payment-terms?token=${newToken}`;
         }
 
         window.open(formUrl, "_blank");

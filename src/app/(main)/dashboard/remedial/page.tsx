@@ -3,9 +3,10 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-// Placeholder for Next.js router/searchParams (for canvas compatibility)
-// import { useSearchParams, useRouter } from "next/navigation";
 import { CheckSquare, ArrowLeft, Trash2, Download } from "lucide-react";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+
 
 // Dummy component definitions to make the file self-contained for the canvas environment
 const Button = ({ children, onClick, type = "button", variant, size, disabled, className }: any) => (
@@ -127,7 +128,7 @@ const RemedialActionChecklistPage = () => {
     };
 
     try {
-      const response = await fetch(`https://aztec-interior.onrender.com/checklists/save`, {
+      const response = await fetch(`${BACKEND_URL}/checklists/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -161,7 +162,7 @@ const RemedialActionChecklistPage = () => {
 
     try {
       // Call the Flask backend PDF generation endpoint
-      const response = await fetch(`https://aztec-interior.onrender.com/checklists/download-pdf`, {
+      const response = await fetch(`${BACKEND_URL}/checklists/download-pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

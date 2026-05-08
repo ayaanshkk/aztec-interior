@@ -38,7 +38,7 @@ import {
   X,
   Archive,
 } from "lucide-react";
-import { fetchWithAuth, api } from "@/lib/api";
+import { fetchWithAuth, api, BACKEND_URL } from "@/lib/api";
 
 
 // ✅ PERFORMANCE: Improved cache with compression support
@@ -434,7 +434,7 @@ export default function SchedulePage() {
       console.log("🔄 Fetching schedule data...");
 
       const directFetch = async (endpoint: string) => {
-        const response = await fetch(`https://aztec-interior.onrender.com/${endpoint}`, {
+        const response = await fetch(`${BACKEND_URL}/${endpoint}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -644,7 +644,7 @@ export default function SchedulePage() {
       
       console.log(`🗑️ Deleting task: ${id}`);
       
-      const response = await fetch(`https://aztec-interior.onrender.com/assignments/${id}`, {
+      const response = await fetch(`${BACKEND_URL}/assignments/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

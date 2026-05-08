@@ -6,6 +6,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+
+
 interface Material {
   id: string;
   description: string;
@@ -45,7 +48,7 @@ export function CustomerProjectTimeline({ customerId }: { customerId: string }) 
       console.log(`🔍 Fetching timeline for customer ${customerId}...`);
       
       const response = await fetch(
-        `https://aztec-interior.onrender.com/materials/timeline/${customerId}`,
+        `${BACKEND_URL}/materials/timeline/${customerId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,

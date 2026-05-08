@@ -16,7 +16,7 @@ export default function QuotePDFPage() {
       try {
         const token = localStorage.getItem("token");
         const response = await fetch(
-          `https://aztec-interior.onrender.com/quotations/${quoteId}/pdf`,
+          `${BACKEND_URL}/quotations/${quoteId}/pdf`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

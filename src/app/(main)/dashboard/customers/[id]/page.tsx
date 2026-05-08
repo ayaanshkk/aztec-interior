@@ -414,6 +414,20 @@ export default function CustomerDetailsPage() {
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [quoteToDelete, setQuoteToDelete] = useState<{ id: number; reference: string } | null>(null);
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+  const [editCustomerData, setEditCustomerData] = useState<Partial<Customer>>({});
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+  const [showDeleteCustomerDialog, setShowDeleteCustomerDialog] = useState(false);
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
+  const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
+  const [newProjectData, setNewProjectData] = useState({
+    project_name: "",
+    project_type: "Kitchen" as Project["project_type"],
+    stage: "Lead",
+    date_of_measure: "",
+    notes: "",
+  });
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -1310,14 +1324,14 @@ export default function CustomerDetailsPage() {
   const canManageProjects = (): boolean => {
     if (!user || !user.role) return false;
     
-    const allowedRoles = ['Manager', 'HR', 'Production', 'Sales'];
+    const allowedRoles = ['Platform Admin', 'Salesperson', 'Production Team'];
     return allowedRoles.some(role => role.toLowerCase() === user.role.toLowerCase());
   };
 
   const canEditForm = (submission: FormSubmission): boolean => {
     if (!user) return false;
     
-    const allowedRoles = ['Manager', 'HR', 'Production', 'Sales'];
+    const allowedRoles = ['Platform Admin', 'Salesperson', 'Production Team'];
     const isCreator = submission.created_by === user.id;
     
     return allowedRoles.includes(user.role) || isCreator;
@@ -1392,14 +1406,14 @@ export default function CustomerDetailsPage() {
   const canEdit = (): boolean => {
     if (!customer) return false;
     
-    const allowedRoles = ["Manager", "HR", "Production", "Sales"];
+    const allowedRoles = ["Platform Admin", "Salesperson", "Production Team"];
     return allowedRoles.includes(user?.role || "");
   };
 
   const canDelete = (): boolean => {
     if (!user) return false;
     
-    const allowedRoles = ['Manager', 'HR', 'Sales'];
+    const allowedRoles = ['Platform Admin', 'Salesperson', 'Production Team'];
     return allowedRoles.includes(user.role);
   };
 
@@ -1426,47 +1440,21 @@ export default function CustomerDetailsPage() {
     router.push(`/dashboard/projects/create?${queryParams.toString()}`);
   };
 
-  const generateFormLink = async (type: "bedroom" | "kitchen") => {
-    if (generating || !canEdit()) return;
+  const generateFormLink = (type: "bedroom" | "kitchen") => {
+    if (!canEdit()) return;
 
-    setGenerating(true);
-    try {
-      const response = await fetch(`https://aztec-interior.onrender.com/customers/${id}/generate-form-link`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ formType: type }),
-      });
+    const params = new URLSearchParams({
+      customerId: String(id),
+      customerName: customer?.name || "",
+      customerAddress: customer?.address || "",
+      customerPhone: customer?.phone || "",
+      customerPostcode: customer?.postcode || "",
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          const params = new URLSearchParams({
-            type: type,
-            customerId: String(id),
-            customerName: customer?.name || "",
-            customerAddress: customer?.address || "",
-            customerPhone: customer?.phone || "",
-          });
-
-          const fullLink = `${window.location.origin}/form/${data.token}?${params.toString()}`;
-          setGeneratedLink(fullLink);
-          setFormType(type);
-          setShowLinkDialog(true);
-        } else {
-          alert(`Failed to generate ${type} form link: ${data.error}`);
-        }
-      } else {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        alert(`Failed to generate ${type} form link: ${errorData.error || "Unknown error"}`);
-      }
-    } catch (error) {
-      console.error(`Network error generating ${type} form link:`, error);
-      alert(`Network error: Please check your connection and try again.`);
-    } finally {
-      setGenerating(false);
-    }
+    const fullLink = `${window.location.origin}/dashboard/checklists/${type}?${params.toString()}`;
+    setGeneratedLink(fullLink);
+    setFormType(type);
+    setShowLinkDialog(true);
   };
 
   const copyToClipboard = () => {
@@ -1584,7 +1572,7 @@ export default function CustomerDetailsPage() {
 
   const handleCreateRemedialChecklist = () => {
     if (user?.role === "Sales") {
-      alert("Sales users cannot create remedial checklists. Please contact your manager.");
+      alert("Sales users cannot create remedial checklists. Please contact your Platform Admin.");
       return;
     }
     router.push(`/dashboard/checklists/remedial?${buildCustomerQuery()}`);
@@ -1677,83 +1665,90 @@ export default function CustomerDetailsPage() {
     router.push(`/dashboard/checklists/payment-terms/?${buildCustomerQuery()}`)
   };
 
-  const handleCreateKitchenChecklist = async () => {
-    if (generating || !canEdit()) return;
-
-    setGenerating(true);
-    try {
-      const response = await fetch(`https://aztec-interior.onrender.com/customers/${id}/generate-form-link`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ formType: "kitchen" }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          const params = new URLSearchParams({
-            type: "kitchen",
-            customerId: String(id),
-            customerName: customer?.name || "",
-            customerAddress: customer?.address || "",
-            customerPhone: customer?.phone || "",
-          });
-          router.push(`/form/${data.token}?${params.toString()}`);
-        } else {
-          alert(`Failed to generate kitchen form: ${data.error}`);
-        }
-      } else {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        alert(`Failed to generate kitchen form: ${errorData.error || "Unknown error"}`);
-      }
-    } catch (error) {
-      console.error("Network error generating kitchen form:", error);
-      alert("Network error: Please check your connection and try again.");
-    } finally {
-      setGenerating(false);
-    }
+  const handleCreateKitchenChecklist = () => {
+    if (!canEdit()) return;
+    
+    const params = new URLSearchParams({
+      customerId: String(id),
+      customerName: customer?.name || "",
+      customerAddress: customer?.address || "",
+      customerPhone: customer?.phone || "",
+      customerPostcode: customer?.postcode || "",
+    });
+    
+    window.open(`/checklists/kitchen?${params.toString()}`, '_blank');
   };
 
-  const handleCreateBedroomChecklist = async () => {
-    if (generating || !canEdit()) return;
-
-    setGenerating(true);
-    try {
-      const response = await fetch(`https://aztec-interior.onrender.com/customers/${id}/generate-form-link`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ formType: "bedroom" }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          const params = new URLSearchParams({
-            type: "bedroom",
-            customerId: String(id),
-            customerName: customer?.name || "",
-            customerAddress: customer?.address || "",
-            customerPhone: customer?.phone || "",
-          });
-          router.push(`/form/${data.token}?${params.toString()}`);
-        } else {
-          alert(`Failed to generate bedroom form: ${data.error}`);
-        }
-      } else {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-        alert(`Failed to generate bedroom form: ${errorData.error || "Unknown error"}`);
-      }
-    } catch (error) {
-      console.error("Network error generating bedroom form:", error);
-      alert("Network error: Please check your connection and try again.");
-    } finally {
-      setGenerating(false);
-    }
+  const handleCreateBedroomChecklist = () => {
+    if (!canEdit()) return;
+    
+    const params = new URLSearchParams({
+      customerId: String(id),
+      customerName: customer?.name || "",
+      customerAddress: customer?.address || "",
+      customerPhone: customer?.phone || "",
+      customerPostcode: customer?.postcode || "",
+    });
+    
+    window.open(`/checklists/bedroom?${params.toString()}`, '_blank');
   };
+
+const handleCreateNewProject = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!newProjectData.project_name) {
+    alert("Please enter a project name");
+    return;
+  }
+
+  setIsCreatingProject(true);
+  const token = localStorage.getItem("token");
+
+  try {
+    // ✅ Use BACKEND_URL instead of hardcoded URL
+    const response = await fetch(`${BACKEND_URL}/projects`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        client_id: parseInt(id),  // ✅ Ensure it's an integer
+        project_title: newProjectData.project_name,  // ✅ Backend expects project_title
+        project_description: newProjectData.notes || "",
+        status: "Active",
+        stage_id: 100,  // ✅ Default to Survey stage (adjust if needed)
+        priority: "Medium",
+        start_date: newProjectData.date_of_measure || null,
+        notes: newProjectData.notes || "",
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log("✅ Project created:", data);
+      alert("Project created successfully!");
+      setShowCreateProjectDialog(false);
+      setNewProjectData({
+        project_name: "",
+        project_type: "Kitchen",
+        stage: "Lead",
+        date_of_measure: "",
+        notes: "",
+      });
+      loadCustomerData();
+    } else {
+      const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+      console.error("❌ Project creation error:", errorData);
+      alert(`Failed to create project: ${errorData.error}`);
+    }
+  } catch (error) {
+    console.error("❌ Error creating project:", error);
+    alert("Network error: Could not create project");
+  } finally {
+    setIsCreatingProject(false);
+  }
+};
 
   const handleViewJob = (jobId: string) => {
     router.push(`/dashboard/jobs/${jobId}`);
@@ -2050,6 +2045,104 @@ export default function CustomerDetailsPage() {
         </section>
       </div>
     );
+  };
+
+  const handleEditCustomer = () => {
+    setEditCustomerData({
+      name: customer?.name || "",
+      phone: customer?.phone || "",
+      email: customer?.email || "",
+      address: customer?.address || "",
+      postcode: customer?.postcode || "",
+      preferred_contact_method: customer?.preferred_contact_method || "Phone",
+      date_of_measure: customer?.date_of_measure || "",
+      notes: customer?.notes || "",
+    });
+    setIsEditingCustomer(true);
+  };
+
+  const handleCancelEditCustomer = () => {
+    setIsEditingCustomer(false);
+    setEditCustomerData({});
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!editCustomerData.name || !editCustomerData.phone || !editCustomerData.address || !editCustomerData.postcode) {
+      alert("Please fill in all required fields (Name, Phone, Address, Postcode)");
+      return;
+    }
+
+    setIsSavingCustomer(true);
+    const token = localStorage.getItem("token");
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/customers/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: editCustomerData.name,
+          phone: editCustomerData.phone,
+          email: editCustomerData.email || "",
+          address: editCustomerData.address,
+          postcode: editCustomerData.postcode,
+          preferred_contact_method: editCustomerData.preferred_contact_method,
+          date_of_measure: editCustomerData.date_of_measure || null,
+          notes: editCustomerData.notes || "",
+        }),
+      });
+
+      if (response.ok) {
+        alert("Customer updated successfully!");
+        setIsEditingCustomer(false);
+        loadCustomerData();
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        alert(`Failed to update customer: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error updating customer:", error);
+      alert("Network error: Could not update customer");
+    } finally {
+      setIsSavingCustomer(false);
+    }
+  };
+
+  // Delete Customer Handler
+  const handleDeleteCustomer = async () => {
+    if (!canDelete()) {
+      alert("You don't have permission to delete this customer.");
+      return;
+    }
+
+    setIsDeletingCustomer(true);
+    const token = localStorage.getItem("token");
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/customers/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        alert("Customer deleted successfully!");
+        router.push("/dashboard/customers");
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        alert(`Failed to delete customer: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      alert("Network error: Could not delete customer");
+    } finally {
+      setIsDeletingCustomer(false);
+      setShowDeleteCustomerDialog(false);
+    }
   };
 
   const renderRemedialForm = (formData: any) => {
@@ -2494,83 +2587,109 @@ export default function CustomerDetailsPage() {
             </div>
           </div>
           <div className="flex items-center space-x-3">
+            {/* Add Checklist Button */}
             {canEdit() && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <Plus className="h-4 w-4" />
-                    <span>Create</span>
-                    <ChevronDown className="h-4 w-4" />
+                  <Button className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800">
+                    <CheckSquare className="h-4 w-4" />
+                    <span>Add Checklist</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  {canManageProjects() && (
-                    <DropdownMenuItem onClick={handleCreateProject} className="flex items-center space-x-2">
-                      <Briefcase className="h-4 w-4" />
-                      <span>New Project</span>
-                    </DropdownMenuItem>
-                  )}
-                  {user?.role !== "Sales" && (
-                    <DropdownMenuItem onClick={handleCreateRemedialChecklist} className="flex items-center space-x-2">
-                      <CheckSquare className="h-4 w-4" />
-                      <span>Remedial Action Checklist</span>
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={handleCreateQuote} className="flex items-center space-x-2">
-                    <FileText className="h-4 w-4" />
-                    <span>Quotation</span>
-                  </DropdownMenuItem>
-                  {canCreateFinancialDocs() && (
-                    <>
-                      <DropdownMenuItem onClick={handleCreateInvoice} className="flex items-center space-x-2">
-                        <FileText className="h-4 w-4" />
-                        <span>Invoice</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleCreateProformaInvoice} className="flex items-center space-x-2">
-                        <FileText className="h-4 w-4" />
-                        <span>Proforma Invoice</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleCreateReceipt} className="flex items-center space-x-2">
-                        <Receipt className="h-4 w-4" />
-                        <span>Receipt</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleCreateDepositReceipt} className="flex items-center space-x-2">
-                        <Receipt className="h-4 w-4" />
-                        <span>Deposit Receipt</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleCreateFinalReceipt} className="flex items-center space-x-2">
-                        <Receipt className="h-4 w-4" />
-                        <span>Final Receipt</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={handleCreatePaymentTerms} className="flex items-center space-x-2">
-                        <DollarSign className="h-4 w-4" />
-                        <span>Payment Terms</span>
-                      </DropdownMenuItem>
-                    </>
-                  )}
+                <DropdownMenuContent align="end">
                   <DropdownMenuItem
                     onClick={handleCreateKitchenChecklist}
-                    className="flex items-center space-x-2"
                     disabled={generating}
+                    className="flex items-center space-x-2"
                   >
                     <CheckSquare className="h-4 w-4" />
-                    <span>Kitchen Checklist Form</span>
+                    <span>Kitchen Checklist</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleCreateBedroomChecklist}
-                    className="flex items-center space-x-2"
                     disabled={generating}
+                    className="flex items-center space-x-2"
                   >
                     <CheckSquare className="h-4 w-4" />
-                    <span>Bedroom Checklist Form</span>
+                    <span>Bedroom Checklist</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+
+            {/* Add New Project Button */}
+            {canManageProjects() && (
+              <Button
+                onClick={() => setShowCreateProjectDialog(true)}
+                className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add New Project</span>
+              </Button>
+            )}
+
+            {/* Add Financial Document Button */}
+            {canCreateFinancialDocs() && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800">
+                    <DollarSign className="h-4 w-4" />
+                    <span>Add Financial Document</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={handleCreateQuote} className="flex items-center space-x-2">
+                    <FileText className="h-4 w-4" />
+                    <span>Quotation</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCreateInvoice} className="flex items-center space-x-2">
+                    <FileText className="h-4 w-4" />
+                    <span>Invoice</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCreateProformaInvoice} className="flex items-center space-x-2">
+                    <FileText className="h-4 w-4" />
+                    <span>Proforma Invoice</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCreatePaymentTerms} className="flex items-center space-x-2">
+                    <DollarSign className="h-4 w-4" />
+                    <span>Payment Terms</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCreateReceipt} className="flex items-center space-x-2">
+                    <Receipt className="h-4 w-4" />
+                    <span>Receipt</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCreateDepositReceipt} className="flex items-center space-x-2">
+                    <Receipt className="h-4 w-4" />
+                    <span>Deposit Receipt</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCreateFinalReceipt} className="flex items-center space-x-2">
+                    <Receipt className="h-4 w-4" />
+                    <span>Final Receipt</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Edit Button */}
             {canEdit() && (
-              <Button onClick={handleEdit} className="flex items-center space-x-2">
+              <Button
+                onClick={() => setIsEditingCustomer(true)}
+                className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800"
+              >
                 <Edit className="h-4 w-4" />
                 <span>Edit</span>
+              </Button>
+            )}
+
+            {/* Delete Button */}
+            {canDelete() && (
+              <Button
+                onClick={() => setShowDeleteCustomerDialog(true)}
+                variant="destructive"
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span>Delete</span>
               </Button>
             )}
           </div>
@@ -2591,7 +2710,7 @@ export default function CustomerDetailsPage() {
             </TabsTrigger>
             <TabsTrigger value="drawings" className="flex items-center gap-2">
               <Image className="h-4 w-4" />
-              Drawings
+              Drawings & Layouts
             </TabsTrigger>
             <TabsTrigger value="projects" className="flex items-center gap-2">
               <FolderOpen className="h-4 w-4" />
@@ -2609,119 +2728,253 @@ export default function CustomerDetailsPage() {
               <div className="mb-6 flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">Contact Information</h2>
                 <div className="flex items-center space-x-4">
-                  {customer.date_of_measure && (
+                  {customer.date_of_measure && !isEditingCustomer && (
                     <div className="flex items-center space-x-2 text-sm text-gray-600">
                       <Calendar className="h-4 w-4" />
                       <span>Measure: {formatDate(customer.date_of_measure)}</span>
                     </div>
                   )}
+                  {isEditingCustomer && (
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        onClick={handleCancelEditCustomer}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSaveCustomer}
+                        disabled={isSavingCustomer}
+                        size="sm"
+                        className="bg-gray-900 hover:bg-gray-800"
+                      >
+                        {isSavingCustomer ? "Saving..." : "Save Changes"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
               
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Name</span>
-                    <span className="mt-1 text-base font-medium text-gray-900">{customer.name || "—"}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">
-                      Phone <span className="text-red-500">*</span>
-                    </span>
-                    <span className="mt-1 text-base text-gray-900">{customer.phone || "—"}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Email</span>
-                    <span className="mt-1 text-base text-gray-900">{customer.email || "—"}</span>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">
-                      Address <span className="text-red-500">*</span>
-                    </span>
-                    <span className="mt-1 text-base text-gray-900">{customer.address || "—"}</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">
-                      Postcode <span className="text-red-500">*</span>
-                    </span>
-                    <div className="mt-1">
-                      {customer.postcode ? (
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="h-4 w-4 text-gray-400" />
-                          <span className="rounded bg-gray-100 px-2 py-1 font-mono text-sm text-gray-900">
-                            {customer.postcode}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-base text-gray-900">—</span>
-                      )}
+              {isEditingCustomer ? (
+                // Edit Mode
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
+                    <div className="flex flex-col">
+                      <Label htmlFor="edit_name" className="mb-2 text-sm font-medium text-gray-500">
+                        Name <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="edit_name"
+                        value={editCustomerData.name || ""}
+                        onChange={(e) => setEditCustomerData(prev => ({ ...prev, name: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <Label htmlFor="edit_phone" className="mb-2 text-sm font-medium text-gray-500">
+                        Phone <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="edit_phone"
+                        value={editCustomerData.phone || ""}
+                        onChange={(e) => setEditCustomerData(prev => ({ ...prev, phone: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <Label htmlFor="edit_email" className="mb-2 text-sm font-medium text-gray-500">
+                        Email
+                      </Label>
+                      <Input
+                        id="edit_email"
+                        type="email"
+                        value={editCustomerData.email || ""}
+                        onChange={(e) => setEditCustomerData(prev => ({ ...prev, email: e.target.value }))}
+                      />
                     </div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Preferred Contact</span>
-                    <div className="mt-1">
-                      {customer.preferred_contact_method ? (
-                        <div className="flex items-center space-x-2">
-                          {getContactMethodIcon(customer.preferred_contact_method)}
-                          <span className="text-base text-gray-900">{customer.preferred_contact_method}</span>
-                        </div>
-                      ) : (
-                        <span className="text-base text-gray-900">—</span>
-                      )}
+                  
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
+                    <div className="flex flex-col">
+                      <Label htmlFor="edit_address" className="mb-2 text-sm font-medium text-gray-500">
+                        Address <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="edit_address"
+                        value={editCustomerData.address || ""}
+                        onChange={(e) => setEditCustomerData(prev => ({ ...prev, address: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <Label htmlFor="edit_postcode" className="mb-2 text-sm font-medium text-gray-500">
+                        Postcode <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="edit_postcode"
+                        value={editCustomerData.postcode || ""}
+                        onChange={(e) => setEditCustomerData(prev => ({ ...prev, postcode: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <Label htmlFor="edit_preferred_contact" className="mb-2 text-sm font-medium text-gray-500">
+                        Preferred Contact
+                      </Label>
+                      <Select
+                        value={editCustomerData.preferred_contact_method || ""}
+                        onValueChange={(value) => setEditCustomerData(prev => ({ 
+                          ...prev, 
+                          preferred_contact_method: value as "Phone" | "Email" | "WhatsApp" 
+                        }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select contact method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Phone">Phone</SelectItem>
+                          <SelectItem value="Email">Email</SelectItem>
+                          <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
+
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
+                    <div className="flex flex-col">
+                      <Label htmlFor="edit_date_of_measure" className="mb-2 text-sm font-medium text-gray-500">
+                        Date of Measure
+                      </Label>
+                      <Input
+                        id="edit_date_of_measure"
+                        type="date"
+                        value={formatDateForInput(editCustomerData.date_of_measure)}
+                        onChange={(e) => setEditCustomerData(prev => ({ ...prev, date_of_measure: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Project Type</span>
-                    <div className="mt-1">
-                      {allProjectTypes.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {Array.from(new Set(allProjectTypes)).map((type, index) => (
-                            <span
-                              key={index}
-                              className={`inline-flex rounded-full px-2 py-1 text-sm font-semibold ${getProjectTypeColor(type)}`}
-                            >
-                              {type}
+                    <Label htmlFor="edit_notes" className="mb-2 text-sm font-medium text-gray-500">
+                      Notes
+                    </Label>
+                    <Textarea
+                      id="edit_notes"
+                      value={editCustomerData.notes || ""}
+                      onChange={(e) => setEditCustomerData(prev => ({ ...prev, notes: e.target.value }))}
+                      className="min-h-[100px]"
+                      placeholder="Add any relevant notes..."
+                    />
+                  </div>
+                </div>
+              ) : (
+                // View Mode (existing display code)
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-500">Name</span>
+                      <span className="mt-1 text-base font-medium text-gray-900">{customer.name || "—"}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-500">
+                        Phone <span className="text-red-500">*</span>
+                      </span>
+                      <span className="mt-1 text-base text-gray-900">{customer.phone || "—"}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-500">Email</span>
+                      <span className="mt-1 text-base text-gray-900">{customer.email || "—"}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-500">
+                        Address <span className="text-red-500">*</span>
+                      </span>
+                      <span className="mt-1 text-base text-gray-900">{customer.address || "—"}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-500">
+                        Postcode <span className="text-red-500">*</span>
+                      </span>
+                      <div className="mt-1">
+                        {customer.postcode ? (
+                          <div className="flex items-center space-x-2">
+                            <MapPin className="h-4 w-4 text-gray-400" />
+                            <span className="rounded bg-gray-100 px-2 py-1 font-mono text-sm text-gray-900">
+                              {customer.postcode}
                             </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-base text-gray-900">—</span>
-                      )}
+                          </div>
+                        ) : (
+                          <span className="text-base text-gray-900">—</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-500">Preferred Contact</span>
+                      <div className="mt-1">
+                        {customer.preferred_contact_method ? (
+                          <div className="flex items-center space-x-2">
+                            {getContactMethodIcon(customer.preferred_contact_method)}
+                            <span className="text-base text-gray-900">{customer.preferred_contact_method}</span>
+                          </div>
+                        ) : (
+                          <span className="text-base text-gray-900">—</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Pipeline Stage</span>
-                    <div className="mt-1">
-                      {customer.projects && customer.projects.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {customer.projects.map((project, index) => (
-                            <span
-                              key={index}
-                              className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${getStageColor(project.stage)}`}
-                            >
-                              {project.stage}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-base text-gray-900">—</span>
-                      )}
+                  
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-3">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-500">Project Type</span>
+                      <div className="mt-1">
+                        {allProjectTypes.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {Array.from(new Set(allProjectTypes)).map((type, index) => (
+                              <span
+                                key={index}
+                                className={`inline-flex rounded-full px-2 py-1 text-sm font-semibold ${getProjectTypeColor(type)}`}
+                              >
+                                {type}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-base text-gray-900">—</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-500">Customer Since</span>
-                    <span className="mt-1 text-base text-gray-900">{formatDate(customer.created_at)}</span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-500">Pipeline Stage</span>
+                      <div className="mt-1">
+                        {customer.projects && customer.projects.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {customer.projects.map((project, index) => (
+                              <span
+                                key={index}
+                                className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${getStageColor(project.stage)}`}
+                              >
+                                {project.stage}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-base text-gray-900">—</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-gray-500">Customer Since</span>
+                      <span className="mt-1 text-base text-gray-900">{formatDate(customer.created_at)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
               
-              {customer.notes && !customer.notes.includes("Stage changed from") && (
+              {customer.notes && !customer.notes.includes("Stage changed from") && !isEditingCustomer && (
                 <div className="mt-6">
                   <span className="text-sm font-medium text-gray-500">Notes</span>
                   <div className="mt-2 rounded-lg bg-gray-50 p-3">
@@ -3668,6 +3921,183 @@ export default function CustomerDetailsPage() {
               Yes - Generate from Checklist
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Customer Dialog */}
+      <AlertDialog open={showDeleteCustomerDialog} onOpenChange={setShowDeleteCustomerDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete customer "{customer?.name}"? 
+              This action cannot be undone and will permanently remove the customer and all associated data including projects, forms, and documents.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingCustomer}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCustomer}
+              disabled={isDeletingCustomer}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeletingCustomer ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Customer'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create Project Dialog */}
+      <Dialog open={showCreateProjectDialog} onOpenChange={setShowCreateProjectDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+            <DialogDescription>
+              Create a new project for {customer?.name}. Fill in the details below.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {customer && (
+            <div className="rounded-lg bg-blue-50 p-4">
+              <p className="text-sm font-medium text-blue-900">
+                Linked Customer: {customer.name}
+              </p>
+              <p className="text-xs text-blue-700">
+                ID: {customer.id}
+              </p>
+            </div>
+          )}
+
+          <form onSubmit={handleCreateNewProject}>
+            <div className="grid gap-6 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="project_name">
+                  Project Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="project_name"
+                  placeholder="Customer's Project"
+                  value={newProjectData.project_name}
+                  onChange={(e) => setNewProjectData(prev => ({ ...prev, project_name: e.target.value }))}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="project_type">
+                    Project Type <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={newProjectData.project_type}
+                    onValueChange={(value) => setNewProjectData(prev => ({ 
+                      ...prev, 
+                      project_type: value as Project["project_type"] 
+                    }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROJECT_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="stage">
+                    Initial Stage <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={newProjectData.stage}
+                    onValueChange={(value) => setNewProjectData(prev => ({ ...prev, stage: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROJECT_STAGES.map((stage) => (
+                        <SelectItem key={stage} value={stage}>
+                          {stage}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="date_of_measure">Date of Measure (Optional)</Label>
+                <Input
+                  id="date_of_measure"
+                  type="date"
+                  value={newProjectData.date_of_measure}
+                  onChange={(e) => setNewProjectData(prev => ({ ...prev, date_of_measure: e.target.value }))}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="notes">Notes / Scope of Work (Optional)</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Enter any initial notes or details about the project scope."
+                  value={newProjectData.notes}
+                  onChange={(e) => setNewProjectData(prev => ({ ...prev, notes: e.target.value }))}
+                  className="min-h-[100px]"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowCreateProjectDialog(false);
+                  setNewProjectData({
+                    project_name: "",
+                    project_type: "Kitchen",
+                    stage: "Lead",
+                    date_of_measure: "",
+                    notes: "",
+                  });
+                }}
+                disabled={isCreatingProject}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isCreatingProject}
+                className="bg-gray-900 hover:bg-gray-800"
+              >
+                {isCreatingProject ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Briefcase className="mr-2 h-4 w-4" />
+                    Create Project
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

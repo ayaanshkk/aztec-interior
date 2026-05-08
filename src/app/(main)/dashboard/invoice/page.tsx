@@ -8,8 +8,6 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea";
 import { BACKEND_URL } from "@/lib/api";
 
-// --- CurrencyInput component remains the same ---
-
 interface CurrencyInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -234,39 +232,6 @@ export default function InvoicePage() {
       setTimeout(() => setMessage(""), 5000);
     }
   };
-
-  // COMMENTED OUT: Approval status check
-  // const checkApprovalStatus = async () => {
-  //   if (approvalStatus === "approved") {
-  //     return true;
-  //   }
-  //
-  //   if (!submissionId) {
-  //     setMessage("⚠️ Please save the invoice first.");
-  //     return false;
-  //   }
-  //
-  //   try {
-  //     const response = await fetch(`https://aztec-interior.onrender.com/approvals/status/${submissionId}`);
-  //     const data = await response.json();
-  //
-  //     setApprovalStatus(data.approval_status);
-  //     setRejectionReason(data.rejection_reason || "");
-  //
-  //     if (data.approval_status === "rejected") {
-  //       setMessage(`❌ This invoice was rejected. Reason: ${data.rejection_reason}`);
-  //       return false;
-  //     } else if (data.approval_status === "pending") {
-  //       setMessage("⚠️ This invoice is pending manager approval. You cannot download it yet.");
-  //       return false;
-  //     }
-  //
-  //     return true;
-  //   } catch (error) {
-  //     setMessage("❌ Failed to check approval status.");
-  //     return false;
-  //   }
-  // };
 
   const handleDownloadPdf = async () => {
     setMessage("Generating PDF...");

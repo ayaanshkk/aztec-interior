@@ -32,7 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { fetchWithAuth } from "@/lib/api";
+import { fetchWithAuth, BACKEND_URL } from "@/lib/api";
 
 const formatDate = (dateString: string) => {
   if (!dateString) return "—";
@@ -504,7 +504,7 @@ export default function JobDetailsPage() {
                             onClick={() => {
                               const viewUrl = doc.url.startsWith('http') 
                                 ? doc.url 
-                                : `https://aztec-interior.onrender.com${doc.url}`;
+                                : `${BACKEND_URL}${doc.url}`;
                               window.open(viewUrl, '_blank');
                             }}
                           >
@@ -517,7 +517,7 @@ export default function JobDetailsPage() {
                             onClick={() => {
                               const downloadUrl = doc.url.startsWith('http') 
                                 ? doc.url 
-                                : `https://aztec-interior.onrender.com${doc.url}`;
+                                : `${BACKEND_URL}${doc.url}`;
                               const link = document.createElement('a');
                               link.href = downloadUrl;
                               link.download = doc.filename;

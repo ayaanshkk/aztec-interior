@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { fetchWithAuth, BACKEND_URL } from "@/lib/api";
-import JobStageBadge from "@/components/JobStageBadge"; // ✅ Import the badge component
+import JobStageBadge from "@/components/JobStageBadge"; 
 
 const JOB_TYPES = ["Kitchen", "Bedroom", "Wardrobe", "Remedial", "Other"];
 

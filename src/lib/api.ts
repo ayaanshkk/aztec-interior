@@ -387,4 +387,150 @@ export const api = {
     });
     return handleApiResponse(response);
   },
+
+  async getPricelist(filters?: { category?: string; search?: string }) {
+    const params = new URLSearchParams();
+    if (filters?.category && filters.category !== 'all') {
+      params.append("category", filters.category);
+    }
+    if (filters?.search) {
+      params.append("search", filters.search);
+    }
+    
+    const queryString = params.toString() ? `?${params.toString()}` : "";
+    const response = await fetchWithAuth(`/pricelist${queryString}`);
+    return handleApiResponse(response);
+  },
+ 
+  async getPricelistCategories() {
+    return deduplicateRequest("getPricelistCategories", async () => {
+      const response = await fetchWithAuth("/pricelist/categories");
+      return handleApiResponse(response);
+    });
+  },
+ 
+  async createPricelistItem(itemData: {
+    category: string;
+    item_name: string;
+    description?: string;
+    base_price: number;
+    unit?: string;
+    dimension_based?: boolean;
+    dimension_formula?: string;
+  }) {
+    const response = await fetchWithAuth("/pricelist", {
+      method: "POST",
+      body: JSON.stringify(itemData),
+    });
+    return handleApiResponse(response);
+  },
+ 
+  async updatePricelistItem(pricelistId: number, itemData: any) {
+    const response = await fetchWithAuth(`/pricelist/${pricelistId}`, {
+      method: "PUT",
+      body: JSON.stringify(itemData),
+    });
+    return handleApiResponse(response);
+  },
+ 
+  async deletePricelistItem(pricelistId: number) {
+    const response = await fetchWithAuth(`/pricelist/${pricelistId}`, {
+      method: "DELETE",
+    });
+    return handleApiResponse(response);
+  },
+ 
+  async searchPricelist(searchData: {
+    search_term: string;
+    category?: string;
+    dimensions?: Record<string, number>;
+  }) {
+    const response = await fetchWithAuth("/pricelist/search", {
+      method: "POST",
+      body: JSON.stringify(searchData),
+    });
+    return handleApiResponse(response);
+  },
+ 
+  async bulkUploadPricelist(file: File, category: string) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("category", category);
+ 
+    const token = localStorage.getItem("token");
+    if (!token) {
+      console.error("No auth token found");
+      redirectToLogin();
+      throw new Error("Not authenticated");
+    }
+ 
+    const url = `${API_ROOT}/pricelist/bulk-upload`;
+    
+    try {
+      const response = await fetchWithTimeout(
+        url,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // Don't set Content-Type - browser will set it with boundary for FormData
+          },
+          body: formData,
+        },
+        60000 // 60s timeout for file upload
+      );
+ 
+      if (response.status === 401) {
+        console.warn("⚠️ Got 401 - token expired or invalid");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        redirectToLogin();
+        throw new Error("Authentication expired");
+      }
+ 
+      return handleApiResponse(response);
+    } catch (error: any) {
+      if (error.name === "AbortError" || error.message.includes("timeout")) {
+        throw new Error(
+          "Upload timeout - the file is taking too long to process. Please try again."
+        );
+      }
+      throw error;
+    }
+  },
+ 
+  async exportPricelist(category?: string) {
+    const params = new URLSearchParams();
+    if (category && category !== 'all') {
+      params.append("category", category);
+    }
+    
+    const queryString = params.toString() ? `?${params.toString()}` : "";
+    const token = localStorage.getItem("token");
+    
+    if (!token) {
+      console.error("No auth token found");
+      redirectToLogin();
+      throw new Error("Not authenticated");
+    }
+ 
+    const url = `${API_ROOT}/pricelist/export${queryString}`;
+    
+    const response = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      30000
+    );
+ 
+    if (!response.ok) {
+      throw new Error("Failed to export pricelist");
+    }
+ 
+    // Return blob for file download
+    return response.blob();
+  },
 };
