@@ -1,23 +1,51 @@
 "use client";
  
-import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Save, Trash2, Plus, Eye } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Plus } from "lucide-react";
  
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+
+interface QuoteItem {
+  item: string;
+  description: string;
+  color: string;
+  quantity: number;
+  amount: number;
+  width?: number;
+  height?: number;
+  depth?: number;
+  line_total: number;
+  price_list_item_id?: number;
+}
  
 export default function EditQuotePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const quoteId = params.id as string;
  
   const [quotation, setQuotation] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<QuoteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [quoteDoorType, setQuoteDoorType] = useState<string>(''); 
+  const [autoFilling, setAutoFilling] = useState<number | null>(null);
+  
+  // ✅ NEW: Door type and room type with URL param initialization
+  const [doorType, setDoorType] = useState<string>('Basic Slab');
+  const [roomType, setRoomType] = useState<string>('Kitchen');
+  
+  const [vatPercentage, setVatPercentage] = useState<number>(20);
+  
+  // Customer form data
+  const [customerData, setCustomerData] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    date: new Date().toISOString().split('T')[0]
+  });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', {
@@ -25,10 +53,126 @@ export default function EditQuotePage() {
       currency: 'GBP',
     }).format(value);
   };
+
+  // ✅ NEW: Initialize door type and room type from URL params
+  useEffect(() => {
+    const urlDoorType = searchParams.get("doorType");
+    const urlRoomType = searchParams.get("roomType");
+    
+    if (urlDoorType) {
+      setDoorType(urlDoorType);
+      console.log('🚪 Door type from URL:', urlDoorType);
+    }
+    if (urlRoomType) {
+      setRoomType(urlRoomType);
+      console.log('🏠 Room type from URL:', urlRoomType);
+    }
+  }, [searchParams]);
  
   useEffect(() => {
     fetchQuotation();
   }, [quoteId]);
+
+  // ✅ NEW: Update all prices when door type or room type changes
+  useEffect(() => {
+    const updateAllPrices = async () => {
+      // Skip if no items loaded yet
+      if (items.length === 0 || loading) return;
+
+      console.log(`🔄 Door/Room type changed - updating all prices...`);
+      console.log(`   New Door Type: ${doorType}`);
+      console.log(`   New Room Type: ${roomType}`);
+  
+      const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+  
+      // Create array of promises for all items that have a description
+      const updatePromises = items.map(async (item, index) => {
+        // Skip if no description
+        if (!item.description || item.description.trim().length === 0) {
+          return null;
+        }
+  
+        const description = item.description.trim();
+        
+        // Detect if this is an appliance code
+        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(description);
+        
+        const requestBody: any = {
+          description: description,
+          door_type: doorType,
+          room_type: roomType,
+        };
+  
+        // If it's an appliance code, don't send door_type
+        if (isApplianceCode) {
+          delete requestBody.door_type;
+          delete requestBody.room_type;
+        }
+  
+        try {
+          const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+              "X-Tenant-ID": tenantId,
+            },
+            body: JSON.stringify(requestBody),
+          });
+  
+          const data = await response.json();
+  
+          if (data.found) {
+            console.log(`✅ Updated price for ${description}: £${data.price}`);
+            return {
+              index,
+              price: data.price,
+              width: data.width,
+              height: data.height,
+              depth: data.depth,
+            };
+          } else {
+            console.log(`⚠️ No price found for ${description} with new door type`);
+            return null;
+          }
+        } catch (error) {
+          console.error(`Error updating price for ${description}:`, error);
+          return null;
+        }
+      });
+  
+      // Wait for all price lookups to complete
+      const results = await Promise.all(updatePromises);
+  
+      // Update items with new prices
+      setItems((prevItems) =>
+        prevItems.map((item, index) => {
+          const result = results.find((r) => r && r.index === index);
+          if (result) {
+            return {
+              ...item,
+              amount: result.price,
+              width: result.width,
+              height: result.height,
+              depth: result.depth,
+              line_total: result.price * (item.quantity || 1),
+            };
+          }
+          return item;
+        })
+      );
+  
+      console.log(`🎯 Finished updating all prices`);
+    };
+  
+    // Only run if we have items with descriptions
+    const hasItemsWithDescriptions = items.some(item => item.description && item.description.trim().length > 0);
+    
+    if (hasItemsWithDescriptions && !loading) {
+      updateAllPrices();
+    }
+  }, [doorType, roomType]); // Re-run whenever doorType or roomType changes
  
   const fetchQuotation = async () => {
     try {
@@ -43,30 +187,31 @@ export default function EditQuotePage() {
         const data = await response.json();
         setQuotation(data);
         
+        // Set customer data
+        setCustomerData({
+          name: data.customer_name || '',
+          address: data.customer_address || data.client_address || '',
+          phone: data.customer_phone || data.client_phone || '',
+          date: data.created_at ? new Date(data.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+        });
+        
         const itemsWithTotals = (data.items || []).map((item: any) => ({
-          ...item,
+          item: item.item || '',
+          description: item.description || '',
+          color: item.color || '',
           quantity: item.quantity || 1,
           amount: item.amount || 0,
           width: item.width || undefined,
           height: item.height || undefined,
           depth: item.depth || undefined,
           line_total: (item.quantity || 1) * (item.amount || 0),
+          price_list_item_id: item.price_list_item_id,
         }));
         setItems(itemsWithTotals);
         
-        // ✅ EXTRACT DOOR TYPE from first Door item
-        const doorItem = itemsWithTotals.find((item: any) => 
-          item.item?.toLowerCase().includes('door')
-        );
-        
-        if (doorItem) {
-          // "Door - Basic Slab" → "Basic Slab"
-          const doorTypeMatch = doorItem.item?.match(/Door\s*-\s*(.+)/i);
-          if (doorTypeMatch) {
-            const extractedDoorType = doorTypeMatch[1].trim();
-            setQuoteDoorType(extractedDoorType);
-            console.log(`✅ Extracted door type: ${extractedDoorType}`);
-          }
+        // Load VAT percentage if saved
+        if (data.vat_percentage) {
+          setVatPercentage(data.vat_percentage);
         }
       } else {
         alert("Failed to load quotation");
@@ -79,29 +224,39 @@ export default function EditQuotePage() {
     }
   };
  
-  // ============================================================================
-  // SMART AUTO-FILL - Uses door type for ALL items
-  // ============================================================================
   const handleDescriptionChange = async (index: number, value: string) => {
-    // Update description immediately
     const updatedItems = [...items];
     updatedItems[index].description = value;
     setItems(updatedItems);
  
-    // Skip if description is too short
     if (!value || value.length < 3) {
       return;
     }
+
+    console.log(`🔍 Auto-fill triggered: "${value}"`);
+    console.log(`   Door Type: ${doorType}`);
+    console.log(`   Room Type: ${roomType}`);
+    setAutoFilling(index);
  
-    // ✅ Use the global door type (extracted from "Door - Basic Slab")
-    const doorTypeToUse = quoteDoorType || 'Basic Slab'; // Default to Basic Slab if not found
- 
-    console.log(`🔍 Auto-fill triggered: "${value}" with door type: ${doorTypeToUse}`);
- 
-    // Call backend for smart auto-price lookup
     try {
       const token = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
+      
+      // Detect if this is an appliance code
+      const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(value.trim());
+      
+      const requestBody: any = {
+        description: value,
+        door_type: doorType,
+        room_type: roomType,
+      };
+
+      // If it's an appliance code, don't send door_type
+      if (isApplianceCode) {
+        console.log('🔥 Detected appliance code pattern');
+        delete requestBody.door_type;
+        delete requestBody.room_type;
+      }
       
       const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
         method: "POST",
@@ -110,16 +265,12 @@ export default function EditQuotePage() {
           "Authorization": `Bearer ${token}`,
           "X-Tenant-ID": tenantId,
         },
-        body: JSON.stringify({
-          description: value,
-          door_type: doorTypeToUse,  // ← Use global door type
-        }),
+        body: JSON.stringify(requestBody),
       });
  
       const data = await response.json();
  
       if (data.found) {
-        // Auto-fill price, width, height, depth
         const updatedItems = [...items];
         updatedItems[index] = {
           ...updatedItems[index],
@@ -139,9 +290,12 @@ export default function EditQuotePage() {
       }
     } catch (error) {
       console.error("Auto-price lookup failed:", error);
+    } finally {
+      setAutoFilling(null);
     }
   };
- 
+
+  // ✅ NEW: Handle item code change with auto-fill
   const handleItemChange = (index: number, field: string, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = {
@@ -149,7 +303,6 @@ export default function EditQuotePage() {
       [field]: value,
     };
  
-    // Recalculate line total when quantity or amount changes
     if (field === 'quantity' || field === 'amount') {
       const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItems[index].quantity || 1;
       const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItems[index].amount || 0;
@@ -157,6 +310,79 @@ export default function EditQuotePage() {
     }
  
     setItems(updatedItems);
+
+    // ✅ Auto-fill when ITEM field changes (code lookup)
+    if (field === 'item' && value && value.length >= 2) {
+      const trimmedValue = value.trim();
+      
+      // Skip auto-fill if it looks like a full item name (contains spaces or is too long)
+      if (trimmedValue.includes(' ') || trimmedValue.length > 20) {
+        return;
+      }
+
+      console.log(`🔍 Item code auto-fill: "${trimmedValue}"`);
+      console.log(`   Door Type: ${doorType}`);
+      console.log(`   Room Type: ${roomType}`);
+      setAutoFilling(index);
+
+      const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+
+      // Detect if this is an appliance code
+      const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(trimmedValue);
+      
+      const requestBody: any = {
+        description: trimmedValue,
+        door_type: doorType,
+        room_type: roomType,
+      };
+
+      // If it's an appliance code, don't send door_type
+      if (isApplianceCode) {
+        console.log('🔥 Detected appliance code pattern');
+        delete requestBody.door_type;
+        delete requestBody.room_type;
+      }
+
+      fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "X-Tenant-ID": tenantId,
+        },
+        body: JSON.stringify(requestBody),
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.found) {
+          setItems(prevItems => {
+            const newItems = [...prevItems];
+            newItems[index] = {
+              ...newItems[index],
+              item: data.item_code || trimmedValue,
+              description: data.description || data.item_name || '',
+              amount: data.price || 0,
+              width: data.width,
+              height: data.height,
+              depth: data.depth,
+              line_total: (data.price || 0) * (newItems[index].quantity || 1),
+            };
+            return newItems;
+          });
+
+          console.log(`✅ Auto-filled: ${data.item_name} - £${data.price}`);
+        } else {
+          console.log("❌ No pricing found for code:", trimmedValue);
+        }
+      })
+      .catch(error => {
+        console.error("Auto-price lookup failed:", error);
+      })
+      .finally(() => {
+        setAutoFilling(null);
+      });
+    }
   };
  
   const handleAddItem = () => {
@@ -187,7 +413,7 @@ export default function EditQuotePage() {
       const token = localStorage.getItem("token");
       
       const subtotal = items.reduce((sum, item) => sum + ((item.amount || 0) * (item.quantity || 1)), 0);
-      const vat = subtotal * 0.20;
+      const vat = subtotal * (vatPercentage / 100);
       const total = subtotal + vat;
  
       const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}`, {
@@ -197,6 +423,9 @@ export default function EditQuotePage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
+          customer_name: customerData.name,
+          customer_address: customerData.address,
+          customer_phone: customerData.phone,
           items: items.map(item => ({
             item: item.item,
             description: item.description,
@@ -210,11 +439,13 @@ export default function EditQuotePage() {
           subtotal,
           vat,
           total,
+          vat_percentage: vatPercentage,
         }),
       });
  
       if (response.ok) {
         alert("✅ Quotation saved successfully!");
+        // Redirect to view page
         router.push(`/dashboard/quotes/${quoteId}`);
       } else {
         const error = await response.json();
@@ -226,10 +457,6 @@ export default function EditQuotePage() {
     } finally {
       setSaving(false);
     }
-  };
- 
-  const handleViewQuote = () => {
-    router.push(`/dashboard/quotes/${quoteId}`);
   };
  
   if (loading) {
@@ -249,7 +476,7 @@ export default function EditQuotePage() {
   }
  
   const subtotal = items.reduce((sum, item) => sum + ((item.amount || 0) * (item.quantity || 1)), 0);
-  const vat = subtotal * 0.20;
+  const vat = subtotal * (vatPercentage / 100);
   const total = subtotal + vat;
  
   return (
@@ -264,16 +491,11 @@ export default function EditQuotePage() {
             <div>
               <h1 className="text-2xl font-bold">Edit Quotation {quotation.reference_number}</h1>
               <p className="text-sm text-gray-600">
-                Customer: {quotation.customer_name}
-                {quoteDoorType && <span className="ml-4 text-blue-600">Door Type: {quoteDoorType}</span>}
+                Customer: {customerData.name}
               </p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={handleViewQuote} variant="outline">
-              <Eye className="mr-2 h-4 w-4" />
-              View Quote
-            </Button>
             <Button onClick={handleSave} disabled={saving}>
               <Save className="mr-2 h-4 w-4" />
               {saving ? "Saving..." : "Save Changes"}
@@ -311,25 +533,97 @@ export default function EditQuotePage() {
         {/* Quotation Title */}
         <h1 className="mb-6 text-center text-2xl font-bold">QUOTATION</h1>
 
-        {/* Customer Information */}
+        {/* ✅ NEW: Door Type and Room Type Selection */}
+        <div className="mb-6 grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Room Type <span className="text-red-600">*</span>
+            </label>
+            <select
+              value={roomType}
+              onChange={(e) => setRoomType(e.target.value)}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Kitchen">Kitchen</option>
+              <option value="Bedroom">Bedroom</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Door Type <span className="text-red-600">*</span>
+            </label>
+            <select
+              value={doorType}
+              onChange={(e) => setDoorType(e.target.value)}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Basic Slab">Basic Slab</option>
+              <option value="Acrylic Gloss/Matt">Acrylic Gloss/Matt</option>
+              <option value="Vinyl">Vinyl</option>
+              <option value="Black Glass">Black Glass</option>
+            </select>
+          </div>
+        </div>
+
+        {/* ✅ NEW: Info Banner */}
+        <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800">
+          <p className="font-medium">
+            💡 Selected: <span className="font-bold">{roomType}</span> with <span className="font-bold">{doorType}</span> doors
+          </p>
+          <p className="mt-1 text-xs text-blue-600">
+            Prices will be automatically updated when you change these selections.
+          </p>
+        </div>
+
+        {/* Customer Information - EDITABLE */}
         <div className="mb-6">
           <table className="w-full border-collapse">
             <tbody>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50" style={{ width: '20%' }}>DATE:</td>
-                <td className="border border-black px-3 py-2">{new Date().toLocaleDateString('en-GB')}</td>
+                <td className="border border-black p-0">
+                  <Input
+                    type="date"
+                    value={customerData.date}
+                    onChange={(e) => setCustomerData({ ...customerData, date: e.target.value })}
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                  />
+                </td>
               </tr>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">NAME:</td>
-                <td className="border border-black px-3 py-2">{quotation.customer_name}</td>
+                <td className="border border-black p-0">
+                  <Input
+                    value={customerData.name}
+                    onChange={(e) => setCustomerData({ ...customerData, name: e.target.value })}
+                    placeholder="Customer name"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                  />
+                </td>
               </tr>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ADDRESS:</td>
-                <td className="border border-black px-3 py-2">{quotation.customer_address || '—'}</td>
+                <td className="border border-black p-0">
+                  <textarea
+                    value={customerData.address}
+                    onChange={(e) => setCustomerData({ ...customerData, address: e.target.value })}
+                    placeholder="Customer address"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2 resize-none"
+                    rows={2}
+                  />
+                </td>
               </tr>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">TEL:</td>
-                <td className="border border-black px-3 py-2">{quotation.customer_phone || '—'}</td>
+                <td className="border border-black p-0">
+                  <Input
+                    value={customerData.phone}
+                    onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
+                    placeholder="Phone number"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                  />
+                </td>
               </tr>
             </tbody>
           </table>
@@ -368,16 +662,30 @@ export default function EditQuotePage() {
                       <Input
                         value={item.item}
                         onChange={(e) => handleItemChange(index, "item", e.target.value)}
-                        placeholder="Item name"
-                        className="border-none focus-visible:ring-0 min-w-[140px]"
+                        placeholder="Item code"
+                        className={`border-none focus-visible:ring-0 min-w-[140px] ${
+                          autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
+                        }`}
                       />
                     </td>
                     <td className="border border-black p-2">
-                      <Input
+                      <textarea
                         value={item.description}
                         onChange={(e) => handleDescriptionChange(index, e.target.value)}
-                        placeholder="e.g., Base Unit 150mm wide"
-                        className="border-none focus-visible:ring-0 min-w-[190px]"
+                        placeholder="Description"
+                        className={`border-none focus-visible:ring-0 min-w-[190px] w-full resize-none overflow-hidden ${
+                          autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
+                        }`}
+                        rows={2}
+                        style={{
+                          minHeight: '40px',
+                          lineHeight: '1.4'
+                        }}
+                        onInput={(e) => {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          target.style.height = `${target.scrollHeight}px`;
+                        }}
                       />
                     </td>
                     <td className="border border-black p-2">
@@ -453,14 +761,6 @@ export default function EditQuotePage() {
                     </td>
                   </tr>
                 ))}
-                
-                {items.length === 0 && (
-                  <tr>
-                    <td colSpan={10} className="border border-black px-3 py-8 text-center text-gray-500">
-                      No items yet. Click "Add Item" to get started.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
@@ -475,7 +775,23 @@ export default function EditQuotePage() {
                 <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotal)}</td>
               </tr>
               <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">VAT</td>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>VAT</span>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        value={vatPercentage}
+                        onChange={(e) => setVatPercentage(parseFloat(e.target.value) || 0)}
+                        className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                      <span className="text-sm">%</span>
+                    </div>
+                  </div>
+                </td>
                 <td className="border border-black px-3 py-2 text-right">{formatCurrency(vat)}</td>
               </tr>
               <tr>

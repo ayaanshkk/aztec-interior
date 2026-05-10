@@ -83,7 +83,7 @@ const allSidebarItems: NavGroup[] = [
       },
       {
         title: "Tasks",
-        url: "/dashboard/jobs",
+        url: "/dashboard/tasks",
         icon: Briefcase,
         roles: ["Platform Admin", "Production Team"],
       },
@@ -94,8 +94,8 @@ const allSidebarItems: NavGroup[] = [
         roles: ["Platform Admin", "Production Team"],
       },
       {
-        title: "Schedule",
-        url: "/dashboard/schedule",
+        title: "Calendar",
+        url: "/dashboard/calendar",
         icon: Calendar,
         roles: ["Platform Admin", "Salesperson", "Production Team"],
       },

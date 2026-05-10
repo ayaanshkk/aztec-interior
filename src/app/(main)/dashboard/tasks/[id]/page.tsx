@@ -114,7 +114,7 @@ export default function JobDetailsPage() {
       setLoading(true);
 
       // Load job details
-      const jobRes = await fetchWithAuth(`jobs/${jobId}`);
+      const jobRes = await fetchWithAuth(`tasks/${jobId}`);
       if (!jobRes.ok) throw new Error("Failed to fetch task");
       const jobData = await jobRes.json();
       setJob(jobData);
@@ -174,7 +174,7 @@ export default function JobDetailsPage() {
   };
 
   const handleEdit = () => {
-    router.push(`/dashboard/jobs/${jobId}/edit`);
+    router.push(`/dashboard/tasks/${jobId}/edit`);
   };
 
   const handleCreateSchedule = () => {
@@ -184,7 +184,7 @@ export default function JobDetailsPage() {
   // Delete job handler
   const handleDeleteJob = async () => {
     try {
-      const response = await fetchWithAuth(`jobs/${jobId}`, {
+      const response = await fetchWithAuth(`tasks/${jobId}`, {
         method: "DELETE",
       });
 
@@ -192,7 +192,7 @@ export default function JobDetailsPage() {
         throw new Error("Failed to delete job");
       }
 
-      router.push("/dashboard/jobs?deleted=true");
+      router.push("/dashboard/tasks?deleted=true");
     } catch (error) {
       console.error("Error deleting task:", error);
       alert("Failed to delete task. Please try again.");
@@ -215,7 +215,7 @@ export default function JobDetailsPage() {
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <p className="text-lg text-gray-600">Task not found</p>
-          <Button onClick={() => router.push("/dashboard/jobs")} className="mt-4">
+          <Button onClick={() => router.push("/dashboard/tasks")} className="mt-4">
             Back to Tasks
           </Button>
         </div>
@@ -245,7 +245,7 @@ export default function JobDetailsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => router.push("/dashboard/jobs")}
+                onClick={() => router.push("/dashboard/tasks")}
                 className="flex items-center text-gray-500 hover:text-gray-700"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -328,7 +328,7 @@ export default function JobDetailsPage() {
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="documents">
               Documents
@@ -342,7 +342,6 @@ export default function JobDetailsPage() {
                 <Badge variant="secondary" className="ml-2">{formSubmissions.length}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="schedule">Schedule</TabsTrigger>
           </TabsList>
 
           {/* DETAILS TAB */}
@@ -684,36 +683,6 @@ export default function JobDetailsPage() {
                     )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* SCHEDULE TAB */}
-          <TabsContent value="schedule" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Schedule</CardTitle>
-                  <Button onClick={handleCreateSchedule}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Schedule
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="py-12 text-center text-gray-500">
-                  <Clock className="mx-auto mb-4 h-12 w-12 opacity-50" />
-                  <p className="font-medium">No schedule created yet</p>
-                  <p className="text-sm mt-1">Create a schedule to track project milestones and deadlines</p>
-                  <Button
-                    variant="outline"
-                    className="mt-4"
-                    onClick={handleCreateSchedule}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Schedule
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>

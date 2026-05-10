@@ -490,7 +490,6 @@ export default function ChecklistViewPage() {
       const token = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
       
-      // ✅ CORRECTED: Use /api/quotations/ prefix
       const response = await fetch(
         `${BACKEND_URL}/quotations/generate-from-checklist/${formSubmissionId}`,
         {
@@ -519,9 +518,13 @@ export default function ChecklistViewPage() {
         `Type: ${data.checklist_type}`
       );
       
-      // Open quote editor in new tab
+      // ✅ NEW: Pass door_type and room_type to the quote editor
+      const doorType = data.door_type || formData.door_type || 'Basic Slab';
+      const roomType = data.room_type || (detectedType === 'kitchen' ? 'Kitchen' : 'Bedroom');
+      
+      // Open quote editor in new tab with door type and room type
       window.open(
-        `/dashboard/quotes/${data.quotation_id}/edit?source=checklist`,
+        `/dashboard/quotes/${data.quotation_id}/edit?source=checklist&doorType=${encodeURIComponent(doorType)}&roomType=${encodeURIComponent(roomType)}`,
         '_blank'
       );
     } catch (error) {

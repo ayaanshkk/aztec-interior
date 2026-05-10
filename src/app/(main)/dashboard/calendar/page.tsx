@@ -310,7 +310,7 @@ export default function SchedulePage() {
   }, [tasks]);
 
   const declinedTasks = useMemo(() => {
-    if (user?.role === "Manager") return [];
+    if (user?.role === "Platform Admin") return [];
     return tasks.filter((a) => a.user_id === user?.id && a.status === "Declined");
   }, [tasks, user]);
 
@@ -433,27 +433,18 @@ export default function SchedulePage() {
       
       console.log("🔄 Fetching schedule data...");
 
-      const directFetch = async (endpoint: string) => {
-        const response = await fetch(`${BACKEND_URL}/${endpoint}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (!response.ok) {
-          throw new Error(`${endpoint} failed: ${response.status}`);
-        }
-        
-        return response.json();
-      };
-
-      // ✅ Fetch all in parallel for faster loading
+      // ✅ Fetch all in parallel using the proper API helper
+      const [tasksResponse, jobsResponse, customersResponse] = await Promise.all([
+        fetchWithAuth('calendar/tasks'),
+        fetchWithAuth('jobs/available'),
+        fetchWithAuth('customers/active')
+      ]);
+      
+      // Parse JSON responses
       const [tasksData, jobsData, customersData] = await Promise.all([
-        directFetch('assignments'),
-        directFetch('jobs'),
-        directFetch('customers')
+        tasksResponse.json(),
+        jobsResponse.json(),
+        customersResponse.json()
       ]);
       
       const newData = {
@@ -483,7 +474,7 @@ export default function SchedulePage() {
     setVisibleCalendars([user.full_name]);
 
     const fetchEmployees = async () => {
-      if (user.role !== "Manager") return;
+      if (user.role !== "PLatform Admin") return;
 
       try {
         const res = await fetchWithAuth("auth/users/staff");
@@ -579,7 +570,7 @@ export default function SchedulePage() {
         estimated_hours: estimatedHours,
         notes: taskData.notes,
         priority: taskData.priority,
-        status: user?.role === "Manager" || taskData.user_id === user?.id ? "Accepted" : "Scheduled",
+        status: user?.role === "Platform Admin" || taskData.user_id === user?.id ? "Accepted" : "Scheduled",
         user_id: taskData.user_id || user?.id,
         team_member: taskData.team_member,
         job_id: taskData.job_id,
@@ -644,27 +635,9 @@ export default function SchedulePage() {
       
       console.log(`🗑️ Deleting task: ${id}`);
       
-      const response = await fetch(`${BACKEND_URL}/assignments/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('❌ Non-JSON response:', text);
-        throw new Error('Server returned an error. Please check if the task exists.');
-      }
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || `Failed to delete task: ${response.status}`);
-      }
-
+      // ✅ Use the API helper instead of direct fetch
+      await api.deleteAssignment(id);
+      
       const updatedTasks = tasks.filter((t) => t.id !== id);
       setTasks(updatedTasks);
       saveToCache({ tasks: updatedTasks });
@@ -922,7 +895,7 @@ export default function SchedulePage() {
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          {user?.role === "Manager" && (
+          {user?.role === "Platform Admin" && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -1338,45 +1311,61 @@ export default function SchedulePage() {
         </DialogContent>
       </Dialog>
 
-      {/* View/Edit Dialog */}
+      {/* Task Details Dialog */}
       <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {isEditingTask ? "Edit Task" : "Task Details"}
-            </DialogTitle>
+            <DialogTitle>Task Details</DialogTitle>
           </DialogHeader>
 
           {selectedTask && (
             <div className="space-y-4">
               <div>
-                <Label>Title</Label>
-                <p className="text-sm">{selectedTask.title}</p>
+                <Label className="text-sm font-medium text-gray-500">Title</Label>
+                <p className="text-base">{selectedTask.title}</p>
               </div>
+
+              {selectedTask.customer_name && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Customer</Label>
+                  <p className="text-base">{selectedTask.customer_name}</p>
+                </div>
+              )}
+
+              {selectedTask.team_member && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Assigned To</Label>
+                  <p className="text-base">{selectedTask.team_member}</p>
+                </div>
+              )}
+
               {selectedTask.start_date && (
                 <div>
-                  <Label>Start Date</Label>
-                  <p className="text-sm">{selectedTask.start_date}</p>
+                  <Label className="text-sm font-medium text-gray-500">Start Date</Label>
+                  <p className="text-base">{selectedTask.start_date}</p>
                 </div>
               )}
+
               {selectedTask.end_date && (
                 <div>
-                  <Label>End Date</Label>
-                  <p className="text-sm">{selectedTask.end_date}</p>
+                  <Label className="text-sm font-medium text-gray-500">End Date</Label>
+                  <p className="text-base">{selectedTask.end_date}</p>
                 </div>
               )}
-              {selectedTask.start_time && (
+
+              {selectedTask.start_time && selectedTask.end_time && (
                 <div>
-                  <Label>Time</Label>
-                  <p className="text-sm">
+                  <Label className="text-sm font-medium text-gray-500">Time</Label>
+                  <p className="text-base">
                     {selectedTask.start_time} - {selectedTask.end_time}
                   </p>
                 </div>
               )}
+
               {selectedTask.notes && (
                 <div>
-                  <Label>Notes</Label>
-                  <p className="text-sm">{selectedTask.notes}</p>
+                  <Label className="text-sm font-medium text-gray-500">Notes</Label>
+                  <p className="text-base">{selectedTask.notes}</p>
                 </div>
               )}
 
@@ -1390,7 +1379,7 @@ export default function SchedulePage() {
                 >
                   Close
                 </Button>
-                {(user?.role === "Manager" || user?.role === "Sales") && (
+                {(user?.role === "Platform Admin" || user?.role === "Salesperson") && (
                   <Button
                     variant="destructive"
                     onClick={() => selectedTask && handleDeleteTask(selectedTask.id)}
@@ -1406,7 +1395,7 @@ export default function SchedulePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Day View Dialog */}
+      {/* Day View Dialog - Around line 900 */}
       <Dialog open={showDayViewDialog} onOpenChange={setShowDayViewDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -1432,54 +1421,32 @@ export default function SchedulePage() {
                       setShowTaskDialog(true);
                     }}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-base mb-1">{task.title}</h3>
-                        {task.customer_name && (
-                          <p className="text-sm text-gray-600 mb-1">
-                            Customer: {task.customer_name}
-                          </p>
-                        )}
-                        {task.start_time && (
-                          <p className="text-sm text-gray-600 mb-1">
-                            Time: {task.start_time} - {task.end_time}
-                          </p>
-                        )}
-                        {task.team_member && (
-                          <p className="text-sm text-gray-600 mb-1">
-                            Assigned: {task.team_member}
-                          </p>
-                        )}
-                        {task.notes && (
-                          <p className="text-sm text-gray-500 mt-2 line-clamp-2">
-                            {task.notes}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        {task.priority && (
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            task.priority === 'High' 
-                              ? 'bg-red-100 text-red-700' 
-                              : task.priority === 'Medium'
-                              ? 'bg-yellow-100 text-yellow-700'
-                              : 'bg-green-100 text-green-700'
-                          }`}>
-                            {task.priority}
-                          </span>
-                        )}
-                        {task.status && (
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            task.status === 'Completed'
-                              ? 'bg-green-100 text-green-700'
-                              : task.status === 'In Progress'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            {task.status}
-                          </span>
-                        )}
-                      </div>
+                    <div className="space-y-2">
+                      <h3 className="font-semibold text-base">{task.title}</h3>
+                      
+                      {task.customer_name && (
+                        <p className="text-sm text-gray-700">
+                          <span className="font-medium">Customer:</span> {task.customer_name}
+                        </p>
+                      )}
+                      
+                      {task.start_time && task.end_time && (
+                        <p className="text-sm text-gray-700">
+                          <span className="font-medium">Time:</span> {task.start_time} - {task.end_time}
+                        </p>
+                      )}
+                      
+                      {task.team_member && (
+                        <p className="text-sm text-gray-700">
+                          <span className="font-medium">Assigned:</span> {task.team_member}
+                        </p>
+                      )}
+                      
+                      {task.notes && (
+                        <p className="text-sm text-gray-600 mt-2 line-clamp-2">
+                          {task.notes}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}

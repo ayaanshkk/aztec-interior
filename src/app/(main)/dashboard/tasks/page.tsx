@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Filter, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,55 +16,57 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { fetchWithAuth, BACKEND_URL } from "@/lib/api";
-import JobStageBadge from "@/components/JobStageBadge"; 
+import { fetchWithAuth } from "@/lib/api";
+import JobStageBadge from "@/components/JobStageBadge";
+import CreateTaskModal from "@/components/ui/CreateTaskModal";
 
 const JOB_TYPES = ["Kitchen", "Bedroom", "Wardrobe", "Remedial", "Other"];
 
-// ✅ Work stages definition
+// ✅ Work stages definition (Survey → Delivery → Installation)
 const WORK_STAGES = [
   { value: "Survey", label: "Survey", icon: "📏" },
   { value: "Delivery", label: "Delivery", icon: "🚚" },
   { value: "Installation", label: "Installation", icon: "🏗️" },
 ];
 
-interface Job {
+interface Task {
   id: string;
-  job_reference: string;
-  job_name: string;
+  title: string;
   customer_name: string;
   job_type: string;
-  stage: string;
-  work_stage?: string; // ✅ NEW: Work stage field
-  priority: string;
+  type: string;
+  work_stage?: string;
+  status: string;
   start_date: string;
   end_date: string;
-  agreed_price: number;
   created_at: string;
 }
 
-export default function JobsPage() {
+export default function TasksPage() {
   const router = useRouter();
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
-  const [filterWorkStage, setFilterWorkStage] = useState<string>("all"); // ✅ NEW: Work stage filter
+  const [filterWorkStage, setFilterWorkStage] = useState<string>("all");
+  
+  // Create task modal
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   
   // Delete confirmation dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   useEffect(() => {
-    loadJobs();
+    loadTasks();
   }, []);
 
   useEffect(() => {
     applyFilters();
-  }, [jobs, searchTerm, filterType, filterWorkStage]); // ✅ Added filterWorkStage
+  }, [tasks, searchTerm, filterType, filterWorkStage]);
 
-  const loadJobs = async () => {
+  const loadTasks = async () => {
     setLoading(true);
     const startTime = performance.now();
     
@@ -83,14 +85,14 @@ export default function JobsPage() {
         'Content-Type': 'application/json'
       };
 
-      // ✅ Retry logic
+      // ✅ FIXED: Changed endpoint from /jobs to /tasks
       let response;
       let retryCount = 0;
       const maxRetries = 2;
 
       while (retryCount <= maxRetries) {
         try {
-          response = await fetch(`${BACKEND_URL}/jobs`, {
+          response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/tasks`, {
             headers,
             signal: AbortSignal.timeout(15000), // 15 second timeout
           });
@@ -129,49 +131,49 @@ export default function JobsPage() {
       }
 
       const data = await response.json();
-      console.log(`✅ Tasks received: ${data.length} jobs`);
+      console.log(`✅ Tasks received: ${data.length} tasks`);
       
-      setJobs(data);
+      setTasks(data);
 
       const endTime = performance.now();
       console.log(`⏱️ Tasks page loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
     } catch (error) {
       console.error("❌ Error loading tasks:", error);
-      setJobs([]); // Set empty array instead of leaving undefined
+      setTasks([]); // Set empty array instead of leaving undefined
     } finally {
       setLoading(false);
     }
   };
 
   const applyFilters = () => {
-    let filtered = [...jobs];
+    let filtered = [...tasks];
 
     if (searchTerm) {
       filtered = filtered.filter(
-        (job) =>
-          job.job_reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          job.job_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          job.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        (task) =>
+          task.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          task.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          task.id?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
     if (filterType && filterType !== "all") {
-      filtered = filtered.filter((job) => job.job_type === filterType);
+      filtered = filtered.filter((task) => task.job_type === filterType || task.type === filterType);
     }
 
-    // ✅ NEW: Filter by work stage
+    // Filter by work stage
     if (filterWorkStage && filterWorkStage !== "all") {
-      filtered = filtered.filter((job) => job.work_stage === filterWorkStage);
+      filtered = filtered.filter((task) => task.work_stage === filterWorkStage);
     }
 
-    setFilteredJobs(filtered);
+    setFilteredTasks(filtered);
   };
 
-  // ✅ NEW: Update job work stage
-  const handleUpdateWorkStage = async (jobId: string, newWorkStage: string) => {
+  // Update task work stage
+  const handleUpdateWorkStage = async (taskId: string, newWorkStage: string) => {
     try {
-      const response = await fetchWithAuth(`jobs/${jobId}`, {
+      const response = await fetchWithAuth(`tasks/${taskId}`, {
         method: "PUT",
         body: JSON.stringify({ work_stage: newWorkStage }),
       });
@@ -181,26 +183,26 @@ export default function JobsPage() {
         throw new Error(errorData.error || "Failed to update work stage");
       }
 
-      const updatedJob = await response.json();
+      const updatedTask = await response.json();
       
       // Update state
-      setJobs((prev) =>
-        prev.map((j) => (j.id === jobId ? { ...j, work_stage: updatedJob.work_stage } : j))
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, work_stage: updatedTask.work_stage } : t))
       );
       
-      console.log(`Updated task ${jobId} work stage to ${newWorkStage}`);
+      console.log(`Updated task ${taskId} work stage to ${newWorkStage}`);
     } catch (error) {
       console.error("Error updating work stage:", error);
       alert(`Failed to update work stage: ${error instanceof Error ? error.message : 'Please try again'}`);
     }
   };
 
-  // ✅ Delete job handler
-  const handleDeleteJob = async () => {
-    if (!jobToDelete) return;
+  // Delete task handler
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return;
 
     try {
-      const response = await fetchWithAuth(`jobs/${jobToDelete.id}`, {
+      const response = await fetchWithAuth(`tasks/${taskToDelete.id}`, {
         method: "DELETE",
       });
 
@@ -210,40 +212,23 @@ export default function JobsPage() {
       }
 
       // Remove from state
-      setJobs((prev) => prev.filter((j) => j.id !== jobToDelete.id));
+      setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
       setDeleteDialogOpen(false);
-      setJobToDelete(null);
+      setTaskToDelete(null);
     } catch (error) {
       console.error("Error deleting task:", error);
       alert(`Failed to delete task: ${error instanceof Error ? error.message : 'Please try again'}`);
     }
   };
 
-  const getStageColor = (stage: string) => {
+  const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      Lead: "bg-gray-100 text-gray-800",
-      Quote: "bg-blue-100 text-blue-800",
-      Survey: "bg-yellow-100 text-yellow-800",
-      Measure: "bg-purple-100 text-purple-800",
-      Design: "bg-pink-100 text-pink-800",
-      Quoted: "bg-indigo-100 text-indigo-800",
-      Accepted: "bg-green-100 text-green-800",
-      Production: "bg-orange-100 text-orange-800",
-      Delivery: "bg-cyan-100 text-cyan-800",
-      Installation: "bg-teal-100 text-teal-800",
-      Complete: "bg-green-200 text-green-900",
+      Scheduled: "bg-blue-100 text-blue-800",
+      "In Progress": "bg-yellow-100 text-yellow-800",
+      Completed: "bg-green-100 text-green-800",
       Cancelled: "bg-red-100 text-red-800",
     };
-    return colors[stage] || "bg-gray-100 text-gray-800";
-  };
-
-  const getPriorityColor = (priority: string) => {
-    const colors: Record<string, string> = {
-      High: "text-red-600 font-semibold",
-      Medium: "text-yellow-600",
-      Low: "text-gray-600",
-    };
-    return colors[priority] || "text-gray-600";
+    return colors[status] || "bg-gray-100 text-gray-800";
   };
 
   if (loading) {
@@ -267,7 +252,7 @@ export default function JobsPage() {
               Manage and track all your tasks in one place
             </p>
           </div>
-          <Button onClick={() => router.push("/dashboard/jobs/create")} className="flex items-center gap-2">
+          <Button onClick={() => setCreateModalOpen(true)} className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Create New Task
           </Button>
@@ -280,7 +265,7 @@ export default function JobsPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
-                placeholder="Search by job reference, name, or customer..."
+                placeholder="Search by task name or customer..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -304,7 +289,7 @@ export default function JobsPage() {
             </Select>
           </div>
 
-          {/* ✅ NEW: Work Stage Filter */}
+          {/* Work Stage Filter */}
           <div className="w-[200px]">
             <Select value={filterWorkStage} onValueChange={setFilterWorkStage}>
               <SelectTrigger>
@@ -344,15 +329,15 @@ export default function JobsPage() {
         <div className="flex gap-8">
           <div>
             <p className="text-sm text-gray-600">Total Tasks</p>
-            <p className="text-2xl font-semibold">{jobs.length}</p>
+            <p className="text-2xl font-semibold">{tasks.length}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Filtered Results</p>
-            <p className="text-2xl font-semibold">{filteredJobs.length}</p>
+            <p className="text-2xl font-semibold">{filteredTasks.length}</p>
           </div>
-          {/* ✅ NEW: Work stage counts */}
+          {/* Work stage counts */}
           {WORK_STAGES.map((stage) => {
-            const count = jobs.filter((j) => j.work_stage === stage.value).length;
+            const count = tasks.filter((t) => t.work_stage === stage.value).length;
             if (count === 0) return null;
             return (
               <div key={stage.value}>
@@ -365,17 +350,17 @@ export default function JobsPage() {
       </div>
 
       <main className="px-8 py-6">
-        {filteredJobs.length === 0 ? (
+        {filteredTasks.length === 0 ? (
           <div className="rounded-lg border bg-white p-12 text-center">
             <Filter className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-semibold text-gray-900">No jobs found</h3>
+            <h3 className="mt-4 text-lg font-semibold text-gray-900">No tasks found</h3>
             <p className="mt-2 text-sm text-gray-600">
-              {jobs.length === 0
-                ? "Get started by creating your first job."
+              {tasks.length === 0
+                ? "Get started by creating your first task."
                 : "Try adjusting your search or filter criteria."}
             </p>
-            {jobs.length === 0 && (
-              <Button onClick={() => router.push("/dashboard/jobs/create")} className="mt-4">
+            {tasks.length === 0 && (
+              <Button onClick={() => setCreateModalOpen(true)} className="mt-4">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Your First Task
               </Button>
@@ -388,7 +373,7 @@ export default function JobsPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
-                      Task Reference
+                      Task ID
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
                       Task Name
@@ -399,12 +384,11 @@ export default function JobsPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
                       Type
                     </th>
-                    {/* ✅ NEW: Work Stage column */}
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
                       Work Stage
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
-                      Priority
+                      Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-700">
                       Created
@@ -415,38 +399,51 @@ export default function JobsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
-                  {filteredJobs.map((job) => (
+                  {filteredTasks.map((task) => {
+                    // Format task ID as Task-XXX
+                    const taskNumber = task.id.split('-').pop() || task.id;
+                    const formattedId = `Task-${taskNumber.padStart(3, '0')}`;
+                    
+                    // Determine actual task type and work stage
+                    const taskType = task.job_type || task.type;
+                    const workStage = task.work_stage || 
+                      (taskType === 'Survey' || taskType === 'Delivery' || taskType === 'Installation' 
+                        ? taskType 
+                        : 'Survey');
+                    
+                    // If type is a work stage, show it in work stage instead
+                    const displayType = ['Survey', 'Delivery', 'Installation'].includes(taskType) 
+                      ? 'Other' 
+                      : taskType;
+                    
+                    return (
                     <tr
-                      key={job.id}
-                      onClick={() => router.push(`/dashboard/jobs/${job.id}`)}
+                      key={task.id}
+                      onClick={() => router.push(`/dashboard/tasks/${task.id}`)}
                       className="hover:bg-gray-50 transition-colors cursor-pointer"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="font-medium text-gray-900">{job.job_reference || "N/A"}</span>
+                        <span className="font-medium text-gray-900">{formattedId}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-gray-900">
-                          {job.customer_name && job.job_name 
-                            ? `${job.customer_name} - ${job.job_name}`
-                            : job.job_name || job.customer_name || "-"}
-                        </span>
+                        <span className="text-gray-900">{task.title || "Untitled Task"}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-gray-900">{job.customer_name || "Unknown"}</span>
+                        <span className="text-gray-900">{task.customer_name || "Unknown"}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-700">{job.job_type}</span>
+                        <span className="text-sm text-gray-700">{displayType}</span>
                       </td>
-                      {/* ✅ NEW: Work Stage cell with inline editing */}
+                      {/* Work Stage cell with inline editing */}
                       <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <Select
-                          value={job.work_stage || "Survey"}
-                          onValueChange={(value) => handleUpdateWorkStage(job.id, value)}
+                          value={workStage}
+                          onValueChange={(value) => handleUpdateWorkStage(task.id, value)}
                         >
                           <SelectTrigger className="w-[150px] h-8">
                             <SelectValue>
-                              {job.work_stage ? (
-                                <JobStageBadge stage={job.work_stage as any} size="sm" showIcon={true} />
+                              {workStage ? (
+                                <JobStageBadge stage={workStage as any} size="sm" showIcon={true} />
                               ) : (
                                 <span className="text-gray-400">Not set</span>
                               )}
@@ -465,12 +462,12 @@ export default function JobsPage() {
                         </Select>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`text-sm ${getPriorityColor(job.priority)}`}>
-                          {job.priority}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
+                          {task.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {new Date(job.created_at).toLocaleDateString()}
+                        {new Date(task.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
@@ -480,7 +477,7 @@ export default function JobsPage() {
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setJobToDelete(job);
+                              setTaskToDelete(task);
                               setDeleteDialogOpen(true);
                             }}
                           >
@@ -489,7 +486,7 @@ export default function JobsPage() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
@@ -497,21 +494,28 @@ export default function JobsPage() {
         )}
       </main>
 
-      {/* ✅ Delete Confirmation Dialog */}
+      {/* Create Task Modal */}
+      <CreateTaskModal 
+        open={createModalOpen} 
+        onOpenChange={setCreateModalOpen}
+        onSuccess={loadTasks}
+      />
+
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Task?</AlertDialogTitle>
             <AlertDialogDescription>
-              {jobToDelete && (
+              {taskToDelete && (
                 <>
                   <p className="mb-2">
                     Are you sure you want to delete this task?
                   </p>
                   <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
-                    <p><strong>Task Reference:</strong> {jobToDelete.job_reference}</p>
-                    <p><strong>Customer:</strong> {jobToDelete.customer_name}</p>
-                    <p><strong>Type:</strong> {jobToDelete.job_type}</p>
+                    <p><strong>Task ID:</strong> #{taskToDelete.id}</p>
+                    <p><strong>Customer:</strong> {taskToDelete.customer_name}</p>
+                    <p><strong>Type:</strong> {taskToDelete.job_type || taskToDelete.type}</p>
                   </div>
                   <p className="mt-3 text-red-600 font-medium">
                     This action cannot be undone.
@@ -523,12 +527,12 @@ export default function JobsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
               setDeleteDialogOpen(false);
-              setJobToDelete(null);
+              setTaskToDelete(null);
             }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteJob}
+              onClick={handleDeleteTask}
               className="bg-red-600 hover:bg-red-700"
             >
               Delete

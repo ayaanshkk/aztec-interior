@@ -19,8 +19,9 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-type Category = 'Kitchen' | 'Bedrooms';
+type Category = 'Kitchen' | 'Bedrooms' | 'Appliances';
 type DoorType = 'Basic Slab' | 'Acrylic Gloss/Matt' | 'Vinyl Doors' | 'Black Glass' | 'Base Cabinet Only';
+type ApplianceSeries = 'Low' | 'Mid' | 'High';
 
 interface PricelistItem {
   pricelist_id: number;
@@ -38,6 +39,7 @@ interface PricelistItem {
 interface GroupedItem {
   item_code: string;
   item_name: string;
+  brand?: string; // NEW: For appliances
   width: number;
   height: number;
   depth: number;
@@ -45,12 +47,15 @@ interface GroupedItem {
     [key: string]: {
       price: number;
       pricelist_id: number;
+      series?: string; // For appliances - S2, S4, S6, S8
+      model?: string;  // For appliances - model number
     };
   };
 }
 
 export default function PricelistPage() {
   const [activeTab, setActiveTab] = useState<Category>('Kitchen');
+  const [selectedBrand, setSelectedBrand] = useState<string>('All');
   const [pricelistItems, setPricelistItems] = useState<PricelistItem[]>([]);
   const [groupedItems, setGroupedItems] = useState<GroupedItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -73,21 +78,36 @@ export default function PricelistPage() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [newItemForm, setNewItemForm] = useState<any>({});
+  const [saving, setSaving] = useState(false);
 
-  // Door types based on active tab
+  // Door types / Series based on active tab
   const doorTypes: DoorType[] = activeTab === 'Kitchen' 
     ? ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass']
-    : ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Base Cabinet Only'];
+    : activeTab === 'Bedrooms'
+    ? ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Base Cabinet Only']
+    : []; // Appliances doesn't use door types
+  
+  const applianceSeries: ApplianceSeries[] = ['Low', 'Mid', 'High'];
+  const brands = ['All', 'Bosch', 'Siemens', 'Neff', 'Samsung'];
 
   // Fetch all pricelist items (no backend pagination, we'll paginate grouped results)
   const fetchPricelistItems = useCallback(async () => {
     try {
       setLoading(true);
-      // @ts-ignore
-      const response = await api.getPricelist({
+      
+      const filters: any = {
         category: activeTab,
-        per_page: 1000 // Get all items for this category
-      });
+        per_page: 1000
+      };
+      
+      // Add brand filter for Appliances
+      if (activeTab === 'Appliances' && selectedBrand !== 'All') {
+        filters.brand = selectedBrand;
+      }
+      
+      // @ts-ignore
+      const response = await api.getPricelist(filters);
       
       setPricelistItems(response.items || []);
       setError(null);
@@ -96,7 +116,7 @@ export default function PricelistPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, selectedBrand]);
 
   useEffect(() => {
     fetchPricelistItems();
@@ -109,14 +129,19 @@ export default function PricelistPage() {
       return;
     }
 
-    // Group by item_code
+    // Group differently for Appliances vs Kitchen/Bedrooms
     const grouped = pricelistItems.reduce((acc, item) => {
-      const code = item.item_code;
+      // For Appliances, group by item_name + brand (so Bosch and Siemens don't mix!)
+      // For Kitchen/Bedrooms, group by item_code
+      const groupKey = activeTab === 'Appliances' 
+        ? `${item.item_name}|${item.brand || 'Unknown'}` // ← FIXED: Include brand in key
+        : item.item_code;
       
-      if (!acc[code]) {
-        acc[code] = {
-          item_code: code,
+      if (!acc[groupKey]) {
+        acc[groupKey] = {
+          item_code: groupKey, // For appliances, this will be "HOB 90cm Gas|Bosch"
           item_name: item.item_name,
+          brand: item.brand, // ← NEW: Store brand for display
           width: item.width,
           height: item.height,
           depth: item.depth,
@@ -124,9 +149,18 @@ export default function PricelistPage() {
         };
       }
       
-      acc[code].prices[item.door_type] = {
+      // Extract series info from description for appliances
+      let seriesInfo = '';
+      if (activeTab === 'Appliances' && item.description) {
+        const match = item.description.match(/\(([^)]+)\)/);
+        seriesInfo = match ? match[1] : '';
+      }
+      
+      acc[groupKey].prices[item.door_type] = {
         price: item.base_price,
-        pricelist_id: item.pricelist_id
+        pricelist_id: item.pricelist_id,
+        series: seriesInfo,
+        model: activeTab === 'Appliances' ? item.item_code : undefined
       };
       
       return acc;
@@ -279,6 +313,91 @@ export default function PricelistPage() {
     }
   };
 
+  const handleAddItem = async () => {
+    try {
+      setSaving(true);
+      
+      // Validation
+      if (!newItemForm.item_code || !newItemForm.item_name) {
+        alert('Please fill in item code and name');
+        return;
+      }
+      
+      if (activeTab === 'Appliances') {
+        // Appliances validation
+        if (!newItemForm.brand || !newItemForm.series_level || !newItemForm.base_price) {
+          alert('Please fill in brand, series level, and price for appliances');
+          return;
+        }
+        
+        // Build description for appliances
+        const seriesInfo = newItemForm.series_info || '';
+        const description = `${newItemForm.item_name} - ${newItemForm.series_level} Series${seriesInfo ? ` (${seriesInfo})` : ''}`;
+        
+        const itemData = {
+          category: activeTab,
+          item_code: newItemForm.item_code,
+          item_name: newItemForm.item_name,
+          description: description,
+          base_price: parseFloat(newItemForm.base_price),
+          door_type: newItemForm.series_level,
+          brand: newItemForm.brand,
+          unit: 'each'
+        };
+        
+        // @ts-ignore
+        await api.createPricelistItem(itemData);
+        
+      } else {
+        // Kitchen/Bedrooms - Create one row per door type that has a price
+        const doorTypesWithPrices = Object.entries(newItemForm.prices || {})
+          .filter(([_, price]) => price && parseFloat(price as string) > 0);
+        
+        if (doorTypesWithPrices.length === 0) {
+          alert('Please enter at least one price');
+          return;
+        }
+        
+        // Create multiple rows - one for each door type
+        const createPromises = doorTypesWithPrices.map(([doorType, price]) => {
+          const description = `${newItemForm.item_name} - ${doorType}`;
+          
+          const itemData = {
+            category: activeTab,
+            item_code: newItemForm.item_code,
+            item_name: newItemForm.item_name,
+            description: description,
+            base_price: parseFloat(price as string),
+            door_type: doorType,
+            width: newItemForm.width ? parseInt(newItemForm.width) : null,
+            height: newItemForm.height ? parseInt(newItemForm.height) : null,
+            depth: newItemForm.depth ? parseInt(newItemForm.depth) : null,
+            unit: 'each'
+          };
+          
+          // @ts-ignore
+          return api.createPricelistItem(itemData);
+        });
+        
+        await Promise.all(createPromises);
+      }
+      
+      setSuccess(`Item added successfully!`);
+      setTimeout(() => setSuccess(null), 3000);
+      
+      // Close modal and refresh
+      setShowAddModal(false);
+      setNewItemForm({});
+      fetchPricelistItems();
+      
+    } catch (err: any) {
+      setError(err.message || 'Failed to add item');
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setSaving(false);
+    }
+  };
+  
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -289,22 +408,13 @@ export default function PricelistPage() {
               <h1 className="text-3xl font-bold text-gray-900">Price List Management</h1>
               <p className="text-gray-600 mt-1">Manage products, prices, and categories</p>
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
-              >
-                <Upload className="w-4 h-4" />
-                Import Excel
-              </button>
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
-              >
-                <Download className="w-4 h-4" />
-                Export Excel
-              </button>
-            </div>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
+            >
+              <Plus className="w-4 h-4" />
+              Add Item
+            </button>
           </div>
 
           {/* Tabs */}
@@ -329,18 +439,43 @@ export default function PricelistPage() {
             >
               Bedrooms
             </button>
+            <button
+              onClick={() => setActiveTab('Appliances')}
+              className={`px-6 py-2 rounded-lg font-medium transition ${
+                activeTab === 'Appliances'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Appliances
+            </button>
           </div>
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by code or description..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-            />
+          {/* Search and Brand Filter */}
+          <div className="flex gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by code or description..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              />
+            </div>
+            
+            {/* Brand filter for Appliances */}
+            {activeTab === 'Appliances' && (
+              <select
+                value={selectedBrand}
+                onChange={(e) => setSelectedBrand(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white min-w-[150px]"
+              >
+                {brands.map(brand => (
+                  <option key={brand} value={brand}>{brand}</option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
       </div>
@@ -384,19 +519,57 @@ export default function PricelistPage() {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Code
+                        {activeTab === 'Appliances' ? 'Item' : 'Code'}
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Description
-                      </th>
-                      {doorTypes.map(doorType => (
-                        <th key={doorType} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                          {doorType}
+                      {activeTab !== 'Appliances' && (
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Description
                         </th>
-                      ))}
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Dimensions (W×H×D)
-                      </th>
+                      )}
+                      {activeTab === 'Appliances' ? (
+                        // Appliances: Show Low Model/Series/Price, Mid Model/Series/Price, High Model/Series/Price
+                        <>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Low Model
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Series
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Price
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Mid Model
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Series
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Price
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            High Model
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Series
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Price
+                          </th>
+                        </>
+                      ) : (
+                        // Kitchen/Bedrooms: Show door types
+                        doorTypes.map(doorType => (
+                          <th key={doorType} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                            {doorType}
+                          </th>
+                        ))
+                      )}
+                      {activeTab !== 'Appliances' && (
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Dimensions (W×H×D)
+                        </th>
+                      )}
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
@@ -409,71 +582,209 @@ export default function PricelistPage() {
                           // Edit mode
                           <>
                             <td className="px-4 py-3 whitespace-nowrap">
-                              <input
-                                type="text"
-                                value={editForm.item_code}
-                                onChange={(e) => setEditForm({...editForm, item_code: e.target.value})}
-                                className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
-                                disabled
-                              />
+                              {activeTab === 'Appliances' ? (
+                                // Appliances: Show item name + brand (not editable)
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">{editForm.item_name}</div>
+                                  <div className="text-xs text-gray-500">{editForm.brand}</div>
+                                </div>
+                              ) : (
+                                // Kitchen/Bedrooms: Show code (not editable)
+                                <input
+                                  type="text"
+                                  value={editForm.item_code}
+                                  className="w-24 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
+                                  disabled
+                                />
+                              )}
                             </td>
-                            <td className="px-4 py-3">
-                              <input
-                                type="text"
-                                value={editForm.item_name}
-                                onChange={(e) => setEditForm({...editForm, item_name: e.target.value})}
-                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
-                              />
-                            </td>
-                            {doorTypes.map(doorType => (
-                              <td key={doorType} className="px-4 py-3 whitespace-nowrap">
-                                {editForm.prices[doorType] ? (
+                            {activeTab !== 'Appliances' && (
+                              <td className="px-4 py-3">
+                                <input
+                                  type="text"
+                                  value={editForm.item_name}
+                                  onChange={(e) => setEditForm({...editForm, item_name: e.target.value})}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                />
+                              </td>
+                            )}
+                            {activeTab === 'Appliances' ? (
+                              // Appliances: Edit Model (disabled), Series (disabled), Price (editable) for each level
+                              <>
+                                {/* Low */}
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <input
+                                    type="text"
+                                    value={editForm.prices?.['Low']?.model || ''}
+                                    className="w-28 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
+                                    disabled
+                                  />
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <input
+                                    type="text"
+                                    value={editForm.prices?.['Low']?.series || ''}
+                                    className="w-12 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
+                                    disabled
+                                  />
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {editForm.prices?.['Low'] ? (
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={editForm.prices['Low'].price || ''}
+                                      onChange={(e) => setEditForm({
+                                        ...editForm,
+                                        prices: {
+                                          ...editForm.prices,
+                                          'Low': {
+                                            ...editForm.prices['Low'],
+                                            price: e.target.value
+                                          }
+                                        }
+                                      })}
+                                      className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                    />
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )}
+                                </td>
+                                
+                                {/* Mid */}
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <input
+                                    type="text"
+                                    value={editForm.prices?.['Mid']?.model || ''}
+                                    className="w-28 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
+                                    disabled
+                                  />
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <input
+                                    type="text"
+                                    value={editForm.prices?.['Mid']?.series || ''}
+                                    className="w-12 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
+                                    disabled
+                                  />
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {editForm.prices?.['Mid'] ? (
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={editForm.prices['Mid'].price || ''}
+                                      onChange={(e) => setEditForm({
+                                        ...editForm,
+                                        prices: {
+                                          ...editForm.prices,
+                                          'Mid': {
+                                            ...editForm.prices['Mid'],
+                                            price: e.target.value
+                                          }
+                                        }
+                                      })}
+                                      className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                    />
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )}
+                                </td>
+                                
+                                {/* High */}
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <input
+                                    type="text"
+                                    value={editForm.prices?.['High']?.model || ''}
+                                    className="w-28 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
+                                    disabled
+                                  />
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  <input
+                                    type="text"
+                                    value={editForm.prices?.['High']?.series || ''}
+                                    className="w-12 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
+                                    disabled
+                                  />
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap">
+                                  {editForm.prices?.['High'] ? (
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={editForm.prices['High'].price || ''}
+                                      onChange={(e) => setEditForm({
+                                        ...editForm,
+                                        prices: {
+                                          ...editForm.prices,
+                                          'High': {
+                                            ...editForm.prices['High'],
+                                            price: e.target.value
+                                          }
+                                        }
+                                      })}
+                                      className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                    />
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )}
+                                </td>
+                              </>
+                            ) : (
+                              // Kitchen/Bedrooms: Edit door type prices
+                              doorTypes.map(doorType => (
+                                <td key={doorType} className="px-4 py-3 whitespace-nowrap">
+                                  {editForm.prices[doorType] ? (
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={editForm.prices[doorType].price}
+                                      onChange={(e) => setEditForm({
+                                        ...editForm,
+                                        prices: {
+                                          ...editForm.prices,
+                                          [doorType]: {
+                                            ...editForm.prices[doorType],
+                                            price: e.target.value
+                                          }
+                                        }
+                                      })}
+                                      className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                    />
+                                  ) : (
+                                    <span className="text-gray-400 text-sm">-</span>
+                                  )}
+                                </td>
+                              ))
+                            )}
+                            {activeTab !== 'Appliances' && (
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="flex gap-1">
                                   <input
                                     type="number"
-                                    step="0.01"
-                                    value={editForm.prices[doorType].price}
-                                    onChange={(e) => setEditForm({
-                                      ...editForm,
-                                      prices: {
-                                        ...editForm.prices,
-                                        [doorType]: {
-                                          ...editForm.prices[doorType],
-                                          price: e.target.value
-                                        }
-                                      }
-                                    })}
-                                    className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                    value={editForm.width || ''}
+                                    onChange={(e) => setEditForm({...editForm, width: e.target.value})}
+                                    placeholder="W"
+                                    className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
                                   />
-                                ) : (
-                                  <span className="text-gray-400 text-sm">-</span>
-                                )}
+                                  <input
+                                    type="number"
+                                    value={editForm.height || ''}
+                                    onChange={(e) => setEditForm({...editForm, height: e.target.value})}
+                                    placeholder="H"
+                                    className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                  />
+                                  <input
+                                    type="number"
+                                    value={editForm.depth || ''}
+                                    onChange={(e) => setEditForm({...editForm, depth: e.target.value})}
+                                    placeholder="D"
+                                    className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                  />
+                                </div>
                               </td>
-                            ))}
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              <div className="flex gap-1">
-                                <input
-                                  type="number"
-                                  value={editForm.width || ''}
-                                  onChange={(e) => setEditForm({...editForm, width: e.target.value})}
-                                  placeholder="W"
-                                  className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
-                                />
-                                <input
-                                  type="number"
-                                  value={editForm.height || ''}
-                                  onChange={(e) => setEditForm({...editForm, height: e.target.value})}
-                                  placeholder="H"
-                                  className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
-                                />
-                                <input
-                                  type="number"
-                                  value={editForm.depth || ''}
-                                  onChange={(e) => setEditForm({...editForm, depth: e.target.value})}
-                                  placeholder="D"
-                                  className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
-                                />
-                              </div>
-                            </td>
+                            )}
                             <td className="px-4 py-3 whitespace-nowrap text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button
@@ -495,25 +806,75 @@ export default function PricelistPage() {
                           // View mode
                           <>
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {item.item_code}
+                              {activeTab === 'Appliances' ? (
+                                <div>
+                                  <div>{item.item_name}</div>
+                                  <div className="text-xs text-gray-500">{item.brand}</div>
+                                </div>
+                              ) : (
+                                item.item_code
+                              )}
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-700">
-                              {item.item_name}
-                            </td>
-                            {doorTypes.map(doorType => (
-                              <td key={doorType} className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                {item.prices[doorType] ? (
-                                  `£${item.prices[doorType].price?.toFixed(2) || '0.00'}`
-                                ) : (
-                                  <span className="text-gray-400">-</span>
-                                )}
+                            {activeTab !== 'Appliances' && (
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                {item.item_name}
                               </td>
-                            ))}
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                              {item.width && item.height && item.depth 
-                                ? `${item.width}×${item.height}×${item.depth}`
-                                : '-'}
-                            </td>
+                            )}
+                            {activeTab === 'Appliances' ? (
+                              // Appliances: Show Model, Series, Price for Low/Mid/High
+                              <>
+                                {/* Low */}
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                  {item.prices['Low']?.model || <span className="text-gray-400">-</span>}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                  {item.prices['Low']?.series || <span className="text-gray-400">-</span>}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                  {item.prices['Low'] ? `£${item.prices['Low'].price?.toFixed(2) || '0.00'}` : <span className="text-gray-400">-</span>}
+                                </td>
+                                
+                                {/* Mid */}
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                  {item.prices['Mid']?.model || <span className="text-gray-400">-</span>}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                  {item.prices['Mid']?.series || <span className="text-gray-400">-</span>}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                  {item.prices['Mid'] ? `£${item.prices['Mid'].price?.toFixed(2) || '0.00'}` : <span className="text-gray-400">-</span>}
+                                </td>
+                                
+                                {/* High */}
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                  {item.prices['High']?.model || <span className="text-gray-400">-</span>}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                  {item.prices['High']?.series || <span className="text-gray-400">-</span>}
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                  {item.prices['High'] ? `£${item.prices['High'].price?.toFixed(2) || '0.00'}` : <span className="text-gray-400">-</span>}
+                                </td>
+                              </>
+                            ) : (
+                              // Kitchen/Bedrooms: Show door type prices
+                              doorTypes.map(doorType => (
+                                <td key={doorType} className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                  {item.prices[doorType] ? (
+                                    `£${item.prices[doorType].price?.toFixed(2) || '0.00'}`
+                                  ) : (
+                                    <span className="text-gray-400">-</span>
+                                  )}
+                                </td>
+                              ))
+                            )}
+                            {activeTab !== 'Appliances' && (
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                {item.width && item.height && item.depth 
+                                  ? `${item.width}×${item.height}×${item.depth}`
+                                  : '-'}
+                              </td>
+                            )}
                             <td className="px-4 py-3 whitespace-nowrap text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button
@@ -574,92 +935,215 @@ export default function PricelistPage() {
         </div>
       </div>
 
-      {/* Upload Modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-lg w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Import from Excel</h2>
-                <button
-                  onClick={() => setShowUploadModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
-                </button>
+      {/* Add Item Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold">Add New Item - {activeTab}</h2>
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setNewItemForm({});
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+      
+            <div className="p-6 space-y-4">
+              {/* Common Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Item Code *
+                </label>
+                <input
+                  type="text"
+                  value={newItemForm.item_code || ''}
+                  onChange={(e) => setNewItemForm({...newItemForm, item_code: e.target.value.toUpperCase()})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                  placeholder="e.g., 30B"
+                  required
+                />
               </div>
-
-              <form onSubmit={handleFileUpload} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Importing to: <span className="font-bold">{activeTab}</span>
-                  </label>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Excel File
-                  </label>
-                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-900 transition">
-                    <div className="space-y-1 text-center">
-                      <FileSpreadsheet className="mx-auto h-12 w-12 text-gray-400" />
-                      <div className="flex text-sm text-gray-600">
-                        <label className="relative cursor-pointer bg-white rounded-md font-medium text-gray-900 hover:text-gray-700">
-                          <span>Upload a file</span>
+      
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Item Name *
+                </label>
+                <input
+                  type="text"
+                  value={newItemForm.item_name || ''}
+                  onChange={(e) => setNewItemForm({...newItemForm, item_name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                  placeholder="e.g., Base Unit 300mm"
+                  required
+                />
+              </div>
+      
+              {/* Kitchen/Bedrooms: Multiple Door Type Prices */}
+              {activeTab !== 'Appliances' && (
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-medium text-gray-900 mb-3">Prices by Door Type</h3>
+                  <p className="text-xs text-gray-500 mb-4">Enter prices for each door type (at least one required)</p>
+                  
+                  <div className="space-y-3">
+                    {doorTypes.map(doorType => (
+                      <div key={doorType} className="flex items-center gap-3">
+                        <label className="w-48 text-sm text-gray-700">{doorType}</label>
+                        <div className="flex-1 relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">£</span>
                           <input
-                            type="file"
-                            accept=".xlsx,.xls"
-                            onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                            className="sr-only"
+                            type="number"
+                            step="0.01"
+                            value={newItemForm.prices?.[doorType] || ''}
+                            onChange={(e) => setNewItemForm({
+                              ...newItemForm,
+                              prices: {
+                                ...newItemForm.prices,
+                                [doorType]: e.target.value
+                              }
+                            })}
+                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                            placeholder="0.00"
                           />
-                        </label>
-                        <p className="pl-1">or drag and drop</p>
+                        </div>
                       </div>
-                      <p className="text-xs text-gray-500">XLSX or XLS files only</p>
-                      {uploadFile && (
-                        <p className="text-sm text-gray-900 font-medium">
-                          Selected: {uploadFile.name}
-                        </p>
-                      )}
-                    </div>
+                    ))}
                   </div>
                 </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
-                    <strong>Note:</strong> Items will be created for each door type found in the Excel file. 
-                    Existing items will be updated.
-                  </p>
+              )}
+      
+              {/* Appliances: Brand and Series */}
+              {activeTab === 'Appliances' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Brand *
+                    </label>
+                    <select
+                      value={newItemForm.brand || ''}
+                      onChange={(e) => setNewItemForm({...newItemForm, brand: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                      required
+                    >
+                      <option value="">Select brand...</option>
+                      {brands.filter(b => b !== 'All').map(brand => (
+                        <option key={brand} value={brand}>{brand}</option>
+                      ))}
+                    </select>
+                  </div>
+      
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Series Level *
+                    </label>
+                    <select
+                      value={newItemForm.series_level || ''}
+                      onChange={(e) => setNewItemForm({...newItemForm, series_level: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                      required
+                    >
+                      <option value="">Select series...</option>
+                      {applianceSeries.map(series => (
+                        <option key={series} value={series}>{series}</option>
+                      ))}
+                    </select>
+                  </div>
+      
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Series Info (e.g., S6, iQ700, N90)
+                    </label>
+                    <input
+                      type="text"
+                      value={newItemForm.series_info || ''}
+                      onChange={(e) => setNewItemForm({...newItemForm, series_info: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                      placeholder="e.g., S6, iQ700, N90"
+                    />
+                  </div>
+      
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Price (£) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newItemForm.base_price || ''}
+                      onChange={(e) => setNewItemForm({...newItemForm, base_price: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+      
+              {/* Dimensions - Not for Appliances */}
+              {activeTab !== 'Appliances' && (
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Width (mm)
+                    </label>
+                    <input
+                      type="number"
+                      value={newItemForm.width || ''}
+                      onChange={(e) => setNewItemForm({...newItemForm, width: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                      placeholder="300"
+                    />
+                  </div>
+      
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Height (mm)
+                    </label>
+                    <input
+                      type="number"
+                      value={newItemForm.height || ''}
+                      onChange={(e) => setNewItemForm({...newItemForm, height: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                      placeholder="720"
+                    />
+                  </div>
+      
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Depth (mm)
+                    </label>
+                    <input
+                      type="number"
+                      value={newItemForm.depth || ''}
+                      onChange={(e) => setNewItemForm({...newItemForm, depth: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                      placeholder="570"
+                    />
+                  </div>
                 </div>
-
-                <div className="flex items-center gap-4 pt-4 border-t">
-                  <button
-                    type="button"
-                    onClick={() => setShowUploadModal(false)}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-                    disabled={uploading}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!uploadFile || uploading}
-                    className="flex-1 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {uploading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4" />
-                        Upload
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
+              )}
+            </div>
+      
+            <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setNewItemForm({});
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddItem}
+                disabled={saving}
+                className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition disabled:opacity-50"
+              >
+                {saving ? 'Adding...' : 'Add Item'}
+              </button>
             </div>
           </div>
         </div>

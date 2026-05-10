@@ -17,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
-// Assuming Kanban components are wrappers that might enforce React.Children.only
 import { KanbanBoard, KanbanCard, KanbanCards, KanbanHeader, KanbanProvider } from "@/components/ui/shadcn-io/kanban";
 import {
   Briefcase,
@@ -50,7 +49,6 @@ import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 
 // --- START OF STAGE AND ROLE DEFINITIONS ---
 
-// MODIFICATION 1: REMOVED "Consultation" and "Quoted"
 const STAGES = [
   "Lead",
   "Survey",
@@ -68,7 +66,6 @@ const STAGES = [
 
 type Stage = (typeof STAGES)[number];
 
-// MODIFICATION 2: REMOVED COLORS FOR "Consultation" and "Quoted"
 const stageColors: Record<Stage, string> = {
   Lead: "#6B7280",
   Survey: "#EC4899",
@@ -139,20 +136,10 @@ const calculateDaysInStage = (createdAt: string | null | undefined): number => {
   }
 };
 
-type UserRole = "Manager" | "HR" | "Sales" | "Production" | "Staff";
+type UserRole = "Platform Admin" | "Salesperson" | "Production Team" ;
 
 const ROLE_PERMISSIONS: Record<UserRole, any> = {
-  Manager: {
-    canCreate: true,
-    canEdit: true,
-    canDelete: true,
-    canViewFinancials: true,
-    canDragDrop: true,
-    canViewAllRecords: true, // Manager has full visibility
-    canSendQuotes: true,
-    canSchedule: true,
-  },
-  HR: {
+  "Platform Admin": {
     canCreate: true,
     canEdit: true,
     canDelete: true,
@@ -162,120 +149,73 @@ const ROLE_PERMISSIONS: Record<UserRole, any> = {
     canSendQuotes: true,
     canSchedule: true,
   },
-  Sales: {
+  Salesperson: {
     canCreate: true,
     canEdit: true,
-    canDelete: false,
+    canDelete: true,
     canViewFinancials: true,
     canDragDrop: true,
-    canViewAllRecords: false,
+    canViewAllRecords: true,
     canSendQuotes: true,
-    canSchedule: false,
+    canSchedule: true,
   },
-  Production: {
+  "Production Team": {
     canCreate: false,
     canEdit: true,
     canDelete: false,
     canViewFinancials: false,
     canDragDrop: true,
     canViewAllRecords: true,
-    canSendQuotes: false,
-    canSchedule: false,
-  },
-  Staff: {
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-    canViewFinancials: false,
-    canDragDrop: false,
-    canViewAllRecords: false,
     canSendQuotes: false,
     canSchedule: false,
   },
 };
 
-const PRODUCTION_STAGES: Stage[] = [
-  "Accepted",
-  "Ordered",
-  "Production",
-  "Delivery",
-  "Installation",
-  "Complete",
-  "Remedial",
-];
-
-// --- END OF STAGE AND ROLE DEFINITIONS ---
-
-// Updated types based on your backend models
+// Updated types for new schema
 type Customer = {
   id: string;
   name: string;
-  address?: string | null;
-  postcode?: string | null;
+  contact_name?: string | null;
   phone?: string | null;
   email?: string | null;
-  contact_made: "Yes" | "No" | "Unknown";
-  preferred_contact_method?: "Phone" | "Email" | "WhatsApp" | null;
-  marketing_opt_in: boolean;
-  date_of_measure?: string | null;
-  stage: Stage;
-  notes?: string | null;
-  project_types?: string[] | null;
-  salesperson?: string | null;
-  status: string;
+  stage?: Stage;
+  is_allocated?: boolean;
+  is_cleansed?: boolean;
   created_at?: string | null;
-  created_by?: string | null;
-  updated_at?: string | null;
-  updated_by?: string | null;
 };
 
-// Merged Job/Project Type for clarity in pipeline data
-type Job = {
+type Project = {
   id: string;
-  customer_id: string;
-  job_reference?: string | null;
-  job_name?: string | null; // This will hold the project_name for Project items
-  job_type: "Kitchen" | "Bedroom" | "Wardrobe" | "Remedial" | "Other"; // Project type maps here
-  stage: Stage;
-  quote_price?: number | null;
-  agreed_price?: number | null;
-  sold_amount?: number | null;
-  deposit1?: number | null;
-  deposit2?: number | null;
-  delivery_date?: string | null;
-  measure_date?: string | null;
-  completion_date?: string | null;
-  installation_address?: string | null;
-  notes?: string | null;
-  salesperson_name?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  deposit1_paid?: boolean; // Added for the pipeline item
-  deposit2_paid?: boolean; // Added for the pipeline item
+  title: string;
+  description?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  status: string;
+};
+
+type Opportunity = {
+  id: string;
+  title: string;
+  description?: string | null;
+  process_stage?: string | null;
+  value?: number | null;
+  start_date?: string | null;
+  end_date?: string | null;
 };
 
 // Combined type for pipeline display
 type PipelineItem = {
-  id: string; // Can be customer-uuid, job-uuid, or project-uuid
-  type: "customer" | "job" | "project"; // 'job' covers both real Job models and Project models for display purposes
+  id: string; // Format: "project-{uuid}", "opportunity-{uuid}", or "client-{uuid}"
+  type: "client" | "project" | "opportunity";
   customer: Customer;
-  job?: Job; // Job model or Project model fields mapped here
+  project?: Project;
+  opportunity?: Opportunity;
   // Display fields
   reference: string;
-  name: string; // Customer name OR Customer Name - Project Name
+  name: string;
   stage: Stage;
-  jobType?: string;
-  quotePrice?: number | null;
-  agreedPrice?: number | null;
-  soldAmount?: number | null;
-  deposit1?: number | null;
-  deposit2?: number | null;
-  deposit1Paid?: boolean;
-  deposit2Paid?: boolean;
-  measureDate?: string | null;
-  deliveryDate?: string | null;
-  salesperson?: string | null;
-   project_count?: number; 
+  jobType?: string; // Project/Opportunity type (Kitchen, Bedroom, etc.)
+  project_count?: number;
 };
 
 type AuditLog = {
@@ -287,14 +227,6 @@ type AuditLog = {
   changed_at: string;
   change_summary: string;
 };
-
-
-const makeColumns = () =>
-  STAGES.map((name) => ({
-    id: `col-${name.toLowerCase().replace(/\s+/g, "-")}`,
-    name,
-    color: stageColors[name],
-  }));
 
 const columnIdToStage = (colId: string): Stage => {
   const stage = STAGES.find((s) => `col-${s.toLowerCase().replace(/\s+/g, "-")}` === colId);
@@ -313,17 +245,15 @@ export default function EnhancedPipelinePage() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"kanban" | "list">("kanban");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterSalesperson, setFilterSalesperson] = useState("all");
   const [filterStage, setFilterStage] = useState("all");
   const [filterType, setFilterType] = useState("all");
-  const [filterDateRange, setFilterDateRange] = useState("all");
   const { user, token, loading: authLoading } = useAuth();
   const [editDialog, setEditDialog] = useState<{
     open: boolean;
     itemId: string | null;
     newStage?: Stage;
     reason?: string;
-    itemType?: "customer" | "job" | "project";
+    itemType?: "client" | "project" | "opportunity";
   }>({
     open: false,
     itemId: null,
@@ -337,14 +267,12 @@ export default function EnhancedPipelinePage() {
   const userRole = (user?.role || "Staff") as UserRole;
   const permissions = ROLE_PERMISSIONS[userRole as keyof typeof ROLE_PERMISSIONS] || ROLE_PERMISSIONS.Staff;
 
-  // MODIFICATION 3: Filter visible stages/columns based on user role
+  // Filter visible stages/columns based on user role
   const visibleStages: Stage[] = useMemo(() => {
-    // ✅ Production role only sees post-acceptance stages
-    if (userRole === "Production") {
+    if (userRole === "Production Team") {
       return ["Accepted", "Ordered", "Production", "Delivery", "Installation", "Complete", "Remedial"] as Stage[];
     }
     
-    // All other roles see all stages
     return STAGES as unknown as Stage[];
   }, [userRole]);
 
@@ -355,16 +283,9 @@ export default function EnhancedPipelinePage() {
       color: stageColors[name],
     }));
   }, [visibleStages]);
-  // END MODIFICATION 3
 
-  // Helper function to create a standardized user ID for comparison
-  const getStandardUserId = (value: string | null | undefined): string => {
-    return (value || "").toLowerCase().trim();
-  };
-  
   // Helper function to check if user can access an item
   const canUserAccessItem = (item: PipelineItem): boolean => {
-    // ✅ FIX 1: Show all records to all logged-in users.
     if (!user) {
       return false;
     }
@@ -375,16 +296,14 @@ export default function EnhancedPipelinePage() {
   const canUserEditItem = (item: PipelineItem): boolean => {
     if (!permissions.canEdit) return false;
 
-    if (userRole === "Manager" || userRole === "HR" || userRole === "Production") {
+    if (userRole === "Platform Admin" || userRole === "Salesperson" || userRole === "Production Team") {
       return true;
     }
 
-    if (userRole === "Sales") {
-      const standardItemSalesperson = getStandardUserId(item.salesperson);
-      const standardUserEmail = getStandardUserId(user?.email);
-      const standardUserName = getStandardUserId(user?.name);
-
-      return standardItemSalesperson === standardUserEmail || standardItemSalesperson === standardUserName;
+    // Sales can only edit their own items
+    if (userRole === "Salesperson") {
+      // TODO: Add salesperson check when that field is available
+      return true;
     }
 
     return false;
@@ -393,44 +312,32 @@ export default function EnhancedPipelinePage() {
   // Function to map PipelineItem to Kanban features
   const mapPipelineToFeatures = useCallback((items: PipelineItem[]) => {
     return items.map((item) => {
-      const { notes: customerNotes, ...customerWithoutNotes } = item.customer;
-      const jobWithoutNotes = item.job ? (({ notes: jobNotes, ...rest }) => rest)(item.job) : undefined;
-
-      const isProjectItem = item.id.startsWith("project-");
+      const isProjectItem = item.type === "project";
+      const isOpportunityItem = item.type === "opportunity";
       
-      const jobName = isProjectItem 
-        ? `${item.customer.name} - ${item.job?.job_name || "Project"}` 
-        : item.customer.name;
-      
-      const jobReference = isProjectItem
-        ? item.job?.job_reference || `PROJ-${item.job?.id?.slice(-4).toUpperCase() || "NEW"}`
-        : item.job?.job_reference || `JOB-${item.job?.id?.slice(-4).toUpperCase() || "NEW"}`;
+      let displayName = item.customer.name;
+      if (isProjectItem && item.project) {
+        displayName = `${item.customer.name} - ${item.project.title}`;
+      } else if (isOpportunityItem && item.opportunity) {
+        displayName = `${item.customer.name} - ${item.opportunity.title}`;
+      }
 
       return {
         id: item.id,
-        name: `${jobReference} — ${jobName}`,
+        name: `${item.reference} — ${displayName}`,
         column: stageToColumnId(item.stage),
         itemId: item.id,
-        itemType: isProjectItem ? "project" : item.type,
-        customer: customerWithoutNotes,
-        job: jobWithoutNotes,
-        reference: jobReference,
+        itemType: item.type,
+        customer: item.customer,
+        project: item.project,
+        opportunity: item.opportunity,
+        reference: item.reference,
         stage: item.stage,
-        jobType: item.jobType,
-        quotePrice: item.quotePrice,
-        agreedPrice: item.agreedPrice,
-        soldAmount: item.soldAmount,
-        deposit1: item.deposit1,
-        deposit2: item.deposit2,
-        deposit1Paid: item.deposit1Paid,
-        deposit2Paid: item.deposit2Paid,
-        measureDate: item.measureDate,
-        deliveryDate: item.deliveryDate,
-        salesperson: item.salesperson,
+        jobType: item.jobType, // Pass through the job type
         project_count: item.project_count || 0,
       };
     });
-  }, []); // Empty deps - function doesn't need to change
+  }, []);
 
   // Fetch data from backend
   useEffect(() => {
@@ -450,32 +357,19 @@ export default function EnhancedPipelinePage() {
       try {
         setLoading(true);
         setError(null);
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-        const pipelineResponse = await fetch(`${BACKEND_URL}/pipeline`,
-          {
-            headers: {
-              "Authorization": `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            signal: controller.signal,
-          }
-        );
-
-        clearTimeout(timeoutId);
-
+ 
+        const pipelineResponse = await fetchWithAuth("pipeline");
+ 
         if (!pipelineResponse.ok) {
           throw new Error(`Failed to fetch: ${pipelineResponse.status}`);
         }
-
+ 
         const rawPipelineData = await pipelineResponse.json();
         
         if (isCancelled) return;
         
         processPipelineData(rawPipelineData);
-
+ 
       } catch (err: any) {
         if (isCancelled) return;
         
@@ -490,9 +384,9 @@ export default function EnhancedPipelinePage() {
         }
       }
     };
-
+ 
     fetchData();
-
+ 
     return () => {
       isCancelled = true;
     };
@@ -500,70 +394,67 @@ export default function EnhancedPipelinePage() {
 
   // Extract the data processing logic into a separate function
   const processPipelineData = useCallback((rawPipelineData: any[]) => {
-    // Use requestAnimationFrame for non-blocking UI updates
     requestAnimationFrame(() => {
       const pipelineItemsRetrieved = rawPipelineData
         .map((item: any) => {
           const isProjectItem = item.id.startsWith("project-");
+          const isOpportunityItem = item.id.startsWith("opportunity-");
+          const isClientItem = item.id.startsWith("client-");
+          
           const backendStage = item.stage?.trim() || "Lead";
           const validStage = STAGES.includes(backendStage as Stage) ? backendStage : "Lead" as Stage;
+
+          // Generate reference based on type
+          let reference = "";
+          let jobType = undefined;
+          
+          if (isProjectItem) {
+            const projectId = String(item.project?.id || '').slice(-4).toUpperCase();
+            reference = `PROJ-${projectId}`;
+            // Extract project type from project data
+            jobType = item.project?.project_type || item.project?.type;
+          } else if (isOpportunityItem) {
+            const oppId = String(item.opportunity?.id || '').slice(-4).toUpperCase();
+            reference = `OPP-${oppId}`;
+            // Extract opportunity type if available
+            jobType = item.opportunity?.opportunity_type || item.opportunity?.type;
+          } else {
+            const clientId = String(item.customer?.id || '').slice(-4).toUpperCase();
+            reference = `CLIENT-${clientId}`;
+            // ✅ For pure clients, extract from customer.project_types array
+            if (item.customer?.project_types && Array.isArray(item.customer.project_types) && item.customer.project_types.length > 0) {
+              jobType = item.customer.project_types.join(", ");
+            }
+          }
 
           const commonItem = {
             id: item.id,
             customer: item.customer,
-            name: item.customer.name,
-            salesperson: item.job?.salesperson_name || item.customer.salesperson,
-            measureDate: item.job?.measure_date || item.customer.date_of_measure,
             stage: validStage,
+            reference,
+            jobType,
           };
 
-          if (item.type === "customer") {
+          if (isProjectItem && item.project) {
             return {
               ...commonItem,
-              type: "customer" as const,
-              reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
-              jobType: item.customer.project_types?.join(", "),
-              project_count: item.project_count || 0,
+              type: "project" as const,
+              project: item.project,
+              name: `${item.customer.name} - ${item.project.title}`,
+            };
+          } else if (isOpportunityItem && item.opportunity) {
+            return {
+              ...commonItem,
+              type: "opportunity" as const,
+              opportunity: item.opportunity,
+              name: `${item.customer.name} - ${item.opportunity.title}`,
             };
           } else {
-            const projectData = item.project || item.job;
-            
-            if (!projectData) {
-              return {
-                ...commonItem,
-                type: "customer" as const,
-                reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
-                jobType: item.customer.project_types?.join(", "),
-                project_count: item.project_count || 0,
-              };
-            }
-
-            const jobReference = isProjectItem
-              ? projectData.job_reference || `PROJ-${projectData.id?.slice(-4).toUpperCase() || "NEW"}`
-              : projectData.job_reference || `JOB-${projectData.id?.slice(-4).toUpperCase() || "NEW"}`;
-
-            const jobName = isProjectItem 
-              ? `${item.customer.name} - ${projectData.project_name || projectData.job_name || "Project"}` 
-              : item.customer.name;
-
             return {
               ...commonItem,
-              type: isProjectItem ? ("project" as const) : ("job" as const),
-              job: projectData,
-              name: jobName,
-              reference: jobReference,
-              stage: validStage as Stage,
-              jobType: projectData.project_type || projectData.job_type,
-              quotePrice: projectData.quote_price,
-              agreedPrice: projectData.agreed_price,
-              soldAmount: projectData.sold_amount,
-              deposit1: projectData.deposit1,
-              deposit2: projectData.deposit2,
-              deposit1Paid: projectData.deposit1_paid || false,
-              deposit2Paid: projectData.deposit2_paid || false,
-              deliveryDate: projectData.delivery_date,
-              measureDate: projectData.date_of_measure || projectData.measure_date,
-              salesperson: projectData.salesperson_name || item.customer.salesperson,
+              type: "client" as const,
+              name: item.customer.name,
+              project_count: item.project_count || 0,
             };
           }
         })
@@ -579,122 +470,149 @@ export default function EnhancedPipelinePage() {
     });
   }, [mapPipelineToFeatures]);
 
-
   const handleDataChange = async (next: any[]) => {
-      console.log("=".repeat(60));
-      console.log("🎯 DRAG DETECTED - Starting handleDataChange");
-      
-      if (!permissions.canDragDrop) {
-        console.warn("⛔ User doesn't have drag permission");
-        alert("You don't have permission to move items in the pipeline.");
-        return;
+    console.log("=".repeat(60));
+    console.log("🎯 DRAG DETECTED - Starting handleDataChange");
+    console.log("📊 Received next array:", next.length, "items");
+    
+    if (!permissions.canDragDrop) {
+      console.warn("⛔ User doesn't have drag permission");
+      alert("You don't have permission to move items in the pipeline.");
+      return;
+    }
+
+    const prev = prevFeaturesRef.current;
+    console.log("📊 Previous array:", prev.length, "items");
+    
+    // Add detailed comparison logging
+    const moved = next.filter((n) => {
+      const p = prev.find((x) => x.id === n.id);
+      if (!p) {
+        console.log(`⚠️ Item ${n.id} not found in previous state`);
+        return false;
+      }
+      const hasMoved = p.column !== n.column;
+      if (hasMoved) {
+        console.log(`✅ MOVED: ${n.id} from "${p.column}" to "${n.column}"`);
+      } else {
+        console.log(`⏭️ SAME: ${n.id} stayed in "${n.column}"`);
+      }
+      return hasMoved;
+    });
+    
+    console.log("📊 Total items that moved:", moved.length);
+    
+    if (moved.length === 0) {
+      console.log("⚠️ No items detected as moved - exiting");
+      console.log("💡 This might be a reorder within the same column");
+      return;
+    }
+
+    console.log("🎯 Moved items details:");
+    moved.forEach(item => {
+      const newStage = columnIdToStage(item.column);
+      console.log(`  - ${item.name}: ${item.column} → Stage: ${newStage}`);
+    });
+
+    // Create stage updates map
+    const stageUpdates = new Map(
+      moved.map((item) => [item.itemId, columnIdToStage(item.column)]),
+    );
+
+    // Check for unauthorized moves
+    const unauthorizedMoves = moved.filter((item) => {
+      const originalItem = pipelineItems.find((pi) => pi.id === item.itemId);
+      if (!originalItem) return true;
+      return !canUserEditItem(originalItem);
+    });
+
+    if (unauthorizedMoves.length > 0) {
+      console.error("❌ Unauthorized moves detected:", unauthorizedMoves);
+      alert("You don't have permission to move some of these items. Reverting changes.");
+      return;
+    }
+
+    // Take snapshots for potential rollback
+    const previousFeaturesSnapshot = prevFeaturesRef.current;
+    const previousPipelineSnapshot = pipelineItems;
+    console.log("📸 Snapshots taken for rollback");
+
+    // Optimistically update UI
+    console.log("🎨 Applying optimistic UI updates...");
+    const movedIds = new Set(moved.map((item) => item.id));
+    const nextById = new Map(next.map((item) => [item.id, item]));
+
+    const optimisticallyUpdatedFeatures = features.map((feature) => {
+      if (!movedIds.has(feature.id)) {
+        return feature;
       }
 
-      const prev = prevFeaturesRef.current;
-      const moved = next.filter((n) => {
-        const p = prev.find((x) => x.id === n.id);
-        const hasMoved = p && p.column !== n.column;
-        return hasMoved;
-      });
-      
-      if (moved.length === 0) {
-        console.log("⚠️ No items detected as moved - exiting");
-        return;
-      }
+      const nextFeature = nextById.get(feature.id);
+      const nextColumn = nextFeature?.column ?? feature.column;
+      const nextStage = stageUpdates.get(feature.itemId) ?? feature.stage;
 
-      // ✅ ADD THIS DEBUG CODE
-      console.log("🎯 Moved items details:");
-      moved.forEach(item => {
-        const newStage = columnIdToStage(item.column);
-        console.log(`  - ${item.name}: ${item.column} → Stage: ${newStage}`);
-      });
+      return {
+        ...feature,
+        column: nextColumn,
+        stage: nextStage,
+      };
+    });
 
-      // Create stage updates map
-      const stageUpdates = new Map(
-        moved.map((item) => [item.itemId, columnIdToStage(item.column)]),
-      );
+    setFeatures(optimisticallyUpdatedFeatures);
+    prevFeaturesRef.current = optimisticallyUpdatedFeatures;
 
-      // Check for unauthorized moves
-      const unauthorizedMoves = moved.filter((item) => {
-        const originalItem = pipelineItems.find((pi) => pi.id === item.itemId);
-        if (!originalItem) return true;
-        return !canUserEditItem(originalItem);
-      });
-
-      if (unauthorizedMoves.length > 0) {
-        console.error("❌ Unauthorized moves detected:", unauthorizedMoves);
-        alert("You don't have permission to move some of these items. Reverting changes.");
-        return;
-      }
-
-      // Take snapshots for potential rollback
-      const previousFeaturesSnapshot = prevFeaturesRef.current;
-      const previousPipelineSnapshot = pipelineItems;
-      console.log("📸 Snapshots taken for rollback");
-
-      // Optimistically update UI
-      console.log("🎨 Applying optimistic UI updates...");
-      const movedIds = new Set(moved.map((item) => item.id));
-      const nextById = new Map(next.map((item) => [item.id, item]));
-
-      const optimisticallyUpdatedFeatures = features.map((feature) => {
-        if (!movedIds.has(feature.id)) {
-          return feature;
+    setPipelineItems((current) =>
+      current.map((item) => {
+        const newStage = stageUpdates.get(item.id);
+        if (!newStage) {
+          return item;
         }
-
-        const nextFeature = nextById.get(feature.id);
-        const nextColumn = nextFeature?.column ?? feature.column;
-        const nextStage = stageUpdates.get(feature.itemId) ?? feature.stage;
-
         return {
-          ...feature,
-          column: nextColumn,
-          stage: nextStage,
+          ...item,
+          stage: newStage,
         };
-      });
+      }),
+    );
 
-      setFeatures(optimisticallyUpdatedFeatures);
-      prevFeaturesRef.current = optimisticallyUpdatedFeatures;
-
-      setPipelineItems((current) =>
-        current.map((item) => {
-          const newStage = stageUpdates.get(item.id);
-          if (!newStage) {
-            return item;
-          }
-          return {
-            ...item,
-            stage: newStage,
-          };
-        }),
-      );
-
-      console.log("✅ Optimistic UI updates applied");
-      console.log("📤 Starting API calls...");
+    console.log("✅ Optimistic UI updates applied");
+    console.log("📤 Starting API calls...");
 
     try {
       const updatePromises = moved.map(async (item) => {
         const newStage = columnIdToStage(item.column);
         
+        console.log(`📡 Processing item:`, {
+          itemId: item.itemId,
+          itemType: item.itemType,
+          column: item.column,
+          newStage
+        });
+        
         const isProject = item.itemId.startsWith("project-");
-        const isCustomer = item.itemId.startsWith("customer-");
-        const isJob = item.itemId.startsWith("job-");
+        const isOpportunity = item.itemId.startsWith("opportunity-");
+        const isClient = item.itemId.startsWith("client-");
 
         let entityId;
         let endpoint;
 
-        if (isJob) {
-          entityId = item.itemId.replace("job-", "");
-          endpoint = `jobs/${entityId}/stage`;
-        } else if (isProject) {
+        if (isProject) {
           entityId = item.itemId.replace("project-", "");
           endpoint = `projects/${entityId}/stage`;
-        } else if (isCustomer) {
-          entityId = item.itemId.replace("customer-", "");
-          endpoint = `customers/${entityId}/stage`;
+        } else if (isOpportunity) {
+          entityId = item.itemId.replace("opportunity-", "");
+          endpoint = `opportunities/${entityId}/stage`;
+        } else if (isClient) {
+          entityId = item.itemId.replace("client-", "");
+          endpoint = `clients/${entityId}/stage`;
         } else {
           throw new Error(`Unknown pipeline item type: ${item.itemId}`);
         }
+
+        console.log(`📡 API Call:`, {
+          endpoint,
+          method: 'PATCH',
+          stage: newStage
+        });
 
         const bodyData = {
           stage: newStage,
@@ -708,16 +626,22 @@ export default function EnhancedPipelinePage() {
         });
         
         if (!response.ok) {
-          throw new Error(`Failed to update ${item.itemType} ${entityId}`);
+          const errorText = await response.text();
+          console.error(`❌ API Error:`, {
+            endpoint,
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+          throw new Error(`Failed to update ${item.itemType} ${entityId}: ${response.status} ${errorText}`);
         }
 
-        return await response.json();
+        const result = await response.json();
+        console.log(`✅ Successfully updated ${item.itemId}`);
+        return result;
       });
 
       await Promise.all(updatePromises);
-      
-      // ✅ DON'T REFETCH - Optimistic update is enough
-      // await refetchPipelineData();
       
       console.log("✅ Stage updates completed");
 
@@ -738,79 +662,7 @@ export default function EnhancedPipelinePage() {
       const pipelineResponse = await fetchWithAuth("pipeline");
       if (pipelineResponse.ok) {
         const pipelineData = await pipelineResponse.json();
-
-        const items = pipelineData.map((item: any) => {
-          const isProjectItem = item.id.startsWith("project-");
-
-          const backendStage = item.stage ? item.stage.trim() : "Lead";
-          const validStage = STAGES.includes(backendStage) ? backendStage : ("Lead" as Stage);
-
-          const commonItem = {
-            id: item.id,
-            customer: item.customer,
-            name: item.customer.name,
-            salesperson: item.job?.salesperson_name || item.customer.salesperson,
-            measureDate: item.job?.measure_date || item.customer.date_of_measure,
-            stage: validStage,
-          };
-
-          if (item.type === "customer") {
-            return {
-              ...commonItem,
-              type: "customer" as const,
-              reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
-              jobType: item.customer.project_types?.join(", "),
-              project_count: item.project_count || 0,
-            };
-          } else {
-            // ✅ CRITICAL FIX: Safety check for missing job data
-            if (!item.job) {
-                // If malformed, treat it as a customer item for safety and display
-                 return {
-                    ...commonItem,
-                    type: "customer" as const, // Force type to customer for safe rendering
-                    reference: `CUST-${item.customer.id.slice(-4).toUpperCase()}`,
-                    jobType: item.customer.project_types?.join(", "),
-                    project_count: item.project_count || 0,
-                };
-            }
-
-            const jobStage = validStage;
-
-            // ✅ SAFE ACCESS
-            const jobReference = isProjectItem
-              ? item.job.job_reference || `PROJ-${item.job.id?.slice(-4).toUpperCase() || 'NEW'}`
-              : item.job.job_reference || `JOB-${item.job.id?.slice(-4).toUpperCase() || 'NEW'}`;
-
-            const jobName = isProjectItem ? `${item.customer.name} - ${item.job.job_name || 'Project'}` : item.customer.name;
-
-            return {
-              ...commonItem,
-              type: isProjectItem ? ("project" as const) : ("job" as const),
-              job: item.job,
-              name: jobName,
-              reference: jobReference,
-              stage: jobStage as Stage,
-              jobType: item.job.job_type,
-              quotePrice: item.job.quote_price,
-              agreedPrice: item.job.agreed_price,
-              soldAmount: item.job.sold_amount,
-              deposit1: item.job.deposit1,
-              deposit2: item.job.deposit2,
-              deposit1Paid: item.job.deposit1_paid || false,
-              deposit2Paid: item.job.deposit2_paid || false,
-              deliveryDate: item.job.delivery_date,
-              measureDate: item.job.measure_date,
-            };
-          }
-        }).filter(Boolean); // Filter out nulls
-
-        const filteredItems = items.filter((item: PipelineItem) => canUserAccessItem(item));
-        setPipelineItems(filteredItems);
-
-        const updatedFeatures = mapPipelineToFeatures(filteredItems);
-        setFeatures(updatedFeatures);
-        prevFeaturesRef.current = updatedFeatures;
+        processPipelineData(pipelineData);
       }
     } catch (pipelineError) {
       console.log("Pipeline refetch failed, using last known state.");
@@ -825,34 +677,19 @@ export default function EnhancedPipelinePage() {
         !searchTerm ||
         item.customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.customer.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.customer.phone?.toLowerCase().includes(searchTerm.toLowerCase());
+        item.customer.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.customer.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesSalesperson = filterSalesperson === "all" || item.salesperson === filterSalesperson;
-      
       const matchesStage = filterStage === "all" || item.stage === filterStage;
       const isVisibleStage = visibleStages.includes(item.stage as Stage);
 
-      const matchesType = filterType === "all" || item.jobType === filterType;
-
-      const matchesDateRange = () => {
-        const today = new Date();
-        const measureDate = item.measureDate ? new Date(item.measureDate) : null;
-        if (filterDateRange === "today") {
-          return measureDate && measureDate.toDateString() === today.toDateString();
-        } else if (filterDateRange === "week") {
-          return measureDate && isWithinInterval(measureDate, { start: today, end: addDays(today, 7) });
-        } else if (filterDateRange === "month") {
-          return measureDate && measureDate.getMonth() === today.getMonth();
-        }
-        return true; // "all"
-      };
+      const matchesType = filterType === "all" || item.itemType === filterType;
 
       const matchesVisibility = visibleStages.includes(item.stage as Stage); 
 
-      return matchesSearch && matchesSalesperson && matchesStage && matchesType && matchesDateRange() && matchesVisibility;
+      return matchesSearch && matchesStage && matchesType && matchesVisibility;
     });
-  }, [features, searchTerm, filterSalesperson, filterStage, filterType, filterDateRange, loading, visibleStages]);
+  }, [features, searchTerm, filterStage, filterType, loading, visibleStages]);
 
   const filteredListItems = useMemo(() => {
     return pipelineItems.filter((item) => {
@@ -860,50 +697,30 @@ export default function EnhancedPipelinePage() {
         !searchTerm ||
         item.customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.customer.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.customer.phone?.toLowerCase().includes(searchTerm.toLowerCase());
+        item.customer.phone?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.customer.email?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesSalesperson = filterSalesperson === "all" || item.salesperson === filterSalesperson;
       const matchesStage = filterStage === "all" || item.stage === filterStage;
-      const matchesType = filterType === "all" || item.jobType === filterType;
+      const matchesType = filterType === "all" || item.type === filterType;
       
       const isVisibleStage = visibleStages.includes(item.stage as Stage);
       const matchesVisibility = isVisibleStage;
 
-      const matchesDateRange = () => {
-        const today = new Date();
-        const measureDate = item.measureDate ? new Date(item.measureDate) : null;
-        if (filterDateRange === "today") {
-          return measureDate && measureDate.toDateString() === today.toDateString();
-        } else if (filterDateRange === "week") {
-          return measureDate && isWithinInterval(measureDate, { start: today, end: addDays(today, 7) });
-        } else if (filterDateRange === "month") {
-          return measureDate && measureDate.getMonth() === today.getMonth();
-        }
-        return true; // "all"
-      };
-
-      return matchesSearch && matchesSalesperson && matchesStage && matchesType && matchesDateRange() && matchesVisibility;
+      return matchesSearch && matchesStage && matchesType && matchesVisibility;
     });
-  }, [pipelineItems, searchTerm, filterSalesperson, filterStage, filterType, filterDateRange, visibleStages]);
+  }, [pipelineItems, searchTerm, filterStage, filterType, visibleStages]);
 
-  const salespeople = useMemo(
-    () => [...new Set(pipelineItems.map((item) => item.salesperson).filter(Boolean))],
-    [pipelineItems],
+  const itemTypes = useMemo(
+    () => ["client", "project", "opportunity"],
+    [],
   );
 
-  const jobTypes = useMemo(
-    () => [...new Set(pipelineItems.map((item) => item.jobType).filter(Boolean))],
-    [pipelineItems],
-  );
-
-  // Quick stage change handler (no confirmation dialog, direct move)
+  // Quick stage change handler
   const handleQuickStageChange = async (
     itemId: string,
     newStage: Stage,
-    itemType: "customer" | "job" | "project"
+    itemType: "client" | "project" | "opportunity"
   ) => {
-    // Check permissions
     const item = pipelineItems.find((i) => i.id === itemId);
     if (!item || !canUserEditItem(item)) {
       alert("You don't have permission to change the stage of this item.");
@@ -912,52 +729,33 @@ export default function EnhancedPipelinePage() {
 
     try {
       const isProject = itemId.startsWith("project-");
-      const isCustomer = itemId.startsWith("customer-");
-      const isJob = itemId.startsWith("job-");
+      const isOpportunity = itemId.startsWith("opportunity-");
+      const isClient = itemId.startsWith("client-");
 
       let entityId;
       let endpoint;
-      let method = "PATCH";
 
-      if (isJob) {
-        entityId = itemId.replace("job-", "");
-        endpoint = `jobs/${entityId}/stage`;
-      } else if (isProject) {
+      if (isProject) {
         entityId = itemId.replace("project-", "");
-        endpoint = `projects/${entityId}`;
-        method = "PUT";
-      } else if (isCustomer) {
-        entityId = itemId.replace("customer-", "");
-        endpoint = `customers/${entityId}/stage`;
+        endpoint = `projects/${entityId}/stage`;
+      } else if (isOpportunity) {
+        entityId = itemId.replace("opportunity-", "");
+        endpoint = `opportunities/${entityId}/stage`;
+      } else if (isClient) {
+        entityId = itemId.replace("client-", "");
+        endpoint = `clients/${entityId}/stage`;
       } else {
         throw new Error(`Unknown pipeline item type: ${itemId}`);
       }
 
-      // Get original item for project data
-      const originalItem = pipelineItems.find((pi) => pi.id === itemId);
-      let bodyData: any;
-
-      if (isProject) {
-        // For projects, send full data (PUT requires all fields)
-        bodyData = {
-          project_name: originalItem?.job?.job_name,
-          project_type: originalItem?.job?.job_type,
-          date_of_measure: originalItem?.job?.measure_date,
-          notes: originalItem?.job?.notes,
-          stage: newStage,
-          updated_by: user?.email || "current_user",
-        };
-      } else {
-        // For customers/jobs, send only stage update
-        bodyData = {
-          stage: newStage,
-          reason: "Rejected via quick button on Kanban board",
-          updated_by: user?.email || "current_user",
-        };
-      }
+      const bodyData = {
+        stage: newStage,
+        reason: "Rejected via quick button on Kanban board",
+        updated_by: user?.email || "current_user",
+      };
 
       const response = await fetchWithAuth(endpoint, {
-        method: method,
+        method: "PATCH",
         body: JSON.stringify(bodyData),
       });
 
@@ -979,9 +777,8 @@ export default function EnhancedPipelinePage() {
     itemId: string,
     newStage: Stage,
     reason: string,
-    itemType: "customer" | "job" | "project",
+    itemType: "client" | "project" | "opportunity",
   ) => {
-    // Check permissions
     const item = pipelineItems.find((i) => i.id === itemId);
     if (!item || !canUserEditItem(item)) {
       alert("You don't have permission to change the stage of this item.");
@@ -990,53 +787,33 @@ export default function EnhancedPipelinePage() {
 
     try {
       const isProject = itemId.startsWith("project-");
-      const isCustomer = itemId.startsWith("customer-");
-      const isJob = itemId.startsWith("job-");
+      const isOpportunity = itemId.startsWith("opportunity-");
+      const isClient = itemId.startsWith("client-");
 
       let entityId;
       let endpoint;
-      let method;
 
-      if (isJob) {
-        entityId = itemId.replace("job-", "");
-        endpoint = `jobs/${entityId}/stage`; 
-        method = "PATCH";
-      } else if (isProject) {
+      if (isProject) {
         entityId = itemId.replace("project-", "");
-        endpoint = `projects/${entityId}`; 
-        method = "PUT";
-      } else if (isCustomer) {
-        entityId = itemId.replace("customer-", "");
-        endpoint = `customers/${entityId}/stage`; 
-        method = "PATCH";
+        endpoint = `projects/${entityId}/stage`;
+      } else if (isOpportunity) {
+        entityId = itemId.replace("opportunity-", "");
+        endpoint = `opportunities/${entityId}/stage`;
+      } else if (isClient) {
+        entityId = itemId.replace("client-", "");
+        endpoint = `clients/${entityId}/stage`;
       } else {
         throw new Error(`Unknown pipeline item type: ${itemId}`);
       }
 
-      // Retrieve original item data to send full body for PUT requests (Projects)
-      const originalItem = pipelineItems.find((pi) => pi.id === itemId);
-      let bodyData: any;
-
-      if (isProject) {
-        bodyData = {
-          project_name: originalItem?.job?.job_name,
-          project_type: originalItem?.job?.job_type,
-          date_of_measure: originalItem?.job?.measure_date,
-          notes: originalItem?.job?.notes,
-          stage: newStage, // Update the stage
-          updated_by: user?.email || "current_user",
-        };
-      } else {
-        // For PATCH (Job/Customer), only send the stage and audit details.
-        bodyData = {
-          stage: newStage,
-          reason: reason,
-          updated_by: user?.email || "current_user",
-        };
-      }
+      const bodyData = {
+        stage: newStage,
+        reason: reason,
+        updated_by: user?.email || "current_user",
+      };
 
       const response = await fetchWithAuth(endpoint, {
-        method: method,
+        method: "PATCH",
         body: JSON.stringify(bodyData),
       });
 
@@ -1050,7 +827,7 @@ export default function EnhancedPipelinePage() {
       // Log audit entry
       const auditEntry: AuditLog = {
         audit_id: `audit-${Date.now()}`,
-        entity_type: isCustomer ? "Customer" : isProject ? "Project" : "Job",
+        entity_type: isClient ? "Client" : isProject ? "Project" : "Opportunity",
         entity_id: itemId,
         action: "update",
         changed_by: user?.email || "current_user",
@@ -1059,17 +836,6 @@ export default function EnhancedPipelinePage() {
       };
       setAuditLogs((prev) => [auditEntry, ...prev.slice(0, 4)]);
 
-      // Trigger automation for "Accepted" stage - only for real job entities
-      if (newStage === "Accepted" && isJob && permissions.canSendQuotes) {
-        try {
-          await fetchWithAuth(`invoices`, {
-            method: "POST",
-            body: JSON.stringify({ jobId: entityId, templateId: "default_invoice" }),
-          });
-        } catch (e) {
-          console.warn("Failed to create invoice automatically:", e);
-        }
-      }
     } catch (e) {
       console.error("Failed to update stage:", e);
       alert("Failed to update stage. Please try again.");
@@ -1077,7 +843,7 @@ export default function EnhancedPipelinePage() {
   };
 
   // Action handlers
-  const handleOpenItem = (itemId: string, itemType: "customer" | "job" | "project") => {
+  const handleOpenItem = (itemId: string, itemType: "client" | "project" | "opportunity") => {
     const item = pipelineItems.find((i) => i.id === itemId);
     
     if (!item) {
@@ -1087,26 +853,22 @@ export default function EnhancedPipelinePage() {
 
     let url = '';
     
-    if (itemType === "customer") {
-      // For customers, go to customer details page
-      url = `/dashboard/customers/${item.customer.id}`;
+    if (itemType === "client") {
+      url = `/dashboard/clients/${item.customer.id}`;
     } else if (itemType === "project") {
-      // ✅ For projects, extract the project UUID and go to project details page
       const projectId = itemId.replace("project-", "");
       url = `/dashboard/projects/${projectId}`;
-    } else if (itemType === "job") {
-      // For jobs, go to job details page
-      const jobId = itemId.replace("job-", "");
-      url = `/dashboard/jobs/${jobId}`;
+    } else if (itemType === "opportunity") {
+      const opportunityId = itemId.replace("opportunity-", "");
+      url = `/dashboard/opportunities/${opportunityId}`;
     }
     
-    // Open in new tab
     window.open(url, '_blank');
   };
 
   const handleOpenCustomer = (customerId: string) => {
-    const cleanId = customerId.replace('customer-', '');
-    router.push(`/dashboard/customers/${cleanId}`);
+    const cleanId = customerId.replace('client-', '');
+    router.push(`/dashboard/clients/${cleanId}`);
   };
 
   const handleCreateCustomer = () => {
@@ -1114,41 +876,9 @@ export default function EnhancedPipelinePage() {
       alert("You don't have permission to create new customers.");
       return;
     }
-    window.location.href = "/dashboard/customers/new";
+    window.location.href = "/dashboard/clients/new";
   };
 
-  const handleSendQuote = async (itemId: string) => {
-    if (!permissions.canSendQuotes) {
-      alert("You don't have permission to send quotes.");
-      return;
-    }
-
-    try {
-      const entityId = itemId.replace("job-", "").replace("customer-", "").replace("project-", "");
-      await fetchWithAuth(`jobs/${entityId}/quotes`, {
-        method: "POST",
-        body: JSON.stringify({ templateId: "default_quote" }),
-      });
-      alert("Quote sent successfully!");
-    } catch (e) {
-      console.error("Failed to send quote:", e);
-      alert("Failed to send quote. Please try again.");
-    }
-  };
-
-  const handleSchedule = (itemId: string) => {
-    if (!permissions.canSchedule) {
-      alert("You don't have permission to schedule items.");
-      return;
-    }
-    console.log("Scheduling for item:", itemId);
-  };
-
-  const handleViewDocuments = (itemId: string) => {
-    console.log("Viewing documents for item:", itemId);
-  };
-
-  // MODIFICATION 4: Use visibleColumns for counts
   // Count per column for Kanban headers
   const counts = useMemo(() => {
     const map: Record<string, number> = {};
@@ -1158,7 +888,6 @@ export default function EnhancedPipelinePage() {
     }
     return map;
   }, [visibleColumns, filteredFeatures]);
-  // END MODIFICATION 4
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return "N/A";
@@ -1173,19 +902,16 @@ export default function EnhancedPipelinePage() {
   if (loading) {
     return (
       <div className="space-y-6 p-6">
-        {/* Header Skeleton */}
         <div className="flex items-center justify-between">
           <div className="h-9 w-48 bg-gray-200 rounded animate-pulse" />
           <div className="h-9 w-32 bg-gray-200 rounded animate-pulse" />
         </div>
 
-        {/* Filters Skeleton */}
         <div className="flex gap-4">
           <div className="h-10 w-64 bg-gray-200 rounded animate-pulse" />
           <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
         </div>
 
-        {/* Kanban Skeleton */}
         <div className="flex gap-4 overflow-x-auto">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="w-[300px] flex-shrink-0 space-y-3">
@@ -1222,26 +948,25 @@ export default function EnhancedPipelinePage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Sales Pipeline</h1>
         <div className="flex items-center gap-2">
-          {/* Show role badge */}
           <Badge variant="outline" className="text-xs">
-            {userRole} View (All Customers)
+            {userRole} View (All Records)
           </Badge>
 
           {permissions.canCreate && (
             <Button variant="outline" size="sm" onClick={() => setIsCreateCustomerModalOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
-              New Customer
+              New Client
             </Button>
           )}
         </div>
-        </div>
+      </div>
 
       {/* Search + Filters */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <Search className="text-muted-foreground h-4 w-4" />
           <Input
-            placeholder="Search by name, address, phone, reference..."
+            placeholder="Search by name, phone, email, reference..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-64"
@@ -1259,24 +984,7 @@ export default function EnhancedPipelinePage() {
             <DropdownMenuLabel>Filters</DropdownMenuLabel>
             <DropdownMenuSeparator />
 
-            {/* Salesperson filter - only show for users with full visibility */}
-            {permissions.canViewAllRecords && (
-              <Select value={filterSalesperson} onValueChange={setFilterSalesperson}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Salespeople" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Salespeople</SelectItem>
-                  {salespeople.map((person) => (
-                    <SelectItem key={person} value={person!}>
-                      {person}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* Stage filter - uses visibleStages */}
+            {/* Stage filter */}
             <Select value={filterStage} onValueChange={setFilterStage}>
               <SelectTrigger>
                 <SelectValue placeholder="All Stages" />
@@ -1291,31 +999,16 @@ export default function EnhancedPipelinePage() {
               </SelectContent>
             </Select>
 
-            {/* Job type filter */}
+            {/* Type filter */}
             <Select value={filterType} onValueChange={setFilterType}>
               <SelectTrigger>
-                <SelectValue placeholder="All Job Types" />
+                <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Job Types</SelectItem>
-                {jobTypes.map((type) => (
-                  <SelectItem key={type} value={type!}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Date range filter */}
-            <Select value={filterDateRange} onValueChange={setFilterDateRange}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Dates" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Dates</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="client">Clients</SelectItem>
+                <SelectItem value="project">Projects</SelectItem>
+                <SelectItem value="opportunity">Opportunities</SelectItem>
               </SelectContent>
             </Select>
           </DropdownMenuContent>
@@ -1340,11 +1033,10 @@ export default function EnhancedPipelinePage() {
               }}
             >
               <div className="flex h-full items-start gap-4 p-3" style={{ width: "max-content", minWidth: "100%" }}>
-                {/* Use visibleColumns for KanbanProvider */}
                 <KanbanProvider
                   columns={visibleColumns} 
                   data={filteredFeatures}
-                  onDataChange={permissions.canDragDrop ? handleDataChange : undefined}
+                  onDataChange={handleDataChange}
                 >
                   {(column) => (
                     <div key={column.id} className="flex-shrink-0">
@@ -1369,18 +1061,13 @@ export default function EnhancedPipelinePage() {
                                 id: feature.itemId,
                                 type: feature.itemType,
                                 customer: feature.customer,
-                                job: feature.job,
+                                project: feature.project,
+                                opportunity: feature.opportunity,
                                 reference: feature.reference,
                                 name: feature.customer.name,
                                 stage: feature.stage,
-                                jobType: feature.jobType,
-                                salesperson: feature.salesperson,
                               } as PipelineItem);
 
-                              // Get color scheme based on project type
-                              const colorScheme = getProjectTypeColor(feature.jobType);
-                              
-                              // Calculate days in stage
                               const daysInStage = calculateDaysInStage(feature.customer.created_at);
 
                               return (
@@ -1389,18 +1076,17 @@ export default function EnhancedPipelinePage() {
                                   id={feature.id}
                                   key={feature.id}
                                   name={feature.name}
-                                  className={`rounded-md border-2 ${colorScheme.border} ${colorScheme.bg} shadow-sm transition-all hover:shadow-md ${permissions.canDragDrop && isEditable ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-90"} p-3 overflow-hidden relative min-h-fit`}
+                                  className={`rounded-md border-2 ${getProjectTypeColor(feature.jobType).border} ${getProjectTypeColor(feature.jobType).bg} shadow-sm transition-all hover:shadow-md ${permissions.canDragDrop && isEditable ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-90"} p-3 overflow-hidden relative min-h-fit`}
                                   style={{ maxWidth: '100%', wordBreak: 'break-word' }}
                                 >
                                   <div className="space-y-2.5">
-                                    {/* Lock icon for non-editable items */}
                                     {!isEditable && (
                                       <div className="absolute top-2 right-2">
                                         <Lock className="h-3 w-3 text-gray-400" />
                                       </div>
                                     )}
 
-                                    {/* Project Type Badge(s) - AT THE TOP */}
+                                    {/* Room Type Badge (if available) - AT THE TOP */}
                                     {feature.jobType && (
                                       <div className="flex flex-wrap gap-1.5 mb-1">
                                         {feature.jobType.split(",").map((type: string, i: number) => {
@@ -1417,13 +1103,13 @@ export default function EnhancedPipelinePage() {
                                       </div>
                                     )}
 
-                                    {/* Customer Name - Large and Bold */}
+                                    {/* Customer/Client Name */}
                                     <div className="pr-6">
-                                      <h3 className={`text-base font-bold leading-tight ${colorScheme.text}`}>
+                                      <h3 className={`text-base font-bold leading-tight ${getProjectTypeColor(feature.jobType).text}`}>
                                         {feature.customer.name}
                                       </h3>
                                       
-                                      {/* Reference below name */}
+                                      {/* Reference */}
                                       <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-600">
                                         <span className="font-medium">{feature.reference}</span>
                                       </div>
@@ -1445,26 +1131,33 @@ export default function EnhancedPipelinePage() {
                                       )}
                                     </div>
 
-                                    {/* Project Name (if it's a project item) */}
-                                    {feature.itemType === "project" && feature.job?.job_name && (
-                                      <div className={`text-sm font-semibold ${colorScheme.text} flex items-center gap-1.5`}>
+                                    {/* Project/Opportunity Title */}
+                                    {feature.itemType === "project" && feature.project && (
+                                      <div className={`text-sm font-semibold ${getProjectTypeColor(feature.jobType).text} flex items-center gap-1.5`}>
                                         <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
-                                        <span>{feature.job.job_name}</span>
+                                        <span>{feature.project.title}</span>
                                       </div>
                                     )}
 
-                                    {/* Project Count Badge - only for customers with multiple projects */}
-                                    {feature.itemType === "customer" && feature.project_count > 1 && (
+                                    {feature.itemType === "opportunity" && feature.opportunity && (
+                                      <div className={`text-sm font-semibold ${getProjectTypeColor(feature.jobType).text} flex items-center gap-1.5`}>
+                                        <DollarSign className="h-3.5 w-3.5 flex-shrink-0" />
+                                        <span>{feature.opportunity.title}</span>
+                                      </div>
+                                    )}
+
+                                    {/* Project Count for clients */}
+                                    {feature.itemType === "client" && feature.project_count > 0 && (
                                       <div className="flex items-center gap-1">
                                         <Badge variant="secondary" className="text-xs px-2 py-0.5 flex items-center gap-1 bg-white/80 border border-gray-300">
                                           <FolderOpen className="h-3 w-3" />
-                                          <span>{feature.project_count} projects</span>
+                                          <span>{feature.project_count} project{feature.project_count > 1 ? 's' : ''}</span>
                                         </Badge>
                                       </div>
                                     )}
 
                                     {/* Contact Info */}
-                                    {(feature.customer.phone || feature.customer.email || feature.customer.address) && (
+                                    {(feature.customer.phone || feature.customer.email) && (
                                       <div className="space-y-1 text-xs text-gray-600">
                                         {feature.customer.phone && (
                                           <div className="flex items-center gap-2">
@@ -1478,81 +1171,11 @@ export default function EnhancedPipelinePage() {
                                             <span className="truncate">{feature.customer.email}</span>
                                           </div>
                                         )}
-                                        {feature.customer.address && (
-                                          <div className="flex items-center gap-2">
-                                            <MapPin className="h-3 w-3 flex-shrink-0 text-gray-500" />
-                                            <span className="truncate">{feature.customer.address}</span>
-                                          </div>
-                                        )}
                                       </div>
                                     )}
 
-                                    {/* Job Details */}
-                                    <div className="space-y-1 text-xs">
-                                      {feature.salesperson && (
-                                        <div className="flex items-center gap-2">
-                                          <Users className="h-3 w-3 flex-shrink-0 text-gray-500" />
-                                          <span className="truncate text-gray-700">{feature.salesperson}</span>
-                                        </div>
-                                      )}
-                                      {feature.measureDate && (
-                                        <div className="flex items-center gap-2">
-                                          <Calendar className="h-3 w-3 flex-shrink-0 text-gray-500" />
-                                          <span className="text-gray-700">Measure: {formatDate(feature.measureDate)}</span>
-                                        </div>
-                                      )}
-
-                                      {/* Financial information - only show if user has permission */}
-                                      {permissions.canViewFinancials && (
-                                        <>
-                                          {feature.quotePrice && (
-                                            <div className="flex items-center gap-2">
-                                              <DollarSign className="h-3 w-3 flex-shrink-0 text-gray-500" />
-                                              <span className="text-gray-700">Quote: £{feature.quotePrice.toFixed(2)}</span>
-                                            </div>
-                                          )}
-                                          {feature.agreedPrice && (
-                                            <div className="flex items-center gap-2">
-                                              <Check className="h-3 w-3 flex-shrink-0 text-green-500" />
-                                              <span className="text-gray-700">Agreed: £{feature.agreedPrice.toFixed(2)}</span>
-                                            </div>
-                                          )}
-                                          {feature.soldAmount && (
-                                            <div className="flex items-center gap-2">
-                                              <Check className="h-3 w-3 flex-shrink-0 text-green-500" />
-                                              <span className="text-gray-700">Sold: £{feature.soldAmount.toFixed(2)}</span>
-                                            </div>
-                                          )}
-                                          {feature.deposit1 && (
-                                            <div className="flex items-center gap-2">
-                                              <div
-                                                className={`h-2 w-2 flex-shrink-0 rounded-full ${feature.deposit1Paid ? "bg-green-500" : "bg-red-500"}`}
-                                              />
-                                              <span className="text-gray-700">Deposit 1: £{feature.deposit1.toFixed(2)}</span>
-                                            </div>
-                                          )}
-                                          {feature.deposit2 && (
-                                            <div className="flex items-center gap-2">
-                                              <div
-                                                className={`h-2 w-2 flex-shrink-0 rounded-full ${feature.deposit2Paid ? "bg-green-500" : "bg-red-500"}`}
-                                              />
-                                              <span className="text-gray-700">Deposit 2: £{feature.deposit2.toFixed(2)}</span>
-                                            </div>
-                                          )}
-                                        </>
-                                      )}
-
-                                      {feature.deliveryDate && (
-                                        <div className="flex items-center gap-2">
-                                          <Calendar className="h-3 w-3 flex-shrink-0 text-gray-500" />
-                                          <span className="text-gray-700">Delivery: {formatDate(feature.deliveryDate)}</span>
-                                        </div>
-                                      )}
-                                    </div>
-
                                     {/* Action Buttons */}
                                     <div className="flex gap-1 pt-2">
-                                      {/* Quick Reject Button */}
                                       {isEditable && feature.stage !== "Rejected" && (
                                         <Button
                                           size="sm"
@@ -1568,7 +1191,6 @@ export default function EnhancedPipelinePage() {
                                         </Button>
                                       )}
                                       
-                                      {/* View Button */}
                                       <Button
                                         size="sm"
                                         variant="ghost"
@@ -1577,7 +1199,7 @@ export default function EnhancedPipelinePage() {
                                           e.stopPropagation();
                                           handleOpenItem(feature.itemId, feature.itemType);
                                         }}
-                                        title={`Open ${feature.itemType === "customer" ? "Customer" : feature.itemType === "project" ? "Project" : "Job"}`}
+                                        title={`Open ${feature.itemType}`}
                                       >
                                         <Eye className="h-3 w-3" />
                                       </Button>
@@ -1597,25 +1219,17 @@ export default function EnhancedPipelinePage() {
           </div>
         </TabsContent>
 
-        {/* List View - updated to handle both customers and jobs */}
+        {/* List View */}
         <TabsContent value="list" className="mt-6">
           <div className="space-y-4">
             {/* Table Header */}
             <div className="bg-muted/50 grid grid-cols-12 gap-4 rounded-lg p-4 text-sm font-medium">
               <div>Type</div>
               <div>Reference</div>
-              <div className="col-span-2">Customer</div>
-              <div>Job Type</div>
-              <div>Salesperson</div>
+              <div className="col-span-3">Name</div>
+              <div className="col-span-2">Contact</div>
               <div>Stage</div>
-              {permissions.canViewFinancials && (
-                <>
-                  <div>Quote Price</div>
-                  <div>Sold Amount</div>
-                </>
-              )}
-              <div>Contact Made</div>
-              <div>Measure Date</div>
+              <div className="col-span-2">Dates</div>
               <div>Actions</div>
             </div>
 
@@ -1631,56 +1245,50 @@ export default function EnhancedPipelinePage() {
                 >
                   <div className="grid grid-cols-12 items-center gap-4 text-sm">
                     <div className="flex items-center gap-2">
-                      <Badge variant={item.type === "customer" ? "secondary" : "default"} className="text-xs">
-                        {item.type === "customer" ? "Customer" : item.type === "project" ? "Project" : "Job"}
+                      <Badge variant={item.type === "client" ? "secondary" : "default"} className="text-xs">
+                        {item.type === "client" ? "Client" : item.type === "project" ? "Project" : "Opportunity"}
                       </Badge>
                       {!isEditable && <Lock className="h-3 w-3 text-gray-400" />}
                     </div>
                     <div className="font-medium">{item.reference}</div>
-                    <div className="col-span-2">
+                    <div className="col-span-3">
                       <button
-                        className="cursor-pointer font-medium text-blue-600 hover:underline"
+                        className="cursor-pointer font-medium text-blue-600 hover:underline text-left"
                         onClick={() => handleOpenCustomer(item.customer.id)}
-                        title="View Customer Details"
+                        title="View Client Details"
                       >
-                        {item.customer.name}
+                        {item.name}
                       </button>
-                      {item.customer.phone && (
-                        <div className="text-muted-foreground text-xs">{item.customer.phone}</div>
-                      )}
-                      {item.customer.address && (
-                        <div className="text-muted-foreground truncate text-xs">{item.customer.address}</div>
-                      )}
-                      {/* Days in Stage in List View */}
-                      {item.customer.created_at && (
-                        <div className="mt-1 flex items-center gap-1 text-xs text-orange-600">
-                          <Clock className="h-3 w-3" />
-                          <span className="font-medium">{daysInStage} {daysInStage === 1 ? 'day' : 'days'} in {item.stage}</span>
+                      {item.type === "client" && item.project_count > 0 && (
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {item.project_count} project{item.project_count > 1 ? 's' : ''}
                         </div>
                       )}
                     </div>
-                    <div>{item.jobType && <Badge variant="outline">{item.jobType}</Badge>}</div>
-                    <div>{item.salesperson}</div>
+                    <div className="col-span-2">
+                      {item.customer.phone && (
+                        <div className="text-xs text-gray-600">{item.customer.phone}</div>
+                      )}
+                      {item.customer.email && (
+                        <div className="text-xs text-gray-500 truncate">{item.customer.email}</div>
+                      )}
+                    </div>
                     <div>
                       <Badge style={{ backgroundColor: stageColors[item.stage], color: "white" }}>{item.stage}</Badge>
                     </div>
-                    {permissions.canViewFinancials ? (
-                      <>
-                        <div>{item.quotePrice ? `£${item.quotePrice.toFixed(2)}` : "N/A"}</div>
-                        <div>{item.soldAmount ? `£${item.soldAmount.toFixed(2)}` : "N/A"}</div>
-                      </>
-                    ) : (
-                      <>
-                        {/* Spacers for Production staff who can't see financials */}
-                        <div className="col-span-2"></div>
-                      </>
-                    )}
-                    <div>
-                      <Badge variant={item.customer.contact_made === "Yes" ? "secondary" : "destructive"}>
-                        {item.customer.contact_made}
-                      </Badge>
+                    <div className="col-span-2">
+                      {item.customer.created_at && (
+                        <>
+                          <div className="text-xs text-gray-600">
+                            Added: {formatDate(item.customer.created_at)}
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-orange-600 mt-0.5">
+                            <Clock className="h-3 w-3" />
+                            <span className="font-medium">{daysInStage}d in stage</span>
+                          </div>
+                        </>
+                      )}
                     </div>
-                    <div>{formatDate(item.measureDate)}</div>
                     <div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -1689,36 +1297,16 @@ export default function EnhancedPipelinePage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenCustomer(item.customer.id)}>
-                            <Users className="mr-2 h-4 w-4" />
-                            View Customer
+                          <DropdownMenuItem onClick={() => handleOpenItem(item.id, item.type)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View {item.type === "client" ? "Client" : item.type === "project" ? "Project" : "Opportunity"}
                           </DropdownMenuItem>
                           
-                          {/* Conditional menu items based on permissions and stage */}
-                          {permissions.canSendQuotes &&
-                            isEditable &&
-                            (item.stage === "Quote" || item.stage === "Design") && ( 
-                              <DropdownMenuItem onClick={() => handleSendQuote(item.id)}>
-                                <Mail className="mr-2 h-4 w-4" />
-                                Send Quote
-                              </DropdownMenuItem>
-                            )}
-                          
-                          {permissions.canSchedule &&
-                            (item.stage === "Survey" || item.stage === "Installation" || item.stage === "Delivery") && (
-                              <DropdownMenuItem onClick={() => handleSchedule(item.id)}>
-                                <Calendar className="mr-2 h-4 w-4" />
-                                Schedule
-                              </DropdownMenuItem>
-                            )}
-                          
-                          {/* NEW: Change Stage submenu - shows all available stages */}
                           {permissions.canEdit && isEditable && (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuLabel>Change Stage</DropdownMenuLabel>
                               {visibleStages.filter(stage => stage !== item.stage).map((stage) => {
-                                // Get the stage color for visual indicator
                                 const stageColor = stageColors[stage];
                                 
                                 return (
@@ -1747,45 +1335,6 @@ export default function EnhancedPipelinePage() {
                       </DropdownMenu>
                     </div>
                   </div>
-
-                  {/* Additional Details */}
-                  {(item.customer.email || (permissions.canViewFinancials && (item.deposit1 || item.deposit2))) && (
-                    <div className="text-muted-foreground mt-3 border-t pt-3 text-xs">
-                      <div className="space-y-1">
-                        {item.customer.email && (
-                          <div>
-                            <span className="font-medium">Email: </span>
-                            {item.customer.email}
-                          </div>
-                        )}
-
-                        {permissions.canViewFinancials && (item.deposit1 || item.deposit2) && (
-                          <div className="flex gap-4">
-                            {item.deposit1 && (
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className={`h-2 w-2 rounded-full ${item.deposit1Paid ? "bg-green-500" : "bg-red-500"}`}
-                                />
-                                <span className={item.deposit1Paid ? "text-green-600" : "text-red-600"}>
-                                  Deposit 1: £{item.deposit1.toFixed(2)} ({item.deposit1Paid ? "Paid" : "Unpaid"})
-                                </span>
-                              </div>
-                            )}
-                            {item.deposit2 && (
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className={`h-2 w-2 rounded-full ${item.deposit2Paid ? "bg-green-500" : "bg-red-500"}`}
-                                />
-                                <span className={item.deposit2Paid ? "text-green-600" : "text-red-600"}>
-                                  Deposit 2: £{item.deposit2.toFixed(2)} ({item.deposit2Paid ? "Paid" : "Unpaid"})
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </Card>
               );
             })}
@@ -1797,13 +1346,13 @@ export default function EnhancedPipelinePage() {
                   <Briefcase className="mx-auto mb-4 h-12 w-12 opacity-50" />
                   <h3 className="mb-2 text-lg font-medium">No items found</h3>
                   <p>
-                    Try creating a new customer or check your connection.
+                    Try creating a new client or adjusting your filters.
                   </p>
                   <div className="mt-4 space-x-2">
                     {permissions.canCreate && (
                       <Button variant="outline" size="sm" onClick={handleCreateCustomer}>
                         <UserPlus className="mr-2 h-4 w-4" />
-                        Create New Customer (Lead)
+                        Create New Client
                       </Button>
                     )}
                   </div>
@@ -1859,7 +1408,6 @@ export default function EnhancedPipelinePage() {
         isOpen={isCreateCustomerModalOpen}
         onClose={() => setIsCreateCustomerModalOpen(false)}
         onCustomerCreated={async () => {
-          // Refetch pipeline data after customer is created
           await refetchPipelineData();
         }}
       />

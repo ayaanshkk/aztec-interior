@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Plus, Trash2, FileText, Download, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BACKEND_URL } from "@/lib/api";
 
@@ -15,64 +12,14 @@ interface QuoteItem {
   id: string;
   item: string;
   description: string;
-  colour: string;
+  color: string;
   quantity: number;
-  unitPrice: number;
   amount: number;
+  width?: number;
+  height?: number;
+  depth?: number;
+  line_total: number;
 }
-
-const VAT_RATE = 0.2;
-
-// Success Modal Component
-const SuccessModal = ({
-  isOpen,
-  onClose,
-  onDownloadPdf,
-  onGoBack,
-  isDownloading,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onDownloadPdf: () => void;
-  onGoBack: () => void;
-  isDownloading: boolean;
-}) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
-      <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6">
-        <div className="text-center">
-          <CheckCircle className="mx-auto mb-4 h-12 w-12 text-green-500" />
-          <h3 className="mb-2 text-lg font-semibold text-gray-900">Quote Saved Successfully!</h3>
-          <p className="mb-6 text-gray-600">
-            Quote is ready. Would you like to download the quote as a PDF?
-          </p>
-
-          <div className="flex flex-col space-y-3">
-            <Button onClick={onDownloadPdf} disabled={isDownloading} className="w-full">
-              {isDownloading ? (
-                <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
-                  Generating PDF...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download PDF
-                </>
-              )}
-            </Button>
-
-            <Button onClick={onGoBack} variant="outline" className="w-full">
-              Go Back
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default function CreateQuotePage() {
   const router = useRouter();
@@ -80,14 +27,12 @@ export default function CreateQuotePage() {
   const { user } = useAuth();
 
   const [customerId, setCustomerId] = useState<string | null>(null);
-
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     name: "",
     address: "",
     phone: "",
     email: "",
-    notes: "",
   });
 
   const [items, setItems] = useState<QuoteItem[]>([
@@ -95,19 +40,29 @@ export default function CreateQuotePage() {
       id: "1",
       item: "",
       description: "",
-      colour: "",
+      color: "",
       quantity: 1,
-      unitPrice: 0,
       amount: 0,
+      line_total: 0,
     },
   ]);
 
-  const [loading, setLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [autoFilling, setAutoFilling] = useState<string | null>(null);  // Track which item is auto-filling
+  
+  // ✅ NEW: Door type and room type for pricing
+  const [doorType, setDoorType] = useState<string>('Basic Slab');
+  const [roomType, setRoomType] = useState<string>('Kitchen');
+  
+  // ✅ NEW: VAT percentage (default 20%)
+  const [vatPercentage, setVatPercentage] = useState<number>(20);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP',
+    }).format(value);
+  };
 
   useEffect(() => {
     const customerIdParam = searchParams.get("customerId");
@@ -118,8 +73,6 @@ export default function CreateQuotePage() {
 
     if (customerIdParam) {
       setCustomerId(customerIdParam);
-      console.log("Customer ID loaded:", customerIdParam);
-      console.log("Current user role:", user?.role);
     }
 
     if (customerName) {
@@ -129,60 +82,305 @@ export default function CreateQuotePage() {
         address: customerAddress || "",
         phone: customerPhone || "",
         email: customerEmail || "",
-        notes: "",
       });
     }
   }, [searchParams, user]);
 
-  const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
-  const vatAmount = subtotal * VAT_RATE;
-  const total = subtotal + vatAmount;
+  useEffect(() => {
+    // Re-fetch prices for all items when door type or room type changes
+    const updateAllPrices = async () => {
+      console.log(`🔄 Door/Room type changed - updating all prices...`);
+      console.log(`   New Door Type: ${doorType}`);
+      console.log(`   New Room Type: ${roomType}`);
+  
+      const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+  
+      // Create array of promises for all items that have an item code
+      const updatePromises = items.map(async (item, index) => {
+        // Skip if no item code
+        if (!item.item || item.item.trim().length === 0) {
+          return null;
+        }
+  
+        const itemCode = item.item.trim();
+        
+        // Detect if this is an appliance code
+        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(itemCode);
+        
+        const requestBody: any = {
+          description: itemCode,
+          door_type: doorType,
+          room_type: roomType,
+        };
+  
+        // If it's an appliance code, don't send door_type
+        if (isApplianceCode) {
+          delete requestBody.door_type;
+          delete requestBody.room_type;
+        }
+  
+        try {
+          const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+              "X-Tenant-ID": tenantId,
+            },
+            body: JSON.stringify(requestBody),
+          });
+  
+          const data = await response.json();
+  
+          if (data.found) {
+            console.log(`✅ Updated price for ${itemCode}: £${data.price}`);
+            return {
+              id: item.id,
+              price: data.price,
+              description: data.description || data.item_name,
+            };
+          } else {
+            console.log(`⚠️ No price found for ${itemCode} with new door type`);
+            return null;
+          }
+        } catch (error) {
+          console.error(`Error updating price for ${itemCode}:`, error);
+          return null;
+        }
+      });
+  
+      // Wait for all price lookups to complete
+      const results = await Promise.all(updatePromises);
+  
+      // Update items with new prices
+      setItems((prevItems) =>
+        prevItems.map((item) => {
+          const result = results.find((r) => r && r.id === item.id);
+          if (result) {
+            return {
+              ...item,
+              amount: result.price,
+              description: result.description,
+              line_total: result.price * (item.quantity || 1),
+            };
+          }
+          return item;
+        })
+      );
+  
+      console.log(`🎯 Finished updating all prices`);
+    };
+  
+    // Only run if we have items with codes
+    const hasItemsWithCodes = items.some(item => item.item && item.item.trim().length > 0);
+    
+    if (hasItemsWithCodes) {
+      updateAllPrices();
+    }
+  }, [doorType, roomType]); // Re-run whenever doorType or roomType changes
+ 
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  // ============================================================================
+  // SMART AUTO-FILL - Triggers when item code is entered
+  // ============================================================================
+  const handleItemChange = async (id: string, field: keyof QuoteItem, value: any) => {
+    // Update field immediately
+    const updatedItems = items.map((item) => {
+      if (item.id === id) {
+        const updatedItem = { ...item, [field]: value };
+
+        if (field === 'quantity' || field === 'amount') {
+          const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItem.quantity || 1;
+          const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItem.amount || 0;
+          updatedItem.line_total = qty * amount;
+        }
+
+        return updatedItem;
+      }
+      return item;
+    });
+    setItems(updatedItems);
+
+    // ✅ AUTO-FILL: Trigger when ITEM field changes (code lookup)
+    if (field === 'item' && value && value.length >= 2) {
+      const trimmedValue = value.trim();
+      
+      // Skip auto-fill if it looks like a full item name (contains spaces or is too long)
+      if (trimmedValue.includes(' ') || trimmedValue.length > 20) {
+        return;
+      }
+
+      console.log(`🔍 Auto-fill triggered for code: "${trimmedValue}"`);
+      console.log(`   Door Type: ${doorType}`);
+      console.log(`   Room Type: ${roomType}`);
+      setAutoFilling(id);
+
+      try {
+        const token = localStorage.getItem("token");
+        const tenantId = localStorage.getItem("tenantId") || "7";
+
+        // ✅ Detect if this is an appliance code (contains letters and numbers, typically 8+ chars)
+        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(trimmedValue);
+        
+        const requestBody: any = {
+          description: trimmedValue,
+          door_type: doorType,
+          room_type: roomType,
+        };
+
+        // ✅ If it's an appliance code, don't send door_type (appliances don't have doors)
+        if (isApplianceCode) {
+          console.log('🔥 Detected appliance code pattern');
+          delete requestBody.door_type;
+          delete requestBody.room_type;
+        }
+
+        const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+            "X-Tenant-ID": tenantId,
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        const data = await response.json();
+
+        if (data.found) {
+          // Auto-fill ALL fields
+          setItems((prevItems) =>
+            prevItems.map((item) => {
+              if (item.id === id) {
+                return {
+                  ...item,
+                  item: data.item_code || trimmedValue,  // Use returned item_code
+                  description: data.description || data.item_name || '',  // ← Auto-fill description
+                  amount: data.price || 0,
+                  width: data.width,
+                  height: data.height,
+                  depth: data.depth,
+                  line_total: (data.price || 0) * (item.quantity || 1),
+                };
+              }
+              return item;
+            })
+          );
+
+          console.log(`✅ Auto-filled: ${data.item_name} - £${data.price}`);
+          console.log(`   Description: ${data.description || data.item_name}`);
+          if (data.brand) {
+            console.log(`   Brand: ${data.brand}`);
+          }
+          if (data.width || data.height || data.depth) {
+            console.log(`   Dimensions: ${data.width}×${data.height}×${data.depth}mm`);
+          }
+        } else {
+          console.log("❌ No pricing found for code:", trimmedValue);
+        }
+      } catch (error) {
+        console.error("Auto-price lookup failed:", error);
+      } finally {
+        setAutoFilling(null);
+      }
+    }
   };
 
-  const handleItemChange = (id: string, field: keyof QuoteItem, value: string | number) => {
+  // ============================================================================
+  // DESCRIPTION AUTO-FILL - Triggers when full description is entered
+  // ============================================================================
+  const handleDescriptionChange = async (id: string, value: string) => {
+    // Update description immediately
     setItems((prev) =>
       prev.map((item) => {
         if (item.id === id) {
-          const updatedItem = { ...item, [field]: value };
-
-          if (field === "quantity" || field === "unitPrice") {
-            updatedItem.amount = (updatedItem.quantity as number) * (updatedItem.unitPrice as number);
-          }
-
-          return updatedItem;
+          return { ...item, description: value };
         }
         return item;
-      }),
+      })
     );
+
+    // Skip if description is too short
+    if (!value || value.length < 5) {
+      return;
+    }
+
+    console.log(`🔍 Description auto-fill: "${value}"`);
+    console.log(`   Door Type: ${doorType}`);
+    console.log(`   Room Type: ${roomType}`);
+    setAutoFilling(id);
+
+    try {
+      const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+
+      const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+          "X-Tenant-ID": tenantId,
+        },
+        body: JSON.stringify({
+          description: value,
+          door_type: doorType,      // ← Use selected door type
+          room_type: roomType,      // ← Use selected room type
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.found) {
+        setItems((prevItems) =>
+          prevItems.map((item) => {
+            if (item.id === id) {
+              return {
+                ...item,
+                item: data.item_code || item.item,
+                amount: data.price || 0,
+                width: data.width,
+                height: data.height,
+                depth: data.depth,
+                line_total: (data.price || 0) * (item.quantity || 1),
+              };
+            }
+            return item;
+          })
+        );
+
+        console.log(`✅ Auto-filled from description: ${data.item_name} - £${data.price}`);
+      }
+    } catch (error) {
+      console.error("Description auto-fill failed:", error);
+    } finally {
+      setAutoFilling(null);
+    }
   };
 
-  const addItem = () => {
-    const newItem: QuoteItem = {
-      id: Date.now().toString(),
-      item: "",
-      description: "",
-      colour: "",
-      quantity: 1,
-      unitPrice: 0,
-      amount: 0,
-    };
-    setItems((prev) => [...prev, newItem]);
+  const handleAddItem = () => {
+    setItems([
+      ...items,
+      {
+        id: Date.now().toString(),
+        item: "",
+        description: "",
+        color: "",
+        quantity: 1,
+        amount: 0,
+        line_total: 0,
+      },
+    ]);
   };
 
-  const removeItem = (id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+  const handleRemoveItem = (id: string) => {
+    if (confirm("Remove this item?")) {
+      setItems(items.filter((item) => item.id !== id));
+    }
   };
 
-  // Fixed handleSubmit function with proper error handling
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
+    if (saving) return;
 
     if (!formData.name?.trim()) {
       alert("Customer name is required");
@@ -194,458 +392,452 @@ export default function CreateQuotePage() {
       return;
     }
 
-    if (total <= 0) {
+    const subtotal = items.reduce((sum, item) => sum + item.line_total, 0);
+    
+    if (subtotal <= 0) {
       alert("Please add at least one item with a valid price");
       return;
     }
 
-    setIsSubmitting(true);
-
+    setSaving(true);
     try {
       const token = localStorage.getItem("token");
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const formDataToSend = {
-        ...formData,
-        total: total,
-        subtotal: subtotal,
-        vat: vatAmount,
-        items: items
-          .filter((item) => item.item.trim() && item.amount > 0)
-          .map((item) => ({
-            item: item.item,
-            description: item.description,
-            colour: item.colour,
-            quantity: item.quantity,
-            unit_price: item.unitPrice,
-            amount: item.amount,
-          })),
-        customer_id: customerId,
-      };
+      const vat = subtotal * (vatPercentage / 100);
+      const total = subtotal + vat;
 
       const response = await fetch(`${BACKEND_URL}/quotations`, {
         method: "POST",
-        headers: headers,
-        body: JSON.stringify(formDataToSend),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          client_id: customerId,  // ✅ Changed from customer_id to client_id
+          customer_name: formData.name,
+          customer_address: formData.address,
+          customer_phone: formData.phone,
+          customer_email: formData.email,
+          date: formData.date,
+          items: items
+            .filter(item => {
+              // Only include items that have either item name OR description with actual content
+              const hasItem = item.item && item.item.trim().length > 0;
+              const hasDescription = item.description && item.description.trim().length > 0;
+              const hasAmount = item.line_total > 0;
+              return hasItem || hasDescription || hasAmount;
+            })
+            .map(item => ({
+              item: item.item,
+              description: item.description,
+              colour: item.color,
+              quantity: item.quantity || 1,
+              unit_price: item.amount || 0,
+              amount: item.line_total,
+              width: item.width,
+              height: item.height,
+              depth: item.depth,
+            })),
+          subtotal,
+          vat,
+          total,
+          vat_percentage: vatPercentage,
+        }),
       });
 
-      // Improved error handling - no undefined variables
-      if (!response.ok) {
-        let errorMessage = "Failed to save quote";
-
-        try {
-          const contentType = response.headers.get("content-type");
-          if (contentType && contentType.includes("application/json")) {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorData.message || errorMessage;
-          } else {
-            const errorText = await response.text();
-            errorMessage = errorText || errorMessage;
-          }
-        } catch (parseError) {
-          console.error("Error parsing error response:", parseError);
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      if (response.ok) {
+        const data = await response.json();
+        const quoteId = data.quotation_id || data.id;
+        
+        alert(`✅ Quote #${quoteId} created successfully!`);
+        
+        // ✅ Open the quote in a new tab
+        const quoteUrl = `/dashboard/quotes/${quoteId}`;
+        window.open(quoteUrl, '_blank');
+        
+        // ✅ Then redirect back to customer page
+        if (customerId) {
+          router.push(`/dashboard/customers/${customerId}`);
+        } else {
+          router.push("/dashboard/quotes");
         }
-
-        throw new Error(errorMessage);
+      } else {
+        const error = await response.json();
+        alert(`❌ Failed to save: ${error.error || 'Unknown error'}`);
       }
-
-      // Parse successful JSON response
-      let responseData;
-      try {
-        responseData = await response.json();
-      } catch (parseError) {
-        throw new Error("Invalid response format from server");
-      }
-
-      alert(`Quote #${responseData.id} created successfully!`);
-      router.push(`/dashboard/customers/${customerId}`);
     } catch (error) {
-      console.error("Error saving quote:", error);
-      const errorMsg = error instanceof Error ? error.message : "Failed to save quote";
-      alert(errorMsg);
+      console.error("Error saving quotation:", error);
+      alert("❌ Error saving quotation");
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
   };
 
-  const handleGenerateQuote = async () => {
-    try {
-      if (!customerId) {
-        setStatusMessage("❌ Error: Customer ID is missing. Please select a customer first.");
-        return;
-      }
-
-      if (!formData.name || !formData.address) {
-        setStatusMessage("❌ Error: Customer name and address are required.");
-        return;
-      }
-
-      if (items.length === 0 || items.every((item) => !item.item)) {
-        setStatusMessage("❌ Error: Please add at least one item to the quote.");
-        return;
-      }
-
-      setLoading(true);
-      setStatusMessage("⏳ Generating quote...");
-
-      const token = localStorage.getItem("token");
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const quoteData = {
-        customer_id: customerId,
-        customer_name: formData.name,
-        customer_address: formData.address,
-        customer_phone: formData.phone,
-        customer_email: formData.email,
-        date: formData.date,
-        items: items
-          .filter((item) => item.item.trim())
-          .map((item) => ({
-            item: item.item,
-            description: item.description,
-            colour: item.colour,
-            quantity: item.quantity,
-            unit_price: item.unitPrice,
-            amount: item.amount,
-          })),
-        subtotal: subtotal,
-        vat: vatAmount,
-        total: total,
-        notes: formData.notes,
-      };
-
-      console.log("Sending quote data:", quoteData);
-
-      const response = await fetch(`${BACKEND_URL}/quotations/generate-quote`, {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify(quoteData),
-      });
-
-      if (!response.ok) {
-        let errorMessage = "Failed to generate quote";
-        try {
-          const contentType = response.headers.get("content-type");
-          if (contentType && contentType.includes("application/json")) {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorData.message || errorMessage;
-          } else {
-            const errorText = await response.text();
-            errorMessage = errorText || errorMessage;
-          }
-        } catch (parseError) {
-          console.error("Error parsing error response:", parseError);
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Quote_${formData.name.replace(/\s+/g, "_")}_${formData.date}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      setStatusMessage("✅ Quote generated and downloaded successfully!");
-
-      setTimeout(() => {
-        setStatusMessage("");
-      }, 5000);
-    } catch (error) {
-      console.error("Error generating quote:", error);
-      const errorMsg = error instanceof Error ? error.message : "Failed to generate quote";
-      setStatusMessage(`❌ Error: ${errorMsg}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDownloadPdf = async () => {
-    if (!savedQuoteId) {
-      alert("No quote ID available");
-      return;
-    }
-
-    setIsDownloading(true);
-
-    try {
-      const token = localStorage.getItem("token");
-      const headers: HeadersInit = {};
-
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${BACKEND_URL}/quotations/${savedQuoteId}/pdf`, {
-        method: "GET",
-        headers: headers,
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate PDF");
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Quote_${savedQuoteId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error("Error downloading PDF:", error);
-      alert("Failed to download PDF");
-    } finally {
-      setIsDownloading(false);
-    }
-  };
+  const subtotal = items.reduce((sum, item) => sum + item.line_total, 0);
+  const vat = subtotal * (vatPercentage / 100);
+  const total = subtotal + vat;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <SuccessModal
-        isOpen={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
-        onDownloadPdf={handleDownloadPdf}
-        onGoBack={() => {
-          setShowSuccessModal(false);
-          if (customerId) {
-            router.push(`/dashboard/customers/${customerId}`);
-          } else {
-            router.push("/dashboard/checklists/quotes");
-          }
-        }}
-        isDownloading={isDownloading}
-      />
-
-      <form onSubmit={handleSubmit}>
-        <div className="sticky top-0 z-10 border-b bg-white">
-          <div className="flex max-w-6xl items-center justify-between px-8 py-4">
-            <div className="flex items-center space-x-4">
-              <Button type="button" variant="ghost" size="sm" onClick={() => router.back()}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-              <h1 className="text-2xl font-semibold text-gray-900">Create Quote</h1>
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="border-b bg-gray-50 px-8 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => router.back()}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Create New Quotation</h1>
+              <p className="text-sm text-gray-600">
+                Fill in the details below to create a quotation
+              </p>
             </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleSave} disabled={saving}>
+              <Save className="mr-2 h-4 w-4" />
+              {saving ? "Saving..." : "Save Quotation"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Quotation Form */}
+      <div className="mx-auto max-w-6xl px-8 py-8">
+        {/* Company Header */}
+        <div className="mb-8 text-center">
+          <div className="mb-4 text-4xl font-bold tracking-wider text-gray-800">
+            AZTEC INTERIORS
           </div>
         </div>
 
-        {/* Status Message */}
-        {statusMessage && (
-          <div className="px-8 pt-4">
-            <div
-              className={`rounded-md p-3 text-sm font-medium ${
-                statusMessage.startsWith("✅")
-                  ? "bg-green-100 text-green-800"
-                  : statusMessage.startsWith("❌")
-                    ? "bg-red-100 text-red-800"
-                    : statusMessage.startsWith("⚠️")
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-gray-200 text-gray-800"
-              }`}
-            >
-              {statusMessage}
-            </div>
-          </div>
-        )}
+        {/* Company Registration Details */}
+        <div className="mb-6 space-y-1 bg-green-200 p-3 text-sm">
+          <p className="font-semibold">Registered to England No 5246881</p>
+          <p className="font-semibold">VAT Reg No.686 8010 72</p>
+        </div>
 
-        <div className="max-w-6xl px-8 py-6">
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Customer Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="date">Date</Label>
+        <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
+          <p className="font-semibold">Acc name : Aztec Interiors Leicester LTD</p>
+          <p className="font-semibold">Bank : HSBC</p>
+          <p className="font-semibold">s/code: 40 28 06</p>
+          <p className="font-semibold">acc no: 43820343</p>
+        </div>
+
+        <div className="mb-6 bg-gray-100 p-3 text-sm">
+          <p>Please use your name and/or road name as reference:</p>
+        </div>
+
+        {/* Quotation Title */}
+        <h1 className="mb-6 text-center text-2xl font-bold">QUOTATION</h1>
+
+        {/* ✅ NEW: Door Type and Room Type Selection */}
+        <div className="mb-6 grid grid-cols-2 gap-4">
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Room Type <span className="text-red-600">*</span>
+            </label>
+            <select
+              value={roomType}
+              onChange={(e) => setRoomType(e.target.value)}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Kitchen">Kitchen</option>
+              <option value="Bedroom">Bedroom</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Door Type <span className="text-red-600">*</span>
+            </label>
+            <select
+              value={doorType}
+              onChange={(e) => setDoorType(e.target.value)}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Basic Slab">Basic Slab</option>
+              <option value="Acrylic Gloss/Matt">Acrylic Gloss/Matt</option>
+              <option value="Vinyl">Vinyl</option>
+              <option value="Black Glass">Black Glass</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Info Banner */}
+        <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800">
+          <p className="font-medium">
+            💡 Selected: <span className="font-bold">{roomType}</span> with <span className="font-bold">{doorType}</span> doors
+          </p>
+          <p className="mt-1 text-xs text-blue-600">
+            Prices will be automatically looked up based on these selections when you enter item codes.
+          </p>
+        </div>
+
+        {/* Customer Information */}
+        <div className="mb-6">
+          <table className="w-full border-collapse">
+            <tbody>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50" style={{ width: '20%' }}>DATE:</td>
+                <td className="border border-black p-0">
                   <Input
-                    id="date"
-                    name="date"
                     type="date"
                     value={formData.date}
-                    onChange={handleInputChange}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">NAME:</td>
+                <td className="border border-black p-0">
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Customer name"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
                     required
                   />
-                </div>
-                <div>
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" name="name" value={formData.name} onChange={handleInputChange} required />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Textarea
-                    id="address"
-                    name="address"
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ADDRESS:</td>
+                <td className="border border-black p-0">
+                  <textarea
                     value={formData.address}
-                    onChange={handleInputChange}
-                    rows={3}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    placeholder="Customer address"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2 resize-none"
+                    rows={2}
+                    required
                   />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea id="notes" name="notes" value={formData.notes} onChange={handleInputChange} rows={3} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">TEL:</td>
+                <td className="border border-black p-0">
+                  <Input
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="Phone number"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-          <Card className="mb-6">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Quote Items</CardTitle>
-                <Button type="button" onClick={addItem} variant="outline" size="sm">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Item
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {items.map((item, index) => (
-                  <div key={item.id} className="rounded-lg border bg-gray-50 p-4">
-                    <div className="mb-4 flex items-center justify-between">
-                      <h4 className="font-medium">Item {index + 1}</h4>
-                      {items.length > 1 && (
-                        <Button
-                          type="button"
-                          onClick={() => removeItem(item.id)}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
-                      <div className="lg:col-span-2">
-                        <Label>Item</Label>
-                        <Input
-                          value={item.item}
-                          onChange={(e) => handleItemChange(item.id, "item", e.target.value)}
-                          placeholder="Item name"
-                        />
-                      </div>
-                      <div className="lg:col-span-2">
-                        <Label>Description</Label>
-                        <Input
-                          value={item.description}
-                          onChange={(e) => handleItemChange(item.id, "description", e.target.value)}
-                          placeholder="Description"
-                        />
-                      </div>
-                      <div>
-                        <Label>Colour</Label>
-                        <Input
-                          value={item.colour}
-                          onChange={(e) => handleItemChange(item.id, "colour", e.target.value)}
-                          placeholder="Colour"
-                        />
-                      </div>
-                      <div>
-                        <Label>Quantity</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(item.id, "quantity", parseInt(e.target.value) || 1)}
-                        />
-                      </div>
-                      <div>
-                        <Label>Unit Price (£)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={item.unitPrice}
-                          onChange={(e) => handleItemChange(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                        />
-                      </div>
-                      <div>
-                        <Label>Amount (£)</Label>
-                        <Input value={item.amount.toFixed(2)} readOnly className="bg-gray-100" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Quote Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="ml-auto max-w-md space-y-2">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>£{subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>VAT (20%):</span>
-                  <span>£{vatAmount.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2 text-lg font-bold">
-                  <span>Total:</span>
-                  <span>£{total.toFixed(2)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex items-center justify-between">
-            <Button type="button" variant="outline" onClick={() => router.back()}>
-              Cancel
+        {/* Items Table */}
+        <div className="mb-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-lg font-bold">Quote Items</h3>
+            <Button onClick={handleAddItem} size="sm" variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
             </Button>
+          </div>
 
-            <div className="flex items-center space-x-3">
-              {/* <Button
-                type="button"
-                variant="outline"
-                onClick={handleGenerateQuote}
-                className="flex items-center space-x-2"
-                disabled={!formData.name || items.some((item) => !item.item) || !customerId}
-              >
-                <FileText className="h-4 w-4" />
-                <span>Generate Quote</span>
-              </Button> */}
-
-              <Button type="submit" disabled={isSubmitting || !customerId || total <= 0}>
-                {isSubmitting ? "Saving..." : "Save Quote"}
-              </Button>
-            </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-white">
+                  <th className="border border-black px-3 py-2 text-left font-bold" style={{ minWidth: '150px' }}>ITEM</th>
+                  <th className="border border-black px-3 py-2 text-left font-bold" style={{ minWidth: '200px' }}>DESCRIPTION</th>
+                  <th className="border border-black px-3 py-2 text-left font-bold" style={{ minWidth: '100px' }}>COLOUR</th>
+                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '60px' }}>QTY</th>
+                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '80px' }}>WIDTH</th>
+                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '80px' }}>HEIGHT</th>
+                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '80px' }}>DEPTH</th>
+                  <th className="border border-black px-3 py-2 text-right font-bold" style={{ minWidth: '80px' }}>PRICE</th>
+                  <th className="border border-black px-3 py-2 text-right font-bold" style={{ minWidth: '100px' }}>AMOUNT</th>
+                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '60px' }}>ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, index) => (
+                  <tr key={item.id}>
+                    <td className="border border-black p-2">
+                      <Input
+                        value={item.item}
+                        onChange={(e) => handleItemChange(item.id, "item", e.target.value)}
+                        placeholder="Item name or code"
+                        className={`border-none focus-visible:ring-0 min-w-[140px] ${
+                          autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''
+                        }`}
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <textarea
+                        value={item.description}
+                        onChange={(e) => handleDescriptionChange(item.id, e.target.value)}
+                        placeholder="Description"
+                        className={`border-none focus-visible:ring-0 min-w-[190px] w-full resize-none overflow-hidden ${
+                          autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''
+                        }`}
+                        rows={2}
+                        style={{
+                          minHeight: '40px',
+                          lineHeight: '1.4'
+                        }}
+                        onInput={(e) => {
+                          // Auto-expand textarea as content grows
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          target.style.height = `${target.scrollHeight}px`;
+                        }}
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        value={item.color}
+                        onChange={(e) => handleItemChange(item.id, "color", e.target.value)}
+                        placeholder="Colour"
+                        className="border-none focus-visible:ring-0 min-w-[90px]"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)}
+                        className="border-none text-center focus-visible:ring-0 w-[50px]"
+                        min="1"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        type="number"
+                        value={item.width || ''}
+                        onChange={(e) => handleItemChange(item.id, "width", e.target.value)}
+                        placeholder="—"
+                        className="border-none text-center focus-visible:ring-0 w-[70px]"
+                        min="0"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        type="number"
+                        value={item.height || ''}
+                        onChange={(e) => handleItemChange(item.id, "height", e.target.value)}
+                        placeholder="—"
+                        className="border-none text-center focus-visible:ring-0 w-[70px]"
+                        min="0"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        type="number"
+                        value={item.depth || ''}
+                        onChange={(e) => handleItemChange(item.id, "depth", e.target.value)}
+                        placeholder="—"
+                        className="border-none text-center focus-visible:ring-0 w-[70px]"
+                        min="0"
+                      />
+                    </td>
+                    <td className="border border-black p-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={item.amount}
+                        onChange={(e) => handleItemChange(item.id, "amount", e.target.value)}
+                        className="border-none text-right focus-visible:ring-0 min-w-[70px]"
+                        min="0"
+                        placeholder="0.00"
+                      />
+                    </td>
+                    <td className="border border-black px-3 py-2 text-right font-semibold">
+                      {formatCurrency(item.line_total)}
+                    </td>
+                    <td className="border border-black p-2 text-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                
+                {items.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="border border-black px-3 py-8 text-center text-gray-500">
+                      No items yet. Click "Add Item" to get started.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      </form>
+
+        {/* Totals */}
+        <div className="mb-6 flex justify-end">
+          <table className="border-collapse" style={{ width: '40%' }}>
+            <tbody>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotal)}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>VAT</span>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        value={vatPercentage}
+                        onChange={(e) => setVatPercentage(parseFloat(e.target.value) || 0)}
+                        className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                      <span className="text-sm">%</span>
+                    </div>
+                  </div>
+                </td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(vat)}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-bold bg-gray-50">TOTAL</td>
+                <td className="border border-black px-3 py-2 text-right font-bold">{formatCurrency(total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Payment Terms */}
+        <div className="mb-6 space-y-2 text-sm">
+          <p className="font-semibold">Only Bacs or Cash will be accepted on Delivery and Completion</p>
+          <p className="font-semibold">
+            NOTE: If you wish to proceed with this quote, you will be required to make the full payment upfront
+          </p>
+        </div>
+
+        <div className="mb-8 text-sm font-semibold text-red-600">
+          <p>Please sign here to confirm.</p>
+        </div>
+
+        {/* Signature Section */}
+        <div className="space-y-4 text-sm">
+          <div className="flex items-center">
+            <span className="mr-2">Customer Signature:</span>
+            <span className="border-b border-dotted border-black flex-1"></span>
+          </div>
+          <div className="flex items-center">
+            <span className="mr-2">Customer Name:</span>
+            <span className="border-b border-dotted border-black flex-1"></span>
+          </div>
+          <div className="flex items-center">
+            <span className="mr-2">Date:</span>
+            <span className="border-b border-dotted border-black flex-1"></span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

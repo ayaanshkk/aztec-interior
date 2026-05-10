@@ -360,13 +360,13 @@ export const api = {
   // ============================================
   async getAssignments() {
     return deduplicateRequest("getAssignments", async () => {
-      const response = await fetchWithAuth("/assignments");
+      const response = await fetchWithAuth("/tasks");  // ✅ Changed from /assignments
       return handleApiResponse(response);
     });
   },
 
   async createAssignment(assignmentData: any) {
-    const response = await fetchWithAuth("/assignments", {
+    const response = await fetchWithAuth("/tasks", {  // ✅ Changed from /assignments
       method: "POST",
       body: JSON.stringify(assignmentData),
     });
@@ -374,7 +374,7 @@ export const api = {
   },
 
   async updateAssignment(assignmentId: string, assignmentData: any) {
-    const response = await fetchWithAuth(`/assignments/${assignmentId}`, {
+    const response = await fetchWithAuth(`/tasks/${assignmentId}`, {  
       method: "PUT",
       body: JSON.stringify(assignmentData),
     });
@@ -382,7 +382,7 @@ export const api = {
   },
 
   async deleteAssignment(assignmentId: string) {
-    const response = await fetchWithAuth(`/assignments/${assignmentId}`, {
+    const response = await fetchWithAuth(`/tasks/${assignmentId}`, {  
       method: "DELETE",
     });
     return handleApiResponse(response);
