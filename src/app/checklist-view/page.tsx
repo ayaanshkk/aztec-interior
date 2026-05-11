@@ -332,7 +332,8 @@ export default function ChecklistViewPage() {
     setFormData({
       ...formData,
       additional_doors: [...(formData.additional_doors || []), { 
-        door_style: "", 
+        door_style: "",
+        door_type: "", 
         door_color: "", 
         door_manufacturer: "",
         door_name: "",
