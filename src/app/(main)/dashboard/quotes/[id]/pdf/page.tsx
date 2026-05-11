@@ -3,6 +3,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BACKEND_URL } from "@/lib/api";
 
 export default function QuotePDFPage() {
   const params = useParams();
