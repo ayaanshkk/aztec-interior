@@ -363,7 +363,7 @@ export default function CustomersPage() {
               const matchesAssignedId = customerAssignedId === userId;
               
               const customerSalesperson = String(customer.salesperson || "").trim();
-              const userName = String(user.name || "").trim();
+              const userName = String(user.employee_name || "").trim();
               const matchesSalesperson = customerSalesperson.toLowerCase() === userName.toLowerCase();
               
               return matchesAssignedId || matchesSalesperson;
@@ -443,7 +443,7 @@ export default function CustomersPage() {
           const customerAssignedId = String(customer.assigned_employee_id || "").trim();
           const userId = String(user.id || "").trim();
           const customerSalesperson = String(customer.salesperson || "").trim().toLowerCase();
-          const userName = String(user.name || "").trim().toLowerCase();
+          const userName = String(user.employee_name || "").trim().toLowerCase();
           return customerAssignedId === userId || customerSalesperson === userName;
       }
       return false;
