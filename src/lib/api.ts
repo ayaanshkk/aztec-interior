@@ -356,38 +356,287 @@ export const api = {
   },
 
   // ============================================
-  // ASSIGNMENTS ENDPOINTS (Schedule)
+  // CALENDAR ENDPOINTS (calendar_routes.py)
   // ============================================
-  async getAssignments() {
-    return deduplicateRequest("getAssignments", async () => {
-      const response = await fetchWithAuth("/tasks");  // ✅ Changed from /assignments
+
+  /**
+   * Get all tasks for calendar view with date range filtering
+   * Backend: calendar_routes.py → get_calendar_tasks()
+   */
+  async getCalendarTasks(params?: {
+    start_date?: string;
+    end_date?: string;
+    assigned_to_employee_id?: number;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.start_date) queryParams.append("start_date", params.start_date);
+    if (params?.end_date) queryParams.append("end_date", params.end_date);
+    if (params?.assigned_to_employee_id) {
+      queryParams.append("assigned_to_employee_id", params.assigned_to_employee_id.toString());
+    }
+
+    const queryString = queryParams.toString();
+    const response = await fetchWithAuth(`/calendar/tasks${queryString ? `?${queryString}` : ""}`);
+    return handleApiResponse(response);
+  },
+
+  /**
+   * Move a task to a new date (for drag and drop)
+   * Backend: calendar_routes.py → move_calendar_task()
+   */
+  async moveCalendarTask(taskId: string, startDate: string, endDate?: string) {
+    const response = await fetchWithAuth(`/calendar/tasks/${taskId}/move`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        start_date: startDate,
+        end_date: endDate || startDate,
+      }),
+    });
+    return handleApiResponse(response);
+  },
+
+  /**
+   * Get all calendar events (tasks + other events)
+   * Backend: calendar_routes.py → get_calendar_events()
+   */
+  async getCalendarEvents(params?: {
+    start_date?: string;
+    end_date?: string;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.start_date) queryParams.append("start_date", params.start_date);
+    if (params?.end_date) queryParams.append("end_date", params.end_date);
+
+    const queryString = queryParams.toString();
+    const response = await fetchWithAuth(`/calendar/events${queryString ? `?${queryString}` : ""}`);
+    return handleApiResponse(response);
+  },
+
+  /**
+   * Get team availability for a date range
+   * Backend: calendar_routes.py → get_team_availability()
+   */
+  async getTeamAvailability(startDate: string, endDate: string) {
+    const queryParams = new URLSearchParams({
+      start_date: startDate,
+      end_date: endDate,
+    });
+
+    const response = await fetchWithAuth(`/calendar/availability?${queryParams.toString()}`);
+    return handleApiResponse(response);
+  },
+
+  // ============================================
+  // TASKS ENDPOINTS (tasks_routes.py)
+  // ============================================
+
+  /**
+   * Get all tasks
+   * Backend: tasks_routes.py → handle_tasks() GET
+   */
+  async getTasks() {
+    return deduplicateRequest("getTasks", async () => {
+      const response = await fetchWithAuth("/tasks");
       return handleApiResponse(response);
     });
   },
 
-  async createAssignment(assignmentData: any) {
-    const response = await fetchWithAuth("/tasks", {  // ✅ Changed from /assignments
+  /**
+   * Create a new task
+   * Backend: tasks_routes.py → handle_tasks() POST
+   */
+  async createTask(taskData: {
+    type?: string;
+    title: string;
+    start_date?: string;
+    end_date?: string;
+    date?: string;
+    customer_name?: string;
+    assigned_to_employee_id?: number;
+    team_member?: string;
+    project_id?: string;
+    client_id?: number;
+    job_type?: string;
+    start_time?: string;
+    end_time?: string;
+    estimated_hours?: number;
+    notes?: string;
+    priority?: string;
+    status?: string;
+    opportunity_id?: string;
+    work_stage?: string;
+  }) {
+    const response = await fetchWithAuth("/tasks", {
       method: "POST",
-      body: JSON.stringify(assignmentData),
+      body: JSON.stringify(taskData),
     });
     return handleApiResponse(response);
   },
 
-  async updateAssignment(assignmentId: string, assignmentData: any) {
-    const response = await fetchWithAuth(`/tasks/${assignmentId}`, {  
+  /**
+   * Get a single task by ID
+   * Backend: tasks_routes.py → handle_single_task() GET
+   */
+  async getTask(taskId: string) {
+    const response = await fetchWithAuth(`/tasks/${taskId}`);
+    return handleApiResponse(response);
+  },
+
+  /**
+   * Update a task
+   * Backend: tasks_routes.py → handle_single_task() PUT
+   */
+  async updateTask(taskId: string, taskData: Partial<{
+    type: string;
+    title: string;
+    start_date: string;
+    end_date: string;
+    date: string;
+    customer_name: string;
+    assigned_to_employee_id: number;
+    team_member: string;
+    project_id: string;
+    client_id: number;
+    job_type: string;
+    start_time: string;
+    end_time: string;
+    estimated_hours: number;
+    notes: string;
+    priority: string;
+    status: string;
+    opportunity_id: string;
+    work_stage: string;
+  }>) {
+    const response = await fetchWithAuth(`/tasks/${taskId}`, {
       method: "PUT",
-      body: JSON.stringify(assignmentData),
+      body: JSON.stringify(taskData),
     });
     return handleApiResponse(response);
   },
 
-  async deleteAssignment(assignmentId: string) {
-    const response = await fetchWithAuth(`/tasks/${assignmentId}`, {  
+  /**
+   * Delete a task
+   * Backend: tasks_routes.py → handle_single_task() DELETE
+   */
+  async deleteTask(taskId: string) {
+    const response = await fetchWithAuth(`/tasks/${taskId}`, {
       method: "DELETE",
     });
     return handleApiResponse(response);
   },
 
+  /**
+   * Get tasks within a date range
+   * Backend: tasks_routes.py → get_tasks_by_date_range()
+   */
+  async getTasksByDateRange(startDate: string, endDate: string) {
+    const queryParams = new URLSearchParams({
+      start_date: startDate,
+      end_date: endDate,
+    });
+
+    const response = await fetchWithAuth(`/tasks/by-date-range?${queryParams.toString()}`);
+    return handleApiResponse(response);
+  },
+
+  /**
+   * Get projects ready to be scheduled
+   * Backend: tasks_routes.py → get_available_jobs()
+   */
+  async getAvailableJobs() {
+    const response = await fetchWithAuth("/jobs/available");
+    return handleApiResponse(response);
+  },
+
+  /**
+   * Get active clients for tasks
+   * Backend: tasks_routes.py → get_active_customers()
+   */
+  async getActiveCustomers() {
+    const response = await fetchWithAuth("/customers/active");
+    return handleApiResponse(response);
+  },
+
+  /**
+   * Get all job work stages with metadata
+   * Backend: tasks_routes.py → get_job_work_stages()
+   */
+  async getJobWorkStages() {
+    const response = await fetchWithAuth("/jobs/work-stages");
+    return handleApiResponse(response);
+  },
+
+  // ============================================
+  // LEGACY ASSIGNMENTS ENDPOINTS (backward compatibility)
+  // Now mapped to /tasks endpoints
+  // ============================================
+  async getAssignments() {
+    return this.getTasks();
+  },
+
+  async createAssignment(assignmentData: any) {
+    return this.createTask(assignmentData);
+  },
+
+  async updateAssignment(assignmentId: string, assignmentData: any) {
+    return this.updateTask(assignmentId, assignmentData);
+  },
+
+  async deleteAssignment(assignmentId: string) {
+    return this.deleteTask(assignmentId);
+  },
+
+  // ============================================
+  // ACTION ITEMS ENDPOINTS (action_items_routes.py)
+  // ============================================
+  async getActionItems() {
+    const response = await fetchWithAuth("/action-items");
+    return handleApiResponse(response);
+  },
+ 
+  async createActionItem(data: {
+    client_id: string;
+    stage?: string;
+    priority?: string;
+    notes?: string;
+  }) {
+    const response = await fetchWithAuth("/action-items", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse(response);
+  },
+
+  async completeActionItem(actionId: string, notes?: string) {
+    const response = await fetchWithAuth(`/action-items/${actionId}/complete`, {
+      method: "PATCH",
+      body: JSON.stringify({ notes: notes || '' }),
+    });
+    return handleApiResponse(response);
+  },
+ 
+  async updateActionItem(actionId: string, data: {
+    priority?: string;
+    notes?: string;
+    stage?: string;
+  }) {
+    const response = await fetchWithAuth(`/action-items/${actionId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+    return handleApiResponse(response);
+  },
+ 
+  async deleteActionItem(actionId: string) {
+    const response = await fetchWithAuth(`/action-items/${actionId}`, {
+      method: "DELETE",
+    });
+    return handleApiResponse(response);
+  },
+
+  // ============================================
+  // PRICELIST ENDPOINTS
+  // ============================================
   async getPricelist(filters?: { category?: string; search?: string }) {
     const params = new URLSearchParams();
     if (filters?.category && filters.category !== 'all') {

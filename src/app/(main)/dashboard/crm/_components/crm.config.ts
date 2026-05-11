@@ -269,13 +269,16 @@ export const generateProposalsChartData = (jobs: any[]) => {
 /**
  * Generate recent leads data from customers in Lead stage
  * Returns the most recent 15 customers in Lead stage
+ * ✅ FIXED: Now uses type === 'client' instead of 'customer'
  */
 export const generateRecentLeadsData = (pipelineItems: any[]) => {
-  // Filter for customers in Lead stage
+  // ✅ FIXED: Filter for 'client' type instead of 'customer'
   const leadCustomers = pipelineItems
-    .filter(item => item.type === 'customer' && item.stage === 'Lead')
+    .filter(item => item.type === 'client' && item.stage === 'Lead')
     .map(item => item.customer)
     .filter(Boolean);
+
+  console.log(`📋 Found ${leadCustomers.length} customers in Lead stage`);
 
   // Sort by created_at (most recent first)
   const sortedLeads = leadCustomers.sort((a, b) => {
@@ -304,7 +307,7 @@ export const generateRecentLeadsData = (pipelineItems: any[]) => {
 
     return {
       id: customer.id,
-      name: customer.name,
+      name: customer.name || 'Unknown',
       email: customer.email || 'No email',
       phone: customer.phone || 'No phone',
       status: 'Lead',
@@ -313,34 +316,3 @@ export const generateRecentLeadsData = (pipelineItems: any[]) => {
     };
   });
 };
-
-// ============================================
-// STATIC DATA (Commented out for now - will implement later)
-// ============================================
-
-// export const revenueChartData = [
-//   { month: "Jul 2024", revenue: 6700 },
-//   { month: "Aug 2024", revenue: 7100 },
-//   { month: "Sep 2024", revenue: 6850 },
-//   { month: "Oct 2024", revenue: 7500 },
-//   { month: "Nov 2024", revenue: 8000 },
-//   { month: "Dec 2024", revenue: 8300 },
-//   { month: "Jan 2025", revenue: 7900 },
-//   { month: "Feb 2025", revenue: 8400 },
-//   { month: "Mar 2025", revenue: 8950 },
-//   { month: "Apr 2025", revenue: 9700 },
-//   { month: "May 2025", revenue: 11200 },
-//   { month: "Jun 2025", revenue: 9500 },
-// ];
-
-// export const projectRevenueChartData = [
-//   { name: "MVP Development", actual: 82000, target: 90000 },
-//   { name: "Consultation", actual: 48000, target: 65000 },
-//   { name: "Framer Sites", actual: 34000, target: 45000 },
-//   { name: "DevOps Support", actual: 77000, target: 90000 },
-//   { name: "LLM Training", actual: 68000, target: 80000 },
-//   { name: "Product Launch", actual: 52000, target: 70000 },
-// ].map((row) => ({
-//   ...row,
-//   remaining: Math.max(0, row.target - row.actual),
-// }));

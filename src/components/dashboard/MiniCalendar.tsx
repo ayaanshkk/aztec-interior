@@ -9,6 +9,8 @@ import { api } from "@/lib/api";
 
 interface Task {
   id: string;
+  task_id?: string;
+  type?: string;
   title: string;
   start_date?: string;
   end_date?: string;
@@ -17,19 +19,38 @@ interface Task {
   customer_name?: string;
   start_time?: string;
   end_time?: string;
+  team_member?: string;
+  status?: string;
+  priority?: string;
+  work_stage?: string;
 }
 
-// Color coding for task types
-const getTaskColor = (jobType?: string) => {
-  switch (jobType?.toLowerCase()) {
+// Color coding for task types based on job_type and work_stage
+const getTaskColor = (task: Task) => {
+  // Priority colors if work_stage is present
+  if (task.work_stage) {
+    switch (task.work_stage.toLowerCase()) {
+      case "survey":
+        return "bg-purple-100 text-purple-800 border-purple-300";
+      case "delivery":
+        return "bg-cyan-100 text-cyan-800 border-cyan-300";
+      case "installation":
+        return "bg-teal-100 text-teal-800 border-teal-300";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-300";
+    }
+  }
+  
+  // Fallback to job_type
+  switch (task.job_type?.toLowerCase()) {
     case "survey":
-      return "bg-blue-100 text-blue-800 border-blue-300";
-    case "delivery":
       return "bg-purple-100 text-purple-800 border-purple-300";
+    case "delivery":
+      return "bg-cyan-100 text-cyan-800 border-cyan-300";
     case "installation":
-      return "bg-green-100 text-green-800 border-green-300";
+      return "bg-teal-100 text-teal-800 border-teal-300";
     default:
-      return "bg-gray-100 text-gray-800 border-gray-300";
+      return "bg-blue-100 text-blue-800 border-blue-300";
   }
 };
 
@@ -55,7 +76,20 @@ export function MiniCalendar() {
     const fetchTasks = async () => {
       try {
         setLoading(true);
-        const tasksData = await api.getAssignments();
+        
+        // Calculate date range for the current week view
+        const weekEnd = new Date(currentWeekStart);
+        weekEnd.setDate(currentWeekStart.getDate() + 6);
+        
+        const startDateStr = formatDateKey(currentWeekStart);
+        const endDateStr = formatDateKey(weekEnd);
+        
+        // Use the calendar tasks endpoint with date range filtering
+        const tasksData = await api.getCalendarTasks({
+          start_date: startDateStr,
+          end_date: endDateStr
+        });
+        
         setTasks(Array.isArray(tasksData) ? tasksData : []);
       } catch (err) {
         console.error("Failed to fetch tasks:", err);
@@ -66,7 +100,7 @@ export function MiniCalendar() {
     };
 
     fetchTasks();
-  }, []);
+  }, [currentWeekStart]);
 
   // Get week days
   const weekDays = useMemo(() => {
@@ -84,13 +118,16 @@ export function MiniCalendar() {
     const map: Record<string, Task[]> = {};
     
     tasks.forEach((task) => {
+      // Use start_date as primary date field (from backend)
       if (task.start_date) {
         const dateKey = formatDateKey(new Date(task.start_date));
         if (!map[dateKey]) map[dateKey] = [];
         map[dateKey].push(task);
       } else if (task.date) {
-        if (!map[task.date]) map[task.date] = [];
-        map[task.date].push(task);
+        // Fallback to date field if start_date is not present
+        const dateKey = formatDateKey(new Date(task.date));
+        if (!map[dateKey]) map[dateKey] = [];
+        map[dateKey].push(task);
       }
     });
     
@@ -167,14 +204,18 @@ export function MiniCalendar() {
                   {dayTasks.slice(0, 2).map((task) => (
                     <div
                       key={task.id}
-                      className={`text-xs p-1 rounded border ${getTaskColor(task.job_type)} truncate`}
-                      title={task.title}
+                      className={`text-xs p-1 rounded border ${getTaskColor(task)} truncate cursor-pointer hover:opacity-80`}
+                      title={`${task.title}${task.start_time ? ` (${task.start_time})` : ''}`}
+                      onClick={() => router.push(`/dashboard/schedule/${task.id}`)}
                     >
+                      {task.start_time && (
+                        <span className="font-semibold mr-1">{task.start_time}</span>
+                      )}
                       {task.customer_name || task.title}
                     </div>
                   ))}
                   {dayTasks.length > 2 && (
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 text-center">
                       +{dayTasks.length - 2} more
                     </div>
                   )}

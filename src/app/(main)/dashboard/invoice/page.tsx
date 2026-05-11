@@ -85,10 +85,6 @@ export default function InvoicePage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // COMMENTED OUT: User role fetching
-      // const storedRole = localStorage.getItem("user_role");
-      // setUserRole(storedRole || "manager");
-
       const lastUsedNumber = localStorage.getItem("lastInvoiceNumber") || "INV-0000";
       const nextNumber = getNextInvoiceNumber(lastUsedNumber);
       setInvoiceNumber(nextNumber);

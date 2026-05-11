@@ -26,11 +26,10 @@ import {
 
 interface PipelineItem {
   id: string;
-  type: "customer" | "job" | "project";
+  type: "client" | "job" | "project";  // ✅ FIXED: Changed 'customer' to 'client'
   customer: {
-    id: string;
+    id: number;
     created_at: string;
-    stage: string;
     name: string;
   };
   stage: string;
@@ -82,6 +81,10 @@ export function OverviewCards() {
         const pipelineItems: PipelineItem[] = await pipelineRes.json();
         console.log("✅ Pipeline data loaded:", pipelineItems.length, "items");
 
+        // ✅ FIXED: Filter for 'client' type instead of 'customer'
+        const clients = pipelineItems.filter(item => item.type === 'client');
+        console.log("📊 Found", clients.length, "clients");
+
         // Process New Leads
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -105,27 +108,32 @@ export function OverviewCards() {
           endDate.setDate(today.getDate() - period.daysAgoStart);
           endDate.setHours(23, 59, 59, 999);
 
-          const periodCustomers = pipelineItems.filter(item => {
-            if (item.type !== 'customer' || !item.customer.created_at) return false;
+          // ✅ FIXED: Use 'client' type and check customer.created_at
+          const periodClients = clients.filter(item => {
+            if (!item.customer.created_at) return false;
             const createdDate = new Date(item.customer.created_at);
             return createdDate >= startDate && createdDate <= endDate;
           });
 
           return {
             date: period.label,
-            newLeads: periodCustomers.filter(c => c.customer.stage !== 'Rejected').length,
-            disqualified: periodCustomers.filter(c => c.customer.stage === 'Rejected').length,
+            newLeads: periodClients.filter(c => c.stage !== 'Rejected').length,
+            disqualified: periodClients.filter(c => c.stage === 'Rejected').length,
           };
         });
 
+        console.log("📊 Chart data:", chartData);
         setLeadsChartData(chartData);
 
-        const recentCustomers = pipelineItems.filter((item) => {
-          if (item.type !== "customer" || !item.customer.created_at) return false;
+        // ✅ FIXED: Use clients array instead of filtering by type
+        const recentClients = clients.filter((item) => {
+          if (!item.customer.created_at) return false;
           return new Date(item.customer.created_at) >= thirtyDaysAgo;
         });
         
-        setNewLeadsCount(recentCustomers.filter(c => c.customer.stage !== 'Rejected').length);
+        const newLeadsTotal = recentClients.filter(c => c.stage !== 'Rejected').length;
+        console.log("📈 New leads in last 30 days:", newLeadsTotal);
+        setNewLeadsCount(newLeadsTotal);
 
         // Process Pipeline
         const stageCounts: Record<string, number> = {
@@ -138,6 +146,8 @@ export function OverviewCards() {
             stageCounts[stage]++;
           }
         });
+
+        console.log("📊 Stage counts:", stageCounts);
 
         setPipelineData([
           { stage: "Lead", value: stageCounts['Lead'], fill: "var(--color-lead)" },
@@ -184,11 +194,10 @@ export function OverviewCards() {
         
         if (actionsRes.ok) {
           const actionsData: ActionItem[] = await actionsRes.json();
-          console.log("✅ Action items loaded:", actionsData);
+          console.log("✅ Action items loaded:", actionsData.length);
           setActionItems(actionsData);
 
           if (actionsData.length === 0 && showLoading) {
-            // Only check for missing action items on initial load
             console.log("📋 No action items found, checking for Accepted customers...");
             await createMissingActionItems();
           }
@@ -223,15 +232,15 @@ export function OverviewCards() {
         const pipelineItems: PipelineItem[] = await pipelineRes.json();
         console.log("📊 Total pipeline items:", pipelineItems.length);
         
-        // ✅ FIX: Filter for customers AND projects in Accepted stage
-        const acceptedCustomers = pipelineItems.filter(
-          item => (item.type === 'customer' || item.type === 'project') && item.stage === 'Accepted'
+        // ✅ FIXED: Filter for 'client' AND 'project' types in Accepted stage
+        const acceptedItems = pipelineItems.filter(
+          item => (item.type === 'client' || item.type === 'project') && item.stage === 'Accepted'
         );
                 
-        console.log(`📋 Found ${acceptedCustomers.length} items (customers + projects) in Accepted stage`);
+        console.log(`📋 Found ${acceptedItems.length} items in Accepted stage`);
         
-        if (acceptedCustomers.length === 0) {
-          console.log("ℹ️ No customers in Accepted stage");
+        if (acceptedItems.length === 0) {
+          console.log("ℹ️ No items in Accepted stage");
           return;
         }
         
@@ -244,8 +253,8 @@ export function OverviewCards() {
         
         // Create action items for customers that don't have one
         let createdCount = 0;
-        for (const item of acceptedCustomers) {
-          const customerId = item.customer.id;
+        for (const item of acceptedItems) {
+          const customerId = String(item.customer.id);
           
           if (existingCustomerIds.has(customerId)) {
             console.log(`⏭️ Skipping ${item.customer.name} - action item already exists`);
@@ -259,12 +268,11 @@ export function OverviewCards() {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                customer_id: customerId,
+                client_id: customerId,
               }),
             });
             
             if (createRes.ok) {
-              const responseData = await createRes.json();
               console.log(`✅ Created action item for ${item.customer.name}`);
               createdCount++;
             } else {
@@ -294,10 +302,7 @@ export function OverviewCards() {
     };
 
     if (userRole) {
-      // Initial load with spinner
       fetchActionItems(true);
-      
-      // Background refresh every 60 seconds WITHOUT spinner
       const interval = setInterval(() => fetchActionItems(false), 60000);
       return () => clearInterval(interval);
     }
@@ -320,7 +325,6 @@ export function OverviewCards() {
     }
   };
 
-  // Determine action items card color
   const hasActionItems = actionItems.length > 0;
   const cardBorderColor = hasActionItems ? "border-red-300" : "border-green-300";
   const cardBgColor = hasActionItems ? "bg-red-50/30" : "bg-green-50/30";
@@ -400,7 +404,7 @@ export function OverviewCards() {
         </CardFooter>
       </Card>
 
-      {/* Action Items - RED when pending, GREEN when complete */}
+      {/* Action Items */}
       <Card className={cn("border-2", cardBorderColor, cardBgColor)}>
         <CardHeader className={cn("border-b", headerBgColor)}>
           <div className="flex items-center gap-2">

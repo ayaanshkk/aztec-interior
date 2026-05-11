@@ -763,14 +763,14 @@ export default function CustomersPage() {
             <tbody className="divide-y divide-gray-200 bg-white">
               {isLoading ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center">  {/* Changed from 11 to 10 */}
+                  <td colSpan={10} className="px-6 py-12 text-center">
                     <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent text-gray-600"></div>
                     <p className="mt-4 text-gray-500">Loading customers...</p>
                   </td>
                 </tr>
               ) : paginatedCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center text-gray-500">  {/* Changed from 11 to 10 */}
+                  <td colSpan={10} className="px-6 py-12 text-center text-gray-500">  
                     <p className="text-lg">No customers found.</p>
                     {user?.role === "Salesperson" && (
                       <p className="mt-2 text-sm">Create your first customer to get started!</p>
