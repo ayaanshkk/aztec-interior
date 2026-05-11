@@ -4,3 +4,4 @@
 .next/type
 .next/types
 node_modules
+.env.local
