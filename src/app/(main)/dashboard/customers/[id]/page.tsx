@@ -93,6 +93,7 @@ interface Customer {
   marketing_opt_in: boolean;
   date_of_measure: string;
   status: string;
+  stage: string;
   notes: string;
   created_at: string;
   updated_at: string;
