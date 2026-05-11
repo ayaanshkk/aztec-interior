@@ -310,6 +310,7 @@ export default function ChecklistViewPage() {
     const additional_doors = [...(formData.additional_doors || [])];
     if (!additional_doors[index]) {
       additional_doors[index] = { 
+        door_type: "",
         door_style: "", 
         door_color: "", 
         door_manufacturer: "",
