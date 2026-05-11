@@ -151,7 +151,7 @@ export default function ChecklistViewPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   
   const [user, setUser] = useState<User | null>(null);
-  const [userRole, setUserRole] = useState<string>("manager");
+  const [userRole, setUserRole] = useState<string>("platform admin");
   const sidebarItems = getSidebarItems(userRole);
   
   const [formData, setFormData] = useState<FormData | null>(null);
@@ -177,13 +177,13 @@ export default function ChecklistViewPage() {
 
   const canEdit = () => {
     if (!user) return false;
-    const allowedRoles = ["manager", "hr", "sales", "production"];
+    const allowedRoles = ["platform admin","salesperson", "production team"];
     return allowedRoles.includes(user.role.toLowerCase());
   };
 
   const canDelete = () => {
     if (!user) return false;
-    const allowedRoles = ["manager", "hr", "sales", "production"];
+    const allowedRoles = ["platform admin","salesperson", "production team"];
     return allowedRoles.includes(user.role.toLowerCase());
   };
 
@@ -205,7 +205,7 @@ export default function ChecklistViewPage() {
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setUser(userData);
-          setUserRole(userData.role || "manager");
+          setUserRole(userData.role || "platform admin");
         }
       } catch (err) {
         console.error("Error fetching user:", err);

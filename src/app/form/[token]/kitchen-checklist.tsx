@@ -29,7 +29,7 @@ export default function KitchenChecklist() {
   const router = useRouter();
   const formRef = useRef<HTMLDivElement>(null);
   
-  const [userRole, setUserRole] = useState<string>("manager");
+  const [userRole, setUserRole] = useState<string>("platform admin");
   const sidebarItems = getSidebarItems(userRole);
 
   const [isSubmitting, setIsSubmitting] = useState(false);

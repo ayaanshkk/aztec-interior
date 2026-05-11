@@ -53,8 +53,8 @@ export function OperationalCards() {
           setNewLeadsData(generateNewLeadsData(customers.map((c: any) => c.customer)));
         }
 
-        // Fetch action items (only for Manager, HR, Production)
-        if (["Manager", "HR", "Production"].includes(userRole)) {
+        // Fetch action items (only for Platform Admin, Salesperson, Production Team)
+        if (["Platform Admin", "Salesperson", "Production Team"].includes(userRole)) {
           const actionsResponse = await fetchWithAuth("action-items");
           if (actionsResponse.ok) {
             const actionsData = await actionsResponse.json();
@@ -103,7 +103,7 @@ export function OperationalCards() {
         <Card className="h-96 animate-pulse">
           <div className="h-full bg-gray-100" />
         </Card>
-        {["Manager", "HR", "Production"].includes(userRole) && (
+        {["Platform Admin", "Salesperson", "Production Team"].includes(userRole) && (
           <Card className="h-96 animate-pulse">
             <div className="h-full bg-gray-100" />
           </Card>
@@ -166,8 +166,8 @@ export function OperationalCards() {
         </CardFooter>
       </Card>
 
-      {/* Action Items Card - Only for Manager, HR, Production */}
-      {["Manager", "HR", "Production"].includes(userRole) && (
+      {/* Action Items Card - Only for Platform Admin, Salesperson, Production Team */}
+      {["Platform Admin", "Salesperson", "Production Team"].includes(userRole) && (
         <Card className="border-2 border-orange-200 bg-orange-50/30">
           <CardHeader className="border-b border-orange-200 bg-orange-100/50">
             <div className="flex items-center gap-2">

@@ -33,10 +33,9 @@ interface Address {
 
 // Define stage permissions by role
 const ROLE_STAGE_PERMISSIONS: Record<string, string[]> = {
-  Sales: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted"],
-  Production: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "Rejected", "Production", "Delivery", "Installation"],
-  Manager: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "Rejected", "Production", "Delivery", "Installation", "Complete", "Remedial", "Cancelled"],
-  HR: ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "Rejected", "Production", "Delivery", "Installation", "Complete", "Remedial", "Cancelled"],
+  "Salesperson": ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted"],
+  "Production Team": ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "Rejected", "Production", "Delivery", "Installation"],
+  "Platform Admin": ["Lead", "Quote", "Consultation", "Survey", "Measure", "Design", "Quoted", "Accepted", "Rejected", "Production", "Delivery", "Installation", "Complete", "Remedial", "Cancelled"],
 };
 
 export default function CustomerEditPage() {
@@ -296,7 +295,7 @@ export default function CustomerEditPage() {
         title: "Sales User Permissions",
         message: "You can edit customer details and update stages up to 'Quoted'. For production stages and beyond, please contact your manager."
       };
-    } else if (userRole === "Production") {
+    } else if (userRole === "Production Team") {
       return {
         title: "Production User Permissions",
         message: "You can edit customer details and update stages up to 'Installation'. For final stages, please contact your manager."

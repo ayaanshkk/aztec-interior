@@ -18,7 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 // before the user interacts with it. We use .optional() and .pipe(z.enum(...)) to achieve this.
 
 // Define a literal type for the roles
-const Roles = ["Manager", "HR", "Sales", "Production"] as const;
+const Roles = ["Platform Admin", "Salesperson", "Production Team"] as const;
 type RoleType = (typeof Roles)[number];
 
 const FormSchema = z
@@ -161,10 +161,9 @@ export function RegisterForm() {
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Manager">Manager</SelectItem>
-                      <SelectItem value="HR">HR</SelectItem>
-                      <SelectItem value="Sales">Sales</SelectItem>
-                      <SelectItem value="Production">Production</SelectItem>
+                      <SelectItem value="Platform Admin">Platform Admin</SelectItem>
+                      <SelectItem value="Salesperson">Salesperson</SelectItem>
+                      <SelectItem value="Production Team">Production Team</SelectItem>
                     </SelectContent>
                   </Select>
                 </FormControl>

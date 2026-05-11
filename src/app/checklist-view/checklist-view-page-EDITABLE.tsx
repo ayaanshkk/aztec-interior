@@ -150,13 +150,13 @@ export default function ChecklistViewPage() {
 
   const canEdit = () => {
     if (!user) return false;
-    const allowedRoles = ["manager", "hr", "sales", "production"];
+    const allowedRoles = ["platform admin","salesperson", "production team"];
     return allowedRoles.includes(user.role.toLowerCase());
   };
 
   const canDelete = () => {
     if (!user) return false;
-    const allowedRoles = ["manager", "hr", "sales", "production"];
+    const allowedRoles = ["platform admin","salesperson", "production team"];
     return allowedRoles.includes(user.role.toLowerCase());
   };
 

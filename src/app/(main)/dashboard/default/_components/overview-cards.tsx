@@ -169,7 +169,7 @@ export function OverviewCards() {
   // Fetch Action Items SEPARATELY + Create for existing Accepted customers
   useEffect(() => {
     const fetchActionItems = async (showLoading = true) => {
-      if (!["Manager", "HR", "Production"].includes(userRole || "")) {
+      if (!["Platform Admin", "Salesperson", "Production Team"].includes(userRole || "")) {
         setLoadingActions(false);
         return;
       }

@@ -42,7 +42,7 @@ interface UserSettings {
   first_name: string;
   last_name: string;
   email: string;
-  role: "Manager" | "HR" | "Sales" | "Production" | "Staff" | string;
+  role: "Platform Admin" | "Salesperson" | "Production Team" | string;
   is_active: boolean;
   is_invited?: boolean;
   invitation_token?: string;
@@ -239,7 +239,7 @@ export default function SettingsPage() {
     // Normalize the role for comparison
     const userRoleLower = String(role).toLowerCase().trim();
     
-    return userRoleLower === "manager" || userRoleLower === "hr";
+    return userRoleLower === "platform admin" || userRoleLower === "salesperson";
   };
 
   const handleInviteUser = () => {
@@ -586,11 +586,9 @@ export default function SettingsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Manager">Manager</SelectItem>
-                        <SelectItem value="HR">HR</SelectItem>
-                        <SelectItem value="Sales">Sales</SelectItem>
-                        <SelectItem value="Production">Production</SelectItem>
-                        <SelectItem value="Staff">Staff</SelectItem>
+                        <SelectItem value="Platform Admin">Platform Admin</SelectItem>
+                        <SelectItem value="Salesperson">Salesperson</SelectItem>
+                        <SelectItem value="Production Team">Production Team</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -651,7 +649,7 @@ export default function SettingsPage() {
             {/* ONLY show the permission warning if not loading AND the user cannot manage */}
             {!canManageUsers() && (
               <div className="mb-4 rounded-lg bg-yellow-50 p-4 text-sm text-yellow-800">
-                You don't have permission to manage users. Only <strong>Manager</strong> and <strong>HR</strong> roles can invite, edit, or delete
+                You don't have permission to manage users. Only <strong>Platform Admin</strong> and <strong>Salesperson</strong> roles can invite, edit, or delete
                 users.
               </div>
             )}
@@ -696,11 +694,9 @@ export default function SettingsPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Manager">Manager</SelectItem>
-                              <SelectItem value="HR">HR</SelectItem>
-                              <SelectItem value="Sales">Sales</SelectItem>
-                              <SelectItem value="Production">Production</SelectItem>
-                              <SelectItem value="Staff">Staff</SelectItem>
+                              <SelectItem value="Platform Admin">Platform Admin</SelectItem>
+                              <SelectItem value="Salesperson">Salesperson</SelectItem>
+                              <SelectItem value="Production Team">Production Team</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

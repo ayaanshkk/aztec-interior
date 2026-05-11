@@ -278,43 +278,6 @@ export default function InvoicePage() {
           </Button>
         </div>
 
-        {/* COMMENTED OUT: Approval Status Badge */}
-        {/* {submissionId && (
-          <div
-            className={`mb-4 rounded-lg border-l-4 p-3 ${
-              approvalStatus === "approved"
-                ? "border-green-500 bg-green-50"
-                : approvalStatus === "rejected"
-                  ? "border-red-500 bg-red-50"
-                  : "border-yellow-500 bg-yellow-50"
-            } no-print`}
-          >
-            <div className="flex items-center">
-              <AlertCircle
-                className={`mr-2 h-5 w-5 ${
-                  approvalStatus === "approved"
-                    ? "text-green-600"
-                    : approvalStatus === "rejected"
-                      ? "text-red-600"
-                      : "text-yellow-600"
-                }`}
-              />
-              <span className="font-medium">
-                Status: <span className="capitalize">{approvalStatus}</span>
-                {userRole && <span className="ml-2 text-sm text-gray-500">({userRole} role)</span>}
-              </span>
-            </div>
-            {approvalStatus === "rejected" && rejectionReason && (
-              <p className="mt-1 ml-7 text-sm text-red-700">Reason: {rejectionReason}</p>
-            )}
-            {approvalStatus === "pending" && (
-              <p className="mt-1 ml-7 text-sm text-yellow-700">
-                Waiting for manager approval before PDF download is available.
-              </p>
-            )}
-          </div>
-        )} */}
-
         {message && (
           <div
             className={`mb-4 rounded-md p-3 text-sm font-medium ${

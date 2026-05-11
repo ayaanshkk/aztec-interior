@@ -33,6 +33,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import CreateProjectModal from "@/components/ui/CreateProjectModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -420,14 +421,6 @@ export default function CustomerDetailsPage() {
   const [showDeleteCustomerDialog, setShowDeleteCustomerDialog] = useState(false);
   const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
   const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
-  const [newProjectData, setNewProjectData] = useState({
-    project_name: "",
-    project_type: "Kitchen" as Project["project_type"],
-    stage: "Lead",
-    date_of_measure: "",
-    notes: "",
-  });
-  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -454,11 +447,22 @@ export default function CustomerDetailsPage() {
       }
 
       const customerData = await customerRes.json();
-      
+
       const normalizedCustomer = {
         ...customerData,
         postcode: customerData.post_code ?? customerData.postcode ?? "",
+        // ✅ ADD these normalizations
+        project_types: customerData.project_types || [],
+        stage: customerData.stage || 'Lead',
+        projects: customerData.projects || [],
       };
+
+      console.log('📊 Customer data loaded:', {
+        name: normalizedCustomer.name,
+        stage: normalizedCustomer.stage,
+        project_types: normalizedCustomer.project_types,
+        projects_count: normalizedCustomer.projects?.length
+      });
 
       if (user?.role === "Sales" && customerData.created_by !== user.id && customerData.salesperson !== user.name) {
         setHasAccess(true);
@@ -798,6 +802,8 @@ export default function CustomerDetailsPage() {
       );
 
       if (res.ok) {
+        // ✅ REMOVED: loadCustomerData() call
+        // ✅ Update state directly
         setFormDocuments((prev) => prev.filter((d) => d.id !== formDocToDelete.id));
         setShowDeleteFormDocDialog(false);
         setFormDocToDelete(null);
@@ -845,17 +851,34 @@ export default function CustomerDetailsPage() {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     const deletePromises = Array.from(selectedDrawings).map(drawingId =>
-      fetch(`https://aztec-interior.onrender.com/files/drawings/${drawingId}`, {
+      fetch(`${BACKEND_URL}/files/drawings/${drawingId}`, {
         method: "DELETE",
         headers
       })
     );
 
     try {
-      await Promise.all(deletePromises);
-      setDrawingDocuments(prev => prev.filter(d => !selectedDrawings.has(d.id)));
+      const results = await Promise.allSettled(deletePromises);
+      
+      // ✅ Check which deletions succeeded
+      const successfulDeletions = new Set<string>();
+      results.forEach((result, index) => {
+        const drawingId = Array.from(selectedDrawings)[index];
+        if (result.status === 'fulfilled' && result.value.ok) {
+          successfulDeletions.add(drawingId);
+        }
+      });
+      
+      // ✅ REMOVED: loadCustomerData() call
+      // ✅ Only remove successfully deleted items from state
+      setDrawingDocuments(prev => prev.filter(d => !successfulDeletions.has(d.id)));
       setSelectedDrawings(new Set());
       setShowBulkDeleteDrawingsDialog(false);
+      
+      // ✅ Show feedback only if some failed
+      if (successfulDeletions.size < selectedDrawings.size) {
+        alert(`${successfulDeletions.size} of ${selectedDrawings.size} files deleted. Some deletions failed.`);
+      }
     } catch (error) {
       console.error("Error bulk deleting drawings:", error);
       alert("Some files failed to delete. Please try again.");
@@ -915,10 +938,27 @@ export default function CustomerDetailsPage() {
     );
 
     try {
-      await Promise.all(deletePromises);
-      setFormDocuments(prev => prev.filter(d => !selectedFormDocs.has(d.id)));
+      const results = await Promise.allSettled(deletePromises);
+      
+      // ✅ Check which deletions succeeded
+      const successfulDeletions = new Set<string>();
+      results.forEach((result, index) => {
+        const docId = Array.from(selectedFormDocs)[index];
+        if (result.status === 'fulfilled' && result.value.ok) {
+          successfulDeletions.add(docId);
+        }
+      });
+      
+      // ✅ REMOVED: loadCustomerData() call
+      // ✅ Update state directly
+      setFormDocuments(prev => prev.filter(d => !successfulDeletions.has(d.id)));
       setSelectedFormDocs(new Set());
       setShowBulkDeleteFormDocsDialog(false);
+      
+      // ✅ Show feedback only if some failed
+      if (successfulDeletions.size < selectedFormDocs.size) {
+        alert(`${successfulDeletions.size} of ${selectedFormDocs.size} files deleted. Some deletions failed.`);
+      }
     } catch (error) {
       console.error("Error bulk deleting form documents:", error);
       alert("Some files failed to delete. Please try again.");
@@ -943,7 +983,6 @@ export default function CustomerDetailsPage() {
 
     const token = localStorage.getItem("token");
     const headers: HeadersInit = {};
-
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
@@ -954,39 +993,47 @@ export default function CustomerDetailsPage() {
     for (const file of Array.from(files)) {
       try {
         const formData = new FormData();
-        formData.append("file", file);
-        formData.append("customer_id", id);
+        formData.append("file", file); // ✅ Send actual file
+        formData.append("client_id", id); // ✅ Use client_id (not customer_id)
+        formData.append("category", "drawing"); // ✅ Specify category
         
         if (selectedProjectForUpload) {
           formData.append("project_id", selectedProjectForUpload);
         }
 
-        const response = await fetch("https://aztec-interior.onrender.com/files/drawings", {
+        // ✅ Use the correct backend route
+        const response = await fetch(`${BACKEND_URL}/files/documents`, {
           method: "POST",
-          headers: headers,
+          headers: headers, // Don't set Content-Type - browser sets it with boundary
           body: formData,
         });
 
         if (response.ok) {
           const data = await response.json();
-
-          if (data.drawing && data.drawing.id) {
+          
+          // ✅ Backend returns document object
+          if (data.document && data.document.id) {
             const newDoc: DrawingDocument = {
-              id: data.drawing.id,
-              filename: data.drawing.filename || data.drawing.file_name || file.name,
-              url: data.drawing.url || data.drawing.file_url,
-              type: data.drawing.type || data.drawing.category || "other",
-              created_at: data.drawing.created_at || new Date().toISOString(),
-              project_id: data.drawing.project_id,
+              id: String(data.document.id),
+              filename: data.document.file_name || file.name,
+              url: data.document.file_url,
+              type: data.document.document_category || "other",
+              created_at: new Date().toISOString(),
+              project_id: selectedProjectForUpload || undefined,
             };
 
             if (!newDoc.project_id) {
               uploadedDocs.push(newDoc);
             }
           }
+        } else {
+          const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
+          console.error('Upload failed:', errorData);
+          alert(`Failed to upload ${file.name}: ${errorData.error}`);
         }
       } catch (error) {
         console.error("Upload error:", error);
+        alert(`Error uploading ${file.name}`);
       }
     }
 
@@ -1049,11 +1096,16 @@ export default function CustomerDetailsPage() {
 
     try {
       const res = await fetch(
-        `https://aztec-interior.onrender.com/files/drawings/${drawingToDelete.id}`,
-        { method: "DELETE", headers }
+        `${BACKEND_URL}/files/drawings/${drawingToDelete.id}`,
+        { 
+          method: "DELETE", 
+          headers 
+        }
       );
 
       if (res.ok) {
+        // ✅ REMOVED: loadCustomerData() call
+        // ✅ Update state directly
         setDrawingDocuments((prev) =>
           prev.filter((d) => d.id !== drawingToDelete.id)
         );
@@ -1064,7 +1116,7 @@ export default function CustomerDetailsPage() {
         alert(`Failed to delete: ${err.error}`);
       }
     } catch (e) {
-      console.error(e);
+      console.error('Delete error:', e);
       alert("Network error");
     } finally {
       setIsDeletingDrawing(false);
@@ -1143,15 +1195,19 @@ export default function CustomerDetailsPage() {
           },
         }
       );
-  
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `Failed to delete quotation (${response.status})`);
       }
-  
+
       console.log('✅ Quotation deleted successfully');
       
-      await loadCustomerData(); 
+      // ✅ REMOVED: await loadCustomerData();
+      // ✅ Update state directly
+      setFinancialDocuments(prev => prev.filter(doc => 
+        !(doc.type === 'quotation' && doc.id === quoteId)
+      ));
       
       alert('✅ Quotation deleted successfully!');
     } catch (error) {
@@ -1190,32 +1246,78 @@ export default function CustomerDetailsPage() {
     const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
     const docType =
       doc.type ||
-      (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
+      (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif", "webp"].includes(fileExtension) ? "image" : "other");
+
+    // Truncate very long filenames for display
+    const displayFilename = doc.filename.length > 50 
+      ? doc.filename.substring(0, 47) + "..." 
+      : doc.filename;
+
+    const isAssignedToProject = !!doc.project_id;
 
     return (
       <div
         key={doc.id}
-        className="rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+        // ✅ REMOVED: All drag and drop attributes
+        className="rounded-lg border bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md"
       >
-        <div className="flex items-start justify-between">
-          <div className="flex flex-1 items-start space-x-4">
-            <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
-              {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
+        <div className="flex items-start gap-3">
+          {/* Checkbox and Drag Handle */}
+          {canEdit() && (
+            <div className="flex flex-shrink-0 flex-col items-center gap-2">
+              <Checkbox
+                checked={selectedDrawings.has(doc.id)}
+                onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
+              />
+              {/* ✅ REMOVED: Drag handle icon */}
             </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
-              <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
-              {doc.project_id && <p className="mt-1 text-xs text-blue-500">Project ID: {doc.project_id}</p>}
-            </div>
+          )}
+
+          {/* File Icon */}
+          <div className="flex-shrink-0 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
+            {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
           </div>
-          <Button
-            onClick={() => handleViewDrawing(doc)}
-            variant="outline"
-            className="ml-6 flex items-center space-x-2 px-4 py-2"
-          >
-            <Eye className="h-4 w-4" />
-            <span>View</span>
-          </Button>
+
+          {/* File Info */}
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate font-semibold text-gray-900" title={doc.filename}>
+              {displayFilename}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Uploaded: {formatDate(doc.created_at)}
+            </p>
+            {isAssignedToProject && (
+              <span className="mt-1 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                <Package className="mr-1 h-3 w-3" />
+                Assigned to project
+              </span>
+            )}
+            {/* ✅ REMOVED: Drag to assign message */}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <Button 
+              onClick={() => handleViewDrawing(doc)} 
+              variant="outline" 
+              size="sm" 
+              className="flex items-center gap-2"
+            >
+              <Eye className="h-4 w-4" />
+              <span>View</span>
+            </Button>
+            {canEdit() && (
+              <Button
+                onClick={() => handleDeleteDrawing(doc)}
+                disabled={isDeletingDrawing}
+                variant="outline"
+                size="sm"
+                className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -1427,17 +1529,6 @@ export default function CustomerDetailsPage() {
       return;
     }
     router.push(`/dashboard/customers/${id}/edit`);
-  };
-
-  const handleCreateProject = () => {
-    if (!canManageProjects() || !customer) return;
-
-    const queryParams = new URLSearchParams({
-      customerId: customer.id,
-      customerName: customer.name || "",
-    });
-
-    router.push(`/dashboard/projects/create?${queryParams.toString()}`);
   };
 
   const generateFormLink = (type: "bedroom" | "kitchen") => {
@@ -1692,63 +1783,6 @@ export default function CustomerDetailsPage() {
     
     window.open(`/checklists/bedroom?${params.toString()}`, '_blank');
   };
-
-const handleCreateNewProject = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  if (!newProjectData.project_name) {
-    alert("Please enter a project name");
-    return;
-  }
-
-  setIsCreatingProject(true);
-  const token = localStorage.getItem("token");
-
-  try {
-    // ✅ Use BACKEND_URL instead of hardcoded URL
-    const response = await fetch(`${BACKEND_URL}/projects`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        client_id: parseInt(id),  // ✅ Ensure it's an integer
-        project_title: newProjectData.project_name,  // ✅ Backend expects project_title
-        project_description: newProjectData.notes || "",
-        status: "Active",
-        stage_id: 100,  // ✅ Default to Survey stage (adjust if needed)
-        priority: "Medium",
-        start_date: newProjectData.date_of_measure || null,
-        notes: newProjectData.notes || "",
-      }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log("✅ Project created:", data);
-      alert("Project created successfully!");
-      setShowCreateProjectDialog(false);
-      setNewProjectData({
-        project_name: "",
-        project_type: "Kitchen",
-        stage: "Lead",
-        date_of_measure: "",
-        notes: "",
-      });
-      loadCustomerData();
-    } else {
-      const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
-      console.error("❌ Project creation error:", errorData);
-      alert(`Failed to create project: ${errorData.error}`);
-    }
-  } catch (error) {
-    console.error("❌ Error creating project:", error);
-    alert("Network error: Could not create project");
-  } finally {
-    setIsCreatingProject(false);
-  }
-};
 
   const handleViewJob = (jobId: string) => {
     router.push(`/dashboard/jobs/${jobId}`);
@@ -2251,26 +2285,11 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
     
     return (
       <div
-        draggable={!isAssignedToProject && canEdit()}
-        onDragStart={() => !isAssignedToProject && canEdit() && handleDragStart('form', String(submission.id))}
-        onDragEnd={handleDragEnd}
-        className={`flex items-center justify-between rounded-lg border bg-gray-50 p-4 transition hover:bg-gray-100 ${
-          !isAssignedToProject && canEdit() ? 'cursor-move hover:border-blue-400' : ''
-        } ${draggedItem?.type === 'form' && draggedItem?.id === String(submission.id) ? 'opacity-50' : ''}`}
+        // ✅ REMOVED: All drag and drop attributes
+        className="flex items-center justify-between rounded-lg border bg-gray-50 p-4 transition hover:bg-gray-100"
       >
         <div className="flex items-center space-x-3 flex-1">
-          {!isAssignedToProject && canEdit() && (
-            <div className="flex flex-col items-center">
-              <svg 
-                className="h-5 w-5 text-gray-400" 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-              </svg>
-            </div>
-          )}
+          {/* ✅ REMOVED: Drag handle icon */}
           
           <div className="flex flex-col flex-1">
             <h3 className="text-lg font-semibold text-gray-900">{getFormTitle(submission)}</h3>
@@ -2284,9 +2303,7 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
                   Assigned to project
                 </span>
               )}
-              {!isAssignedToProject && canEdit() && (
-                <span className="text-xs text-blue-600 font-medium">← Drag to assign</span>
-              )}
+              {/* ✅ REMOVED: Drag to assign message */}
             </div>
           </div>
         </div>
@@ -2437,12 +2454,14 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
 
     setIsDeletingProject(true);
     const token = localStorage.getItem("token");
+    
     const headers: HeadersInit = {
+      "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,
     };
 
     try {
-      const response = await fetch(`https://aztec-interior.onrender.com/projects/${projectToDelete.id}`, {
+      const response = await fetch(`${BACKEND_URL}/projects/${projectToDelete.id}`, {
         method: "DELETE",
         headers: headers,
       });
@@ -2452,10 +2471,19 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
         throw new Error(errorData.error || `Failed to delete project (status: ${response.status})`);
       }
 
+      // ✅ REMOVED: loadCustomerData() call
+      // ✅ Update state directly
+      setCustomer(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          projects: prev.projects?.filter(p => p.id !== projectToDelete.id) || []
+        };
+      });
+      
       setShowDeleteProjectDialog(false);
       setProjectToDelete(null);
       alert(`Project "${projectToDelete.project_name}" deleted successfully!`);
-      loadCustomerData();
     } catch (error) {
       console.error("Error deleting project:", error);
       alert(`Error: ${(error as Error).message}`);
@@ -2467,6 +2495,7 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
   const handleDeleteForm = async () => {
     if (!formToDelete || !canDelete()) return;
     setIsDeleting(true);
+    
     try {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -2475,16 +2504,27 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
         return;
       }
 
-      const response = await fetch(`https://aztec-interior.onrender.com/form-submissions/${formToDelete.id}`, {
+      // ✅ FIXED: Use correct blueprint prefix /api/form
+      const response = await fetch(`${BACKEND_URL}/api/form/form-submissions/${formToDelete.id}`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
       });
 
       if (response.ok) {
-        loadCustomerData();
+        // ✅ Update state directly instead of reloading
+        setCustomer(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            form_submissions: prev.form_submissions.filter(
+              form => form.id !== formToDelete.id
+            )
+          };
+        });
+        
         setShowDeleteDialog(false);
         setFormToDelete(null);
       } else {
@@ -2540,14 +2580,6 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
   }
 
   if (!customer) return <div className="p-8">Customer not found.</div>;
-
-  const projectTypesFromProjects = customer.projects?.map((p) => p.project_type) || [];
-  const projectTypesFromLegacyField = customer.project_types || [];
-
-  const allProjectTypes = Array.from(new Set([
-    ...projectTypesFromProjects,
-    ...projectTypesFromLegacyField,
-  ])).filter(Boolean);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -2931,9 +2963,10 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-gray-500">Project Type</span>
                       <div className="mt-1">
-                        {allProjectTypes.length > 0 ? (
+                        {/* ✅ Use project_types array instead of allProjectTypes */}
+                        {customer.project_types && customer.project_types.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
-                            {Array.from(new Set(allProjectTypes)).map((type, index) => (
+                            {customer.project_types.map((type, index) => (
                               <span
                                 key={index}
                                 className={`inline-flex rounded-full px-2 py-1 text-sm font-semibold ${getProjectTypeColor(type)}`}
@@ -2947,25 +2980,23 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
                         )}
                       </div>
                     </div>
+                    
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-gray-500">Pipeline Stage</span>
                       <div className="mt-1">
-                        {customer.projects && customer.projects.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {customer.projects.map((project, index) => (
-                              <span
-                                key={index}
-                                className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${getStageColor(project.stage)}`}
-                              >
-                                {project.stage}
-                              </span>
-                            ))}
-                          </div>
+                        {/* ✅ Use customer.stage directly */}
+                        {customer.stage ? (
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-sm font-medium ${getStageColor(customer.stage)}`}
+                          >
+                            {customer.stage}
+                          </span>
                         ) : (
                           <span className="text-base text-gray-900">—</span>
                         )}
                       </div>
                     </div>
+                    
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-gray-500">Customer Since</span>
                       <span className="mt-1 text-base text-gray-900">{formatDate(customer.created_at)}</span>
@@ -3109,84 +3140,10 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
               </div>
 
               {drawingDocuments.length > 0 ? (
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-2">
                   {drawingDocuments
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                    .map((doc) => {
-                      const fileExtension = doc.filename.split(".").pop()?.toLowerCase() || "other";
-                      const docType = doc.type || (fileExtension === "pdf" ? "pdf" : ["png", "jpg", "jpeg", "gif"].includes(fileExtension) ? "image" : "other");
-                      const isAssignedToProject = !!doc.project_id;
-
-                      return (
-                        <div
-                          key={doc.id}
-                          draggable={!isAssignedToProject && canEdit()}
-                          onDragStart={() => !isAssignedToProject && canEdit() && handleDragStart('drawing', doc.id)}
-                          onDragEnd={handleDragEnd}
-                          className={`rounded-lg border bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
-                            !isAssignedToProject && canEdit() ? 'cursor-move hover:border-blue-400' : ''
-                          } ${draggedItem?.type === 'drawing' && draggedItem?.id === doc.id ? 'opacity-50' : ''}`}
-                        >
-                          <div className="flex items-start justify-between">
-                            {canEdit() && (
-                              <div className="mr-3 flex flex-col items-center">
-                                <Checkbox
-                                  checked={selectedDrawings.has(doc.id)}
-                                  onCheckedChange={() => handleToggleDrawingSelection(doc.id)}
-                                  className="mb-2"
-                                />
-                                {!isAssignedToProject && (
-                                  <svg 
-                                    className="h-5 w-5 text-gray-400" 
-                                    fill="none" 
-                                    stroke="currentColor" 
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-                                  </svg>
-                                )}
-                              </div>
-                            )}
-                            <div className="flex flex-1 items-start space-x-4">
-                              <div className="rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 p-3">
-                                {DRAWING_DOCUMENT_ICONS[docType] || <FileText className="h-5 w-5 text-gray-600" />}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <h3 className="truncate font-semibold text-gray-900">{doc.filename}</h3>
-                                <p className="mt-1 text-sm text-gray-500">Uploaded: {formatDate(doc.created_at)}</p>
-                                {isAssignedToProject ? (
-                                  <span className="mt-1 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                                    <Package className="mr-1 h-3 w-3" />
-                                    Assigned to project
-                                  </span>
-                                ) : (
-                                  canEdit() && (
-                                    <p className="mt-1 text-xs text-blue-600">← Drag to assign to project</p>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                            <div className="ml-6 flex items-center space-x-2">
-                              <Button onClick={() => handleViewDrawing(doc)} variant="outline" size="sm" className="flex items-center space-x-2">
-                                <Eye className="h-4 w-4" />
-                                <span>View</span>
-                              </Button>
-                              {canEdit() && (
-                                <Button
-                                  onClick={() => handleDeleteDrawing(doc)}
-                                  disabled={isDeletingDrawing}
-                                  variant="outline"
-                                  size="sm"
-                                  className="flex items-center space-x-2 text-red-600 hover:bg-red-50 hover:text-red-700 border-red-300"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    .map((doc) => renderDrawingDocument(doc))}
                 </div>
               ) : (
                 <div className="rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-12 text-center">
@@ -3213,7 +3170,7 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
               <div className="mb-6 flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900">Projects ({customer.projects?.length || 0})</h2>
                 {canManageProjects() && (
-                  <Button onClick={handleCreateProject} className="flex items-center space-x-2 bg-gray-900 hover:bg-gray-800">
+                  <Button onClick={() => setShowCreateProjectDialog(true)} className="flex items-center space-x-2 bg-gray-900 hover:bg-gray-800">
                     <Plus className="h-4 w-4" />
                     <span>New Project</span>
                   </Button>
@@ -3224,88 +3181,99 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   {customer.projects
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                    .map((project) => (
-                      <div
-                        key={project.id}
-                        className={`rounded-lg border bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-6 shadow-sm transition-all duration-200 hover:shadow-md ${
-                          dragOverProject === project.id ? 'ring-2 ring-blue-500 bg-blue-100/50' : ''
-                        }`}
-                        onDragOver={(e) => handleDragOver(e, project.id)}
-                        onDragLeave={handleDragLeave}
-                        onDrop={(e) => handleDrop(e, project.id)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="min-w-0 flex-1 pr-4">
-                            <div className="mb-2 flex items-center space-x-2">
-                              <Package className="h-5 w-5 text-blue-600" />
-                              <h3 className="truncate text-lg font-semibold text-gray-900">{project.project_name}</h3>
-                            </div>
-                            <div className="mt-3 space-y-2">
-                              <div className="flex items-center space-x-2">
-                                <span
-                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getProjectTypeColor(project.project_type)}`}
-                                >
-                                  {project.project_type}
-                                </span>
-                                <span
-                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStageColor(project.stage)}`}
-                                >
-                                  {project.stage}
-                                </span>
+                    .map((project) => {
+                      // ✅ COUNT checklists for THIS project
+                      const projectChecklistCount = customer.form_submissions?.filter(
+                        form => form.project_id === project.id
+                      ).length || 0;
+                      
+                      // ✅ COUNT financial docs for THIS project
+                      const projectFinancialCount = financialDocuments.filter(
+                        doc => doc.project_id === project.id
+                      ).length || 0;
+
+                      return (
+                        <div
+                          key={project.id}
+                          className="rounded-lg border bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-6 shadow-sm transition-all duration-200 hover:shadow-md"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="min-w-0 flex-1 pr-4">
+                              <div className="mb-2 flex items-center space-x-2">
+                                <Package className="h-5 w-5 text-blue-600" />
+                                <h3 className="truncate text-lg font-semibold text-gray-900">{project.project_name}</h3>
                               </div>
-                              <p className="text-sm text-gray-600">
-                                <Calendar className="mr-1 inline h-3 w-3" />
-                                Measure: {formatDate(project.date_of_measure || "")}
-                              </p>
-                              <p className="text-sm text-gray-600">
-                                <FileText className="mr-1 inline h-3 w-3" />
-                                {project.form_count} Form{project.form_count !== 1 ? "s" : ""}
-                              </p>
+                              <div className="mt-3 space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  <span
+                                    className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getProjectTypeColor(project.project_type)}`}
+                                  >
+                                    {project.project_type}
+                                  </span>
+                                  <span
+                                    className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStageColor(project.stage)}`}
+                                  >
+                                    {project.stage}
+                                  </span>
+                                </div>
+                                
+                                {/* Checklist count */}
+                                <p className="text-sm text-gray-600">
+                                  <ClipboardList className="mr-1 inline h-3 w-3" />
+                                  {projectChecklistCount} Checklist{projectChecklistCount !== 1 ? 's' : ''}
+                                </p>
+                                
+                                {/* Financial document count */}
+                                <p className="text-sm text-gray-600">
+                                  <DollarSign className="mr-1 inline h-3 w-3" />
+                                  {projectFinancialCount} Financial Document{projectFinancialCount !== 1 ? 's' : ''}
+                                </p>
+                              </div>
+                              {project.notes && <p className="mt-3 line-clamp-2 text-sm text-gray-500">{project.notes}</p>}
+                              {dragOverProject === project.id && (
+                                <p className="mt-2 text-xs text-blue-600 font-medium">Drop here to assign</p>
+                              )}
                             </div>
-                            {project.notes && <p className="mt-3 line-clamp-2 text-sm text-gray-500">{project.notes}</p>}
-                            {dragOverProject === project.id && (
-                              <p className="mt-2 text-xs text-blue-600 font-medium">Drop here to assign</p>
-                            )}
-                          </div>
-                          <div className="ml-4 flex flex-shrink-0 flex-col space-y-2">
-                            {canManageProjects() && (
-                              <>
-                                <Button
-                                  onClick={() => handleEditProject(project.id)}
-                                  variant="default"
-                                  size="sm"
-                                  className="flex items-center space-x-2 bg-gray-900 hover:bg-gray-800"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                  <span>Edit</span>
-                                </Button>
-                                <Button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteProject(project);
-                                  }}
-                                  variant="destructive"
-                                  size="sm"
-                                  className="flex items-center space-x-2"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  <span>Delete</span>
-                                </Button>
-                              </>
-                            )}
-                            <Button
-                              onClick={() => window.open(`/dashboard/projects/${project.id}`, '_blank')}
-                              variant="outline"
-                              size="sm"
-                              className="flex items-center space-x-2"
-                            >
-                              <Eye className="h-4 w-4" />
-                              <span>View</span>
-                            </Button>
+                            <div className="ml-4 flex flex-shrink-0 flex-col space-y-2">
+                              {canManageProjects() && (
+                                <>
+                                  <Button
+                                    onClick={() => window.open(`/dashboard/projects/${project.id}`, '_blank')}
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex items-center space-x-2"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    <span>View</span>
+                                  </Button>
+                                  <Button
+                                    onClick={() => handleEditProject(project.id)}
+                                    variant="default"
+                                    size="sm"
+                                    className="flex items-center space-x-2 bg-gray-900 hover:bg-gray-800"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                    <span>Edit</span>
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteProject(project);
+                                    }}
+                                    variant="destructive"
+                                    size="sm"
+                                    className="flex items-center space-x-2"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    <span>Delete</span>
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               ) : (
                 <div className="rounded-lg bg-gray-50 p-8 text-center text-gray-500">
@@ -3956,150 +3924,13 @@ const handleCreateNewProject = async (e: React.FormEvent) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Create Project Dialog */}
-      <Dialog open={showCreateProjectDialog} onOpenChange={setShowCreateProjectDialog}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Create New Project</DialogTitle>
-            <DialogDescription>
-              Create a new project for {customer?.name}. Fill in the details below.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {customer && (
-            <div className="rounded-lg bg-blue-50 p-4">
-              <p className="text-sm font-medium text-blue-900">
-                Linked Customer: {customer.name}
-              </p>
-              <p className="text-xs text-blue-700">
-                ID: {customer.id}
-              </p>
-            </div>
-          )}
-
-          <form onSubmit={handleCreateNewProject}>
-            <div className="grid gap-6 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="project_name">
-                  Project Name <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="project_name"
-                  placeholder="Customer's Project"
-                  value={newProjectData.project_name}
-                  onChange={(e) => setNewProjectData(prev => ({ ...prev, project_name: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="project_type">
-                    Project Type <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={newProjectData.project_type}
-                    onValueChange={(value) => setNewProjectData(prev => ({ 
-                      ...prev, 
-                      project_type: value as Project["project_type"] 
-                    }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PROJECT_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="stage">
-                    Initial Stage <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={newProjectData.stage}
-                    onValueChange={(value) => setNewProjectData(prev => ({ ...prev, stage: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PROJECT_STAGES.map((stage) => (
-                        <SelectItem key={stage} value={stage}>
-                          {stage}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="date_of_measure">Date of Measure (Optional)</Label>
-                <Input
-                  id="date_of_measure"
-                  type="date"
-                  value={newProjectData.date_of_measure}
-                  onChange={(e) => setNewProjectData(prev => ({ ...prev, date_of_measure: e.target.value }))}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="notes">Notes / Scope of Work (Optional)</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="Enter any initial notes or details about the project scope."
-                  value={newProjectData.notes}
-                  onChange={(e) => setNewProjectData(prev => ({ ...prev, notes: e.target.value }))}
-                  className="min-h-[100px]"
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowCreateProjectDialog(false);
-                  setNewProjectData({
-                    project_name: "",
-                    project_type: "Kitchen",
-                    stage: "Lead",
-                    date_of_measure: "",
-                    notes: "",
-                  });
-                }}
-                disabled={isCreatingProject}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isCreatingProject}
-                className="bg-gray-900 hover:bg-gray-800"
-              >
-                {isCreatingProject ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Briefcase className="mr-2 h-4 w-4" />
-                    Create Project
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CreateProjectModal
+        open={showCreateProjectDialog}
+        onOpenChange={setShowCreateProjectDialog}
+        onSuccess={loadCustomerData}
+        customerId={customer?.id || ""}
+        customerName={customer?.name || ""}
+      />
     </div>
   );
 }

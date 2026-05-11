@@ -58,10 +58,9 @@ export interface NavGroup {
 }
 
 // Define all sidebar items with role permissions
-const allSidebarItems: NavGroup[] = [
+const allSidebarItems: NavGroup[] = [   
   {
     id: 1,
-    label: "Dashboard",
     items: [
       {
         title: "Dashboard",
@@ -82,6 +81,12 @@ const allSidebarItems: NavGroup[] = [
         roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {
+        title: "Calendar",
+        url: "/dashboard/calendar",
+        icon: Calendar,
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
+      },
+      {
         title: "Tasks",
         url: "/dashboard/tasks",
         icon: Briefcase,
@@ -92,12 +97,6 @@ const allSidebarItems: NavGroup[] = [
         url: "/dashboard/materials",
         icon: Package,
         roles: ["Platform Admin", "Production Team"],
-      },
-      {
-        title: "Calendar",
-        url: "/dashboard/calendar",
-        icon: Calendar,
-        roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {
         title: "Forms/Checklists",
@@ -116,7 +115,7 @@ const allSidebarItems: NavGroup[] = [
         url: "/dashboard/pricelist",
         icon: PoundSterlingIcon,
         roles: ["Platform Admin"],
-        isNew: true, // Show "New" badge for visibility
+        isNew: true, 
       },
       {
         title: "Chatbot",

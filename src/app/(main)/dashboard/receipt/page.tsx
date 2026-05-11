@@ -161,43 +161,7 @@ export default function ReceiptViewPage() {
     }
   };
 
-  // Check approval status before download
-  // const checkApprovalStatus = async () => {
-  //   if (!submissionId) {
-  //     setSaveMessage("⚠️ Please save the receipt first.");
-  //     return false;
-  //   }
-
-  //   try {
-  //     const response = await fetch(`${BACKEND_URL}/approvals/status/${submissionId}`);
-  //     const data = await response.json();
-
-  //     setApprovalStatus(data.approval_status);
-  //     setRejectionReason(data.rejection_reason || "");
-
-  //     if (data.approval_status === "rejected") {
-  //       setSaveMessage(`❌ This receipt was rejected. Reason: ${data.rejection_reason}`);
-  //       return false;
-  //     } else if (data.approval_status === "pending") {
-  //       setSaveMessage("⚠️ This receipt is pending manager approval. You cannot download it yet.");
-  //       return false;
-  //     }
-
-  //     return true;
-  //   } catch (error) {
-  //     setSaveMessage("❌ Failed to check approval status.");
-  //     return false;
-  //   }
-  // };
-
   const handleDownloadPdf = async () => {
-    // Check approval status first
-    // const canDownload = await checkApprovalStatus();
-    // if (!canDownload) {
-    //   setTimeout(() => setSaveMessage(""), 5000);
-    //   return;
-    // }
-
     setSaveMessage("⌛ Generating PDF on server...");
     const data = getReceiptData();
 
