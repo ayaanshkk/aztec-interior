@@ -1259,7 +1259,7 @@ export default function EnhancedPipelinePage() {
                       >
                         {item.name}
                       </button>
-                      {item.type === "client" && item.project_count > 0 && (
+                      {item.type === "client" && item.project_count && item.project_count > 0 && (
                         <div className="text-xs text-gray-500 mt-0.5">
                           {item.project_count} project{item.project_count > 1 ? 's' : ''}
                         </div>
