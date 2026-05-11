@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -144,7 +144,7 @@ interface FormData {
   integ_freezer_order_date: string;
 }
 
-export default function ChecklistViewPage() {
+function ChecklistViewContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const formSubmissionId = searchParams.get("id");
@@ -2841,6 +2841,14 @@ export default function ChecklistViewPage() {
         }
       `}</style>
     </SidebarProvider>
+  );
+}
+
+export default function ChecklistViewPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <ChecklistViewContent />
+    </Suspense>
   );
 }
 
