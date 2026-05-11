@@ -464,10 +464,10 @@ export default function CustomerDetailsPage() {
         projects_count: normalizedCustomer.projects?.length
       });
 
-      if (user?.role === "Salesperson" && customerData.created_by !== user.id && customerData.salesperson !== user.name) {
+      if (user?.role === "Salesperson" && customerData.created_by !== user.id && customerData.salesperson !== user.employee_name) {
         setHasAccess(true);
       } else if (user?.role === "Staff") {
-        const hasPermission = customerData.created_by === user.id || customerData.salesperson === user.name;
+        const hasPermission = customerData.created_by === user.id || customerData.salesperson === user.employee_name;
         setHasAccess(hasPermission);
         if (!hasPermission) {
           setLoading(false);
