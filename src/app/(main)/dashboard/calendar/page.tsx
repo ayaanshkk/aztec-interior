@@ -920,23 +920,6 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {/* ✅ Show cache status
-      {cachedData && !loading && (
-        <div className="mb-4 rounded-lg bg-green-50 border border-green-200 p-2 text-sm text-green-800">
-          📦 Showing cached data • Last updated {Math.round((Date.now() - cachedData.timestamp) / 1000)}s ago
-        </div>
-      )} */}
-
-      {/* Loading indicator when fetching */}
-      {loading && (
-        <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-3 flex items-center gap-3">
-          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-          <span className="text-sm text-blue-800">
-            {tasks.length > 0 ? 'Refreshing data...' : 'Loading schedule data...'}
-          </span>
-        </div>
-      )}
-
       {/* Toolbar */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">

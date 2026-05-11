@@ -37,8 +37,19 @@ import { BACKEND_URL } from "@/lib/api";
 // ---------------- Constants ----------------
 const CUSTOMERS_PER_PAGE = 25;
 
+const PRODUCTION_STAGES = [
+  "Accepted",
+  "Ordered",
+  "Production",
+  "Delivery",
+  "Installation",
+  "Complete",
+  "Remedial",
+  "Rejected"
+];
+
 // All sales pipeline stages
-const SALES_STAGES = [
+const ALL_SALES_STAGES = [
   "Lead",
   "Survey",
   "Design",
@@ -199,6 +210,13 @@ export default function CustomersPage() {
   const router = useRouter();
   const { user } = useAuth();
 
+  const getAvailableStages = (): string[] => {
+    if (user?.role === "Production Team") {
+      return PRODUCTION_STAGES;
+    }
+    return ALL_SALES_STAGES;
+  };
+
   // Fetch customers and salespeople initially
   useEffect(() => {
     fetchCustomers();
@@ -355,24 +373,17 @@ export default function CustomersPage() {
 
   // ✅ STEP 1: Apply role-based filtering FIRST
   const roleFilteredCustomers = useMemo(() => {
-      if (user?.role === "Salesperson") {
-          const filtered = allCustomers.filter((customer: Customer) => {
-              // Match by assigned_employee_id instead of created_by
-              const customerAssignedId = String(customer.assigned_employee_id || "").trim();
-              const userId = String(user.id || "").trim();
-              const matchesAssignedId = customerAssignedId === userId;
-              
-              const customerSalesperson = String(customer.salesperson || "").trim();
-              const userName = String(user.employee_name || "").trim();
-              const matchesSalesperson = customerSalesperson.toLowerCase() === userName.toLowerCase();
-              
-              return matchesAssignedId || matchesSalesperson;
-          });
-          
-          return filtered;
-      }
-      
+    console.log("📊 Total customers loaded:", allCustomers.length);
+    console.log("👤 Current user role:", user?.role);
+    
+    // ✅ Platform Admin and Salesperson see ALL customers
+    if (user?.role === "Platform Admin" || user?.role === "Salesperson") {
+      console.log("✅ Showing all customers (no filtering)");
       return allCustomers;
+    }
+    
+    // Other roles still filtered (if any)
+    return allCustomers;
   }, [allCustomers, user]);
 
   // ✅ STEP 2: Sort with Accepted stage first, then by created_at DESC (latest first)
@@ -436,20 +447,20 @@ export default function CustomersPage() {
 
   // ---------------- Permissions ----------------
   const canEditCustomer = (customer: Customer): boolean => {
-      if (user?.role === "Platform Admin") return true;
-      if (user?.role === "Salesperson") {
-          // Use assigned_employee_id instead of created_by
-          const customerAssignedId = String(customer.assigned_employee_id || "").trim();
-          const userId = String(user.id || "").trim();
-          const customerSalesperson = String(customer.salesperson || "").trim().toLowerCase();
-          const userName = String(user.employee_name || "").trim().toLowerCase();
-          return customerAssignedId === userId || customerSalesperson === userName;
-      }
-      return false;
+    // ✅ Platform Admin and Salesperson can edit all customers
+    if (user?.role === "Platform Admin" || user?.role === "Salesperson") {
+      return true;
+    }
+    return false;
   };
 
-  const canDeleteCustomer = (customer: Customer): boolean =>
-    user?.role === "Platform Admin";
+  const canDeleteCustomer = (customer: Customer): boolean => {
+    // ✅ Platform Admin and Salesperson can delete all customers
+    if (user?.role === "Platform Admin" || user?.role === "Salesperson") {
+      return true;
+    }
+    return false;
+  };
 
   // const canViewTimeline = (): boolean => {
   //   return user?.role === "Platform Admin" || user?.role === "Production Team";
@@ -660,7 +671,8 @@ export default function CustomersPage() {
               <DropdownMenuItem onClick={() => setStageFilter("All")}>
                 All Stages
               </DropdownMenuItem>
-              {uniqueStages.map((stage) => (
+              {/* ✅ Use getAvailableStages() instead of uniqueStages */}
+              {getAvailableStages().map((stage) => (
                 <DropdownMenuItem key={stage} onClick={() => setStageFilter(stage as JobStage)}>
                   {stage}
                 </DropdownMenuItem>
@@ -786,7 +798,7 @@ export default function CustomersPage() {
                   return (
                     <React.Fragment key={customer.id}>
                       <tr
-                        onClick={() => !isEditing && router.push(`/dashboard/customers/${customer.id}`)}
+                        onClick={() => !isEditing && window.open(`/dashboard/customers/${customer.id}`, '_blank')}
                         className={`${!isEditing ? 'cursor-pointer' : ''} hover:bg-gray-50 transition-colors ${
                           !customer.has_documents ? 'bg-red-50' : ''
                         } ${isAccepted ? 'bg-purple-50' : ''}`}
@@ -897,7 +909,7 @@ export default function CustomersPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {SALES_STAGES.map((stage) => (
+                              {getAvailableStages().map((stage) => (
                                 <SelectItem key={stage} value={stage}>
                                   {stage}
                                 </SelectItem>

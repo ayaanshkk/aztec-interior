@@ -90,13 +90,13 @@ const allSidebarItems: NavGroup[] = [
         title: "Tasks",
         url: "/dashboard/tasks",
         icon: Briefcase,
-        roles: ["Platform Admin", "Production Team"],
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {
         title: "Orders",
         url: "/dashboard/materials",
         icon: Package,
-        roles: ["Platform Admin", "Production Team"],
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {
         title: "Forms/Checklists",
@@ -108,7 +108,7 @@ const allSidebarItems: NavGroup[] = [
         title: "Appliance Catalogue",
         url: "/dashboard/appliances",
         icon: Forklift,
-        roles: ["Platform Admin", "Production Team"],
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {
         title: "Price List",

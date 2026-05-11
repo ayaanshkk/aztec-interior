@@ -96,15 +96,15 @@ export async function fetchPublic(path: string, options: RequestInit = {}) {
  * Helper function to make authenticated API calls
  */
 export async function fetchWithAuth(path: string, options: RequestInit = {}) {
-  const token = localStorage.getItem("token"); // Changed from "auth_token"
+  const token = localStorage.getItem("token");
 
   const url = `${API_ROOT}${path.startsWith("/") ? "" : "/"}${path}`;
 
   console.log("📡 fetchWithAuth calling:", url);
 
   if (!token) {
-    console.error("No auth token found");
-    redirectToLogin();
+    console.error("❌ No auth token found in localStorage");
+    // ✅ DON'T redirect here - let component handle it
     throw new Error("Not authenticated");
   }
 
@@ -124,13 +124,14 @@ export async function fetchWithAuth(path: string, options: RequestInit = {}) {
       30000
     );
 
-    // Handle 401 - redirect to login
+    // Handle 401 - but DON'T auto-redirect during initial page load
     if (response.status === 401) {
       console.warn("⚠️ Got 401 - token expired or invalid");
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      redirectToLogin();
-      throw new Error("Authentication expired");
+      
+      // ✅ CRITICAL FIX: Don't clear auth immediately
+      // Let the AuthContext handle it via the auth guard
+      const errorData = await response.json().catch(() => ({ error: 'Unauthorized' }));
+      throw new Error(errorData.error || 'Authentication expired');
     }
 
     return response;

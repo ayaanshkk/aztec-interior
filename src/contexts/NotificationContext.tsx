@@ -1,12 +1,13 @@
 "use client";
 
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import { API_ROOT } from '@/lib/api'; // ✅ Import from centralized config
 
 interface Notification {
   id: string;
   message: string;
   read: boolean;
-  dismissed: boolean;  // ✅ NEW
+  dismissed: boolean;
   created_at: string;
   customer_id?: string;
   job_id?: string;
@@ -21,16 +22,14 @@ interface NotificationContextType {
   loading: boolean;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
-  dismissNotification: (id: string) => Promise<void>;  // ✅ NEW
+  dismissNotification: (id: string) => Promise<void>;
   deleteNotification: (id: string) => Promise<void>;
   clearAllNotifications: () => Promise<void>;
   fetchNotifications: () => Promise<void>;
-  fetchAllNotifications: () => Promise<void>;  // ✅ NEW: For full page
+  fetchAllNotifications: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -38,22 +37,34 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const unreadCount = notifications.filter(n => !n.read && !n.dismissed).length;
 
+  // ✅ Helper to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  };
+
   // ✅ Fetch notifications (for sidebar - excludes dismissed)
   const fetchNotifications = useCallback(async () => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch(`${BACKEND_URL}/notifications/production`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch(`${API_ROOT}/notifications`, {
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setNotifications(data);
+        // ✅ Map backend notification_id to frontend id
+        const mappedData = data.map((n: any) => ({
+          ...n,
+          id: String(n.notification_id),  // ✅ Convert to string for React keys
+          customer_id: n.customer_id || n.client_id,
+        }));
+        setNotifications(mappedData);
       }
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
@@ -62,22 +73,25 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  // ✅ NEW: Fetch ALL notifications (for full page - includes dismissed)
+  // ✅ Fetch ALL notifications (for full page - includes dismissed)
   const fetchAllNotifications = useCallback(async () => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch(`${BACKEND_URL}/notifications/production/all`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch(`${API_ROOT}/notifications/all`, {
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setNotifications(data);
+        // ✅ Map backend notification_id to frontend id
+        const mappedData = data.map((n: any) => ({
+          ...n,
+          id: String(n.notification_id),  // ✅ Convert to string for React keys
+          customer_id: n.customer_id || n.client_id,
+        }));
+        setNotifications(mappedData);
       }
     } catch (error) {
       console.error('Failed to fetch all notifications:', error);
@@ -88,13 +102,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const markAsRead = async (id: string) => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${BACKEND_URL}/notifications/production/${id}/read`, {
+      const response = await fetch(`${API_ROOT}/notifications/${id}/read`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -109,13 +119,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const markAllAsRead = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${BACKEND_URL}/notifications/production/mark-all-read`, {
+      const response = await fetch(`${API_ROOT}/notifications/mark-all-read`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -128,20 +134,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   };
 
-  // ✅ NEW: Dismiss notification (hide from sidebar, keep in full page)
+  // ✅ Dismiss notification (hide from sidebar, keep in full page)
   const dismissNotification = async (id: string) => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${BACKEND_URL}/notifications/production/${id}/dismiss`, {
+      const response = await fetch(`${API_ROOT}/notifications/${id}/dismiss`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
-        // Mark as dismissed in local state
         setNotifications(prev =>
           prev.map(n => (n.id === id ? { ...n, dismissed: true } : n))
         );
@@ -153,13 +154,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const deleteNotification = async (id: string) => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${BACKEND_URL}/notifications/production/${id}`, {
+      const response = await fetch(`${API_ROOT}/notifications/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -172,13 +169,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const clearAllNotifications = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${BACKEND_URL}/notifications/production/clear-all`, {
+      const response = await fetch(`${API_ROOT}/notifications/clear-all`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
@@ -203,11 +196,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         loading,
         markAsRead,
         markAllAsRead,
-        dismissNotification,  // ✅ NEW
+        dismissNotification,
         deleteNotification,
         clearAllNotifications,
         fetchNotifications,
-        fetchAllNotifications,  // ✅ NEW
+        fetchAllNotifications,
       }}
     >
       {children}

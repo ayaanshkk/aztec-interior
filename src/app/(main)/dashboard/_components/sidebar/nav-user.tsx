@@ -92,14 +92,14 @@ export function NavUser({
                 <CircleUser />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              {/* <DropdownMenuItem>
                 <CreditCard />
                 Billing
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <MessageSquareDot />
                 Notifications
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} disabled={loading} className="flex items-center gap-2">

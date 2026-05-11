@@ -3151,15 +3151,6 @@ export default function CustomerDetailsPage() {
                   <Image className="mx-auto mb-4 h-12 w-12 text-gray-300" />
                   <h3 className="mb-2 text-lg font-medium text-gray-900">No Drawings or Layouts</h3>
                   <p className="mb-4 text-sm text-gray-600">Upload CADs, sketches, photos, or client documentation here.</p>
-                  {canEdit() && (
-                    <Button
-                      onClick={handleUploadDrawing}
-                      className="flex items-center space-x-2 bg-gray-900 hover:bg-gray-800"
-                    >
-                      <Upload className="h-4 w-4" />
-                      <span>Upload File</span>
-                    </Button>
-                  )}
                 </div>
               )}
             </div>

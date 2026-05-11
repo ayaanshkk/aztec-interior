@@ -59,7 +59,7 @@ function formatNotificationMessage(message: string) {
         <div className="pl-3 border-l-2 border-blue-300 space-y-1">
           <p className="text-xs font-medium text-gray-700">Changes made:</p>
           {changes.map((change, idx) => (
-            <p key={idx} className="text-xs text-gray-600">
+            <p key={`change-${idx}-${change.slice(0, 20)}`} className="text-xs text-gray-600">
               {change.startsWith('(+') ? (
                 <span className="italic text-gray-500">{change}</span>
               ) : (
@@ -84,7 +84,7 @@ function formatNotificationMessage(message: string) {
         {detailLines.length > 0 && (
           <div className="pl-3 border-l-2 border-blue-300 space-y-0.5">
             {detailLines.map((line, idx) => (
-              <p key={idx} className="text-xs text-gray-600">
+              <p key={`detail-${idx}-${line.slice(0, 20)}`} className="text-xs text-gray-600">
                 {line}
               </p>
             ))}
@@ -294,7 +294,7 @@ export function NotificationSidebar() {
               </div>
             ) : (
               // Notification items
-              <div className="divide-y">
+              <div className="divide-y pb-4">  {/* ✅ Added pb-4 for bottom padding */}
                 {displayedNotifications.map((notification) => {
                   const priority = getNotificationPriority(notification);
                   const icon = getNotificationIcon(notification.message);
