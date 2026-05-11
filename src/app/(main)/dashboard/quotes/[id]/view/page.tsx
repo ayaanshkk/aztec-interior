@@ -44,7 +44,7 @@ export default function ViewQuotePage() {
         console.log("📋 Number of items:", data.items?.length);
         
         // Debug each item
-        data.items?.forEach((item, idx) => {
+        data.items?.forEach((item: any, idx: number) => {
           console.log(`Item ${idx}:`, {
             item_name: item.item_name,
             item: item.item,
