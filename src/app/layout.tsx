@@ -21,7 +21,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <PreferencesStoreProvider>
+          <PreferencesStoreProvider themeMode="light" themePreset="default">
             <NotificationProvider>
               {children}
             </NotificationProvider>
