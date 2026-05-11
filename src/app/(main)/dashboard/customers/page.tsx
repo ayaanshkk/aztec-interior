@@ -404,8 +404,7 @@ export default function CustomersPage() {
         (customer.address || "").toLowerCase().includes(term) ||
         // (customer.email || "").toLowerCase().includes(term) ||
         (customer.phone || "").toLowerCase().includes(term) ||
-        (customer.postcode || "").toLowerCase().includes(term) ||
-        String(customer.display_id || "").toLowerCase().includes(term);
+        (customer.postcode || "").toLowerCase().includes(term);
 
       // Stage filter
       const customerStageLower = (customer.stage || "").trim().toLowerCase();
