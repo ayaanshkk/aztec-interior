@@ -34,7 +34,7 @@ interface PricelistItem {
   height: number;
   depth: number;
   category: string;
-  brand?: string;
+  brand?: string;  // ✅ Already added
 }
 
 interface GroupedItem {
