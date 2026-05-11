@@ -464,7 +464,7 @@ export default function CustomerDetailsPage() {
         projects_count: normalizedCustomer.projects?.length
       });
 
-      if (user?.role === "Sales" && customerData.created_by !== user.id && customerData.salesperson !== user.name) {
+      if (user?.role === "Salesperson" && customerData.created_by !== user.id && customerData.salesperson !== user.name) {
         setHasAccess(true);
       } else if (user?.role === "Staff") {
         const hasPermission = customerData.created_by === user.id || customerData.salesperson === user.name;
@@ -1662,8 +1662,8 @@ export default function CustomerDetailsPage() {
   };
 
   const handleCreateRemedialChecklist = () => {
-    if (user?.role === "Sales") {
-      alert("Sales users cannot create remedial checklists. Please contact your Platform Admin.");
+    if (user?.role === "Salesperson") {
+      alert("Salesperson users cannot create remedial checklists. Please contact your Platform Admin.");
       return;
     }
     router.push(`/dashboard/checklists/remedial?${buildCustomerQuery()}`);
