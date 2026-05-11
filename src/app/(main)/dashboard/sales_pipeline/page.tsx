@@ -264,8 +264,8 @@ export default function EnhancedPipelinePage() {
   const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] = useState(false);
   
   // Get user role and permissions
-  const userRole = (user?.role || "Staff") as UserRole;
-  const permissions = ROLE_PERMISSIONS[userRole as keyof typeof ROLE_PERMISSIONS] || ROLE_PERMISSIONS.Staff;
+  const userRole = (user?.role || "Salesperson") as UserRole;
+  const permissions = ROLE_PERMISSIONS[userRole as keyof typeof ROLE_PERMISSIONS] || ROLE_PERMISSIONS.Salesperson;
 
   // Filter visible stages/columns based on user role
   const visibleStages: Stage[] = useMemo(() => {
