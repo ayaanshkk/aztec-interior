@@ -810,7 +810,9 @@ export default function CustomersPage() {
                           ) : (
                             <div className="flex items-center space-x-2">
                               {!customer.has_documents && (
-                                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" title="No documents" />
+                                <span title="No documents">
+                                  <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                                </span>
                               )}
                               {isAccepted && (
                                 <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse" title="Accepted stage" />
