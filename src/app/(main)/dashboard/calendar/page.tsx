@@ -471,10 +471,10 @@ export default function SchedulePage() {
   useEffect(() => {
     if (!user || !token) return;
 
-    setVisibleCalendars([user.full_name]);
+    setVisibleCalendars([user.employee_name]);
 
     const fetchEmployees = async () => {
-      if (user.role !== "PLatform Admin") return;
+      if (user.role !== "Platform Admin") return;
 
       try {
         const res = await fetchWithAuth("auth/users/staff");
