@@ -212,29 +212,26 @@ export default function CreateQuotePage() {
       }
 
       console.log(`🔍 Auto-fill triggered for code: "${trimmedValue}"`);
-      console.log(`   Door Type: ${doorType}`);
-      console.log(`   Room Type: ${roomType}`);
       setAutoFilling(id);
 
       try {
         const token = localStorage.getItem("token");
         const tenantId = localStorage.getItem("tenantId") || "7";
 
-        // ✅ Detect if this is an appliance code (contains letters and numbers, typically 8+ chars)
+        // ✅ NEW: Detect if this is an appliance model code
         const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(trimmedValue);
         
         const requestBody: any = {
           description: trimmedValue,
-          door_type: doorType,
-          room_type: roomType,
         };
 
-        // ✅ If it's an appliance code, don't send door_type (appliances don't have doors)
-        if (isApplianceCode) {
-          console.log('🔥 Detected appliance code pattern');
-          delete requestBody.door_type;
-          delete requestBody.room_type;
+        // ✅ Only send door_type/room_type for Kitchen/Bedroom items
+        if (!isApplianceCode) {
+          requestBody.door_type = doorType;
+          requestBody.room_type = roomType;
         }
+
+        console.log(`   Request body:`, requestBody);
 
         const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
           method: "POST",
@@ -249,14 +246,20 @@ export default function CreateQuotePage() {
         const data = await response.json();
 
         if (data.found) {
-          // Auto-fill ALL fields
+          // ✅ NEW: Build description with brand and series for appliances
+          let autoDescription = data.description || data.item_name || '';
+          
+          if (isApplianceCode && data.brand && data.series_level) {
+            autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
+          }
+
           setItems((prevItems) =>
             prevItems.map((item) => {
               if (item.id === id) {
                 return {
                   ...item,
-                  item: data.item_code || trimmedValue,  // Use returned item_code
-                  description: data.description || data.item_name || '',  // ← Auto-fill description
+                  item: data.item_code || trimmedValue,
+                  description: autoDescription,
                   amount: data.price || 0,
                   width: data.width,
                   height: data.height,
@@ -269,13 +272,8 @@ export default function CreateQuotePage() {
           );
 
           console.log(`✅ Auto-filled: ${data.item_name} - £${data.price}`);
-          console.log(`   Description: ${data.description || data.item_name}`);
-          if (data.brand) {
-            console.log(`   Brand: ${data.brand}`);
-          }
-          if (data.width || data.height || data.depth) {
-            console.log(`   Dimensions: ${data.width}×${data.height}×${data.depth}mm`);
-          }
+          if (data.brand) console.log(`   Brand: ${data.brand}`);
+          if (data.series_level) console.log(`   Series: ${data.series_level}`);
         } else {
           console.log("❌ No pricing found for code:", trimmedValue);
         }

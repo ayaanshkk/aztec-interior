@@ -104,17 +104,17 @@ const allSidebarItems: NavGroup[] = [
         icon: FileText,
         roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
-      {
-        title: "Appliance Catalogue",
-        url: "/dashboard/appliances",
-        icon: Forklift,
-        roles: ["Platform Admin", "Salesperson", "Production Team"],
-      },
+      // {
+      //   title: "Appliance Catalogue",
+      //   url: "/dashboard/appliances",
+      //   icon: Forklift,
+      //   roles: ["Platform Admin", "Salesperson", "Production Team"],
+      // },
       {
         title: "Price List",
         url: "/dashboard/pricelist",
         icon: PoundSterlingIcon,
-        roles: ["Platform Admin"],
+        roles: ["Platform Admin", "Salesperson"],
         isNew: true, 
       },
       {

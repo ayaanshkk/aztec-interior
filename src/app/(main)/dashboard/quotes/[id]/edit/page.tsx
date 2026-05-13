@@ -315,33 +315,28 @@ export default function EditQuotePage() {
     if (field === 'item' && value && value.length >= 2) {
       const trimmedValue = value.trim();
       
-      // Skip auto-fill if it looks like a full item name (contains spaces or is too long)
+      // Skip auto-fill if it looks like a full item name
       if (trimmedValue.includes(' ') || trimmedValue.length > 20) {
         return;
       }
 
       console.log(`🔍 Item code auto-fill: "${trimmedValue}"`);
-      console.log(`   Door Type: ${doorType}`);
-      console.log(`   Room Type: ${roomType}`);
       setAutoFilling(index);
 
       const token = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
 
-      // Detect if this is an appliance code
+      // ✅ NEW: Detect appliance code pattern
       const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(trimmedValue);
       
       const requestBody: any = {
         description: trimmedValue,
-        door_type: doorType,
-        room_type: roomType,
       };
 
-      // If it's an appliance code, don't send door_type
-      if (isApplianceCode) {
-        console.log('🔥 Detected appliance code pattern');
-        delete requestBody.door_type;
-        delete requestBody.room_type;
+      // Only send door_type for non-appliances
+      if (!isApplianceCode) {
+        requestBody.door_type = doorType;
+        requestBody.room_type = roomType;
       }
 
       fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
@@ -356,12 +351,19 @@ export default function EditQuotePage() {
       .then(res => res.json())
       .then(data => {
         if (data.found) {
+          // ✅ Build rich description for appliances
+          let autoDescription = data.description || data.item_name || '';
+          
+          if (isApplianceCode && data.brand && data.series_level) {
+            autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
+          }
+
           setItems(prevItems => {
             const newItems = [...prevItems];
             newItems[index] = {
               ...newItems[index],
               item: data.item_code || trimmedValue,
-              description: data.description || data.item_name || '',
+              description: autoDescription,
               amount: data.price || 0,
               width: data.width,
               height: data.height,
