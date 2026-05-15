@@ -440,12 +440,12 @@ export default function EditQuotePage() {
   const handleSave = async () => {
     if (saving) return;
 
-    if (!formData.name?.trim()) {
+    if (!customerData.name?.trim()) {
       alert("Customer name is required");
       return;
     }
 
-    if (!formData.address?.trim()) {
+    if (!customerData.address?.trim()) {
       alert("Customer address is required");
       return;
     }
@@ -456,9 +456,11 @@ export default function EditQuotePage() {
         : item.line_total;
       return sum + itemTotal;
     }, 0);
-    
+
     const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
     const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
+    const vat = subtotal * (vatPercentage / 100);
+    const total = subtotal + vat;
     
     if (subtotal <= 0) {
       alert("Please add at least one item with a valid price");
@@ -478,12 +480,12 @@ export default function EditQuotePage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          client_id: customerId,
-          customer_name: formData.name,
-          customer_address: formData.address,
-          customer_phone: formData.phone,
-          customer_email: formData.email,
-          date: formData.date,
+          client_id: quotation.client_id, // Use quotation.client_id instead of customerId
+          customer_name: customerData.name,
+          customer_address: customerData.address,
+          customer_phone: customerData.phone,
+          customer_email: customerData.email || '', // Add fallback
+          date: customerData.date,
           items: items
             .filter(item => {
               const hasItem = item.item && item.item.trim().length > 0;
@@ -508,8 +510,8 @@ export default function EditQuotePage() {
           vat,
           total,
           vat_percentage: vatPercentage,
-          global_discount_percent: globalDiscountPercent,  // NEW: Add global discount
-          global_discount_amount: globalDiscountAmount,    // NEW: Add discount amount
+          global_discount_percent: globalDiscountPercent,
+          global_discount_amount: globalDiscountAmount,
         }),
       });
 
@@ -617,18 +619,15 @@ export default function EditQuotePage() {
         <div className="mb-6 grid grid-cols-2 gap-4">
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Door Type <span className="text-red-600">*</span>
+              Room Type <span className="text-red-600">*</span>
             </label>
             <select
-              value={doorType}
-              onChange={(e) => setDoorType(e.target.value)}
+              value={roomType}
+              onChange={(e) => setRoomType(e.target.value)}
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="Carcass Only">Carcass Only (No Doors/Drawers)</option>
-              <option value="Basic Slab">Basic Slab</option>
-              <option value="Acrylic Gloss/Matt">Acrylic Gloss/Matt</option>
-              <option value="Vinyl Doors">Vinyl Doors</option>
-              <option value="Black Glass">Black Glass</option>
+              <option value="Kitchen">Kitchen</option>
+              <option value="Bedrooms">Bedrooms</option>
             </select>
           </div>
 
