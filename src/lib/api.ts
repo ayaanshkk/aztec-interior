@@ -783,4 +783,10 @@ export const api = {
     // Return blob for file download
     return response.blob();
   },
+
+  debugPricelist: async () => {
+    const response = await fetchWithAuth('/api/pricelist/debug');
+    console.log('🐛 DEBUG DATA:', response);
+    return response;
+  },
 };

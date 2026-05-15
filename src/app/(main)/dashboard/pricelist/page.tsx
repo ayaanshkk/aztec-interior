@@ -19,8 +19,8 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-type Category = 'Kitchen' | 'Bedrooms' | 'Appliances';
-type DoorType = 'Basic Slab' | 'Acrylic Gloss/Matt' | 'Vinyl Doors' | 'Black Glass' | 'Base Cabinet Only';
+type Category = 'Kitchen' | 'Bedrooms' | 'Appliances' | 'Fillers & End Panels' | 'Accessories' | 'Handles';
+type DoorType = 'Carcass Only' | 'Basic Slab' | 'Acrylic Gloss/Matt' | 'Vinyl Doors' | 'Black Glass' | 'Base Cabinet Only';
 type ApplianceSeries = 'Low' | 'Mid' | 'High';
 
 interface PricelistItem {
@@ -40,7 +40,7 @@ interface PricelistItem {
 interface GroupedItem {
   item_code: string;
   item_name: string;
-  brand?: string; // NEW: For appliances
+  brand?: string;
   width: number;
   height: number;
   depth: number;
@@ -48,8 +48,8 @@ interface GroupedItem {
     [key: string]: {
       price: number;
       pricelist_id: number;
-      series?: string; // For appliances - S2, S4, S6, S8
-      model?: string;  // For appliances - model number
+      series?: string;
+      model?: string;
     };
   };
 }
@@ -68,7 +68,7 @@ export default function PricelistPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const itemsPerPage = 20; // Show 20 grouped items per page
+  const itemsPerPage = 20;
   
   // Edit mode
   const [editingCode, setEditingCode] = useState<string | null>(null);
@@ -84,33 +84,71 @@ export default function PricelistPage() {
 
   // Door types / Series based on active tab
   const doorTypes: DoorType[] = activeTab === 'Kitchen' 
-    ? ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass']
+    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass']
     : activeTab === 'Bedrooms'
     ? ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Base Cabinet Only']
-    : []; // Appliances doesn't use door types
+    : activeTab === 'Fillers & End Panels'
+    ? ['Basic Slab', 'Acrylic Gloss/Matt']
+    : activeTab === 'Accessories'
+    ? ['Standard']  // ← ADD THIS
+    : activeTab === 'Handles'
+    ? ['Standard']  // ← ADD THIS
+    : [];
   
   const applianceSeries: ApplianceSeries[] = ['Low', 'Mid', 'High'];
   const brands = ['All', 'Bosch', 'Siemens', 'Neff', 'Samsung'];
 
-  // Fetch all pricelist items (no backend pagination, we'll paginate grouped results)
+  // Fetch all pricelist items
   const fetchPricelistItems = useCallback(async () => {
     try {
       setLoading(true);
       
-      const filters: any = {
-        category: activeTab,
-        per_page: 1000
-      };
+      // Fetch ALL items for tenant
+      const response = await api.getPricelist({ per_page: 1000 });
       
-      // Add brand filter for Appliances
-      if (activeTab === 'Appliances' && selectedBrand !== 'All') {
-        filters.brand = selectedBrand;
+      // Filter on frontend based on activeTab
+      let filteredItems = response.items || [];
+      
+      if (activeTab === 'Fillers & End Panels') {
+        // ONLY show items with exact category match
+        filteredItems = filteredItems.filter(item => 
+          item.category === 'Fillers & End Panels'
+        );
+      } else if (activeTab === 'Kitchen') {
+        const kitchenCategories = [
+          'Base Units', 'Dresser Units', 'Larder P/O', 
+          'Larder Units', 'Top Box', 'Finishing', 'Misc', 'Quad', 'Kitchen'
+        ];
+        filteredItems = filteredItems.filter(item => 
+          kitchenCategories.includes(item.category)
+        );
+      } else if (activeTab === 'Bedrooms') {
+        const bedroomCategories = ['Wardrobes', 'Chest of drawers', 'Linen Press'];
+        filteredItems = filteredItems.filter(item => 
+          bedroomCategories.includes(item.category)
+        );
+      } else if (activeTab === 'Accessories') {
+        // ONLY Accessories category
+        filteredItems = filteredItems.filter(item => 
+          item.category === 'Accessories'
+        );
+        } else if (activeTab === 'Handles') {
+          filteredItems = filteredItems.filter(item => 
+            item.category === 'Handles'
+          );
+        } else {
+        // Appliances, etc.
+        filteredItems = filteredItems.filter(item => 
+          item.category === activeTab
+        );
+        if (activeTab === 'Appliances' && selectedBrand !== 'All') {
+          filteredItems = filteredItems.filter(item => 
+            item.brand === selectedBrand
+          );
+        }
       }
       
-      // @ts-ignore
-      const response = await api.getPricelist(filters);
-      
-      setPricelistItems(response.items || []);
+      setPricelistItems(filteredItems);
       setError(null);
     } catch (err: any) {
       setError(err.message);
@@ -118,6 +156,19 @@ export default function PricelistPage() {
       setLoading(false);
     }
   }, [activeTab, selectedBrand]);
+
+  useEffect(() => {
+    const checkDebug = async () => {
+      try {
+        // @ts-ignore
+        const debugData = await api.debugPricelist();
+        console.log('🐛 DEBUG RESPONSE:', debugData);
+      } catch (err) {
+        console.error('Debug error:', err);
+      }
+    };
+    checkDebug();
+  }, []);
 
   useEffect(() => {
     fetchPricelistItems();
@@ -130,19 +181,16 @@ export default function PricelistPage() {
       return;
     }
 
-    // Group differently for Appliances vs Kitchen/Bedrooms
     const grouped = pricelistItems.reduce((acc, item) => {
-      // For Appliances, group by item_name + brand (so Bosch and Siemens don't mix!)
-      // For Kitchen/Bedrooms, group by item_code
       const groupKey = activeTab === 'Appliances' 
-        ? `${item.item_name}|${item.brand || 'Unknown'}` // ← FIXED: Include brand in key
+        ? `${item.item_name}|${item.brand || 'Unknown'}`
         : item.item_code;
       
       if (!acc[groupKey]) {
         acc[groupKey] = {
-          item_code: groupKey, // For appliances, this will be "HOB 90cm Gas|Bosch"
+          item_code: groupKey,
           item_name: item.item_name,
-          brand: item.brand, // ← NEW: Store brand for display
+          brand: item.brand,
           width: item.width,
           height: item.height,
           depth: item.depth,
@@ -150,7 +198,6 @@ export default function PricelistPage() {
         };
       }
       
-      // Extract series info from description for appliances
       let seriesInfo = '';
       if (activeTab === 'Appliances' && item.description) {
         const match = item.description.match(/\(([^)]+)\)/);
@@ -169,7 +216,6 @@ export default function PricelistPage() {
 
     let items = Object.values(grouped);
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       items = items.filter(item => 
@@ -178,27 +224,23 @@ export default function PricelistPage() {
       );
     }
 
-    // Sort by code
     items.sort((a, b) => a.item_code.localeCompare(b.item_code));
 
     setGroupedItems(items);
     setTotalItems(items.length);
     setTotalPages(Math.ceil(items.length / itemsPerPage));
-    setCurrentPage(1); // Reset to first page on data change
+    setCurrentPage(1);
   }, [pricelistItems, searchQuery]);
 
-  // Get items for current page
   const paginatedItems = groupedItems.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  // Reset page when tab or search changes
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, searchQuery]);
 
-  // Handle edit
   const startEdit = (item: GroupedItem) => {
     setEditingCode(item.item_code);
     setEditForm({
@@ -218,7 +260,6 @@ export default function PricelistPage() {
 
   const saveEdit = async (code: string) => {
     try {
-      // Update each door type's price
       const updates = Object.entries(editForm.prices).map(([doorType, data]: [string, any]) => {
         if (data.pricelist_id) {
           // @ts-ignore
@@ -246,12 +287,10 @@ export default function PricelistPage() {
     }
   };
 
-  // Handle delete
   const handleDelete = async (item: GroupedItem) => {
     if (!confirm(`Are you sure you want to delete ${item.item_code} with all its door types?`)) return;
 
     try {
-      // Delete all door type rows for this code
       const deletions = Object.values(item.prices).map((data: any) => {
         // @ts-ignore
         return api.deletePricelistItem(data.pricelist_id);
@@ -268,7 +307,6 @@ export default function PricelistPage() {
     }
   };
 
-  // Handle Excel upload
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadFile) return;
@@ -291,7 +329,6 @@ export default function PricelistPage() {
     }
   };
 
-  // Handle Excel export
   const handleExport = async () => {
     try {
       // @ts-ignore
@@ -318,20 +355,17 @@ export default function PricelistPage() {
     try {
       setSaving(true);
       
-      // Validation
       if (!newItemForm.item_code || !newItemForm.item_name) {
         alert('Please fill in item code and name');
         return;
       }
       
       if (activeTab === 'Appliances') {
-        // Appliances validation
         if (!newItemForm.brand || !newItemForm.series_level || !newItemForm.base_price) {
           alert('Please fill in brand, series level, and price for appliances');
           return;
         }
         
-        // Build description for appliances
         const seriesInfo = newItemForm.series_info || '';
         const description = `${newItemForm.item_name} - ${newItemForm.series_level} Series${seriesInfo ? ` (${seriesInfo})` : ''}`;
         
@@ -359,7 +393,6 @@ export default function PricelistPage() {
           return;
         }
         
-        // Create multiple rows - one for each door type
         const createPromises = doorTypesWithPrices.map(([doorType, price]) => {
           const description = `${newItemForm.item_name} - ${doorType}`;
           
@@ -386,7 +419,6 @@ export default function PricelistPage() {
       setSuccess(`Item added successfully!`);
       setTimeout(() => setSuccess(null), 3000);
       
-      // Close modal and refresh
       setShowAddModal(false);
       setNewItemForm({});
       fetchPricelistItems();
@@ -399,6 +431,13 @@ export default function PricelistPage() {
     }
   };
   
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP',
+    }).format(value);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -450,6 +489,39 @@ export default function PricelistPage() {
             >
               Appliances
             </button>
+
+            <button
+              onClick={() => setActiveTab('Handles')}
+              className={`px-6 py-2 rounded-lg font-medium transition ${
+                activeTab === 'Handles'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Handles
+            </button>
+
+            <button
+              onClick={() => setActiveTab('Accessories')}
+              className={`px-6 py-2 rounded-lg font-medium transition ${
+                activeTab === 'Accessories'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Accessories
+            </button>
+
+            <button
+              onClick={() => setActiveTab('Fillers & End Panels')}
+              className={`px-6 py-2 rounded-lg font-medium transition ${
+                activeTab === 'Fillers & End Panels'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Fillers & End Panels
+            </button>
           </div>
 
           {/* Search and Brand Filter */}
@@ -465,7 +537,6 @@ export default function PricelistPage() {
               />
             </div>
             
-            {/* Brand filter for Appliances */}
             {activeTab === 'Appliances' && (
               <select
                 value={selectedBrand}
@@ -528,41 +599,21 @@ export default function PricelistPage() {
                         </th>
                       )}
                       {activeTab === 'Appliances' ? (
-                        // Appliances: Show Low Model/Series/Price, Mid Model/Series/Price, High Model/Series/Price
                         <>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Low Model
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Series
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Price
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Mid Model
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Series
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Price
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            High Model
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Series
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Price
-                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Low Model</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Series</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mid Model</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Series</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">High Model</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Series</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
                         </>
                       ) : (
-                        // Kitchen/Bedrooms: Show door types
                         doorTypes.map(doorType => (
                           <th key={doorType} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                            {doorType}
+                            {doorType === 'Carcass Only' ? 'Carcass' : doorType}
                           </th>
                         ))
                       )}
@@ -580,17 +631,14 @@ export default function PricelistPage() {
                     {paginatedItems.map((item) => (
                       <tr key={item.item_code} className="hover:bg-gray-50">
                         {editingCode === item.item_code ? (
-                          // Edit mode
                           <>
                             <td className="px-4 py-3 whitespace-nowrap">
                               {activeTab === 'Appliances' ? (
-                                // Appliances: Show item name + brand (not editable)
                                 <div>
                                   <div className="text-sm font-medium text-gray-900">{editForm.item_name}</div>
                                   <div className="text-xs text-gray-500">{editForm.brand}</div>
                                 </div>
                               ) : (
-                                // Kitchen/Bedrooms: Show code (not editable)
                                 <input
                                   type="text"
                                   value={editForm.item_code}
@@ -610,130 +658,51 @@ export default function PricelistPage() {
                               </td>
                             )}
                             {activeTab === 'Appliances' ? (
-                              // Appliances: Edit Model (disabled), Series (disabled), Price (editable) for each level
                               <>
-                                {/* Low */}
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <input
-                                    type="text"
-                                    value={editForm.prices?.['Low']?.model || ''}
-                                    className="w-28 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
-                                    disabled
-                                  />
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <input
-                                    type="text"
-                                    value={editForm.prices?.['Low']?.series || ''}
-                                    className="w-12 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
-                                    disabled
-                                  />
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  {editForm.prices?.['Low'] ? (
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={editForm.prices['Low'].price || ''}
-                                      onChange={(e) => setEditForm({
-                                        ...editForm,
-                                        prices: {
-                                          ...editForm.prices,
-                                          'Low': {
-                                            ...editForm.prices['Low'],
-                                            price: e.target.value
-                                          }
-                                        }
-                                      })}
-                                      className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
-                                    />
-                                  ) : (
-                                    <span className="text-gray-400">-</span>
-                                  )}
-                                </td>
-                                
-                                {/* Mid */}
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <input
-                                    type="text"
-                                    value={editForm.prices?.['Mid']?.model || ''}
-                                    className="w-28 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
-                                    disabled
-                                  />
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <input
-                                    type="text"
-                                    value={editForm.prices?.['Mid']?.series || ''}
-                                    className="w-12 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
-                                    disabled
-                                  />
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  {editForm.prices?.['Mid'] ? (
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={editForm.prices['Mid'].price || ''}
-                                      onChange={(e) => setEditForm({
-                                        ...editForm,
-                                        prices: {
-                                          ...editForm.prices,
-                                          'Mid': {
-                                            ...editForm.prices['Mid'],
-                                            price: e.target.value
-                                          }
-                                        }
-                                      })}
-                                      className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
-                                    />
-                                  ) : (
-                                    <span className="text-gray-400">-</span>
-                                  )}
-                                </td>
-                                
-                                {/* High */}
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <input
-                                    type="text"
-                                    value={editForm.prices?.['High']?.model || ''}
-                                    className="w-28 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
-                                    disabled
-                                  />
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <input
-                                    type="text"
-                                    value={editForm.prices?.['High']?.series || ''}
-                                    className="w-12 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
-                                    disabled
-                                  />
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  {editForm.prices?.['High'] ? (
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      value={editForm.prices['High'].price || ''}
-                                      onChange={(e) => setEditForm({
-                                        ...editForm,
-                                        prices: {
-                                          ...editForm.prices,
-                                          'High': {
-                                            ...editForm.prices['High'],
-                                            price: e.target.value
-                                          }
-                                        }
-                                      })}
-                                      className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
-                                    />
-                                  ) : (
-                                    <span className="text-gray-400">-</span>
-                                  )}
-                                </td>
+                                {['Low', 'Mid', 'High'].map((level) => (
+                                  <>
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                      <input
+                                        type="text"
+                                        value={editForm.prices?.[level]?.model || ''}
+                                        className="w-28 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
+                                        disabled
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                      <input
+                                        type="text"
+                                        value={editForm.prices?.[level]?.series || ''}
+                                        className="w-12 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
+                                        disabled
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                      {editForm.prices?.[level] ? (
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={editForm.prices[level].price || ''}
+                                          onChange={(e) => setEditForm({
+                                            ...editForm,
+                                            prices: {
+                                              ...editForm.prices,
+                                              [level]: {
+                                                ...editForm.prices[level],
+                                                price: e.target.value
+                                              }
+                                            }
+                                          })}
+                                          className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                        />
+                                      ) : (
+                                        <span className="text-gray-400">-</span>
+                                      )}
+                                    </td>
+                                  </>
+                                ))}
                               </>
                             ) : (
-                              // Kitchen/Bedrooms: Edit door type prices
                               doorTypes.map(doorType => (
                                 <td key={doorType} className="px-4 py-3 whitespace-nowrap">
                                   {editForm.prices[doorType] ? (
@@ -804,7 +773,6 @@ export default function PricelistPage() {
                             </td>
                           </>
                         ) : (
-                          // View mode
                           <>
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                               {activeTab === 'Appliances' ? (
@@ -822,45 +790,24 @@ export default function PricelistPage() {
                               </td>
                             )}
                             {activeTab === 'Appliances' ? (
-                              // Appliances: Show Model, Series, Price for Low/Mid/High
                               <>
-                                {/* Low */}
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                                  {item.prices['Low']?.model || <span className="text-gray-400">-</span>}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                                  {item.prices['Low']?.series || <span className="text-gray-400">-</span>}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                  {item.prices['Low'] ? `£${item.prices['Low'].price?.toFixed(2) || '0.00'}` : <span className="text-gray-400">-</span>}
-                                </td>
-                                
-                                {/* Mid */}
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                                  {item.prices['Mid']?.model || <span className="text-gray-400">-</span>}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                                  {item.prices['Mid']?.series || <span className="text-gray-400">-</span>}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                  {item.prices['Mid'] ? `£${item.prices['Mid'].price?.toFixed(2) || '0.00'}` : <span className="text-gray-400">-</span>}
-                                </td>
-                                
-                                {/* High */}
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                                  {item.prices['High']?.model || <span className="text-gray-400">-</span>}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                                  {item.prices['High']?.series || <span className="text-gray-400">-</span>}
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                                  {item.prices['High'] ? `£${item.prices['High'].price?.toFixed(2) || '0.00'}` : <span className="text-gray-400">-</span>}
-                                </td>
+                                {['Low', 'Mid', 'High'].map((level) => (
+                                  <>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                      {item.prices[level]?.model || <span className="text-gray-400">-</span>}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                      {item.prices[level]?.series || <span className="text-gray-400">-</span>}
+                                    </td>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                      {item.prices[level] ? `£${item.prices[level].price?.toFixed(2) || '0.00'}` : <span className="text-gray-400">-</span>}
+                                    </td>
+                                  </>
+                                ))}
                               </>
                             ) : (
-                              // Kitchen/Bedrooms: Show door type prices
                               doorTypes.map(doorType => (
-                                <td key={doorType} className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                <td key={doorType} className={`px-4 py-3 whitespace-nowrap text-sm ${doorType === 'Carcass Only' ? ' font-medium text-black-900' : 'text-gray-900'}`}>
                                   {item.prices[doorType] ? (
                                     `£${item.prices[doorType].price?.toFixed(2) || '0.00'}`
                                   ) : (
@@ -954,7 +901,6 @@ export default function PricelistPage() {
             </div>
       
             <div className="p-6 space-y-4">
-              {/* Common Fields */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Item Code *
@@ -983,16 +929,19 @@ export default function PricelistPage() {
                 />
               </div>
       
-              {/* Kitchen/Bedrooms: Multiple Door Type Prices */}
               {activeTab !== 'Appliances' && (
                 <div className="border-t pt-4">
                   <h3 className="text-sm font-medium text-gray-900 mb-3">Prices by Door Type</h3>
-                  <p className="text-xs text-gray-500 mb-4">Enter prices for each door type (at least one required)</p>
+                  <p className="text-xs text-gray-500 mb-4">
+                    💡 Enter carcass price first, then door/drawer component prices separately
+                  </p>
                   
                   <div className="space-y-3">
                     {doorTypes.map(doorType => (
                       <div key={doorType} className="flex items-center gap-3">
-                        <label className="w-48 text-sm text-gray-700">{doorType}</label>
+                        <label className={`w-48 text-sm ${doorType === 'Carcass Only' ? 'font-semibold text-blue-900' : 'text-gray-700'}`}>
+                          {doorType === 'Carcass Only' ? '🏗️ ' + doorType : doorType}
+                        </label>
                         <div className="flex-1 relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">£</span>
                           <input
@@ -1006,7 +955,9 @@ export default function PricelistPage() {
                                 [doorType]: e.target.value
                               }
                             })}
-                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                            className={`w-full pl-7 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-900 ${
+                              doorType === 'Carcass Only' ? 'border-blue-300 bg-blue-50' : 'border-gray-300'
+                            }`}
                             placeholder="0.00"
                           />
                         </div>
@@ -1016,7 +967,6 @@ export default function PricelistPage() {
                 </div>
               )}
       
-              {/* Appliances: Brand and Series */}
               {activeTab === 'Appliances' && (
                 <>
                   <div>
@@ -1083,7 +1033,6 @@ export default function PricelistPage() {
                 </>
               )}
       
-              {/* Dimensions - Not for Appliances */}
               {activeTab !== 'Appliances' && (
                 <div className="grid grid-cols-3 gap-4">
                   <div>

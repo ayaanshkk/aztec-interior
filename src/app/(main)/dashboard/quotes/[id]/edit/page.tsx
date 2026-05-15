@@ -34,7 +34,7 @@ export default function EditQuotePage() {
   const [autoFilling, setAutoFilling] = useState<number | null>(null);
   
   // ✅ NEW: Door type and room type with URL param initialization
-  const [doorType, setDoorType] = useState<string>('Basic Slab');
+  const [doorType, setDoorType] = useState<string>('Carcass Only');
   const [roomType, setRoomType] = useState<string>('Kitchen');
   
   const [vatPercentage, setVatPercentage] = useState<number>(20);

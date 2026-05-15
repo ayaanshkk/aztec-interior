@@ -48,13 +48,13 @@ export default function CreateQuotePage() {
   ]);
 
   const [saving, setSaving] = useState(false);
-  const [autoFilling, setAutoFilling] = useState<string | null>(null);  // Track which item is auto-filling
+  const [autoFilling, setAutoFilling] = useState<string | null>(null);
   
-  // ✅ NEW: Door type and room type for pricing
-  const [doorType, setDoorType] = useState<string>('Basic Slab');
+  // ✅ Door type and room type for pricing
+  const [doorType, setDoorType] = useState<string>('Carcass Only');
   const [roomType, setRoomType] = useState<string>('Kitchen');
   
-  // ✅ NEW: VAT percentage (default 20%)
+  // ✅ VAT percentage (default 20%)
   const [vatPercentage, setVatPercentage] = useState<number>(20);
 
   const formatCurrency = (value: number) => {
@@ -87,7 +87,6 @@ export default function CreateQuotePage() {
   }, [searchParams, user]);
 
   useEffect(() => {
-    // Re-fetch prices for all items when door type or room type changes
     const updateAllPrices = async () => {
       console.log(`🔄 Door/Room type changed - updating all prices...`);
       console.log(`   New Door Type: ${doorType}`);
@@ -96,28 +95,31 @@ export default function CreateQuotePage() {
       const token = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
   
-      // Create array of promises for all items that have an item code
       const updatePromises = items.map(async (item, index) => {
-        // Skip if no item code
         if (!item.item || item.item.trim().length === 0) {
           return null;
         }
   
         const itemCode = item.item.trim();
         
+        // ✅ NEW: Check if item has a suffix (e.g., 50B-BS)
+        const hasSuffix = itemCode.includes('-');
+        
         // Detect if this is an appliance code
-        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(itemCode);
+        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(itemCode.split('-')[0]);
         
         const requestBody: any = {
           description: itemCode,
-          door_type: doorType,
-          room_type: roomType,
         };
   
-        // If it's an appliance code, don't send door_type
-        if (isApplianceCode) {
-          delete requestBody.door_type;
-          delete requestBody.room_type;
+        // ✅ If item has suffix, don't send door_type (backend will use suffix to determine component)
+        // ✅ If item has no suffix, use the dropdown door type
+        if (!hasSuffix && !isApplianceCode) {
+          requestBody.door_type = doorType;
+          requestBody.room_type = roomType;
+        } else if (!isApplianceCode) {
+          // Item has suffix - still send room_type but not door_type
+          requestBody.room_type = roomType;
         }
   
         try {
@@ -150,10 +152,8 @@ export default function CreateQuotePage() {
         }
       });
   
-      // Wait for all price lookups to complete
       const results = await Promise.all(updatePromises);
   
-      // Update items with new prices
       setItems((prevItems) =>
         prevItems.map((item) => {
           const result = results.find((r) => r && r.id === item.id);
@@ -172,13 +172,12 @@ export default function CreateQuotePage() {
       console.log(`🎯 Finished updating all prices`);
     };
   
-    // Only run if we have items with codes
     const hasItemsWithCodes = items.some(item => item.item && item.item.trim().length > 0);
     
     if (hasItemsWithCodes) {
       updateAllPrices();
     }
-  }, [doorType, roomType]); // Re-run whenever doorType or roomType changes
+  }, [doorType, roomType]);
  
 
   // ============================================================================
@@ -204,7 +203,7 @@ export default function CreateQuotePage() {
 
     // ✅ AUTO-FILL: Trigger when ITEM field changes (code lookup)
     if (field === 'item' && value && value.length >= 2) {
-      const trimmedValue = value.trim();
+      const trimmedValue = value.trim().toUpperCase();
       
       // Skip auto-fill if it looks like a full item name (contains spaces or is too long)
       if (trimmedValue.includes(' ') || trimmedValue.length > 20) {
@@ -212,22 +211,33 @@ export default function CreateQuotePage() {
       }
 
       console.log(`🔍 Auto-fill triggered for code: "${trimmedValue}"`);
+      
+      // ✅ NEW: Check if code has suffix (e.g., 50B-BS)
+      const hasSuffix = trimmedValue.includes('-');
+      
       setAutoFilling(id);
 
       try {
         const token = localStorage.getItem("token");
         const tenantId = localStorage.getItem("tenantId") || "7";
 
-        // ✅ NEW: Detect if this is an appliance model code
-        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(trimmedValue);
+        // Get base code (before suffix)
+        const baseCode = trimmedValue.split('-')[0];
+        
+        // ✅ Detect if this is an appliance model code
+        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(baseCode);
         
         const requestBody: any = {
-          description: trimmedValue,
+          description: trimmedValue,  // Send full code with suffix
         };
 
-        // ✅ Only send door_type/room_type for Kitchen/Bedroom items
-        if (!isApplianceCode) {
+        // ✅ If code has suffix, don't send door_type (backend will use suffix)
+        // ✅ If code has no suffix, use the dropdown door type
+        if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
+          requestBody.room_type = roomType;
+        } else if (!isApplianceCode) {
+          // Has suffix - still send room_type but not door_type
           requestBody.room_type = roomType;
         }
 
@@ -246,7 +256,7 @@ export default function CreateQuotePage() {
         const data = await response.json();
 
         if (data.found) {
-          // ✅ NEW: Build description with brand and series for appliances
+          // ✅ Build description with brand and series for appliances
           let autoDescription = data.description || data.item_name || '';
           
           if (isApplianceCode && data.brand && data.series_level) {
@@ -258,7 +268,7 @@ export default function CreateQuotePage() {
               if (item.id === id) {
                 return {
                   ...item,
-                  item: data.item_code || trimmedValue,
+                  item: trimmedValue,
                   description: autoDescription,
                   amount: data.price || 0,
                   width: data.width,
@@ -272,6 +282,7 @@ export default function CreateQuotePage() {
           );
 
           console.log(`✅ Auto-filled: ${data.item_name} - £${data.price}`);
+          if (hasSuffix) console.log(`   🎯 Suffix pricing: Component-only`);
           if (data.brand) console.log(`   Brand: ${data.brand}`);
           if (data.series_level) console.log(`   Series: ${data.series_level}`);
         } else {
@@ -322,8 +333,8 @@ export default function CreateQuotePage() {
         },
         body: JSON.stringify({
           description: value,
-          door_type: doorType,      // ← Use selected door type
-          room_type: roomType,      // ← Use selected room type
+          door_type: doorType,
+          room_type: roomType,
         }),
       });
 
@@ -410,7 +421,7 @@ export default function CreateQuotePage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          client_id: customerId,  // ✅ Changed from customer_id to client_id
+          client_id: customerId,
           customer_name: formData.name,
           customer_address: formData.address,
           customer_phone: formData.phone,
@@ -418,7 +429,6 @@ export default function CreateQuotePage() {
           date: formData.date,
           items: items
             .filter(item => {
-              // Only include items that have either item name OR description with actual content
               const hasItem = item.item && item.item.trim().length > 0;
               const hasDescription = item.description && item.description.trim().length > 0;
               const hasAmount = item.line_total > 0;
@@ -448,11 +458,9 @@ export default function CreateQuotePage() {
         
         alert(`✅ Quote #${quoteId} created successfully!`);
         
-        // ✅ Open the quote in a new tab
         const quoteUrl = `/dashboard/quotes/${quoteId}`;
         window.open(quoteUrl, '_blank');
         
-        // ✅ Then redirect back to customer page
         if (customerId) {
           router.push(`/dashboard/customers/${customerId}`);
         } else {
@@ -528,7 +536,7 @@ export default function CreateQuotePage() {
         {/* Quotation Title */}
         <h1 className="mb-6 text-center text-2xl font-bold">QUOTATION</h1>
 
-        {/* ✅ NEW: Door Type and Room Type Selection */}
+        {/* ✅ Door Type and Room Type Selection */}
         <div className="mb-6 grid grid-cols-2 gap-4">
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">
@@ -553,22 +561,36 @@ export default function CreateQuotePage() {
               onChange={(e) => setDoorType(e.target.value)}
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
+              <option value="Carcass Only">Carcass Only (No Doors/Drawers)</option>
               <option value="Basic Slab">Basic Slab</option>
               <option value="Acrylic Gloss/Matt">Acrylic Gloss/Matt</option>
-              <option value="Vinyl">Vinyl</option>
+              <option value="Vinyl Doors">Vinyl Doors</option>
               <option value="Black Glass">Black Glass</option>
             </select>
           </div>
         </div>
 
-        {/* Info Banner */}
-        <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800">
-          <p className="font-medium">
+        {/* ✅ NEW: Info Banner with Suffix Instructions */}
+        <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-4">
+          <p className="font-medium text-sm text-blue-900 mb-2">
             💡 Selected: <span className="font-bold">{roomType}</span> with <span className="font-bold">{doorType}</span> doors
           </p>
-          <p className="mt-1 text-xs text-blue-600">
+          <p className="text-xs text-blue-700 mb-2">
             Prices will be automatically looked up based on these selections when you enter item codes.
           </p>
+          <div className="mt-3 pt-3 border-t border-blue-200">
+            <p className="text-xs font-semibold text-blue-900 mb-1">🎯 Component-Only Pricing (Advanced):</p>
+            <p className="text-xs text-blue-700">
+              Add a suffix to quote components separately:
+            </p>
+            <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
+              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = Carcass + {doorType} doors (complete unit)</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-BS</code> = Basic Slab door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-AG</code> = Acrylic door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
+            </ul>
+          </div>
         </div>
 
         {/* Customer Information */}
@@ -659,8 +681,8 @@ export default function CreateQuotePage() {
                       <Input
                         value={item.item}
                         onChange={(e) => handleItemChange(item.id, "item", e.target.value)}
-                        placeholder="Item name or code"
-                        className={`border-none focus-visible:ring-0 min-w-[140px] ${
+                        placeholder="e.g., 50B or 50B-BS"
+                        className={`border-none focus-visible:ring-0 min-w-[140px] font-mono ${
                           autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''
                         }`}
                       />
@@ -679,7 +701,6 @@ export default function CreateQuotePage() {
                           lineHeight: '1.4'
                         }}
                         onInput={(e) => {
-                          // Auto-expand textarea as content grows
                           const target = e.target as HTMLTextAreaElement;
                           target.style.height = 'auto';
                           target.style.height = `${target.scrollHeight}px`;
