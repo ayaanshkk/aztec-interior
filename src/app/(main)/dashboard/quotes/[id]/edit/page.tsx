@@ -451,18 +451,6 @@ export default function EditQuotePage() {
       alert("Customer address is required");
       return;
     }
-
-    const subtotalBeforeDiscount = items.reduce((sum, item) => {
-      const itemTotal = (item.discount_percent && item.discount_percent > 0) 
-        ? (item.discounted_total || 0)
-        : item.line_total;
-      return sum + itemTotal;
-    }, 0);
-
-    const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
-    const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
-    const vat = subtotal * (vatPercentage / 100);
-    const total = subtotal + vat;
     
     if (subtotal <= 0) {
       alert("Please add at least one item with a valid price");
@@ -554,8 +542,17 @@ export default function EditQuotePage() {
       </div>
     );
   }
- 
-  const subtotal = items.reduce((sum, item) => sum + ((item.amount || 0) * (item.quantity || 1)), 0);
+
+  // ✅ ADD CALCULATIONS HERE - BEFORE THE RETURN
+  const subtotalBeforeDiscount = items.reduce((sum, item) => {
+    const itemTotal = (item.discount_percent && item.discount_percent > 0) 
+      ? (item.discounted_total || 0)
+      : item.line_total;
+    return sum + itemTotal;
+  }, 0);
+
+  const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
+  const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
   const vat = subtotal * (vatPercentage / 100);
   const total = subtotal + vat;
  
