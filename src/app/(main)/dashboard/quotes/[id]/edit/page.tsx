@@ -521,16 +521,12 @@ export default function EditQuotePage() {
         const data = await response.json();
         const quoteId = data.quotation_id || data.id;
         
-        alert(`✅ Quote #${quoteId} created successfully!`);
+        alert(`✅ Quote #${quoteId} updated successfully!`);
         
         const quoteUrl = `/dashboard/quotes/${quoteId}`;
         window.open(quoteUrl, '_blank');
         
-        if (customerId) {
-          router.push(`/dashboard/customers/${customerId}`);
-        } else {
-          router.push("/dashboard/quotes");
-        }
+        router.push("/dashboard/quotes");  
       } else {
         const error = await response.json();
         alert(`❌ Failed to save: ${error.error || 'Unknown error'}`);
