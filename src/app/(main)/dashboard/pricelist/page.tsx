@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 type Category = 'Kitchen' | 'Bedrooms' | 'Appliances' | 'Fillers & End Panels' | 'Accessories' | 'Handles';
-type DoorType = 'Carcass Only' | 'Basic Slab' | 'Acrylic Gloss/Matt' | 'Vinyl Doors' | 'Black Glass' | 'Base Cabinet Only';
+type DoorType = 'Carcass Only' | 'Basic Slab' | 'Acrylic Gloss/Matt' | 'Vinyl Doors' | 'Black Glass' | 'Base Cabinet Only' | 'Standard';
 type ApplianceSeries = 'Low' | 'Mid' | 'High';
 
 interface PricelistItem {
@@ -86,7 +86,7 @@ export default function PricelistPage() {
   const doorTypes: DoorType[] = activeTab === 'Kitchen' 
     ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass']
     : activeTab === 'Bedrooms'
-    ? ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Base Cabinet Only']
+    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Base Cabinet Only']
     : activeTab === 'Fillers & End Panels'
     ? ['Basic Slab', 'Acrylic Gloss/Matt']
     : activeTab === 'Accessories'
