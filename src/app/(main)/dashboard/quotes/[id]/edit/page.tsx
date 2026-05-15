@@ -49,6 +49,7 @@ export default function EditQuotePage() {
     name: '',
     address: '',
     phone: '',
+    email: '',  // ← ADD THIS
     date: new Date().toISOString().split('T')[0]
   });
 
@@ -212,6 +213,7 @@ export default function EditQuotePage() {
           name: data.customer_name || '',
           address: data.customer_address || data.client_address || '',
           phone: data.customer_phone || data.client_phone || '',
+          email: data.customer_email || data.client_email || '',
           date: data.created_at ? new Date(data.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
         });
         
