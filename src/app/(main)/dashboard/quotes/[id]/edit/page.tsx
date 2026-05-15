@@ -19,6 +19,9 @@ interface QuoteItem {
   depth?: number;
   line_total: number;
   price_list_item_id?: number;
+  // ADD THESE:
+  discount_percent?: number;
+  discounted_total?: number;
 }
  
 export default function EditQuotePage() {
@@ -46,6 +49,21 @@ export default function EditQuotePage() {
     phone: '',
     date: new Date().toISOString().split('T')[0]
   });
+
+  const calculateDiscountedTotal = (
+    quantity: number,
+    amount: number,
+    discountPercent: number
+  ) => {
+    const baseTotal = quantity * amount;
+    
+    if (!discountPercent || discountPercent === 0) {
+      return baseTotal;
+    }
+    
+    const discountAmount = baseTotal * (discountPercent / 100);
+    return baseTotal - discountAmount;
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', {
@@ -206,6 +224,9 @@ export default function EditQuotePage() {
           depth: item.depth || undefined,
           line_total: (item.quantity || 1) * (item.amount || 0),
           price_list_item_id: item.price_list_item_id,
+          // ADD THESE:
+          discount_percent: item.discount_percent || 0,
+          discounted_total: item.discounted_total || ((item.quantity || 1) * (item.amount || 0)),
         }));
         setItems(itemsWithTotals);
         
@@ -302,13 +323,17 @@ export default function EditQuotePage() {
       ...updatedItems[index],
       [field]: value,
     };
- 
-    if (field === 'quantity' || field === 'amount') {
+
+    // Recalculate when quantity, amount, or discount_percent changes
+    if (['quantity', 'amount', 'discount_percent'].includes(field)) {
       const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItems[index].quantity || 1;
       const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItems[index].amount || 0;
+      const discountPercent = field === 'discount_percent' ? parseFloat(value) || 0 : updatedItems[index].discount_percent || 0;
+      
       updatedItems[index].line_total = qty * amount;
+      updatedItems[index].discounted_total = calculateDiscountedTotal(qty, amount, discountPercent);
     }
- 
+
     setItems(updatedItems);
 
     // ✅ Auto-fill when ITEM field changes (code lookup)
@@ -414,7 +439,12 @@ export default function EditQuotePage() {
     try {
       const token = localStorage.getItem("token");
       
-      const subtotal = items.reduce((sum, item) => sum + ((item.amount || 0) * (item.quantity || 1)), 0);
+      const subtotal = items.reduce((sum, item) => {
+        const itemTotal = (item.discount_percent && item.discount_percent > 0) 
+          ? (item.discounted_total || 0)
+          : item.line_total;
+        return sum + itemTotal;
+      }, 0);
       const vat = subtotal * (vatPercentage / 100);
       const total = subtotal + vat;
  
@@ -437,6 +467,9 @@ export default function EditQuotePage() {
             width: item.width,
             height: item.height,
             depth: item.depth,
+            // ADD THESE:
+            discount_percent: item.discount_percent || 0,
+            discounted_amount: item.discounted_total || ((item.amount || 0) * (item.quantity || 1)),
           })),
           subtotal,
           vat,
@@ -539,15 +572,18 @@ export default function EditQuotePage() {
         <div className="mb-6 grid grid-cols-2 gap-4">
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Room Type <span className="text-red-600">*</span>
+              Door Type <span className="text-red-600">*</span>
             </label>
             <select
-              value={roomType}
-              onChange={(e) => setRoomType(e.target.value)}
+              value={doorType}
+              onChange={(e) => setDoorType(e.target.value)}
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="Kitchen">Kitchen</option>
-              <option value="Bedroom">Bedroom</option>
+              <option value="Carcass Only">Carcass Only (No Doors/Drawers)</option>
+              <option value="Basic Slab">Basic Slab</option>
+              <option value="Acrylic Gloss/Matt">Acrylic Gloss/Matt</option>
+              <option value="Vinyl Doors">Vinyl Doors</option>
+              <option value="Black Glass">Black Glass</option>
             </select>
           </div>
 
@@ -569,13 +605,26 @@ export default function EditQuotePage() {
         </div>
 
         {/* ✅ NEW: Info Banner */}
-        <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800">
-          <p className="font-medium">
+        <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-4">
+          <p className="font-medium text-sm text-blue-900 mb-2">
             💡 Selected: <span className="font-bold">{roomType}</span> with <span className="font-bold">{doorType}</span> doors
           </p>
-          <p className="mt-1 text-xs text-blue-600">
-            Prices will be automatically updated when you change these selections.
+          <p className="text-xs text-blue-700 mb-2">
+            Prices will be automatically looked up based on these selections when you enter item codes.
           </p>
+          <div className="mt-3 pt-3 border-t border-blue-200">
+            <p className="text-xs font-semibold text-blue-900 mb-1">🎯 Component-Only Pricing (Advanced):</p>
+            <p className="text-xs text-blue-700">
+              Add a suffix to quote components separately:
+            </p>
+            <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
+              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = Carcass + {doorType} doors (complete unit)</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-BS</code> = Basic Slab door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-AG</code> = Acrylic door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
+            </ul>
+          </div>
         </div>
 
         {/* Customer Information - EDITABLE */}
@@ -645,44 +694,46 @@ export default function EditQuotePage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-white">
-                  <th className="border border-black px-3 py-2 text-left font-bold" style={{ minWidth: '150px' }}>ITEM</th>
-                  <th className="border border-black px-3 py-2 text-left font-bold" style={{ minWidth: '200px' }}>DESCRIPTION</th>
-                  <th className="border border-black px-3 py-2 text-left font-bold" style={{ minWidth: '100px' }}>COLOUR</th>
-                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '60px' }}>QTY</th>
-                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '80px' }}>WIDTH</th>
-                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '80px' }}>HEIGHT</th>
-                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '80px' }}>DEPTH</th>
-                  <th className="border border-black px-3 py-2 text-right font-bold" style={{ minWidth: '80px' }}>PRICE</th>
-                  <th className="border border-black px-3 py-2 text-right font-bold" style={{ minWidth: '100px' }}>AMOUNT</th>
-                  <th className="border border-black px-3 py-2 text-center font-bold" style={{ width: '60px' }}>ACTION</th>
+                  <th className="border border-black px-2 py-2 text-left font-bold text-xs" style={{ minWidth: '100px' }}>ITEM</th>
+                  <th className="border border-black px-2 py-2 text-left font-bold text-xs" style={{ minWidth: '150px' }}>DESCRIPTION</th>
+                  <th className="border border-black px-2 py-2 text-left font-bold text-xs" style={{ minWidth: '80px' }}>COLOUR</th>
+                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '50px' }}>QTY</th>
+                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>W</th>
+                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>H</th>
+                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>D</th>
+                  <th className="border border-black px-2 py-2 text-right font-bold text-xs" style={{ minWidth: '70px' }}>PRICE</th>
+                  <th className="border border-black px-2 py-2 text-right font-bold text-xs" style={{ minWidth: '80px' }}>AMOUNT</th>
+                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>DISC %</th>
+                  <th className="border border-black px-2 py-2 text-right font-bold text-xs" style={{ minWidth: '90px' }}>FINAL</th>
+                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '50px' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, index) => (
                   <tr key={index}>
-                    <td className="border border-black p-2">
+                    {/* ITEM */}
+                    <td className="border border-black p-1">
                       <Input
                         value={item.item}
                         onChange={(e) => handleItemChange(index, "item", e.target.value)}
-                        placeholder="Item code"
-                        className={`border-none focus-visible:ring-0 min-w-[140px] ${
+                        placeholder="50B"
+                        className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${
                           autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
                         }`}
                       />
                     </td>
-                    <td className="border border-black p-2">
+                    
+                    {/* DESCRIPTION */}
+                    <td className="border border-black p-1">
                       <textarea
                         value={item.description}
                         onChange={(e) => handleDescriptionChange(index, e.target.value)}
                         placeholder="Description"
-                        className={`border-none focus-visible:ring-0 min-w-[190px] w-full resize-none overflow-hidden ${
+                        className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${
                           autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
                         }`}
                         rows={2}
-                        style={{
-                          minHeight: '40px',
-                          lineHeight: '1.4'
-                        }}
+                        style={{ minHeight: '35px', lineHeight: '1.3' }}
                         onInput={(e) => {
                           const target = e.target as HTMLTextAreaElement;
                           target.style.height = 'auto';
@@ -690,75 +741,123 @@ export default function EditQuotePage() {
                         }}
                       />
                     </td>
-                    <td className="border border-black p-2">
+                    
+                    {/* COLOUR */}
+                    <td className="border border-black p-1">
                       <Input
                         value={item.color}
                         onChange={(e) => handleItemChange(index, "color", e.target.value)}
                         placeholder="Colour"
-                        className="border-none focus-visible:ring-0 min-w-[90px]"
+                        className="border-none focus-visible:ring-0 min-w-[70px] text-xs"
                       />
                     </td>
-                    <td className="border border-black p-2">
+                    
+                    {/* QTY */}
+                    <td className="border border-black p-1">
                       <Input
                         type="number"
                         value={item.quantity}
                         onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                        className="border-none text-center focus-visible:ring-0 w-[50px]"
+                        className="border-none text-center focus-visible:ring-0 w-[45px] text-xs"
                         min="1"
                       />
                     </td>
-                    <td className="border border-black p-2">
+                    
+                    {/* WIDTH */}
+                    <td className="border border-black p-1">
                       <Input
                         type="number"
                         value={item.width || ''}
                         onChange={(e) => handleItemChange(index, "width", e.target.value)}
                         placeholder="—"
-                        className="border-none text-center focus-visible:ring-0 w-[70px]"
+                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
                         min="0"
                       />
                     </td>
-                    <td className="border border-black p-2">
+                    
+                    {/* HEIGHT */}
+                    <td className="border border-black p-1">
                       <Input
                         type="number"
                         value={item.height || ''}
                         onChange={(e) => handleItemChange(index, "height", e.target.value)}
                         placeholder="—"
-                        className="border-none text-center focus-visible:ring-0 w-[70px]"
+                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
                         min="0"
                       />
                     </td>
-                    <td className="border border-black p-2">
+                    
+                    {/* DEPTH */}
+                    <td className="border border-black p-1">
                       <Input
                         type="number"
                         value={item.depth || ''}
                         onChange={(e) => handleItemChange(index, "depth", e.target.value)}
                         placeholder="—"
-                        className="border-none text-center focus-visible:ring-0 w-[70px]"
+                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
                         min="0"
                       />
                     </td>
-                    <td className="border border-black p-2">
+                    
+                    {/* PRICE */}
+                    <td className="border border-black p-1">
                       <Input
                         type="number"
                         step="0.01"
                         value={item.amount}
                         onChange={(e) => handleItemChange(index, "amount", e.target.value)}
-                        className="border-none text-right focus-visible:ring-0 min-w-[70px]"
+                        className="border-none text-right focus-visible:ring-0 min-w-[65px] text-xs"
                         min="0"
                         placeholder="0.00"
                       />
                     </td>
-                    <td className="border border-black px-3 py-2 text-right font-semibold">
+                    
+                    {/* AMOUNT */}
+                    <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
                       {formatCurrency((item.amount || 0) * (item.quantity || 1))}
                     </td>
-                    <td className="border border-black p-2 text-center">
+                    
+                    {/* DISCOUNT % - NEW COLUMN */}
+                    <td className="border border-black p-1">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={item.discount_percent || ''}
+                        onChange={(e) => handleItemChange(index, "discount_percent", e.target.value)}
+                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
+                        min="0"
+                        max="100"
+                        placeholder="0"
+                      />
+                    </td>
+                    
+                    {/* FINAL AMOUNT - NEW COLUMN */}
+                    <td className="border border-black px-2 py-1 text-right">
+                      {item.discount_percent && item.discount_percent > 0 ? (
+                        <div>
+                          <div className="text-xs text-gray-500 line-through">
+                            {formatCurrency((item.amount || 0) * (item.quantity || 1))}
+                          </div>
+                          <div className="font-semibold text-green-700 text-xs">
+                            {formatCurrency(item.discounted_total || 0)}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="font-semibold text-xs">
+                          {formatCurrency((item.amount || 0) * (item.quantity || 1))}
+                        </span>
+                      )}
+                    </td>
+                    
+                    {/* ACTION */}
+                    <td className="border border-black p-1 text-center">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleRemoveItem(index)}
-                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </td>
                   </tr>

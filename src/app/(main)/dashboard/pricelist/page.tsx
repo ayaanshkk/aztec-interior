@@ -104,7 +104,7 @@ export default function PricelistPage() {
       setLoading(true);
       
       // Fetch ALL items for tenant
-      const response = await api.getPricelist({ per_page: 1000 });
+      const response = await api.getPricelist();
       
       // Filter on frontend based on activeTab
       let filteredItems = response.items || [];
