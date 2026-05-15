@@ -53,6 +53,8 @@ export default function CreateQuotePage() {
 
   const [saving, setSaving] = useState(false);
   const [autoFilling, setAutoFilling] = useState<string | null>(null);
+  const [globalDiscountPercent, setGlobalDiscountPercent] = useState<number>(0);
+
   
   // ✅ Door type and room type for pricing
   const [doorType, setDoorType] = useState<string>('Carcass Only');
@@ -423,7 +425,15 @@ export default function CreateQuotePage() {
       return;
     }
 
-    const subtotal = items.reduce((sum, item) => sum + item.line_total, 0);
+    const subtotalBeforeDiscount = items.reduce((sum, item) => {
+      const itemTotal = (item.discount_percent && item.discount_percent > 0) 
+        ? (item.discounted_total || 0)
+        : item.line_total;
+      return sum + itemTotal;
+    }, 0);
+    
+    const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
+    const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
     
     if (subtotal <= 0) {
       alert("Please add at least one item with a valid price");
@@ -473,6 +483,8 @@ export default function CreateQuotePage() {
           vat,
           total,
           vat_percentage: vatPercentage,
+          global_discount_percent: globalDiscountPercent,  // NEW: Add global discount
+          global_discount_amount: globalDiscountAmount,    // NEW: Add discount amount
         }),
       });
 
@@ -502,14 +514,15 @@ export default function CreateQuotePage() {
     }
   };
 
-  const subtotal = items.reduce((sum, item) => {
-    // Use discounted_total if discount applied, otherwise line_total
+  const subtotalBeforeDiscount = items.reduce((sum, item) => {
     const itemTotal = (item.discount_percent && item.discount_percent > 0) 
       ? (item.discounted_total || 0)
       : item.line_total;
     return sum + itemTotal;
   }, 0);
-    
+
+  const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
+  const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
   const vat = subtotal * (vatPercentage / 100);
   const total = subtotal + vat;
 
@@ -878,8 +891,41 @@ export default function CreateQuotePage() {
             <tbody>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotal)}</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalBeforeDiscount)}</td>
               </tr>
+              
+              {/* NEW: Global Discount Row */}
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>DISCOUNT</span>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        value={globalDiscountPercent}
+                        onChange={(e) => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)}
+                        className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                      <span className="text-sm">%</span>
+                    </div>
+                  </div>
+                </td>
+                <td className="border border-black px-3 py-2 text-right text-red-600">
+                  {globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}
+                </td>
+              </tr>
+              
+              {/* Show adjusted subtotal if discount applied */}
+              {globalDiscountPercent > 0 && (
+                <tr>
+                  <td className="border border-black px-3 py-2 font-semibold bg-blue-50">SUBTOTAL AFTER DISCOUNT</td>
+                  <td className="border border-black px-3 py-2 text-right font-semibold">{formatCurrency(subtotal)}</td>
+                </tr>
+              )}
+              
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
                   <div className="flex items-center justify-between gap-2">

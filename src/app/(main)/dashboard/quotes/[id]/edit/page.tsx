@@ -35,6 +35,8 @@ export default function EditQuotePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [autoFilling, setAutoFilling] = useState<number | null>(null);
+  const [globalDiscountPercent, setGlobalDiscountPercent] = useState<number>(0);
+
   
   // ✅ NEW: Door type and room type with URL param initialization
   const [doorType, setDoorType] = useState<string>('Carcass Only');
@@ -229,7 +231,10 @@ export default function EditQuotePage() {
           discounted_total: item.discounted_total || ((item.quantity || 1) * (item.amount || 0)),
         }));
         setItems(itemsWithTotals);
-        
+
+        if (data.global_discount_percent) {
+          setGlobalDiscountPercent(data.global_discount_percent);
+        }
         // Load VAT percentage if saved
         if (data.vat_percentage) {
           setVatPercentage(data.vat_percentage);
@@ -434,54 +439,94 @@ export default function EditQuotePage() {
  
   const handleSave = async () => {
     if (saving) return;
- 
+
+    if (!formData.name?.trim()) {
+      alert("Customer name is required");
+      return;
+    }
+
+    if (!formData.address?.trim()) {
+      alert("Customer address is required");
+      return;
+    }
+
+    const subtotalBeforeDiscount = items.reduce((sum, item) => {
+      const itemTotal = (item.discount_percent && item.discount_percent > 0) 
+        ? (item.discounted_total || 0)
+        : item.line_total;
+      return sum + itemTotal;
+    }, 0);
+    
+    const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
+    const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
+    
+    if (subtotal <= 0) {
+      alert("Please add at least one item with a valid price");
+      return;
+    }
+
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
-      
-      const subtotal = items.reduce((sum, item) => {
-        const itemTotal = (item.discount_percent && item.discount_percent > 0) 
-          ? (item.discounted_total || 0)
-          : item.line_total;
-        return sum + itemTotal;
-      }, 0);
       const vat = subtotal * (vatPercentage / 100);
       const total = subtotal + vat;
- 
-      const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}`, {
-        method: "PUT",
+
+      const response = await fetch(`${BACKEND_URL}/quotations`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          customer_name: customerData.name,
-          customer_address: customerData.address,
-          customer_phone: customerData.phone,
-          items: items.map(item => ({
-            item: item.item,
-            description: item.description,
-            color: item.color,
-            quantity: item.quantity || 1,
-            amount: item.amount || 0,
-            width: item.width,
-            height: item.height,
-            depth: item.depth,
-            // ADD THESE:
-            discount_percent: item.discount_percent || 0,
-            discounted_amount: item.discounted_total || ((item.amount || 0) * (item.quantity || 1)),
-          })),
+          client_id: customerId,
+          customer_name: formData.name,
+          customer_address: formData.address,
+          customer_phone: formData.phone,
+          customer_email: formData.email,
+          date: formData.date,
+          items: items
+            .filter(item => {
+              const hasItem = item.item && item.item.trim().length > 0;
+              const hasDescription = item.description && item.description.trim().length > 0;
+              const hasAmount = item.line_total > 0;
+              return hasItem || hasDescription || hasAmount;
+            })
+            .map(item => ({
+              item: item.item,
+              description: item.description,
+              colour: item.color,
+              quantity: item.quantity || 1,
+              unit_price: item.amount || 0,
+              amount: item.line_total,
+              discount_percent: item.discount_percent || 0,
+              discounted_amount: item.discounted_total || item.line_total,
+              width: item.width,
+              height: item.height,
+              depth: item.depth,
+            })),
           subtotal,
           vat,
           total,
           vat_percentage: vatPercentage,
+          global_discount_percent: globalDiscountPercent,  // NEW: Add global discount
+          global_discount_amount: globalDiscountAmount,    // NEW: Add discount amount
         }),
       });
- 
+
       if (response.ok) {
-        alert("✅ Quotation saved successfully!");
-        // Redirect to view page
-        router.push(`/dashboard/quotes/${quoteId}`);
+        const data = await response.json();
+        const quoteId = data.quotation_id || data.id;
+        
+        alert(`✅ Quote #${quoteId} created successfully!`);
+        
+        const quoteUrl = `/dashboard/quotes/${quoteId}`;
+        window.open(quoteUrl, '_blank');
+        
+        if (customerId) {
+          router.push(`/dashboard/customers/${customerId}`);
+        } else {
+          router.push("/dashboard/quotes");
+        }
       } else {
         const error = await response.json();
         alert(`❌ Failed to save: ${error.error || 'Unknown error'}`);
@@ -873,8 +918,41 @@ export default function EditQuotePage() {
             <tbody>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotal)}</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalBeforeDiscount)}</td>
               </tr>
+              
+              {/* NEW: Global Discount Row */}
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>DISCOUNT</span>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        value={globalDiscountPercent}
+                        onChange={(e) => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)}
+                        className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                      />
+                      <span className="text-sm">%</span>
+                    </div>
+                  </div>
+                </td>
+                <td className="border border-black px-3 py-2 text-right text-red-600">
+                  {globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}
+                </td>
+              </tr>
+              
+              {/* Show adjusted subtotal if discount applied */}
+              {globalDiscountPercent > 0 && (
+                <tr>
+                  <td className="border border-black px-3 py-2 font-semibold bg-blue-50">SUBTOTAL AFTER DISCOUNT</td>
+                  <td className="border border-black px-3 py-2 text-right font-semibold">{formatCurrency(subtotal)}</td>
+                </tr>
+              )}
+              
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
                   <div className="flex items-center justify-between gap-2">
