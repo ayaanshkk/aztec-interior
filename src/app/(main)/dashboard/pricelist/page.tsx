@@ -111,7 +111,7 @@ export default function PricelistPage() {
       
       if (activeTab === 'Fillers & End Panels') {
         // ONLY show items with exact category match
-        filteredItems = filteredItems.filter(item => 
+        filteredItems = filteredItems.filter((item: PricelistItem) => 
           item.category === 'Fillers & End Panels'
         );
       } else if (activeTab === 'Kitchen') {
@@ -119,30 +119,30 @@ export default function PricelistPage() {
           'Base Units', 'Dresser Units', 'Larder P/O', 
           'Larder Units', 'Top Box', 'Finishing', 'Misc', 'Quad', 'Kitchen'
         ];
-        filteredItems = filteredItems.filter(item => 
+        filteredItems = filteredItems.filter((item: PricelistItem) => 
           kitchenCategories.includes(item.category)
         );
       } else if (activeTab === 'Bedrooms') {
         const bedroomCategories = ['Wardrobes', 'Chest of drawers', 'Linen Press'];
-        filteredItems = filteredItems.filter(item => 
+        filteredItems = filteredItems.filter((item: PricelistItem) => 
           bedroomCategories.includes(item.category)
         );
       } else if (activeTab === 'Accessories') {
         // ONLY Accessories category
-        filteredItems = filteredItems.filter(item => 
+        filteredItems = filteredItems.filter((item: PricelistItem) => 
           item.category === 'Accessories'
         );
         } else if (activeTab === 'Handles') {
-          filteredItems = filteredItems.filter(item => 
+          filteredItems = filteredItems.filter((item: PricelistItem) => 
             item.category === 'Handles'
           );
         } else {
         // Appliances, etc.
-        filteredItems = filteredItems.filter(item => 
+        filteredItems = filteredItems.filter((item: PricelistItem) => 
           item.category === activeTab
         );
         if (activeTab === 'Appliances' && selectedBrand !== 'All') {
-          filteredItems = filteredItems.filter(item => 
+          filteredItems = filteredItems.filter((item: PricelistItem) => 
             item.brand === selectedBrand
           );
         }
@@ -230,7 +230,7 @@ export default function PricelistPage() {
     setTotalItems(items.length);
     setTotalPages(Math.ceil(items.length / itemsPerPage));
     setCurrentPage(1);
-  }, [pricelistItems, searchQuery]);
+  }, [pricelistItems, searchQuery, activeTab]);
 
   const paginatedItems = groupedItems.slice(
     (currentPage - 1) * itemsPerPage,
