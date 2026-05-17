@@ -510,7 +510,7 @@ export default function CustomerDetailsPage() {
         fetchWithFallback(`${BACKEND_URL}/files/drawings?customer_id=${id}`),
         fetchWithFallback(`${BACKEND_URL}/customers/${id}/forms`),
         fetchWithFallback(`${BACKEND_URL}/quotations?customer_id=${id}`),
-        fetchWithFallback(`${BACKEND_URL}/invoices?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/api/form/invoices?customer_id=${id}`),
         fetchWithFallback(`${BACKEND_URL}/receipts?customer_id=${id}`),
         fetchWithFallback(`${BACKEND_URL}/payment-terms?customer_id=${id}`)
       ]);
@@ -1445,17 +1445,27 @@ export default function CustomerDetailsPage() {
       alert("You don't have permission to edit this form.");
       return;
     }
-    
+ 
+    const type = getFormType(submission);
+ 
+    if (type === "remedial") {
+      // Opens the full-page edit layout
+      window.open(`/checklists/remedial/edit/${submission.id}`, "_blank");
+      return;
+    }
+ 
+    // Original dialog-based edit for all other form types
     try {
-      const formData = typeof submission.form_data === "string" 
-        ? JSON.parse(submission.form_data) 
-        : submission.form_data;
-      
+      const formData =
+        typeof submission.form_data === "string"
+          ? JSON.parse(submission.form_data)
+          : submission.form_data;
+ 
       setSelectedForm(submission);
       setEditFormData(formData);
       setIsEditingForm(true);
       setShowFormDialog(true);
-      setFormType(getFormType(submission));
+      setFormType(type);
     } catch (error) {
       console.error("Error parsing form data:", error);
       alert("Error loading form data for editing");
@@ -2266,17 +2276,67 @@ export default function CustomerDetailsPage() {
     );
   };
 
-  const handleViewChecklist = (submission: FormSubmission) => {
-    const formType = getFormType(submission);
-    if (formType === "bedroom" || formType === "kitchen") {
-      const viewUrl = `/checklist-view?id=${submission.id}`;
-      window.open(viewUrl, "_blank");
-    } else {
-      setSelectedForm(submission);
-      setIsEditingForm(false);
-      setShowFormDialog(true);
-      setFormType(formType);
+  const renderFormDialogContent = (submission: FormSubmission) => {
+    let formData: any = {};
+    try {
+      formData =
+        typeof submission.form_data === "string"
+          ? JSON.parse(submission.form_data)
+          : submission.form_data || {};
+    } catch {
+      formData = {};
     }
+ 
+    const type = getFormType(submission);
+ 
+    switch (type) {
+      case "remedial":
+        return renderRemedialForm(formData);
+ 
+      case "document":
+        return renderReceiptData(formData);
+ 
+      case "bedroom":
+      case "kitchen":
+      default: {
+        // Generic field-by-field renderer for bedroom/kitchen/unknown forms
+        const skipKeys = new Set([
+          "form_type", "customer_id", "customer_name", "customer_phone",
+          "customer_address", "signature_data",
+        ]);
+        const entries = Object.entries(formData).filter(
+          ([k, v]) => !skipKeys.has(k) && v !== null && v !== undefined && v !== ""
+        );
+ 
+        return (
+          <div className="space-y-1">
+            {entries.map(([key, value]) => (
+              <Row key={key} label={humanizeLabel(key)} value={value} name={key} />
+            ))}
+          </div>
+        );
+      }
+    }
+  };
+
+  const handleViewChecklist = (submission: FormSubmission) => {
+    const type = getFormType(submission);
+ 
+    if (type === "remedial") {
+      window.open(`/checklists/remedial/view/${submission.id}`, "_blank");
+      return;
+    }
+ 
+    if (type === "bedroom" || type === "kitchen") {
+      window.open(`/checklist-view?id=${submission.id}`, "_blank");
+      return;
+    }
+ 
+    // document / receipt / unknown — open dialog as before
+    setSelectedForm(submission);
+    setIsEditingForm(false);
+    setShowFormDialog(true);
+    setFormType(type);
   };
 
   const renderFormSubmission = (submission: FormSubmission) => {
@@ -3667,6 +3727,94 @@ export default function CustomerDetailsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* FORM DIALOG */}
+      {showFormDialog && selectedForm && (
+        <Dialog
+          open={showFormDialog}
+          onOpenChange={(open) => {
+            if (!open) {
+              setShowFormDialog(false);
+              setIsEditingForm(false);
+              setEditFormData(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{getFormTitle(selectedForm)}</DialogTitle>
+              <DialogDescription>
+                Submitted: {formatDate(selectedForm.submitted_at)}
+              </DialogDescription>
+            </DialogHeader>
+ 
+            <div className="mt-4">
+              {isEditingForm && editFormData ? (
+                // ── Edit mode (existing edit UI — keep whatever you had) ──
+                <div className="space-y-4">
+                  {Object.entries(editFormData)
+                    .filter(([k]) => !["form_type", "customer_id", "signature_data"].includes(k))
+                    .map(([key, value]) => (
+                      <div key={key} className="grid grid-cols-3 items-start gap-4">
+                        <label className="pt-2 text-sm font-medium text-gray-700">
+                          {humanizeLabel(key)}
+                        </label>
+                        <div className="col-span-2">
+                          {typeof value === "boolean" ? (
+                            <input
+                              type="checkbox"
+                              checked={value as boolean}
+                              onChange={(e) => handleFormFieldChange(key, e.target.checked)}
+                              className="h-4 w-4"
+                            />
+                          ) : Array.isArray(value) ? (
+                            <textarea
+                              value={JSON.stringify(value, null, 2)}
+                              onChange={(e) => {
+                                try {
+                                  handleFormFieldChange(key, JSON.parse(e.target.value));
+                                } catch {
+                                  /* ignore parse errors while typing */
+                                }
+                              }}
+                              className="w-full rounded-md border border-gray-300 p-2 text-sm font-mono"
+                              rows={4}
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              value={String(value ?? "")}
+                              onChange={(e) => handleFormFieldChange(key, e.target.value)}
+                              className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+ 
+                  <div className="flex justify-end space-x-2 border-t pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsEditingForm(false);
+                        setEditFormData(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveEditedForm} disabled={isSavingForm}>
+                      {isSavingForm ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                // ── View mode — uses the new unified renderer ──
+                renderFormDialogContent(selectedForm)
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* DELETE FORM DIALOG */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
