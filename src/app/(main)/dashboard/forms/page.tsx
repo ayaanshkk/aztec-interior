@@ -164,17 +164,20 @@ const FormsAndChecklistsPage = () => {
         {
           label: "Quotation",
           icon:  FileText,
-          // ✅ Matches src/app/(main)/dashboard/quotes/create/page.tsx
           route: "/dashboard/quotes/create",
           type:  "quotation" as const,
         },
         {
           label: "Invoice",
           icon:  FileText,
-          // ✅ Matches src/app/dashboard/invoices/create/page.tsx
-          // Update this path to wherever you placed the create invoice page
           route: "/dashboard/invoices/create",
           type:  "invoice" as const,
+        },
+        {
+          label: "Proforma Invoice",
+          icon:  FileText,
+          route: "/dashboard/proformas/create",
+          type:  "proforma" as const,
         },
         {
           label: "Payment Terms",

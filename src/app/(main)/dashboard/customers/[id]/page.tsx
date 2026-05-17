@@ -64,6 +64,7 @@ import {
   User,
   FolderOpen,
   ClipboardList,
+  Download,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Label } from "@/components/ui/label";
@@ -511,8 +512,8 @@ export default function CustomerDetailsPage() {
         fetchWithFallback(`${BACKEND_URL}/customers/${id}/forms`),
         fetchWithFallback(`${BACKEND_URL}/quotations?customer_id=${id}`),
         fetchWithFallback(`${BACKEND_URL}/api/form/invoices?customer_id=${id}`),
-        fetchWithFallback(`${BACKEND_URL}/receipts?customer_id=${id}`),
-        fetchWithFallback(`${BACKEND_URL}/payment-terms?customer_id=${id}`)
+        fetchWithFallback(`${BACKEND_URL}/api/form/receipts?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/api/form/payment-terms?customer_id=${id}`)
       ]);
 
       if (drawingsData && Array.isArray(drawingsData)) {
@@ -589,29 +590,54 @@ export default function CustomerDetailsPage() {
       }
 
       if (receiptsData && Array.isArray(receiptsData)) {
-        receiptsData.forEach((receipt: Receipt) => {
-          const receiptType = receipt.receipt_type?.toLowerCase() || 'receipt';
+        receiptsData.forEach((submission: any) => {
+          // Parse form_data (may be string or object)
+          let fd: any = {};
+          try {
+            fd = typeof submission.form_data === 'string'
+              ? JSON.parse(submission.form_data)
+              : submission.form_data || {};
+          } catch { fd = {}; }
+ 
+          const receiptType = (fd.receiptType || fd.receipt_type || submission.form_type || 'receipt').toLowerCase();
+          const typeKey     = receiptType.includes('deposit') ? 'deposit'
+                            : receiptType.includes('final')   ? 'final'
+                            : 'receipt';
+ 
+          const typeLabel   = typeKey === 'deposit' ? 'Deposit Receipt'
+                            : typeKey === 'final'   ? 'Final Receipt'
+                            : 'Receipt';
+ 
+          const paidAmount  = parseFloat(fd.paidAmount  || fd.paid_amount  || 0);
+          const balance     = parseFloat(fd.balanceToPay || fd.balance_to_pay || 0);
+          const receiptDate = fd.receiptDate || fd.receipt_date || submission.submitted_at;
+ 
           allFinancialDocs.push({
-            id: receipt.id,
-            type: receiptType.includes('deposit') ? 'deposit' : receiptType.includes('final') ? 'final' : 'receipt',
-            title: `${receipt.receipt_type || 'Receipt'} - ${formatDate(receipt.payment_date)}`,
-            reference: `#${receipt.id}`,
-            amount_paid: receipt.amount_paid,
-            balance: receipt.balance_to_pay,
-            created_at: receipt.created_at,
-            project_id: receipt.project_id,
+            id:          submission.form_submission_id || submission.id,
+            type:        typeKey,
+            title:       `${typeLabel} - ${formatDate(receiptDate)}`,
+            reference:   `#${submission.form_submission_id || submission.id}`,
+            amount_paid: paidAmount,
+            balance:     balance,
+            created_at:  submission.submitted_at || submission.created_at,
+            project_id:  submission.project_id,
           });
         });
       }
 
       if (paymentTermsData && Array.isArray(paymentTermsData)) {
-        paymentTermsData.forEach((terms: PaymentTerms) => {
+        paymentTermsData.forEach((terms: any) => {
+          // Support both old PaymentTerms schema and new Payment_Terms_Master schema
+          const ptId    = terms.pt_id    || terms.id;
+          const ptNum   = terms.pt_number || terms.terms_title || `PT-${ptId}`;
+          const ptTotal = terms.total_amount_due || terms.total_amount || 0;
+ 
           allFinancialDocs.push({
-            id: terms.id,
-            type: 'payment_terms',
-            title: terms.terms_title || 'Payment Terms',
-            reference: `#${terms.id}`,
-            total: terms.total_amount,
+            id:         ptId,
+            type:       'payment_terms',
+            title:      `Payment Terms ${ptNum}`,
+            reference:  ptNum,
+            total:      ptTotal,
             created_at: terms.created_at,
             project_id: terms.project_id,
           });
@@ -1126,43 +1152,92 @@ export default function CustomerDetailsPage() {
 
   const getFinancialDocIcon = (type: string) => {
     switch (type) {
-      case 'quotation':
-        return <FileText className="h-5 w-5 text-blue-600" />;
-      case 'invoice':
-        return <FileText className="h-5 w-5 text-indigo-600" />;
-      case 'proforma':
-        return <FileText className="h-5 w-5 text-purple-600" />;
-      case 'receipt':
-        return <Receipt className="h-5 w-5 text-green-600" />;
-      case 'deposit':
-        return <Receipt className="h-5 w-5 text-emerald-600" />;
-      case 'final':
-        return <Receipt className="h-5 w-5 text-teal-600" />;
-      case 'payment_terms':
-        return <DollarSign className="h-5 w-5 text-orange-600" />;
-      default:
-        return <FileText className="h-5 w-5 text-gray-600" />;
+      case 'quotation':     return <FileText className="h-5 w-5 text-violet-600" />;
+      case 'invoice':       return <FileText className="h-5 w-5 text-blue-600" />;
+      case 'proforma':      return <FileText className="h-5 w-5 text-cyan-600" />;
+      case 'receipt':       return <Receipt className="h-5 w-5 text-green-600" />;
+      case 'deposit':       return <Receipt className="h-5 w-5 text-emerald-600" />;
+      case 'final':         return <Receipt className="h-5 w-5 text-teal-600" />;
+      case 'payment_terms': return <DollarSign className="h-5 w-5 text-amber-600" />;
+      default:              return <FileText className="h-5 w-5 text-gray-600" />;
     }
   };
 
   const getFinancialDocColor = (type: string) => {
     switch (type) {
-      case 'quotation':
-        return 'from-blue-50 to-blue-100';
-      case 'invoice':
-        return 'from-indigo-50 to-indigo-100';
-      case 'proforma':
-        return 'from-purple-50 to-purple-100';
-      case 'receipt':
-        return 'from-green-50 to-green-100';
-      case 'deposit':
-        return 'from-emerald-50 to-emerald-100';
-      case 'final':
-        return 'from-teal-50 to-teal-100';
-      case 'payment_terms':
-        return 'from-orange-50 to-orange-100';
-      default:
-        return 'from-gray-50 to-gray-100';
+      case 'quotation':     return 'from-violet-50 to-violet-100 border-violet-200';
+      case 'invoice':       return 'from-blue-50 to-blue-100 border-blue-200';
+      case 'proforma':      return 'from-cyan-50 to-cyan-100 border-cyan-200';
+      case 'receipt':       return 'from-green-50 to-green-100 border-green-200';
+      case 'deposit':       return 'from-emerald-50 to-emerald-100 border-emerald-200';
+      case 'final':         return 'from-teal-50 to-teal-100 border-teal-200';
+      case 'payment_terms': return 'from-amber-50 to-amber-100 border-amber-200';
+      default:              return 'from-gray-50 to-gray-100 border-gray-200';
+    }
+  };
+
+  const getPdfUrl = (doc: FinancialDocument): string | null => {
+    const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+    const api  = `${base}/api/form`;
+    switch (doc.type) {
+      case 'quotation':     return `${api}/quotations/${doc.id}/pdf`;
+      case 'invoice':       return `${api}/invoices/${doc.id}/pdf`;
+      case 'proforma':      return `${api}/proformas/${doc.id}/pdf`;
+      case 'payment_terms': return `${api}/payment-terms/${doc.id}/pdf`;
+      // Receipts handled separately via handleReceiptPdf
+      default:              return null;
+    }
+  };
+
+  const handleReceiptPdf = async (doc: FinancialDocument) => {
+    const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+    const api  = `${base}/api/form`;
+ 
+    // Find the form_data from the financial doc — it was mapped from form submissions
+    // We need to re-fetch the submission to get full form_data
+    try {
+      const token = localStorage.getItem("token");
+      const res   = await fetch(`${api}/form-submissions/${doc.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+ 
+      if (!res.ok) { alert("Failed to load receipt data"); return; }
+ 
+      const submission = await res.json();
+      let fd: any = submission.form_data;
+      if (typeof fd === 'string') fd = JSON.parse(fd);
+ 
+      const pdfRes = await fetch(`${api}/receipts/download-pdf`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receiptType:        fd.receiptType        || fd.receipt_type || 'receipt',
+          receiptDate:        fd.receiptDate        || fd.receipt_date || new Date().toISOString().split('T')[0],
+          customerName:       fd.customerName       || customer?.name  || '',
+          customerAddress:    fd.customerAddress    || customer?.address || '',
+          customerPhone:      fd.customerPhone      || customer?.phone   || '',
+          paymentMethod:      fd.paymentMethod      || 'BACS',
+          paymentDescription: fd.paymentDescription || 'your Kitchen/Bedroom Cabinetry',
+          paidAmount:         fd.paidAmount         || fd.paid_amount      || 0,
+          totalPaidToDate:    fd.totalPaidToDate    || fd.total_paid_to_date || 0,
+          balanceToPay:       fd.balanceToPay       || fd.balance_to_pay   || 0,
+        }),
+      });
+ 
+      if (pdfRes.ok) {
+        const blob = await pdfRes.blob();
+        const url  = window.URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        a.download = `Receipt_${customer?.name?.replace(/\s/g, '_') || 'Customer'}.pdf`;
+        document.body.appendChild(a); a.click(); a.remove();
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert('Failed to generate receipt PDF');
+      }
+    } catch (e) {
+      console.error('Receipt PDF error:', e);
+      alert('Network error generating PDF');
     }
   };
 
@@ -1236,6 +1311,7 @@ export default function CustomerDetailsPage() {
         window.open(`/dashboard/receipts/${doc.id}`, '_blank');
         break;
       case 'payment_terms':
+      case 'terms':
         window.open(`/dashboard/payment-terms/${doc.id}`, '_blank');
         break;
       default:
@@ -3354,11 +3430,11 @@ export default function CustomerDetailsPage() {
               </div>
 
               {financialDocuments.length > 0 ? (
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 grid-rows-[auto]" style={{ alignItems: 'stretch' }}>
                   {financialDocuments.map((doc) => (
                     <div
                       key={`${doc.type}-${doc.id}`}
-                      className={`rounded-lg border bg-gradient-to-br ${getFinancialDocColor(doc.type)} p-6 shadow-sm transition-all duration-200 hover:shadow-md`}
+                      className={`rounded-lg border bg-gradient-to-br ${getFinancialDocColor(doc.type)} p-6 shadow-sm transition-all duration-200 hover:shadow-md flex flex-col`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -3373,19 +3449,6 @@ export default function CustomerDetailsPage() {
                           </div>
 
                           <div className="space-y-2">
-                            {doc.status && (
-                              <div className="flex items-center space-x-2">
-                                <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                                  doc.status === 'Approved' || doc.status === 'Paid' ? 'bg-green-100 text-green-800' :
-                                  doc.status === 'Draft' || doc.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                                  doc.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {doc.status}
-                                </span>
-                              </div>
-                            )}
-
                             {doc.total !== undefined && (
                               <p className="text-sm text-gray-700">
                                 <span className="font-medium">Total:</span>{' '}
@@ -3422,48 +3485,66 @@ export default function CustomerDetailsPage() {
                         </div>
                       </div>
 
-                      <div className="mt-4 flex items-center gap-2">
+                    <div className="mt-auto pt-4 flex items-center gap-2">
+                      {/* View button — always present, takes remaining space */}
+                      <Button
+                        onClick={() => handleViewFinancialDocument(doc)}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 bg-white hover:bg-gray-50"
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        View
+                      </Button>
+ 
+                      {/* PDF button — always present for all types */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (['receipt', 'deposit', 'final'].includes(doc.type)) {
+                            handleReceiptPdf(doc);
+                          } else {
+                            const url = getPdfUrl(doc);
+                            if (url) window.open(url, '_blank');
+                          }
+                        }}
+                        className="flex-1 bg-white hover:bg-gray-50"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        PDF
+                      </Button>
+ 
+                      {/* Delete — only for quotations, fixed width icon button */}
+                      {doc.type === 'quotation' ? (
                         <Button
-                          onClick={() => handleViewFinancialDocument(doc)}
                           variant="outline"
                           size="sm"
-                          className="flex-1 bg-white hover:bg-gray-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const quoteId = typeof doc.id === 'string' ? parseInt(doc.id) : doc.id;
+                            if (!quoteId || isNaN(quoteId)) {
+                              alert('Error: Cannot delete quotation - invalid ID');
+                              return;
+                            }
+                            setQuoteToDelete({ id: quoteId, reference: doc.reference || doc.title });
+                            setDeleteDialogOpen(true);
+                          }}
+                          disabled={deletingQuoteId === doc.id}
+                          className="w-9 flex-shrink-0 px-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                         >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
+                          {deletingQuoteId === doc.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
                         </Button>
-                        
-                        {doc.type === 'quotation' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const quoteId = typeof doc.id === 'string' ? parseInt(doc.id) : doc.id;
-                              
-                              if (!quoteId || isNaN(quoteId)) {
-                                console.error('Invalid quote ID:', doc.id);
-                                alert('Error: Cannot delete quotation - invalid ID');
-                                return;
-                              }
-                              
-                              setQuoteToDelete({
-                                id: quoteId,
-                                reference: doc.reference || doc.title 
-                              });
-                              setDeleteDialogOpen(true);
-                            }}
-                            disabled={deletingQuoteId === doc.id}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                          >
-                            {deletingQuoteId === doc.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
-                      </div>
+                      ) : (
+                        // Invisible spacer — keeps View+PDF the same width on non-quotation cards
+                        <div className="w-9 flex-shrink-0" />
+                      )}
+                    </div>
                     </div>
                   ))}
                 </div>
