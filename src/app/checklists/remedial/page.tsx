@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { CheckSquare, ArrowLeft, Trash2, Download } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 
@@ -76,9 +76,9 @@ const initialItems = (): RemedialItem[] =>
     qty: "",
   }));
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Main Content Component (uses useSearchParams) ────────────────────────────
 
-const RemedialActionChecklistPage = () => {
+const RemedialActionChecklistContent = () => {
   const searchParams = useSearchParams();
   const router       = useRouter();
 
@@ -478,4 +478,19 @@ const RemedialActionChecklistPage = () => {
   );
 };
 
-export default RemedialActionChecklistPage;
+// ── Page Component (wraps content in Suspense) ───────────────────────────────
+
+export default function RemedialActionChecklistPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-gray-300 border-t-black"></div>
+          <p className="mt-4 text-gray-600">Loading checklist...</p>
+        </div>
+      </div>
+    }>
+      <RemedialActionChecklistContent />
+    </Suspense>
+  );
+}
