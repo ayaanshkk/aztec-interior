@@ -119,7 +119,10 @@ export default function SettingsPage() {
       
       if (res.ok) {
         const data = await res.json();
-        console.log("Current user loaded:", data.user?.email, "Role:", data.user?.role);
+        console.log("Current user loaded:", data.user?.email);
+        console.log("Role:", data.user?.role);
+        console.log("Role ID:", data.user?.role_id);
+        console.log("Is Platform Admin:", data.user?.is_platform_admin);
         setCurrentUser(data.user);
       } else {
         const errorText = await res.text();
@@ -229,17 +232,18 @@ export default function SettingsPage() {
       return false;
     }
     
-    // Try to get role from different possible locations
-    const role = currentUser.role || currentUser.Role || (currentUser as any).user_role;
+    // Get role_id from current user
+    const roleId = currentUser.role_id;
     
-    if (!role) {
+    if (!roleId) {
+      console.log("No role_id found for current user");
       return false;
     }
 
-    // Normalize the role for comparison
-    const userRoleLower = String(role).toLowerCase().trim();
+    console.log("Current user role_id:", roleId);
     
-    return userRoleLower === "platform admin" || userRoleLower === "salesperson";
+    // Platform Admin (role_id 2) or Salesperson (role_id 3)
+    return roleId === 2 || roleId === 3;
   };
 
   const handleInviteUser = () => {

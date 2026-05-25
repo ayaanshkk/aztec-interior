@@ -472,7 +472,7 @@ export default function CreateQuotePage() {
               colour: item.color,
               quantity: item.quantity || 1,
               unit_price: item.amount || 0,
-              amount: item.line_total,
+              amount: item.amount || 0,
               discount_percent: item.discount_percent || 0,
               discounted_amount: item.discounted_total || item.line_total,
               width: item.width,
