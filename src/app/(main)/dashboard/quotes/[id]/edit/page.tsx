@@ -463,8 +463,8 @@ export default function EditQuotePage() {
       const vat = subtotal * (vatPercentage / 100);
       const total = subtotal + vat;
 
-      const response = await fetch(`${BACKEND_URL}/quotations`, {
-        method: "POST",
+      const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}`, {
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
@@ -489,7 +489,7 @@ export default function EditQuotePage() {
               colour: item.color,
               quantity: item.quantity || 1,
               unit_price: item.amount || 0,
-              amount: item.line_total,
+              amount: item.amount || 0,
               discount_percent: item.discount_percent || 0,
               discounted_amount: item.discounted_total || item.line_total,
               width: item.width,
@@ -506,15 +506,8 @@ export default function EditQuotePage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        const quoteId = data.quotation_id || data.id;
-        
-        alert(`✅ Quote #${quoteId} updated successfully!`);
-        
-        const quoteUrl = `/dashboard/quotes/${quoteId}`;
-        window.open(quoteUrl, '_blank');
-        
-        router.push("/dashboard/quotes");  
+        alert(`✅ Quote updated successfully!`);
+        router.push(`/dashboard/quotes/${quoteId}`);
       } else {
         const error = await response.json();
         alert(`❌ Failed to save: ${error.error || 'Unknown error'}`);
