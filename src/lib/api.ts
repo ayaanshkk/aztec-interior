@@ -661,12 +661,18 @@ export const api = {
  
   async createPricelistItem(itemData: {
     category: string;
+    item_code: string;
     item_name: string;
     description?: string;
     base_price: number;
+    door_type: string;
     unit?: string;
     dimension_based?: boolean;
     dimension_formula?: string;
+    width?: number | null;
+    height?: number | null;
+    depth?: number | null;
+    brand?: string;
   }) {
     const response = await fetchWithAuth("/pricelist", {
       method: "POST",
