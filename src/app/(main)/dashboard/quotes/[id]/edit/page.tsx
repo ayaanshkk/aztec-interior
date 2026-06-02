@@ -360,12 +360,19 @@ export default function EditQuotePage() {
 
       // ✅ NEW: Detect appliance code pattern
       const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(trimmedValue);
+      const currentItemsSnapshot = items
+        .filter((_, i) => i !== index)
+        .map(i => ({
+          item: i.item,
+          description: i.description,
+          quantity: i.quantity,
+        }));
       
       const requestBody: any = {
         description: trimmedValue,
+        current_items: currentItemsSnapshot,
       };
 
-      // Only send door_type for non-appliances
       if (!isApplianceCode) {
         requestBody.door_type = doorType;
         requestBody.room_type = roomType;
@@ -385,22 +392,27 @@ export default function EditQuotePage() {
         if (data.found) {
           // ✅ Build rich description for appliances
           let autoDescription = data.description || data.item_name || '';
-          
-          if (isApplianceCode && data.brand && data.series_level) {
+
+          if (data.is_fitting) {
+            autoDescription = data.item_name || '';
+          } else if (isApplianceCode && data.brand && data.series_level) {
             autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
           }
 
           setItems(prevItems => {
             const newItems = [...prevItems];
+            const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
+            const qty = fittingQty !== null ? fittingQty : (newItems[index].quantity || 1);
             newItems[index] = {
               ...newItems[index],
               item: data.item_code || trimmedValue,
               description: autoDescription,
               amount: data.price || 0,
+              quantity: qty,
               width: data.width,
               height: data.height,
               depth: data.depth,
-              line_total: (data.price || 0) * (newItems[index].quantity || 1),
+              line_total: (data.price || 0) * qty,
             };
             return newItems;
           });

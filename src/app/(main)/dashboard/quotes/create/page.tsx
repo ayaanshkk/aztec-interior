@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,38 +51,26 @@ export default function CreateQuotePage() {
     },
   ]);
 
+  // ✅ Always-fresh ref for items (avoids stale closure in async handlers)
+  const itemsRef = useRef(items);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+
   const [saving, setSaving] = useState(false);
   const [autoFilling, setAutoFilling] = useState<string | null>(null);
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState<number>(0);
 
-  
-  // ✅ Door type and room type for pricing
   const [doorType, setDoorType] = useState<string>('Carcass Only');
   const [roomType, setRoomType] = useState<string>('Kitchen');
-  
-  // ✅ VAT percentage (default 20%)
   const [vatPercentage, setVatPercentage] = useState<number>(20);
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
-    }).format(value);
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
   };
 
-  const calculateDiscountedTotal = (
-    quantity: number,
-    amount: number,
-    discountPercent: number
-  ) => {
+  const calculateDiscountedTotal = (quantity: number, amount: number, discountPercent: number) => {
     const baseTotal = quantity * amount;
-    
-    if (!discountPercent || discountPercent === 0) {
-      return baseTotal;
-    }
-    
-    const discountAmount = baseTotal * (discountPercent / 100);
-    return baseTotal - discountAmount;
+    if (!discountPercent || discountPercent === 0) return baseTotal;
+    return baseTotal - baseTotal * (discountPercent / 100);
   };
 
   useEffect(() => {
@@ -92,9 +80,7 @@ export default function CreateQuotePage() {
     const customerPhone = searchParams.get("customerPhone");
     const customerEmail = searchParams.get("customerEmail");
 
-    if (customerIdParam) {
-      setCustomerId(customerIdParam);
-    }
+    if (customerIdParam) setCustomerId(customerIdParam);
 
     if (customerName) {
       setFormData({
@@ -107,42 +93,32 @@ export default function CreateQuotePage() {
     }
   }, [searchParams, user]);
 
+  // Update all prices when door/room type changes
   useEffect(() => {
     const updateAllPrices = async () => {
-      console.log(`🔄 Door/Room type changed - updating all prices...`);
-      console.log(`   New Door Type: ${doorType}`);
-      console.log(`   New Room Type: ${roomType}`);
-  
       const token = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
-  
-      const updatePromises = items.map(async (item, index) => {
-        if (!item.item || item.item.trim().length === 0) {
-          return null;
-        }
-  
+
+      const currentItems = itemsRef.current;
+      const hasItemsWithCodes = currentItems.some(item => item.item && item.item.trim().length > 0);
+      if (!hasItemsWithCodes) return;
+
+      const updatePromises = currentItems.map(async (item) => {
+        if (!item.item || item.item.trim().length === 0) return null;
+
         const itemCode = item.item.trim();
-        
-        // ✅ NEW: Check if item has a suffix (e.g., 50B-BS)
         const hasSuffix = itemCode.includes('-');
-        
-        // Detect if this is an appliance code
         const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(itemCode.split('-')[0]);
-        
-        const requestBody: any = {
-          description: itemCode,
-        };
-  
-        // ✅ If item has suffix, don't send door_type (backend will use suffix to determine component)
-        // ✅ If item has no suffix, use the dropdown door type
+
+        const requestBody: any = { description: itemCode };
+
         if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
         } else if (!isApplianceCode) {
-          // Item has suffix - still send room_type but not door_type
           requestBody.room_type = roomType;
         }
-  
+
         try {
           const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
             method: "POST",
@@ -153,28 +129,19 @@ export default function CreateQuotePage() {
             },
             body: JSON.stringify(requestBody),
           });
-  
+
           const data = await response.json();
-  
           if (data.found) {
-            console.log(`✅ Updated price for ${itemCode}: £${data.price}`);
-            return {
-              id: item.id,
-              price: data.price,
-              description: data.description || data.item_name,
-            };
-          } else {
-            console.log(`⚠️ No price found for ${itemCode} with new door type`);
-            return null;
+            return { id: item.id, price: data.price, description: data.description || data.item_name };
           }
-        } catch (error) {
-          console.error(`Error updating price for ${itemCode}:`, error);
+          return null;
+        } catch {
           return null;
         }
       });
-  
+
       const results = await Promise.all(updatePromises);
-  
+
       setItems((prevItems) =>
         prevItems.map((item) => {
           const result = results.find((r) => r && r.id === item.id);
@@ -189,17 +156,10 @@ export default function CreateQuotePage() {
           return item;
         })
       );
-  
-      console.log(`🎯 Finished updating all prices`);
     };
-  
-    const hasItemsWithCodes = items.some(item => item.item && item.item.trim().length > 0);
-    
-    if (hasItemsWithCodes) {
-      updateAllPrices();
-    }
+
+    updateAllPrices();
   }, [doorType, roomType]);
- 
 
   // ============================================================================
   // SMART AUTO-FILL - Triggers when item code is entered
@@ -209,12 +169,11 @@ export default function CreateQuotePage() {
       if (item.id === id) {
         const updatedItem = { ...item, [field]: value };
 
-        // Recalculate when quantity, amount, or discount_percent changes
         if (['quantity', 'amount', 'discount_percent'].includes(field)) {
           const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItem.quantity || 1;
           const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItem.amount || 0;
           const discountPercent = field === 'discount_percent' ? parseFloat(value) || 0 : updatedItem.discount_percent || 0;
-          
+
           updatedItem.line_total = qty * amount;
           updatedItem.discounted_total = calculateDiscountedTotal(qty, amount, discountPercent);
         }
@@ -225,47 +184,44 @@ export default function CreateQuotePage() {
     });
     setItems(updatedItems);
 
-    // ✅ AUTO-FILL: Trigger when ITEM field changes (code lookup)
-    if (field === 'item' && value && value.length >= 2) {
+    if (field === 'item' && value && value.length >= 1) {
       const trimmedValue = value.trim().toUpperCase();
-      
-      // Skip auto-fill if it looks like a full item name (contains spaces or is too long)
-      if (trimmedValue.includes(' ') || trimmedValue.length > 20) {
-        return;
-      }
 
-      console.log(`🔍 Auto-fill triggered for code: "${trimmedValue}"`);
-      
-      // ✅ NEW: Check if code has suffix (e.g., 50B-BS)
+      if (trimmedValue.includes(' ') || trimmedValue.length > 20) return;
+
       const hasSuffix = trimmedValue.includes('-');
-      
       setAutoFilling(id);
 
       try {
         const token = localStorage.getItem("token");
         const tenantId = localStorage.getItem("tenantId") || "7";
 
-        // Get base code (before suffix)
         const baseCode = trimmedValue.split('-')[0];
-        
-        // ✅ Detect if this is an appliance model code
         const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(baseCode);
-        
+
+        // ✅ Use itemsRef to get fresh snapshot, exclude current row
+        const currentItemsSnapshot = itemsRef.current
+          .filter(i => i.id !== id)
+          .map(i => ({
+            item: i.item,
+            description: i.description,
+            quantity: i.quantity,
+          }));
+
+        console.log(`🔍 Auto-fill: "${trimmedValue}", sending ${currentItemsSnapshot.length} items for fitting calc`);
+        console.log('📦 current_items:', JSON.stringify(currentItemsSnapshot));
+
         const requestBody: any = {
-          description: trimmedValue,  // Send full code with suffix
+          description: trimmedValue,
+          current_items: currentItemsSnapshot,
         };
 
-        // ✅ If code has suffix, don't send door_type (backend will use suffix)
-        // ✅ If code has no suffix, use the dropdown door type
         if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
         } else if (!isApplianceCode) {
-          // Has suffix - still send room_type but not door_type
           requestBody.room_type = roomType;
         }
-
-        console.log(`   Request body:`, requestBody);
 
         const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
           method: "POST",
@@ -280,35 +236,38 @@ export default function CreateQuotePage() {
         const data = await response.json();
 
         if (data.found) {
-          // ✅ Build description with brand and series for appliances
           let autoDescription = data.description || data.item_name || '';
-          
-          if (isApplianceCode && data.brand && data.series_level) {
+
+          if (data.is_fitting) {
+            // For fittings, use the fitting name as description
+            autoDescription = data.item_name || '';
+          } else if (isApplianceCode && data.brand && data.series_level) {
             autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
           }
+
+          const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
 
           setItems((prevItems) =>
             prevItems.map((item) => {
               if (item.id === id) {
+                const qty = fittingQty !== null ? fittingQty : (item.quantity || 1);
                 return {
                   ...item,
                   item: trimmedValue,
                   description: autoDescription,
                   amount: data.price || 0,
+                  quantity: qty,
                   width: data.width,
                   height: data.height,
                   depth: data.depth,
-                  line_total: (data.price || 0) * (item.quantity || 1),
+                  line_total: (data.price || 0) * qty,
                 };
               }
               return item;
             })
           );
 
-          console.log(`✅ Auto-filled: ${data.item_name} - £${data.price}`);
-          if (hasSuffix) console.log(`   🎯 Suffix pricing: Component-only`);
-          if (data.brand) console.log(`   Brand: ${data.brand}`);
-          if (data.series_level) console.log(`   Series: ${data.series_level}`);
+          console.log(`✅ Auto-filled: ${data.item_name} - £${data.price}${fittingQty ? ` x${fittingQty}` : ''}`);
         } else {
           console.log("❌ No pricing found for code:", trimmedValue);
         }
@@ -321,27 +280,18 @@ export default function CreateQuotePage() {
   };
 
   // ============================================================================
-  // DESCRIPTION AUTO-FILL - Triggers when full description is entered
+  // DESCRIPTION AUTO-FILL
   // ============================================================================
   const handleDescriptionChange = async (id: string, value: string) => {
-    // Update description immediately
     setItems((prev) =>
       prev.map((item) => {
-        if (item.id === id) {
-          return { ...item, description: value };
-        }
+        if (item.id === id) return { ...item, description: value };
         return item;
       })
     );
 
-    // Skip if description is too short
-    if (!value || value.length < 5) {
-      return;
-    }
+    if (!value || value.length < 5) return;
 
-    console.log(`🔍 Description auto-fill: "${value}"`);
-    console.log(`   Door Type: ${doorType}`);
-    console.log(`   Room Type: ${roomType}`);
     setAutoFilling(id);
 
     try {
@@ -381,8 +331,6 @@ export default function CreateQuotePage() {
             return item;
           })
         );
-
-        console.log(`✅ Auto-filled from description: ${data.item_name} - £${data.price}`);
       }
     } catch (error) {
       console.error("Description auto-fill failed:", error);
@@ -415,30 +363,20 @@ export default function CreateQuotePage() {
   const handleSave = async () => {
     if (saving) return;
 
-    if (!formData.name?.trim()) {
-      alert("Customer name is required");
-      return;
-    }
-
-    if (!formData.address?.trim()) {
-      alert("Customer address is required");
-      return;
-    }
+    if (!formData.name?.trim()) { alert("Customer name is required"); return; }
+    if (!formData.address?.trim()) { alert("Customer address is required"); return; }
 
     const subtotalBeforeDiscount = items.reduce((sum, item) => {
-      const itemTotal = (item.discount_percent && item.discount_percent > 0) 
+      const itemTotal = (item.discount_percent && item.discount_percent > 0)
         ? (item.discounted_total || 0)
         : item.line_total;
       return sum + itemTotal;
     }, 0);
-    
+
     const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
     const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
-    
-    if (subtotal <= 0) {
-      alert("Please add at least one item with a valid price");
-      return;
-    }
+
+    if (subtotal <= 0) { alert("Please add at least one item with a valid price"); return; }
 
     setSaving(true);
     try {
@@ -448,10 +386,7 @@ export default function CreateQuotePage() {
 
       const response = await fetch(`${BACKEND_URL}/quotations`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           client_id: customerId,
           customer_name: formData.name,
@@ -483,20 +418,16 @@ export default function CreateQuotePage() {
           vat,
           total,
           vat_percentage: vatPercentage,
-          global_discount_percent: globalDiscountPercent,  // NEW: Add global discount
-          global_discount_amount: globalDiscountAmount,    // NEW: Add discount amount
+          global_discount_percent: globalDiscountPercent,
+          global_discount_amount: globalDiscountAmount,
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
         const quoteId = data.quotation_id || data.id;
-        
         alert(`✅ Quote #${quoteId} created successfully!`);
-        
-        const quoteUrl = `/dashboard/quotes/${quoteId}`;
-        window.open(quoteUrl, '_blank');
-        
+        window.open(`/dashboard/quotes/${quoteId}`, '_blank');
         if (customerId) {
           router.push(`/dashboard/customers/${customerId}`);
         } else {
@@ -515,7 +446,7 @@ export default function CreateQuotePage() {
   };
 
   const subtotalBeforeDiscount = items.reduce((sum, item) => {
-    const itemTotal = (item.discount_percent && item.discount_percent > 0) 
+    const itemTotal = (item.discount_percent && item.discount_percent > 0)
       ? (item.discounted_total || 0)
       : item.line_total;
     return sum + itemTotal;
@@ -537,9 +468,7 @@ export default function CreateQuotePage() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold">Create New Quotation</h1>
-              <p className="text-sm text-gray-600">
-                Fill in the details below to create a quotation
-              </p>
+              <p className="text-sm text-gray-600">Fill in the details below to create a quotation</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -551,16 +480,12 @@ export default function CreateQuotePage() {
         </div>
       </div>
 
-      {/* Quotation Form */}
       <div className="mx-auto max-w-6xl px-8 py-8">
         {/* Company Header */}
         <div className="mb-8 text-center">
-          <div className="mb-4 text-4xl font-bold tracking-wider text-gray-800">
-            AZTEC INTERIORS
-          </div>
+          <div className="mb-4 text-4xl font-bold tracking-wider text-gray-800">AZTEC INTERIORS</div>
         </div>
 
-        {/* Company Registration Details */}
         <div className="mb-6 space-y-1 bg-green-200 p-3 text-sm">
           <p className="font-semibold">Registered to England No 5246881</p>
           <p className="font-semibold">VAT Reg No.686 8010 72</p>
@@ -577,10 +502,9 @@ export default function CreateQuotePage() {
           <p>Please use your name and/or road name as reference:</p>
         </div>
 
-        {/* Quotation Title */}
         <h1 className="mb-6 text-center text-2xl font-bold">QUOTATION</h1>
 
-        {/* ✅ Door Type and Room Type Selection */}
+        {/* Door Type and Room Type */}
         <div className="mb-6 grid grid-cols-2 gap-4">
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">
@@ -595,7 +519,6 @@ export default function CreateQuotePage() {
               <option value="Bedroom">Bedroom</option>
             </select>
           </div>
-
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">
               Door Type <span className="text-red-600">*</span>
@@ -614,7 +537,6 @@ export default function CreateQuotePage() {
           </div>
         </div>
 
-        {/* ✅ NEW: Info Banner with Suffix Instructions */}
         <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-4">
           <p className="font-medium text-sm text-blue-900 mb-2">
             💡 Selected: <span className="font-bold">{roomType}</span> with <span className="font-bold">{doorType}</span> doors
@@ -624,9 +546,6 @@ export default function CreateQuotePage() {
           </p>
           <div className="mt-3 pt-3 border-t border-blue-200">
             <p className="text-xs font-semibold text-blue-900 mb-1">🎯 Component-Only Pricing (Advanced):</p>
-            <p className="text-xs text-blue-700">
-              Add a suffix to quote components separately:
-            </p>
             <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
               <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = Carcass + {doorType} doors (complete unit)</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-BS</code> = Basic Slab door component only</li>
@@ -644,48 +563,25 @@ export default function CreateQuotePage() {
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50" style={{ width: '20%' }}>DATE:</td>
                 <td className="border border-black p-0">
-                  <Input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                  />
+                  <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
                 </td>
               </tr>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">NAME:</td>
                 <td className="border border-black p-0">
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Customer name"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                    required
-                  />
+                  <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Customer name" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" required />
                 </td>
               </tr>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ADDRESS:</td>
                 <td className="border border-black p-0">
-                  <textarea
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="Customer address"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2 resize-none"
-                    rows={2}
-                    required
-                  />
+                  <textarea value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="Customer address" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2 resize-none" rows={2} required />
                 </td>
               </tr>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">TEL:</td>
                 <td className="border border-black p-0">
-                  <Input
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="Phone number"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                  />
+                  <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="Phone number" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
                 </td>
               </tr>
             </tbody>
@@ -721,29 +617,23 @@ export default function CreateQuotePage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, index) => (
+                {items.map((item) => (
                   <tr key={item.id}>
-                    {/* ITEM */}
                     <td className="border border-black p-1">
                       <Input
                         value={item.item}
                         onChange={(e) => handleItemChange(item.id, "item", e.target.value)}
+                        onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
                         placeholder="50B"
-                        className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${
-                          autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''
-                        }`}
+                        className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
                       />
                     </td>
-                    
-                    {/* DESCRIPTION */}
                     <td className="border border-black p-1">
                       <textarea
                         value={item.description}
                         onChange={(e) => handleDescriptionChange(item.id, e.target.value)}
                         placeholder="Description"
-                        className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${
-                          autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''
-                        }`}
+                        className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
                         rows={2}
                         style={{ minHeight: '35px', lineHeight: '1.3' }}
                         onInput={(e) => {
@@ -753,126 +643,47 @@ export default function CreateQuotePage() {
                         }}
                       />
                     </td>
-                    
-                    {/* COLOUR */}
                     <td className="border border-black p-1">
-                      <Input
-                        value={item.color}
-                        onChange={(e) => handleItemChange(item.id, "color", e.target.value)}
-                        placeholder="Colour"
-                        className="border-none focus-visible:ring-0 min-w-[70px] text-xs"
-                      />
+                      <Input value={item.color} onChange={(e) => handleItemChange(item.id, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 min-w-[70px] text-xs" />
                     </td>
-                    
-                    {/* QTY */}
                     <td className="border border-black p-1">
-                      <Input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)}
-                        className="border-none text-center focus-visible:ring-0 w-[45px] text-xs"
-                        min="1"
-                      />
+                      <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-[45px] text-xs" min="1" />
                     </td>
-                    
-                    {/* WIDTH */}
                     <td className="border border-black p-1">
-                      <Input
-                        type="number"
-                        value={item.width || ''}
-                        onChange={(e) => handleItemChange(item.id, "width", e.target.value)}
-                        placeholder="—"
-                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
-                        min="0"
-                      />
+                      <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" min="0" />
                     </td>
-                    
-                    {/* HEIGHT */}
                     <td className="border border-black p-1">
-                      <Input
-                        type="number"
-                        value={item.height || ''}
-                        onChange={(e) => handleItemChange(item.id, "height", e.target.value)}
-                        placeholder="—"
-                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
-                        min="0"
-                      />
+                      <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" min="0" />
                     </td>
-                    
-                    {/* DEPTH */}
                     <td className="border border-black p-1">
-                      <Input
-                        type="number"
-                        value={item.depth || ''}
-                        onChange={(e) => handleItemChange(item.id, "depth", e.target.value)}
-                        placeholder="—"
-                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
-                        min="0"
-                      />
+                      <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" min="0" />
                     </td>
-                    
-                    {/* PRICE */}
                     <td className="border border-black p-1">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={item.amount}
-                        onChange={(e) => handleItemChange(item.id, "amount", e.target.value)}
-                        className="border-none text-right focus-visible:ring-0 min-w-[65px] text-xs"
-                        min="0"
-                        placeholder="0.00"
-                      />
+                      <Input type="number" step="0.01" value={item.amount} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 min-w-[65px] text-xs" min="0" placeholder="0.00" />
                     </td>
-                    
-                    {/* AMOUNT */}
                     <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
                       {formatCurrency(item.line_total)}
                     </td>
-                    
-                    {/* DISCOUNT % - NEW COLUMN */}
                     <td className="border border-black p-1">
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={item.discount_percent || ''}
-                        onChange={(e) => handleItemChange(item.id, "discount_percent", e.target.value)}
-                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
-                        min="0"
-                        max="100"
-                        placeholder="0"
-                      />
+                      <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(item.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" min="0" max="100" placeholder="0" />
                     </td>
-                    
-                    {/* FINAL AMOUNT - NEW COLUMN */}
                     <td className="border border-black px-2 py-1 text-right">
                       {item.discount_percent && item.discount_percent > 0 ? (
                         <div>
-                          <div className="text-xs text-gray-500 line-through">
-                            {formatCurrency(item.line_total)}
-                          </div>
-                          <div className="font-semibold text-green-700 text-xs">
-                            {formatCurrency(item.discounted_total || 0)}
-                          </div>
+                          <div className="text-xs text-gray-500 line-through">{formatCurrency(item.line_total)}</div>
+                          <div className="font-semibold text-green-700 text-xs">{formatCurrency(item.discounted_total || 0)}</div>
                         </div>
                       ) : (
                         <span className="font-semibold text-xs">{formatCurrency(item.line_total)}</span>
                       )}
                     </td>
-                    
-                    {/* ACTION */}
                     <td className="border border-black p-1 text-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveItem(item.id)}
-                        className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7"
-                      >
+                      <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7">
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </td>
                   </tr>
                 ))}
-
                 {items.length === 0 && (
                   <tr>
                     <td colSpan={12} className="border border-black px-3 py-8 text-center text-gray-500">
@@ -893,22 +704,12 @@ export default function CreateQuotePage() {
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
                 <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalBeforeDiscount)}</td>
               </tr>
-              
-              {/* NEW: Global Discount Row */}
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
                   <div className="flex items-center justify-between gap-2">
                     <span>DISCOUNT</span>
                     <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        value={globalDiscountPercent}
-                        onChange={(e) => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)}
-                        className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                      />
+                      <Input type="number" value={globalDiscountPercent} onChange={(e) => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)} className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm" min="0" max="100" step="0.1" />
                       <span className="text-sm">%</span>
                     </div>
                   </div>
@@ -917,29 +718,18 @@ export default function CreateQuotePage() {
                   {globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}
                 </td>
               </tr>
-              
-              {/* Show adjusted subtotal if discount applied */}
               {globalDiscountPercent > 0 && (
                 <tr>
                   <td className="border border-black px-3 py-2 font-semibold bg-blue-50">SUBTOTAL AFTER DISCOUNT</td>
                   <td className="border border-black px-3 py-2 text-right font-semibold">{formatCurrency(subtotal)}</td>
                 </tr>
               )}
-              
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
                   <div className="flex items-center justify-between gap-2">
                     <span>VAT</span>
                     <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        value={vatPercentage}
-                        onChange={(e) => setVatPercentage(parseFloat(e.target.value) || 0)}
-                        className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                      />
+                      <Input type="number" value={vatPercentage} onChange={(e) => setVatPercentage(parseFloat(e.target.value) || 0)} className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm" min="0" max="100" step="0.1" />
                       <span className="text-sm">%</span>
                     </div>
                   </div>
@@ -954,19 +744,15 @@ export default function CreateQuotePage() {
           </table>
         </div>
 
-        {/* Payment Terms */}
         <div className="mb-6 space-y-2 text-sm">
           <p className="font-semibold">Only Bacs or Cash will be accepted on Delivery and Completion</p>
-          <p className="font-semibold">
-            NOTE: If you wish to proceed with this quote, you will be required to make the full payment upfront
-          </p>
+          <p className="font-semibold">NOTE: If you wish to proceed with this quote, you will be required to make the full payment upfront</p>
         </div>
 
         <div className="mb-8 text-sm font-semibold text-red-600">
           <p>Please sign here to confirm.</p>
         </div>
 
-        {/* Signature Section */}
         <div className="space-y-4 text-sm">
           <div className="flex items-center">
             <span className="mr-2">Customer Signature:</span>
