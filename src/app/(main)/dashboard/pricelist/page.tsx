@@ -111,13 +111,14 @@ export default function PricelistPage() {
       } else if (activeTab === 'Kitchen') {
         const kitchenCategories = [
           'Base Units', 'Dresser Units', 'Larder P/O',
-          'Larder Units', 'Top Box', 'Finishing', 'Misc', 'Quad', 'Kitchen'
+          'Larder Units', 'Top Box', 'Finishing', 'Misc', 'Quad', 'Kitchen',
+          'Wall Units'
         ];
         filteredItems = filteredItems.filter((item: PricelistItem) =>
           kitchenCategories.includes(item.category)
         );
       } else if (activeTab === 'Bedrooms') {
-        const bedroomCategories = ['Wardrobes', 'Chest of drawers', 'Linen Press'];
+        const bedroomCategories = ['Wardrobes', 'Chest of drawers', 'Linen Press', 'Bedroom Wall Units'];
         filteredItems = filteredItems.filter((item: PricelistItem) =>
           bedroomCategories.includes(item.category)
         );
