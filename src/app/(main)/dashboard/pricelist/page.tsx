@@ -118,7 +118,7 @@ export default function PricelistPage() {
           kitchenCategories.includes(item.category)
         );
       } else if (activeTab === 'Bedrooms') {
-        const bedroomCategories = ['Wardrobes', 'Chest of drawers', 'Linen Press', 'Bedroom Wall Units'];
+        const bedroomCategories = ['Wardrobes', 'Chest of drawers', 'Linen Press', 'Bedroom Wall Units', 'Bedroom Drawer Fronts'];
         filteredItems = filteredItems.filter((item: PricelistItem) =>
           bedroomCategories.includes(item.category)
         );
