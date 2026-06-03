@@ -125,6 +125,7 @@ interface Customer {
   has_documents: boolean;
   updated_at?: string;
   assigned_employee_id?: string;
+  visit_date?: string;
 }
 
 interface Salesperson {
@@ -256,6 +257,7 @@ export default function CustomersPage() {
       const customersWithData = data.map((c: any) => {
         const customer: Customer = {
           ...c,
+          visit_date: c.visit_date || null,
           postcode: c.postcode || c.post_code || "",
           salesperson: c.salesperson || "",
           project_types: Array.isArray(c.project_types) ? c.project_types : [],
@@ -747,7 +749,7 @@ export default function CustomersPage() {
                 {/* <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
                   Email
                 </th> */}
-                <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase max-w-[180px]">
                   Address
                 </th>
                 <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase w-24">
@@ -759,13 +761,16 @@ export default function CustomersPage() {
                 <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase w-20">
                   Projects
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase">
+                <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase w-32">
                   Salesperson
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase w-24">
+                <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase w-32">
+                  Visit Date
+                </th>
+                <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase w-32">
                   Types
                 </th>
-                <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase w-20">
+                <th className="px-3 py-2 text-left text-xs font-medium tracking-wider text-gray-500 uppercase w-28">
                   Actions
                 </th>
               </tr>
@@ -774,14 +779,14 @@ export default function CustomersPage() {
             <tbody className="divide-y divide-gray-200 bg-white">
               {isLoading ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center">
+                  <td colSpan={11} className="px-6 py-12 text-center">
                     <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent text-gray-600"></div>
                     <p className="mt-4 text-gray-500">Loading customers...</p>
                   </td>
                 </tr>
               ) : paginatedCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center text-gray-500">  
+                  <td colSpan={11} className="px-6 py-12 text-center text-gray-500">  
                     <p className="text-lg">No customers found.</p>
                     {user?.role === "Salesperson" && (
                       <p className="mt-2 text-sm">Create your first customer to get started!</p>
@@ -867,7 +872,7 @@ export default function CustomersPage() {
                         </td> */}
 
                         {/* Address */}
-                        <td className="px-3 py-2 text-sm text-gray-900">
+                        <td className="px-3 py-2 text-sm text-gray-900 max-w-[180px]">
                           {isEditing ? (
                             <Input
                               value={editFormData.address || ""}
@@ -878,7 +883,9 @@ export default function CustomersPage() {
                               className="w-full"
                             />
                           ) : (
-                            customer.address
+                            <span className="block truncate" title={customer.address}>
+                              {customer.address}
+                            </span>
                           )}
                         </td>
 
@@ -995,11 +1002,23 @@ export default function CustomersPage() {
                           )}
                         </td>
 
-                        <td className="px-3 py-2 text-sm text-gray-900">
+                        <td className="px-3 py-2 text-sm text-gray-900 w-32">
                           {customer.salesperson || "—"}
                         </td>
 
-                        <td className="px-3 py-2 whitespace-nowrap">
+                        {/* Visit Date */}
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 w-32">
+                          {customer.visit_date
+                            ? new Date(customer.visit_date).toLocaleDateString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
+                        </td>
+
+                        {/* Types */}
+                        <td className="px-3 py-2 whitespace-nowrap w-32">
                           {customer.project_types && customer.project_types.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
                               {customer.project_types.map((type, idx) => (
@@ -1019,7 +1038,7 @@ export default function CustomersPage() {
                         </td>
 
                         {/* Actions */}
-                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                        <td className="px-3 py-2 text-right whitespace-nowrap w-28">
                           <div className="flex gap-2 justify-end">
                             {/* {canViewTimeline() && isAccepted && !isEditing && (
                               <Button

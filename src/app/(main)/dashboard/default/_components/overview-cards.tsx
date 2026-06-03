@@ -26,7 +26,7 @@ import {
 
 interface PipelineItem {
   id: string;
-  type: "client" | "job" | "project";  // ✅ FIXED: Changed 'customer' to 'client'
+  type: "client" | "job" | "project";
   customer: {
     id: number;
     created_at: string;
@@ -81,61 +81,50 @@ export function OverviewCards() {
         const pipelineItems: PipelineItem[] = await pipelineRes.json();
         console.log("✅ Pipeline data loaded:", pipelineItems.length, "items");
 
-        // ✅ FIXED: Filter for 'client' type instead of 'customer'
         const clients = pipelineItems.filter(item => item.type === 'client');
         console.log("📊 Found", clients.length, "clients");
 
-        // Process New Leads
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        const periods = [
-          { label: "26-30", daysAgoStart: 26, daysAgoEnd: 30 },
-          { label: "21-25", daysAgoStart: 21, daysAgoEnd: 25 },
-          { label: "16-20", daysAgoStart: 16, daysAgoEnd: 20 },
-          { label: "11-15", daysAgoStart: 11, daysAgoEnd: 15 },
-          { label: "6-10", daysAgoStart: 6, daysAgoEnd: 10 },
-          { label: "1-5", daysAgoStart: 1, daysAgoEnd: 5 },
-        ];
+        // --- Monthly breakdown: last 6 months ---
+        const monthlyData: Record<string, { newLeads: number; disqualified: number }> = {};
 
-        const today = new Date();
-        const chartData = periods.map(period => {
-          const startDate = new Date(today);
-          startDate.setDate(today.getDate() - period.daysAgoEnd);
-          startDate.setHours(0, 0, 0, 0);
-          
-          const endDate = new Date(today);
-          endDate.setDate(today.getDate() - period.daysAgoStart);
-          endDate.setHours(23, 59, 59, 999);
+        // Build last 6 months as ordered keys
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(1);
+          d.setMonth(d.getMonth() - i);
+          const key = d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+          monthlyData[key] = { newLeads: 0, disqualified: 0 };
+        }
 
-          // ✅ FIXED: Use 'client' type and check customer.created_at
-          const periodClients = clients.filter(item => {
-            if (!item.customer.created_at) return false;
-            const createdDate = new Date(item.customer.created_at);
-            return createdDate >= startDate && createdDate <= endDate;
-          });
-
-          return {
-            date: period.label,
-            newLeads: periodClients.filter(c => c.stage !== 'Rejected').length,
-            disqualified: periodClients.filter(c => c.stage === 'Rejected').length,
-          };
+        // Bucket each client into their month
+        clients.forEach(item => {
+          const dateStr = (item.customer as any).visit_date || item.customer.created_at;
+          if (!dateStr) return;
+          const d = new Date(dateStr);
+          const key = d.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+          if (monthlyData[key] !== undefined) {
+            if (item.stage === "Rejected") {
+              monthlyData[key].disqualified++;
+            } else {
+              monthlyData[key].newLeads++;
+            }
+          }
         });
 
-        console.log("📊 Chart data:", chartData);
+        const chartData = Object.entries(monthlyData).map(([month, counts]) => ({
+          date: month,
+          ...counts,
+        }));
+
+        console.log("📊 Monthly chart data:", chartData);
         setLeadsChartData(chartData);
 
-        // ✅ FIXED: Use clients array instead of filtering by type
-        const recentClients = clients.filter((item) => {
-          if (!item.customer.created_at) return false;
-          return new Date(item.customer.created_at) >= thirtyDaysAgo;
-        });
-        
-        const newLeadsTotal = recentClients.filter(c => c.stage !== 'Rejected').length;
-        console.log("📈 New leads in last 30 days:", newLeadsTotal);
-        setNewLeadsCount(newLeadsTotal);
+        // Count leads for current month only (for footer)
+        const currentMonthKey = new Date().toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+        const currentMonthData = monthlyData[currentMonthKey] || { newLeads: 0 };
+        setNewLeadsCount(currentMonthData.newLeads);
 
-        // Process Pipeline
+        // Process Sales Pipeline funnel
         const stageCounts: Record<string, number> = {
           Lead: 0, Quote: 0, Accepted: 0, Production: 0, Complete: 0,
         };
@@ -232,7 +221,6 @@ export function OverviewCards() {
         const pipelineItems: PipelineItem[] = await pipelineRes.json();
         console.log("📊 Total pipeline items:", pipelineItems.length);
         
-        // ✅ FIXED: Filter for 'client' AND 'project' types in Accepted stage
         const acceptedItems = pipelineItems.filter(
           item => (item.type === 'client' || item.type === 'project') && item.stage === 'Accepted'
         );
@@ -244,14 +232,12 @@ export function OverviewCards() {
           return;
         }
         
-        // Get existing action items to avoid duplicates
         const existingRes = await fetchWithAuth("action-items");
         const existingActionItems: ActionItem[] = existingRes.ok ? await existingRes.json() : [];
         const existingCustomerIds = new Set(existingActionItems.map(item => item.customer_id));
         
         console.log(`📌 Existing action items for ${existingCustomerIds.size} customers`);
         
-        // Create action items for customers that don't have one
         let createdCount = 0;
         for (const item of acceptedItems) {
           const customerId = String(item.customer.id);
@@ -286,7 +272,6 @@ export function OverviewCards() {
         
         console.log(`🎉 Created ${createdCount} new action items`);
         
-        // Refresh action items after creation
         if (createdCount > 0) {
           console.log("🔄 Refreshing action items list...");
           const refreshRes = await fetchWithAuth("action-items");
@@ -335,11 +320,11 @@ export function OverviewCards() {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {/* New Leads Card */}
+      {/* Leads by Month Card */}
       <Card>
         <CardHeader>
-          <CardTitle>New Leads</CardTitle>
-          <CardDescription>Last 30 Days</CardDescription>
+          <CardTitle>Leads by Month</CardTitle>
+          <CardDescription>Last 6 months</CardDescription>
         </CardHeader>
         <CardContent className="h-48">
           {loadingPipeline ? (
@@ -348,12 +333,14 @@ export function OverviewCards() {
             </div>
           ) : (
             <ChartContainer config={leadsChartConfig} className="h-full w-full">
-              <BarChart data={leadsChartData} margin={{ left: 0, right: 0, top: 20, bottom: 20 }}>
-                <XAxis 
-                  dataKey="date" 
-                  tickLine={false} 
-                  axisLine={false} 
+              <BarChart data={leadsChartData} margin={{ left: 0, right: 0, top: 20, bottom: 30 }}>
+                <XAxis
+                  dataKey="date"
+                  tickLine={false}
+                  axisLine={false}
                   tickMargin={8}
+                  angle={-35}
+                  textAnchor="end"
                   className="text-xs"
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
@@ -363,18 +350,21 @@ export function OverviewCards() {
                   fill="var(--color-newLeads)"
                   radius={[0, 0, 0, 0]}
                 />
-                <Bar 
-                  dataKey="disqualified" 
-                  stackId="a" 
-                  fill="var(--color-disqualified)" 
-                  radius={[4, 4, 0, 0]} 
+                <Bar
+                  dataKey="disqualified"
+                  stackId="a"
+                  fill="var(--color-disqualified)"
+                  radius={[4, 4, 0, 0]}
                 />
               </BarChart>
             </ChartContainer>
           )}
         </CardContent>
         <CardFooter>
-          <span className="text-xl font-semibold">{newLeadsCount}</span>
+          <span className="text-sm text-gray-600">
+            This month:{" "}
+            <span className="text-xl font-semibold ml-1">{newLeadsCount}</span> new leads
+          </span>
         </CardFooter>
       </Card>
 
@@ -422,7 +412,7 @@ export function OverviewCards() {
         <CardContent className="h-48 overflow-y-auto">
           {loadingActions ? (
             <div className="flex items-center justify-center h-full">
-              <div className={cn("animate-spin rounded-full h-8 w-8 border-b-2", 
+              <div className={cn("animate-spin rounded-full h-8 w-8 border-b-2",
                 hasActionItems ? "border-red-600" : "border-green-600"
               )}></div>
             </div>

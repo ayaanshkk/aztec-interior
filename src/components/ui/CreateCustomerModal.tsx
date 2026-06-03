@@ -67,7 +67,16 @@ export function CreateCustomerModal({
         project_types: [] as ProjectType[],
         marketing_opt_in: false,
         notes: "",
+        visit_date: "",
+        stage: "Lead",
     });
+
+    const STAGES = [
+        "Lead", "Quote", "Consultation", "Survey", "Measure",
+        "Design", "Quoted", "Accepted", "Rejected", "Ordered",
+        "Production", "Delivery", "Installation", "Complete",
+        "Remedial", "Cancelled"
+    ];
 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
@@ -257,6 +266,36 @@ export function CreateCustomerModal({
                         {errors.postcode && (
                             <span className="text-red-500 text-xs">{errors.postcode}</span>
                         )}
+                    </div>
+
+                    {/* --- Visit Date & Stage --- */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col space-y-1.5">
+                            <Label htmlFor="visit_date">Client Visit Date</Label>
+                            <Input
+                                id="visit_date"
+                                type="date"
+                                value={formData.visit_date}
+                                onChange={(e) => handleChange("visit_date", e.target.value)}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                When did this client first come in?
+                            </span>
+                        </div>
+
+                        <div className="flex flex-col space-y-1.5">
+                            <Label htmlFor="stage">Stage</Label>
+                            <select
+                                id="stage"
+                                value={formData.stage}
+                                onChange={(e) => handleChange("stage", e.target.value)}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                            >
+                                {STAGES.map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     {/* --- Salesperson & Project Type --- */}
