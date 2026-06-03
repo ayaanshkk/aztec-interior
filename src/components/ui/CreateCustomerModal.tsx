@@ -173,6 +173,8 @@ export function CreateCustomerModal({
             project_types: [],
             marketing_opt_in: false,
             notes: "",
+            visit_date: "",
+            stage: "Lead",
         });
         setErrors({});
         onClose();

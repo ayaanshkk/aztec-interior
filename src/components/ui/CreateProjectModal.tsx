@@ -36,6 +36,7 @@ interface FormData {
   project_type: string;
   stage: string;
   date_of_measure: string;
+  visit_date: string;
   notes: string;
 }
 
@@ -51,11 +52,12 @@ export default function CreateProjectModal({ open, onOpenChange, onSuccess, cust
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState<FormData>({
-    project_name: "",
-    project_type: "Kitchen",
-    stage: "Lead",
-    date_of_measure: "",
-    notes: "",
+      project_name: "",
+      project_type: "Kitchen",
+      stage: "Lead",
+      date_of_measure: "",
+      visit_date: "",
+      notes: "",
   });
 
   const handleInputChange = (field: keyof FormData, value: string) => {
@@ -80,11 +82,12 @@ export default function CreateProjectModal({ open, onOpenChange, onSuccess, cust
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          project_title:   formData.project_name,
-          project_type:    formData.project_type,
-          stage_name:      formData.stage,
-          date_of_measure: formData.date_of_measure || null,
-          notes:           formData.notes || "",
+            project_title:   formData.project_name,
+            project_type:    formData.project_type,
+            stage_name:      formData.stage,
+            date_of_measure: formData.date_of_measure || null,
+            visit_date:      formData.visit_date || null,
+            notes:           formData.notes || "",
         }),
       });
 
@@ -93,7 +96,7 @@ export default function CreateProjectModal({ open, onOpenChange, onSuccess, cust
         throw new Error(err.error || `Failed (${response.status})`);
       }
 
-      setFormData({ project_name: "", project_type: "Kitchen", stage: "Lead", date_of_measure: "", notes: "" });
+      setFormData({ project_name: "", project_type: "Kitchen", stage: "Lead", date_of_measure: "", visit_date: "", notes: "" });
       setErrors({});
       onOpenChange(false);
       if (onSuccess) onSuccess();
@@ -105,7 +108,7 @@ export default function CreateProjectModal({ open, onOpenChange, onSuccess, cust
   };
 
   const handleClose = () => {
-    setFormData({ project_name: "", project_type: "Kitchen", stage: "Lead", date_of_measure: "", notes: "" });
+    setFormData({ project_name: "", project_type: "Kitchen", stage: "Lead", date_of_measure: "", visit_date: "", notes: "" });
     setErrors({});
     onOpenChange(false);
   };
@@ -164,6 +167,13 @@ export default function CreateProjectModal({ open, onOpenChange, onSuccess, cust
               onChange={e => handleInputChange("date_of_measure", e.target.value)} className="h-11" />
           </div>
 
+          <div className="space-y-2">
+              <Label htmlFor="visit_date" className="text-base">Client Visit Date</Label>
+              <Input id="visit_date" type="date" value={formData.visit_date}
+                  onChange={e => handleInputChange("visit_date", e.target.value)} className="h-11" />
+              <p className="text-xs text-muted-foreground">When did this client first come in?</p>
+          </div>
+          
           <div className="space-y-2">
             <Label htmlFor="notes" className="text-base">Notes / Scope of Work (Optional)</Label>
             <Textarea id="notes" placeholder="Enter any initial notes or details about the project scope."
