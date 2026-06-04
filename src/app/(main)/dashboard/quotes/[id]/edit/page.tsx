@@ -1,6 +1,6 @@
 "use client";
  
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,8 @@ export default function EditQuotePage() {
   const quoteId = params.id as string;
  
   const [quotation, setQuotation] = useState<any>(null);
-  const [items, setItems] = useState<QuoteItem[]>([]);
+  const itemsRef = useRef(items);
+  useEffect(() => { itemsRef.current = items; }, [items]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [autoFilling, setAutoFilling] = useState<number | null>(null);
@@ -360,7 +361,7 @@ export default function EditQuotePage() {
 
       // ✅ NEW: Detect appliance code pattern
       const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(trimmedValue);
-      const currentItemsSnapshot = items
+      const currentItemsSnapshot = itemsRef.current
         .filter((_, i) => i !== index)
         .map(i => ({
           item: i.item,
@@ -640,6 +641,7 @@ export default function EditQuotePage() {
               onChange={(e) => setDoorType(e.target.value)}
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
+              <option value="Carcass Only">Carcass Only (No Doors/Drawers)</option>
               <option value="Basic Slab">Basic Slab</option>
               <option value="Acrylic Gloss/Matt">Acrylic Gloss/Matt</option>
               <option value="Vinyl">Vinyl</option>
@@ -667,6 +669,10 @@ export default function EditQuotePage() {
               <li>• <code className="bg-blue-100 px-1 rounded">50B-AG</code> = Acrylic door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-BST</code> = Carcass + Basic Slab total</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-AGT</code> = Carcass + Acrylic total</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
             </ul>
           </div>
         </div>
