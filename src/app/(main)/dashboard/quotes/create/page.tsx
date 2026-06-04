@@ -108,7 +108,8 @@ export default function CreateQuotePage() {
 
         const itemCode = item.item.trim();
         const hasSuffix = itemCode.includes('-');
-        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(itemCode.split('-')[0]);
+        const baseCode = itemCode.split('-')[0];
+        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(baseCode) && baseCode.length >= 8;
 
         const requestBody: any = { description: itemCode };
 
@@ -197,7 +198,7 @@ export default function CreateQuotePage() {
         const tenantId = localStorage.getItem("tenantId") || "7";
 
         const baseCode = trimmedValue.split('-')[0];
-        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(baseCode);
+        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(baseCode) && baseCode.length >= 8;
 
         // ✅ Use itemsRef to get fresh snapshot, exclude current row
         const currentItemsSnapshot = itemsRef.current
@@ -394,6 +395,8 @@ export default function CreateQuotePage() {
           customer_phone: formData.phone,
           customer_email: formData.email,
           date: formData.date,
+          door_type: doorType,
+          room_type: roomType,
           items: items
             .filter(item => {
               const hasItem = item.item && item.item.trim().length > 0;
@@ -547,15 +550,18 @@ export default function CreateQuotePage() {
           <div className="mt-3 pt-3 border-t border-blue-200">
             <p className="text-xs font-semibold text-blue-900 mb-1">🎯 Component-Only Pricing (Advanced):</p>
             <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
-              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = Carcass + {doorType} doors (complete unit)</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = {doorType === 'Carcass Only' ? 'Carcass only' : `Carcass + ${doorType} total (auto)`}</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only (when door type selected)</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-BS</code> = Basic Slab door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-AG</code> = Acrylic door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-BST</code> = Carcass + Basic Slab total</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-AGT</code> = Carcass + Acrylic total</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
+              {doorType === 'Carcass Only' && <>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-BST</code> = Carcass + Basic Slab total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-AGT</code> = Carcass + Acrylic total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
+              </>}
             </ul>
           </div>
         </div>

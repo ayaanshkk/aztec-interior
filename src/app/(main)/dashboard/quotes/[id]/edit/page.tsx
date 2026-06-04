@@ -119,7 +119,7 @@ export default function EditQuotePage() {
         const description = item.description.trim();
         
         // Detect if this is an appliance code
-        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(description);
+        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(description) && description.length >= 8;
         
         const requestBody: any = {
           description: description,
@@ -243,6 +243,8 @@ export default function EditQuotePage() {
         if (data.vat_percentage) {
           setVatPercentage(data.vat_percentage);
         }
+        if (data.door_type) setDoorType(data.door_type);
+        if (data.room_type) setRoomType(data.room_type);
       } else {
         alert("Failed to load quotation");
       }
@@ -273,8 +275,7 @@ export default function EditQuotePage() {
       const tenantId = localStorage.getItem("tenantId") || "7";
       
       // Detect if this is an appliance code
-      const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(value.trim());
-      
+      const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(value.trim()) && value.trim().length >= 8; 
       const requestBody: any = {
         description: value,
         door_type: doorType,
@@ -361,7 +362,7 @@ export default function EditQuotePage() {
       const tenantId = localStorage.getItem("tenantId") || "7";
 
       // ✅ NEW: Detect appliance code pattern
-      const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(trimmedValue);
+      const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(trimmedValue) && trimmedValue.length >= 8;
       const currentItemsSnapshot = itemsRef.current
         .filter((_, i) => i !== index)
         .map(i => ({
@@ -490,6 +491,8 @@ export default function EditQuotePage() {
           customer_phone: customerData.phone,
           customer_email: customerData.email || '', // Add fallback
           date: customerData.date,
+          door_type: doorType,
+          room_type: roomType,
           items: items
             .filter(item => {
               const hasItem = item.item && item.item.trim().length > 0;
@@ -629,7 +632,7 @@ export default function EditQuotePage() {
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Kitchen">Kitchen</option>
-              <option value="Bedrooms">Bedrooms</option>
+              <option value="Bedroom">Bedroom</option>
             </select>
           </div>
 
@@ -665,15 +668,18 @@ export default function EditQuotePage() {
               Add a suffix to quote components separately:
             </p>
             <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
-              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = Carcass + {doorType} doors (complete unit)</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = {doorType === 'Carcass Only' ? 'Carcass only' : `Carcass + ${doorType} total (auto)`}</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only (when door type selected)</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-BS</code> = Basic Slab door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-AG</code> = Acrylic door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-BST</code> = Carcass + Basic Slab total</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-AGT</code> = Carcass + Acrylic total</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
+              {doorType === 'Carcass Only' && <>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-BST</code> = Carcass + Basic Slab total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-AGT</code> = Carcass + Acrylic total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
+              </>}
             </ul>
           </div>
         </div>
