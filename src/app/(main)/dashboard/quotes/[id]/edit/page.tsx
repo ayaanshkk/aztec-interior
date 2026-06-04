@@ -30,6 +30,7 @@ export default function EditQuotePage() {
   const searchParams = useSearchParams();
   const quoteId = params.id as string;
  
+  const [quotation, setQuotation] = useState<any>(null);
   const [items, setItems] = useState<QuoteItem[]>([]);
   const itemsRef = useRef<QuoteItem[]>([]);
   useEffect(() => { itemsRef.current = items; }, [items]);
