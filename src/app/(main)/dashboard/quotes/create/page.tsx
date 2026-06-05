@@ -109,7 +109,7 @@ export default function CreateQuotePage() {
         const itemCode = item.item.trim();
         const hasSuffix = itemCode.includes('-');
         const baseCode = itemCode.split('-')[0];
-        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(baseCode) && baseCode.length >= 8;
+        const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
 
         const requestBody: any = { description: itemCode };
 
@@ -166,109 +166,122 @@ export default function CreateQuotePage() {
   // SMART AUTO-FILL - Triggers when item code is entered
   // ============================================================================
   const handleItemChange = async (id: string, field: keyof QuoteItem, value: any) => {
-    const updatedItems = items.map((item) => {
-      if (item.id === id) {
-        const updatedItem = { ...item, [field]: value };
-
-        if (['quantity', 'amount', 'discount_percent'].includes(field)) {
-          const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItem.quantity || 1;
-          const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItem.amount || 0;
-          const discountPercent = field === 'discount_percent' ? parseFloat(value) || 0 : updatedItem.discount_percent || 0;
-
-          updatedItem.line_total = qty * amount;
-          updatedItem.discounted_total = calculateDiscountedTotal(qty, amount, discountPercent);
+      const updatedItems = items.map((item) => {
+        if (item.id === id) {
+          const updatedItem = { ...item, [field]: value };
+          if (['quantity', 'amount', 'discount_percent'].includes(field)) {
+            const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItem.quantity || 1;
+            const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItem.amount || 0;
+            const discountPercent = field === 'discount_percent' ? parseFloat(value) || 0 : updatedItem.discount_percent || 0;
+            updatedItem.line_total = qty * amount;
+            updatedItem.discounted_total = calculateDiscountedTotal(qty, amount, discountPercent);
+          }
+          return updatedItem;
         }
+        return item;
+      });
+      setItems(updatedItems);
 
-        return updatedItem;
-      }
-      return item;
-    });
-    setItems(updatedItems);
+      if (field !== 'item' || !value || value.length < 1) return;
 
-    if (field === 'item' && value && value.length >= 1) {
       const trimmedValue = value.trim().toUpperCase();
+
+      // ── FITTING EXPANSION ────────────────────────────────────────────
+      if (trimmedValue === 'FITTING') {
+        setAutoFilling(id);
+        const token = localStorage.getItem("token");
+        const tenantId = localStorage.getItem("tenantId") || "7";
+        const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'WTJT', 'FITDR', 'PANW'];
+        const currentItemsSnapshot = itemsRef.current
+          .filter(i => i.id !== id)
+          .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
+        console.log('📦 FITTING snapshot:', JSON.stringify(currentItemsSnapshot));
+        try {
+          const fittingResults = await Promise.all(
+            FITTING_CODES.map(async (code) => {
+              try {
+                const res = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+                  body: JSON.stringify({ description: code, current_items: currentItemsSnapshot }),
+                });
+                const data = await res.json();
+                if (data.found && data.quantity > 0) {
+                  return { code, price: data.price, quantity: data.quantity, name: data.item_name };
+                }
+                return null;
+              } catch { return null; }
+            })
+          );
+          const validFittings = fittingResults.filter(Boolean) as { code: string; price: number; quantity: number; name: string }[];
+          if (validFittings.length === 0) {
+            alert('No fitting items detected in the quote. Add kitchen/bedroom units first.');
+            setAutoFilling(null);
+            return;
+          }
+          setItems(prevItems => {
+            const withoutPlaceholder = prevItems.filter(i => i.id !== id);
+            const newFittingRows = validFittings.map(f => ({
+              id: `fitting-${f.code}-${Date.now()}-${Math.random()}`,
+              item: f.code,
+              description: f.name,
+              color: '',
+              quantity: f.quantity,
+              amount: f.price,
+              line_total: f.price * f.quantity,
+              discount_percent: 0,
+              discounted_total: f.price * f.quantity,
+            }));
+            return [...withoutPlaceholder, ...newFittingRows];
+          });
+        } catch (error) {
+          console.error('Fitting expansion failed:', error);
+        } finally {
+          setAutoFilling(null);
+        }
+        return;
+      }
+      // ── END FITTING EXPANSION ────────────────────────────────────────
 
       if (trimmedValue.includes(' ') || trimmedValue.length > 20) return;
 
-      const hasSuffix = trimmedValue.includes('-');
       setAutoFilling(id);
-
       try {
         const token = localStorage.getItem("token");
         const tenantId = localStorage.getItem("tenantId") || "7";
-
+        const hasSuffix = trimmedValue.includes('-');
         const baseCode = trimmedValue.split('-')[0];
-        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(baseCode) && baseCode.length >= 8;
-
-        // ✅ Use itemsRef to get fresh snapshot, exclude current row
+        const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
         const currentItemsSnapshot = itemsRef.current
           .filter(i => i.id !== id)
-          .map(i => ({
-            item: i.item,
-            description: i.description,
-            quantity: i.quantity,
-          }));
-
-        console.log(`🔍 Auto-fill: "${trimmedValue}", sending ${currentItemsSnapshot.length} items for fitting calc`);
-        console.log('📦 current_items:', JSON.stringify(currentItemsSnapshot));
-
-        const requestBody: any = {
-          description: trimmedValue,
-          current_items: currentItemsSnapshot,
-        };
-
+          .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
+        const requestBody: any = { description: trimmedValue, current_items: currentItemsSnapshot };
         if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
         } else if (!isApplianceCode) {
           requestBody.room_type = roomType;
         }
-
         const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-            "X-Tenant-ID": tenantId,
-          },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
           body: JSON.stringify(requestBody),
         });
-
         const data = await response.json();
-
         if (data.found) {
           let autoDescription = data.description || data.item_name || '';
-
-          if (data.is_fitting) {
-            // For fittings, use the fitting name as description
-            autoDescription = data.item_name || '';
-          } else if (isApplianceCode && data.brand && data.series_level) {
+          if (data.is_fitting) autoDescription = data.item_name || '';
+          else if (isApplianceCode && data.brand && data.series_level) {
             autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
           }
-
           const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
-
-          setItems((prevItems) =>
-            prevItems.map((item) => {
-              if (item.id === id) {
-                const qty = fittingQty !== null ? fittingQty : (item.quantity || 1);
-                return {
-                  ...item,
-                  item: trimmedValue,
-                  description: autoDescription,
-                  amount: data.price || 0,
-                  quantity: qty,
-                  width: data.width,
-                  height: data.height,
-                  depth: data.depth,
-                  line_total: (data.price || 0) * qty,
-                };
-              }
-              return item;
-            })
-          );
-
-          console.log(`✅ Auto-filled: ${data.item_name} - £${data.price}${fittingQty ? ` x${fittingQty}` : ''}`);
+          setItems(prevItems => prevItems.map(item => {
+            if (item.id === id) {
+              const qty = fittingQty !== null ? fittingQty : (item.quantity || 1);
+              return { ...item, item: trimmedValue, description: autoDescription, amount: data.price || 0, quantity: qty, width: data.width, height: data.height, depth: data.depth, line_total: (data.price || 0) * qty };
+            }
+            return item;
+          }));
         } else {
           console.log("❌ No pricing found for code:", trimmedValue);
         }
@@ -277,8 +290,7 @@ export default function CreateQuotePage() {
       } finally {
         setAutoFilling(null);
       }
-    }
-  };
+    };
 
   // ============================================================================
   // DESCRIPTION AUTO-FILL
@@ -483,7 +495,7 @@ export default function CreateQuotePage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-8 py-8">
+      <div className="px-4 py-8">
         {/* Company Header */}
         <div className="mb-8 text-center">
           <div className="mb-4 text-4xl font-bold tracking-wider text-gray-800">AZTEC INTERIORS</div>
@@ -561,6 +573,7 @@ export default function CreateQuotePage() {
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-AGT</code> = Carcass + Acrylic total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">FITTING</code> = Auto-detect all fittings from quote items</li>
               </>}
             </ul>
           </div>
@@ -600,36 +613,32 @@ export default function CreateQuotePage() {
 
         {/* Items Table */}
         <div className="mb-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3">
             <h3 className="text-lg font-bold">Quote Items</h3>
-            <Button onClick={handleAddItem} size="sm" variant="outline">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
-            </Button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+          <div>
+            <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
               <thead>
                 <tr className="bg-white">
-                  <th className="border border-black px-2 py-2 text-left font-bold text-xs" style={{ minWidth: '100px' }}>ITEM</th>
-                  <th className="border border-black px-2 py-2 text-left font-bold text-xs" style={{ minWidth: '150px' }}>DESCRIPTION</th>
-                  <th className="border border-black px-2 py-2 text-left font-bold text-xs" style={{ minWidth: '80px' }}>COLOUR</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '50px' }}>QTY</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>W</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>H</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>D</th>
-                  <th className="border border-black px-2 py-2 text-right font-bold text-xs" style={{ minWidth: '70px' }}>PRICE</th>
-                  <th className="border border-black px-2 py-2 text-right font-bold text-xs" style={{ minWidth: '80px' }}>AMOUNT</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>DISC %</th>
-                  <th className="border border-black px-2 py-2 text-right font-bold text-xs" style={{ minWidth: '90px' }}>FINAL</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '50px' }}></th>
+                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '8%' }}>ITEM</th>
+                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '20%' }}>DESCRIPTION</th>
+                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '7%' }}>COLOUR</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}>QTY</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>W</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>H</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>D</th>
+                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '8%' }}>PRICE</th>
+                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>AMOUNT</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '6%' }}>DISC %</th>
+                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>FINAL</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id}>
-                    <td className="border border-black p-1">
+                    <td className="border border-black p-0">
                       <Input
                         value={item.item}
                         onChange={(e) => handleItemChange(item.id, "item", e.target.value)}
@@ -638,7 +647,7 @@ export default function CreateQuotePage() {
                         className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
                       />
                     </td>
-                    <td className="border border-black p-1">
+                    <td className="border border-black p-0">
                       <textarea
                         value={item.description}
                         onChange={(e) => handleDescriptionChange(item.id, e.target.value)}
@@ -653,29 +662,29 @@ export default function CreateQuotePage() {
                         }}
                       />
                     </td>
-                    <td className="border border-black p-1">
+                    <td className="border border-black p-0">
                       <Input value={item.color} onChange={(e) => handleItemChange(item.id, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 min-w-[70px] text-xs" />
                     </td>
-                    <td className="border border-black p-1">
-                      <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-[45px] text-xs" min="1" />
+                    <td className="border border-black p-0">
+                      <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="1" />
                     </td>
-                    <td className="border border-black p-1">
-                      <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" min="0" />
+                    <td className="border border-black p-0">
+                      <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
                     </td>
-                    <td className="border border-black p-1">
-                      <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" min="0" />
+                    <td className="border border-black p-0">
+                      <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
                     </td>
-                    <td className="border border-black p-1">
-                      <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" min="0" />
+                    <td className="border border-black p-0">
+                      <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
                     </td>
-                    <td className="border border-black p-1">
-                      <Input type="number" step="0.01" value={item.amount} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 min-w-[65px] text-xs" min="0" placeholder="0.00" />
+                    <td className="border border-black p-0">
+                      <Input type="number" step="0.01" value={item.amount} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
                     </td>
                     <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
                       {formatCurrency(item.line_total)}
                     </td>
-                    <td className="border border-black p-1">
-                      <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(item.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" min="0" max="100" placeholder="0" />
+                    <td className="border border-black p-0">
+                      <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(item.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" max="100" placeholder="0" />
                     </td>
                     <td className="border border-black px-2 py-1 text-right">
                       {item.discount_percent && item.discount_percent > 0 ? (
@@ -703,6 +712,12 @@ export default function CreateQuotePage() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div className="mt-3 flex justify-start">
+            <Button onClick={handleAddItem} size="sm" variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Button>
           </div>
         </div>
 

@@ -119,8 +119,7 @@ export default function EditQuotePage() {
         const description = item.description.trim();
         
         // Detect if this is an appliance code
-        const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(description) && description.length >= 8;
-        
+        const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(description) && description.length >= 9;      
         const requestBody: any = {
           description: description,
           door_type: doorType,
@@ -327,33 +326,95 @@ export default function EditQuotePage() {
   };
 
   // ✅ NEW: Handle item code change with auto-fill
-  const handleItemChange = (index: number, field: string, value: any) => {
+const handleItemChange = async (index: number, field: string, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = {
       ...updatedItems[index],
       [field]: value,
     };
 
-    // Recalculate when quantity, amount, or discount_percent changes
     if (['quantity', 'amount', 'discount_percent'].includes(field)) {
       const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItems[index].quantity || 1;
       const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItems[index].amount || 0;
       const discountPercent = field === 'discount_percent' ? parseFloat(value) || 0 : updatedItems[index].discount_percent || 0;
-      
       updatedItems[index].line_total = qty * amount;
       updatedItems[index].discounted_total = calculateDiscountedTotal(qty, amount, discountPercent);
     }
 
     setItems(updatedItems);
 
-    // ✅ Auto-fill when ITEM field changes (code lookup)
     if (field === 'item' && value && value.length >= 2) {
       const trimmedValue = value.trim();
-      
-      // Skip auto-fill if it looks like a full item name
-      if (trimmedValue.includes(' ') || trimmedValue.length > 20) {
+
+      // ── FITTING EXPANSION ──────────────────────────────────────────
+      if (trimmedValue.toUpperCase() === 'FITTING') {
+        setAutoFilling(index);
+        const token = localStorage.getItem("token");
+        const tenantId = localStorage.getItem("tenantId") || "7";
+
+        const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'WTJT', 'FITDR', 'PANW'];
+
+        const currentItemsSnapshot = itemsRef.current
+          .filter((_, i) => i !== index)
+          .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
+
+        console.log('📦 FITTING snapshot:', JSON.stringify(currentItemsSnapshot));
+
+        try {
+          const fittingResults = await Promise.all(
+            FITTING_CODES.map(async (code) => {
+              try {
+                const res = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                    "X-Tenant-ID": tenantId,
+                  },
+                  body: JSON.stringify({ description: code, current_items: currentItemsSnapshot }),
+                });
+                const data = await res.json();
+                if (data.found && data.quantity > 0) {
+                  return { code, price: data.price, quantity: data.quantity, name: data.item_name };
+                }
+                return null;
+              } catch { return null; }
+            })
+          );
+
+          const validFittings = fittingResults.filter(Boolean) as { code: string; price: number; quantity: number; name: string }[];
+
+          if (validFittings.length === 0) {
+            alert('No fitting items detected in the quote. Add kitchen/bedroom units first.');
+            setAutoFilling(null);
+            return;
+          }
+
+          setItems(prevItems => {
+            const newItems = prevItems.filter((_, i) => i !== index);
+            const newFittingRows = validFittings.map(f => ({
+              item: f.code,
+              description: f.name,
+              color: '',
+              quantity: f.quantity,
+              amount: f.price,
+              line_total: f.price * f.quantity,
+              discount_percent: 0,
+              discounted_total: f.price * f.quantity,
+            }));
+            return [...newItems, ...newFittingRows];
+          });
+
+        } catch (error) {
+          console.error('Fitting expansion failed:', error);
+        } finally {
+          setAutoFilling(null);
+        }
         return;
       }
+      // ── END FITTING EXPANSION ──────────────────────────────────────
+
+      if (trimmedValue.includes(' ') || trimmedValue.length > 20) return;
 
       console.log(`🔍 Item code auto-fill: "${trimmedValue}"`);
       setAutoFilling(index);
@@ -361,16 +422,11 @@ export default function EditQuotePage() {
       const token = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
 
-      // ✅ NEW: Detect appliance code pattern
-      const isApplianceCode = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(trimmedValue) && trimmedValue.length >= 8;
+      const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(trimmedValue) && trimmedValue.length >= 9;
       const currentItemsSnapshot = itemsRef.current
         .filter((_, i) => i !== index)
-        .map(i => ({
-          item: i.item,
-          description: i.description,
-          quantity: i.quantity,
-        }));
-      
+        .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
+
       const requestBody: any = {
         description: trimmedValue,
         current_items: currentItemsSnapshot,
@@ -393,9 +449,7 @@ export default function EditQuotePage() {
       .then(res => res.json())
       .then(data => {
         if (data.found) {
-          // ✅ Build rich description for appliances
           let autoDescription = data.description || data.item_name || '';
-
           if (data.is_fitting) {
             autoDescription = data.item_name || '';
           } else if (isApplianceCode && data.brand && data.series_level) {
@@ -419,21 +473,15 @@ export default function EditQuotePage() {
             };
             return newItems;
           });
-
-          console.log(`✅ Auto-filled: ${data.item_name} - £${data.price}`);
         } else {
           console.log("❌ No pricing found for code:", trimmedValue);
         }
       })
-      .catch(error => {
-        console.error("Auto-price lookup failed:", error);
-      })
-      .finally(() => {
-        setAutoFilling(null);
-      });
+      .catch(error => console.error("Auto-price lookup failed:", error))
+      .finally(() => setAutoFilling(null));
     }
   };
- 
+
   const handleAddItem = () => {
     setItems([
       ...items,
@@ -592,7 +640,7 @@ export default function EditQuotePage() {
       </div>
 
       {/* Quotation Form */}
-      <div className="mx-auto max-w-6xl px-8 py-8">
+      <div className="px-4 py-8">
         {/* Company Header */}
         <div className="mb-8 text-center">
           <div className="mb-4 text-4xl font-bold tracking-wider text-gray-800">
@@ -679,6 +727,7 @@ export default function EditQuotePage() {
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-AGT</code> = Carcass + Acrylic total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">FITTING</code> = Auto-detect all fittings from quote items</li>
               </>}
             </ul>
           </div>
@@ -739,30 +788,26 @@ export default function EditQuotePage() {
 
         {/* Items Table */}
         <div className="mb-4">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3">
             <h3 className="text-lg font-bold">Quote Items</h3>
-            <Button onClick={handleAddItem} size="sm" variant="outline">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
-            </Button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+          <div>
+            <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
               <thead>
                 <tr className="bg-white">
-                  <th className="border border-black px-2 py-2 text-left font-bold text-xs" style={{ minWidth: '100px' }}>ITEM</th>
-                  <th className="border border-black px-2 py-2 text-left font-bold text-xs" style={{ minWidth: '150px' }}>DESCRIPTION</th>
-                  <th className="border border-black px-2 py-2 text-left font-bold text-xs" style={{ minWidth: '80px' }}>COLOUR</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '50px' }}>QTY</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>W</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>H</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>D</th>
-                  <th className="border border-black px-2 py-2 text-right font-bold text-xs" style={{ minWidth: '70px' }}>PRICE</th>
-                  <th className="border border-black px-2 py-2 text-right font-bold text-xs" style={{ minWidth: '80px' }}>AMOUNT</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '60px' }}>DISC %</th>
-                  <th className="border border-black px-2 py-2 text-right font-bold text-xs" style={{ minWidth: '90px' }}>FINAL</th>
-                  <th className="border border-black px-2 py-2 text-center font-bold text-xs" style={{ width: '50px' }}></th>
+                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '8%' }}>ITEM</th>
+                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '20%' }}>DESCRIPTION</th>
+                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '7%' }}>COLOUR</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}>QTY</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>W</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>H</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>D</th>
+                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '8%' }}>PRICE</th>
+                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>AMOUNT</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '6%' }}>DISC %</th>
+                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>FINAL</th>
+                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -815,37 +860,37 @@ export default function EditQuotePage() {
                         type="number"
                         value={item.quantity}
                         onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                        className="border-none text-center focus-visible:ring-0 w-[45px] text-xs"
+                        className="border-none text-center focus-visible:ring-0 w-full text-xs"
                         min="1"
                       />
                     </td>
                     
                     {/* WIDTH */}
-                    <td className="border border-black p-1">
+                    <td className="border border-black p-0">
                       <Input
                         type="number"
                         value={item.width || ''}
                         onChange={(e) => handleItemChange(index, "width", e.target.value)}
                         placeholder="—"
-                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
+                        className="border-none text-center focus-visible:ring-0 w-full text-xs"
                         min="0"
                       />
                     </td>
                     
                     {/* HEIGHT */}
-                    <td className="border border-black p-1">
+                    <td className="border border-black p-0">
                       <Input
                         type="number"
                         value={item.height || ''}
                         onChange={(e) => handleItemChange(index, "height", e.target.value)}
                         placeholder="—"
-                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
+                        className="border-none text-center focus-visible:ring-0 w-full text-xs"
                         min="0"
                       />
                     </td>
                     
                     {/* DEPTH */}
-                    <td className="border border-black p-1">
+                    <td className="border border-black p-0">
                       <Input
                         type="number"
                         value={item.depth || ''}
@@ -857,13 +902,13 @@ export default function EditQuotePage() {
                     </td>
                     
                     {/* PRICE */}
-                    <td className="border border-black p-1">
+                    <td className="border border-black p-0">
                       <Input
                         type="number"
                         step="0.01"
                         value={item.amount}
                         onChange={(e) => handleItemChange(index, "amount", e.target.value)}
-                        className="border-none text-right focus-visible:ring-0 min-w-[65px] text-xs"
+                        className="border-none text-right focus-visible:ring-0 w-full text-xs"
                         min="0"
                         placeholder="0.00"
                       />
@@ -875,13 +920,13 @@ export default function EditQuotePage() {
                     </td>
                     
                     {/* DISCOUNT % - NEW COLUMN */}
-                    <td className="border border-black p-1">
+                    <td className="border border-black p-0">
                       <Input
                         type="number"
                         step="0.1"
                         value={item.discount_percent || ''}
                         onChange={(e) => handleItemChange(index, "discount_percent", e.target.value)}
-                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
+                        className="border-none text-center focus-visible:ring-0 w-full text-xs"
                         min="0"
                         max="100"
                         placeholder="0"
@@ -921,6 +966,12 @@ export default function EditQuotePage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="mt-3 flex justify-start">
+            <Button onClick={handleAddItem} size="sm" variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Button>
           </div>
         </div>
 
