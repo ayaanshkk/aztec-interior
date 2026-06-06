@@ -427,9 +427,12 @@ const handleItemChange = async (index: number, field: string, value: any) => {
         .filter((_, i) => i !== index)
         .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
 
+      const MANUAL_FITTING_CODES = ['APPL', 'SINKTAP', 'KUNIT', 'BUNIT', 'ROBE', 'WTJT', 'FITDR', 'PANW'];
+      const isFittingCode = MANUAL_FITTING_CODES.includes(trimmedValue.toUpperCase());
+
       const requestBody: any = {
         description: trimmedValue,
-        current_items: currentItemsSnapshot,
+        current_items: isFittingCode ? [] : currentItemsSnapshot,
       };
 
       if (!isApplianceCode) {

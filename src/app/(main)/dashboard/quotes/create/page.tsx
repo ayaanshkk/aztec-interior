@@ -255,7 +255,15 @@ export default function CreateQuotePage() {
         const currentItemsSnapshot = itemsRef.current
           .filter(i => i.id !== id)
           .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
-        const requestBody: any = { description: trimmedValue, current_items: currentItemsSnapshot };
+          
+        const MANUAL_FITTING_CODES = ['APPL', 'SINKTAP', 'KUNIT', 'BUNIT', 'ROBE', 'WTJT', 'FITDR', 'PANW'];
+        const isFittingCode = MANUAL_FITTING_CODES.includes(trimmedValue.toUpperCase());
+
+        const requestBody: any = {
+          description: trimmedValue,
+          current_items: isFittingCode ? [] : currentItemsSnapshot,
+        };
+
         if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
