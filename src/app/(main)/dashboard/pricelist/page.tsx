@@ -86,7 +86,7 @@ export default function PricelistPage() {
     : activeTab === 'Bedrooms'
     ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Base Cabinet Only']
     : activeTab === 'Fillers & End Panels'
-    ? ['Basic Slab', 'Acrylic Gloss/Matt']
+    ? ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors']
     : activeTab === 'Accessories'
     ? ['Standard']
     : activeTab === 'Handles'
@@ -268,6 +268,7 @@ export default function PricelistPage() {
         if (data.pricelist_id) {
           // @ts-ignore
           return api.updatePricelistItem(data.pricelist_id, {
+            item_code: editForm.item_code,
             item_name: editForm.item_name,
             base_price: parseFloat(data.price) || 0,
             width: parseInt(editForm.width) || null,
@@ -555,7 +556,15 @@ export default function PricelistPage() {
                           <tr key={item.item_code} className="hover:bg-gray-50">
                             {editingCode === item.item_code ? (
                               <>
-                                <td className="px-4 py-3 text-sm font-mono text-gray-900">{item.item_code}</td>
+                                <td className="px-4 py-3">
+                                  <input
+                                    type="text"
+                                    value={editForm.item_code}
+                                    onChange={(e) => setEditForm({ ...editForm, item_code: e.target.value.toUpperCase() })}
+                                    className="w-24 px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                  />
+                                </td>
+                                
                                 <td className="px-4 py-3">
                                   <input
                                     type="text"
@@ -667,8 +676,8 @@ export default function PricelistPage() {
                                   <input
                                     type="text"
                                     value={editForm.item_code}
-                                    className="w-24 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50"
-                                    disabled
+                                    onChange={(e) => setEditForm({ ...editForm, item_code: e.target.value.toUpperCase() })}
+                                    className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
                                   />
                                 )}
                               </td>

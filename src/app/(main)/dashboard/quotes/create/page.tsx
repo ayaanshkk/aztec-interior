@@ -23,7 +23,10 @@ interface QuoteItem {
   discounted_total?: number;
   autoFitting?: boolean;
   subItems?: QuoteItem[];
+  section?: string;
 }
+
+const SECTIONS = ['Furniture', 'Appliances', 'Handles', 'Accessories', 'Fillers and End Panels', 'Fittings'] as const;
 
 export default function CreateQuotePage() {
   const router = useRouter();
@@ -50,6 +53,7 @@ export default function CreateQuotePage() {
       line_total: 0,
       discount_percent: 0,
       discounted_total: 0,
+      section: 'Furniture',
     },
   ]);
 
@@ -447,7 +451,7 @@ export default function CreateQuotePage() {
     }
   };
 
-  const handleAddItem = () => {
+  const handleAddItem = (section: string) => {
     setItems([
       ...items,
       {
@@ -458,6 +462,7 @@ export default function CreateQuotePage() {
         quantity: 1,
         amount: 0,
         line_total: 0,
+        section,
       },
     ]);
   };
@@ -529,6 +534,7 @@ export default function CreateQuotePage() {
               width: item.width,
               height: item.height,
               depth: item.depth,
+              section: item.section || 'Furniture',
               subItems: (item.subItems || [])
                 .filter(sub => (sub.item && sub.item.trim()) || (sub.description && sub.description.trim()) || sub.line_total > 0)
                 .map(sub => ({
@@ -862,180 +868,182 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
 
         {/* Items Table */}
         <div className="mb-4">
-          <div className="mb-3">
-            <h3 className="text-lg font-bold">Quote Items</h3>
-          </div>
+          {SECTIONS.map((section) => {
+            const sectionItems = items.filter((item) => (item.section || 'Furniture') === section);
 
-          <div>
-            <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-              <thead>
-                <tr className="bg-white">
-                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '8%' }}>ITEM</th>
-                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '20%' }}>DESCRIPTION</th>
-                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '7%' }}>COLOUR</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}>QTY</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>W</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>H</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>D</th>
-                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '8%' }}>PRICE</th>
-                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>AMOUNT</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '6%' }}>DISC %</th>
-                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>FINAL</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <React.Fragment key={item.id}>
-                    <tr>
-                      <td className="border border-black p-0">
-                        <Input
-                          value={item.item}
-                          onChange={(e) => handleItemChange(item.id, "item", e.target.value)}
-                          onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
-                          placeholder="50B"
-                          className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
-                        />
-                      </td>
-                      <td className="border border-black p-0">
-                        <textarea
-                          value={item.description}
-                          onChange={(e) => handleDescriptionChange(item.id, e.target.value)}
-                          placeholder="Description"
-                          className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
-                          rows={2}
-                          style={{ minHeight: '35px', lineHeight: '1.3' }}
-                          onInput={(e) => {
-                            const target = e.target as HTMLTextAreaElement;
-                            target.style.height = 'auto';
-                            target.style.height = `${target.scrollHeight}px`;
-                          }}
-                        />
-                      </td>
-                      <td className="border border-black p-0">
-                        <Input value={item.color} onChange={(e) => handleItemChange(item.id, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 min-w-[70px] text-xs" />
-                      </td>
-                      <td className="border border-black p-0">
-                        <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="1" />
-                      </td>
-                      <td className="border border-black p-0">
-                        <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
-                      </td>
-                      <td className="border border-black p-0">
-                        <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
-                      </td>
-                      <td className="border border-black p-0">
-                        <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
-                      </td>
-                      <td className="border border-black p-0">
-                        <Input type="number" step="0.01" value={item.amount} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
-                      </td>
-                      <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
-                        {formatCurrency(item.line_total)}
-                      </td>
-                      <td className="border border-black p-0">
-                        <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(item.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" max="100" placeholder="0" />
-                      </td>
-                      <td className="border border-black px-2 py-1 text-right">
-                        {item.discount_percent && item.discount_percent > 0 ? (
-                          <div>
-                            <div className="text-xs text-gray-500 line-through">{formatCurrency(item.line_total)}</div>
-                            <div className="font-semibold text-green-700 text-xs">{formatCurrency(item.discounted_total || 0)}</div>
-                          </div>
-                        ) : (
-                          <span className="font-semibold text-xs">{formatCurrency(item.line_total)}</span>
-                        )}
-                      </td>
-                      <td className="border border-black p-1 text-center">
-                        <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7">
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </td>
-                    </tr>
+            return (
+              <div key={section} className="mb-6">
+                <div className="mb-3">
+                  <h3 className="text-lg font-bold">{section}</h3>
+                </div>
 
-                    {/* SUB-ITEMS */}
-                    {(item.subItems || []).map((sub) => (
-                      <tr key={sub.id} className="bg-gray-50">
-                        <td className="border border-black p-0 pl-4">
-                          <Input
-                            value={sub.item}
-                            onChange={(e) => handleSubItemAutoFill(item.id, sub.id, e.target.value)}
-                            onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleSubItemAutoFill(item.id, sub.id, val); }}
-                            placeholder="↳ sub-code"
-                            className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
-                          />
-                        </td>
-                        <td className="border border-black p-0">
-                          <Input
-                            value={sub.description}
-                            onChange={(e) => handleSubItemChange(item.id, sub.id, "description", e.target.value)}
-                            placeholder="Sub-item description"
-                            className="border-none focus-visible:ring-0 w-full text-xs px-1"
-                          />
-                        </td>
-                        <td className="border border-black p-0">
-                          <Input
-                            value={sub.color}
-                            onChange={(e) => handleSubItemChange(item.id, sub.id, "color", e.target.value)}
-                            placeholder="Colour"
-                            className="border-none focus-visible:ring-0 w-full text-xs px-1"
-                          />
-                        </td>
-                        <td className="border border-black p-0">
-                          <Input type="number" value={sub.quantity} onChange={(e) => handleSubItemChange(item.id, sub.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="1" />
-                        </td>
-                        <td className="border border-black p-0"></td>
-                        <td className="border border-black p-0"></td>
-                        <td className="border border-black p-0"></td>
-                        <td className="border border-black p-0">
-                          <Input type="number" step="0.01" value={sub.amount} onChange={(e) => handleSubItemChange(item.id, sub.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs px-1" min="0" placeholder="0.00" />
-                        </td>
-                        <td className="border border-black px-2 py-1 text-right text-xs">{formatCurrency(sub.line_total)}</td>
-                        <td className="border border-black p-0">
-                          <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(item.id, sub.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
-                        </td>
-                        <td className="border border-black px-2 py-1 text-right text-xs">
-                          {sub.discount_percent && sub.discount_percent > 0
-                            ? formatCurrency(sub.discounted_total || 0)
-                            : formatCurrency(sub.line_total)}
-                        </td>
-                        <td className="border border-black p-1 text-center">
-                          <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(item.id, sub.id)} className="text-red-600 hover:bg-red-50 h-6 w-6">
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </td>
+                {sectionItems.length > 0 && (
+                  <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                    <thead>
+                      <tr className="bg-white">
+                        <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '8%' }}>ITEM</th>
+                        <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '20%' }}>DESCRIPTION</th>
+                        <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '7%' }}>COLOUR</th>
+                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>QTY</th>
+                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>W</th>
+                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>H</th>
+                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>D</th>
+                        <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '8%' }}>PRICE</th>
+                        <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>AMOUNT</th>
+                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '6%' }}>DISC %</th>
+                        <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>FINAL</th>
+                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}></th>
                       </tr>
-                    ))}
+                    </thead>
+                    <tbody>
+                      {sectionItems.map((item) => (
+                        <React.Fragment key={item.id}>
+                          <tr>
+                            <td className="border border-black p-0">
+                              <Input
+                                value={item.item}
+                                onChange={(e) => handleItemChange(item.id, "item", e.target.value)}
+                                onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
+                                placeholder="50B"
+                                className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
+                              />
+                            </td>
+                            <td className="border border-black p-0">
+                              <textarea
+                                value={item.description}
+                                onChange={(e) => handleDescriptionChange(item.id, e.target.value)}
+                                placeholder="Description"
+                                className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
+                                rows={2}
+                                style={{ minHeight: '35px', lineHeight: '1.3' }}
+                                onInput={(e) => {
+                                  const target = e.target as HTMLTextAreaElement;
+                                  target.style.height = 'auto';
+                                  target.style.height = `${target.scrollHeight}px`;
+                                }}
+                              />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input value={item.color} onChange={(e) => handleItemChange(item.id, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 min-w-[70px] text-xs" />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="1" />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input type="number" step="0.01" value={item.amount} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
+                            </td>
+                            <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
+                              {formatCurrency(item.line_total)}
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(item.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" max="100" placeholder="0" />
+                            </td>
+                            <td className="border border-black px-2 py-1 text-right">
+                              {item.discount_percent && item.discount_percent > 0 ? (
+                                <div>
+                                  <div className="text-xs text-gray-500 line-through">{formatCurrency(item.line_total)}</div>
+                                  <div className="font-semibold text-green-700 text-xs">{formatCurrency(item.discounted_total || 0)}</div>
+                                </div>
+                              ) : (
+                                <span className="font-semibold text-xs">{formatCurrency(item.line_total)}</span>
+                              )}
+                            </td>
+                            <td className="border border-black p-1 text-center">
+                              <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </td>
+                          </tr>
 
-                    {/* ADD SUB-ITEM BUTTON ROW */}
-                    <tr>
-                      <td colSpan={12} className="border border-black px-2 py-1 bg-gray-50">
-                        <button
-                          onClick={() => handleAddSubItem(item.id)}
-                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                        >
-                          <Plus className="h-3 w-3" /> Add sub-item
-                        </button>
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                ))}
-                {items.length === 0 && (
-                  <tr>
-                    <td colSpan={12} className="border border-black px-3 py-8 text-center text-gray-500">
-                      No items yet. Click "Add Item" to get started.
-                    </td>
-                  </tr>
+                          {/* SUB-ITEMS */}
+                          {(item.subItems || []).map((sub) => (
+                            <tr key={sub.id} className="bg-gray-50">
+                              <td className="border border-black p-0 pl-4">
+                                <Input
+                                  value={sub.item}
+                                  onChange={(e) => handleSubItemAutoFill(item.id, sub.id, e.target.value)}
+                                  onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleSubItemAutoFill(item.id, sub.id, val); }}
+                                  placeholder="↳ sub-code"
+                                  className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
+                                />
+                              </td>
+                              <td className="border border-black p-0">
+                                <Input
+                                  value={sub.description}
+                                  onChange={(e) => handleSubItemChange(item.id, sub.id, "description", e.target.value)}
+                                  placeholder="Sub-item description"
+                                  className="border-none focus-visible:ring-0 w-full text-xs px-1"
+                                />
+                              </td>
+                              <td className="border border-black p-0">
+                                <Input
+                                  value={sub.color}
+                                  onChange={(e) => handleSubItemChange(item.id, sub.id, "color", e.target.value)}
+                                  placeholder="Colour"
+                                  className="border-none focus-visible:ring-0 w-full text-xs px-1"
+                                />
+                              </td>
+                              <td className="border border-black p-0">
+                                <Input type="number" value={sub.quantity} onChange={(e) => handleSubItemChange(item.id, sub.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="1" />
+                              </td>
+                              <td className="border border-black p-0"></td>
+                              <td className="border border-black p-0"></td>
+                              <td className="border border-black p-0"></td>
+                              <td className="border border-black p-0">
+                                <Input type="number" step="0.01" value={sub.amount} onChange={(e) => handleSubItemChange(item.id, sub.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs px-1" min="0" placeholder="0.00" />
+                              </td>
+                              <td className="border border-black px-2 py-1 text-right text-xs">{formatCurrency(sub.line_total)}</td>
+                              <td className="border border-black p-0">
+                                <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(item.id, sub.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
+                              </td>
+                              <td className="border border-black px-2 py-1 text-right text-xs">
+                                {sub.discount_percent && sub.discount_percent > 0
+                                  ? formatCurrency(sub.discounted_total || 0)
+                                  : formatCurrency(sub.line_total)}
+                              </td>
+                              <td className="border border-black p-1 text-center">
+                                <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(item.id, sub.id)} className="text-red-600 hover:bg-red-50 h-6 w-6">
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+
+                          {/* ADD SUB-ITEM BUTTON ROW */}
+                          <tr>
+                            <td colSpan={12} className="border border-black px-2 py-1 bg-gray-50">
+                              <button
+                                onClick={() => handleAddSubItem(item.id)}
+                                className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                              >
+                                <Plus className="h-3 w-3" /> Add sub-item
+                              </button>
+                            </td>
+                          </tr>
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-3 flex justify-start">
-            <Button onClick={handleAddItem} size="sm" variant="outline">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
-            </Button>
-          </div>
+
+                <div className="mt-3 flex justify-start">
+                  <Button onClick={() => handleAddItem(section)} size="sm" variant="outline">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Item
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Totals */}

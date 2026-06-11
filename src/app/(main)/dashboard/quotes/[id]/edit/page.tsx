@@ -25,7 +25,10 @@ interface QuoteItem {
   discounted_total?: number;
   autoFitting?: boolean;
   subItems?: QuoteItem[];
+  section?: string;
 }
+
+const SECTIONS = ['Furniture', 'Appliances', 'Handles', 'Accessories', 'Fillers and End Panels', 'Fittings'] as const;
  
 export default function EditQuotePage() {
   const params = useParams();
@@ -234,6 +237,7 @@ export default function EditQuotePage() {
           price_list_item_id: item.price_list_item_id,
           discount_percent: item.discount_percent || 0,
           discounted_total: item.discounted_total || ((item.quantity || 1) * (item.amount || 0)),
+          section: item.section || 'Furniture',
           subItems: (item.subItems || []).map((sub: any) => ({
             item: sub.item || '',
             description: sub.description || '',
@@ -249,7 +253,6 @@ export default function EditQuotePage() {
             discounted_total: sub.discounted_total || ((sub.quantity || 1) * (sub.amount || 0)),
           })),
         }));
-
         setItems(itemsWithTotals);
 
         if (data.global_discount_percent) {
@@ -586,7 +589,7 @@ export default function EditQuotePage() {
     return () => clearTimeout(timer);
   }, [items]);
 
-  const handleAddItem = () => {
+  const handleAddItem = (section: string) => {
     setItems([
       ...items,
       {
@@ -596,6 +599,7 @@ export default function EditQuotePage() {
         quantity: 1,
         amount: 0,
         line_total: 0,
+        section,
       },
     ]);
   };
@@ -664,6 +668,7 @@ export default function EditQuotePage() {
               width: item.width,
               height: item.height,
               depth: item.depth,
+              section: item.section || 'Furniture',
               subItems: (item.subItems || [])
                 .filter(sub => (sub.item && sub.item.trim()) || (sub.description && sub.description.trim()) || sub.line_total > 0)
                 .map(sub => ({
@@ -1032,261 +1037,284 @@ export default function EditQuotePage() {
 
         {/* Items Table */}
         <div className="mb-4">
-          <div className="mb-3">
-            <h3 className="text-lg font-bold">Quote Items</h3>
-          </div>
+          {SECTIONS.map((section) => {
+            const indexedItems = items
+              .map((item, index) => ({ item, index }))
+              .filter(({ item }) => (item.section || 'Furniture') === section);
 
-          <div>
-            <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-              <thead>
-                <tr className="bg-white">
-                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '8%' }}>ITEM</th>
-                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '20%' }}>DESCRIPTION</th>
-                  <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '7%' }}>COLOUR</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}>QTY</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>W</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>H</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>D</th>
-                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '8%' }}>PRICE</th>
-                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>AMOUNT</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '6%' }}>DISC %</th>
-                  <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>FINAL</th>
-                  <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, index) => (
-                  <React.Fragment key={index}>
-                    <tr>
-                      {/* ITEM */}
-                      <td className="border border-black p-1">
-                        <Input
-                          value={item.item}
-                          onChange={(e) => handleItemChange(index, "item", e.target.value)}
-                          placeholder="50B"
-                          className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${
-                            autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
-                          }`}
-                        />
-                      </td>
-                      
-                      {/* DESCRIPTION */}
-                      <td className="border border-black p-1">
-                        <textarea
-                          value={item.description}
-                          onChange={(e) => handleDescriptionChange(index, e.target.value)}
-                          placeholder="Description"
-                          className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${
-                            autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
-                          }`}
-                          rows={2}
-                          style={{ minHeight: '35px', lineHeight: '1.3' }}
-                          onInput={(e) => {
-                            const target = e.target as HTMLTextAreaElement;
-                            target.style.height = 'auto';
-                            target.style.height = `${target.scrollHeight}px`;
-                          }}
-                        />
-                      </td>
-                      
-                      {/* COLOUR */}
-                      <td className="border border-black p-1">
-                        <Input
-                          value={item.color}
-                          onChange={(e) => handleItemChange(index, "color", e.target.value)}
-                          placeholder="Colour"
-                          className="border-none focus-visible:ring-0 min-w-[70px] text-xs"
-                        />
-                      </td>
-                      
-                      {/* QTY */}
-                      <td className="border border-black p-1">
-                        <Input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                          className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                          min="1"
-                        />
-                      </td>
-                      
-                      {/* WIDTH */}
-                      <td className="border border-black p-0">
-                        <Input
-                          type="number"
-                          value={item.width || ''}
-                          onChange={(e) => handleItemChange(index, "width", e.target.value)}
-                          placeholder="—"
-                          className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                          min="0"
-                        />
-                      </td>
-                      
-                      {/* HEIGHT */}
-                      <td className="border border-black p-0">
-                        <Input
-                          type="number"
-                          value={item.height || ''}
-                          onChange={(e) => handleItemChange(index, "height", e.target.value)}
-                          placeholder="—"
-                          className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                          min="0"
-                        />
-                      </td>
-                      
-                      {/* DEPTH */}
-                      <td className="border border-black p-0">
-                        <Input
-                          type="number"
-                          value={item.depth || ''}
-                          onChange={(e) => handleItemChange(index, "depth", e.target.value)}
-                          placeholder="—"
-                          className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
-                          min="0"
-                        />
-                      </td>
-                      
-                      {/* PRICE */}
-                      <td className="border border-black p-0">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={item.amount}
-                          onChange={(e) => handleItemChange(index, "amount", e.target.value)}
-                          className="border-none text-right focus-visible:ring-0 w-full text-xs"
-                          min="0"
-                          placeholder="0.00"
-                        />
-                      </td>
-                      
-                      {/* AMOUNT */}
-                      <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
-                        {formatCurrency((item.amount || 0) * (item.quantity || 1))}
-                      </td>
-                      
-                      {/* DISCOUNT % */}
-                      <td className="border border-black p-0">
-                        <Input
-                          type="number"
-                          step="0.1"
-                          value={item.discount_percent || ''}
-                          onChange={(e) => handleItemChange(index, "discount_percent", e.target.value)}
-                          className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                          min="0"
-                          max="100"
-                          placeholder="0"
-                        />
-                      </td>
-                      
-                      {/* FINAL AMOUNT */}
-                      <td className="border border-black px-2 py-1 text-right">
-                        {item.discount_percent && item.discount_percent > 0 ? (
-                          <div>
-                            <div className="text-xs text-gray-500 line-through">
-                              {formatCurrency((item.amount || 0) * (item.quantity || 1))}
-                            </div>
-                            <div className="font-semibold text-green-700 text-xs">
-                              {formatCurrency(item.discounted_total || 0)}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="font-semibold text-xs">
+            if (indexedItems.length === 0) return null;
+
+            return (
+              <div key={section} className="mb-6">
+                <div className="mb-3">
+                  <h3 className="text-lg font-bold">{section}</h3>
+                </div>
+
+                <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                  <thead>
+                    <tr className="bg-white">
+                      <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '8%' }}>ITEM</th>
+                      <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '20%' }}>DESCRIPTION</th>
+                      <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '7%' }}>COLOUR</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>QTY</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>W</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>H</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>D</th>
+                      <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '8%' }}>PRICE</th>
+                      <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>AMOUNT</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '6%' }}>DISC %</th>
+                      <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>FINAL</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {indexedItems.map(({ item, index }) => (
+                      <React.Fragment key={index}>
+                        <tr>
+                          {/* ITEM */}
+                          <td className="border border-black p-1">
+                            <Input
+                              value={item.item}
+                              onChange={(e) => handleItemChange(index, "item", e.target.value)}
+                              placeholder="50B"
+                              className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${
+                                autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
+                              }`}
+                            />
+                          </td>
+
+                          {/* DESCRIPTION */}
+                          <td className="border border-black p-1">
+                            <textarea
+                              value={item.description}
+                              onChange={(e) => handleDescriptionChange(index, e.target.value)}
+                              placeholder="Description"
+                              className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${
+                                autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
+                              }`}
+                              rows={2}
+                              style={{ minHeight: '35px', lineHeight: '1.3' }}
+                              onInput={(e) => {
+                                const target = e.target as HTMLTextAreaElement;
+                                target.style.height = 'auto';
+                                target.style.height = `${target.scrollHeight}px`;
+                              }}
+                            />
+                          </td>
+
+                          {/* COLOUR */}
+                          <td className="border border-black p-1">
+                            <Input
+                              value={item.color}
+                              onChange={(e) => handleItemChange(index, "color", e.target.value)}
+                              placeholder="Colour"
+                              className="border-none focus-visible:ring-0 min-w-[70px] text-xs"
+                            />
+                          </td>
+
+                          {/* QTY */}
+                          <td className="border border-black p-1">
+                            <Input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                              className="border-none text-center focus-visible:ring-0 w-full text-xs"
+                              min="1"
+                            />
+                          </td>
+
+                          {/* WIDTH */}
+                          <td className="border border-black p-0">
+                            <Input
+                              type="number"
+                              value={item.width || ''}
+                              onChange={(e) => handleItemChange(index, "width", e.target.value)}
+                              placeholder="—"
+                              className="border-none text-center focus-visible:ring-0 w-full text-xs"
+                              min="0"
+                            />
+                          </td>
+
+                          {/* HEIGHT */}
+                          <td className="border border-black p-0">
+                            <Input
+                              type="number"
+                              value={item.height || ''}
+                              onChange={(e) => handleItemChange(index, "height", e.target.value)}
+                              placeholder="—"
+                              className="border-none text-center focus-visible:ring-0 w-full text-xs"
+                              min="0"
+                            />
+                          </td>
+
+                          {/* DEPTH */}
+                          <td className="border border-black p-0">
+                            <Input
+                              type="number"
+                              value={item.depth || ''}
+                              onChange={(e) => handleItemChange(index, "depth", e.target.value)}
+                              placeholder="—"
+                              className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
+                              min="0"
+                            />
+                          </td>
+
+                          {/* PRICE */}
+                          <td className="border border-black p-0">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={item.amount}
+                              onChange={(e) => handleItemChange(index, "amount", e.target.value)}
+                              className="border-none text-right focus-visible:ring-0 w-full text-xs"
+                              min="0"
+                              placeholder="0.00"
+                            />
+                          </td>
+
+                          {/* AMOUNT */}
+                          <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
                             {formatCurrency((item.amount || 0) * (item.quantity || 1))}
-                          </span>
-                        )}
-                      </td>
-                      
-                      {/* ACTION */}
-                      <td className="border border-black p-1 text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveItem(index)}
-                          className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </td>
-                    </tr>
+                          </td>
 
-                    {/* SUB-ITEMS */}
-                    {(item.subItems || []).map((sub, subIndex) => (
-                      <tr key={subIndex} className="bg-gray-50">
-                        <td className="border border-black p-0 pl-4">
-                          <Input
-                            value={sub.item}
-                            onChange={(e) => handleSubItemAutoFill(index, subIndex, e.target.value)}
-                            onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleSubItemAutoFill(index, subIndex, val); }}
-                            placeholder="↳ sub-code"
-                            className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
-                          />
-                        </td>
-                        <td className="border border-black p-0">
-                          <Input
-                            value={sub.description}
-                            onChange={(e) => handleSubItemChange(index, subIndex, "description", e.target.value)}
-                            placeholder="Sub-item description"
-                            className="border-none focus-visible:ring-0 w-full text-xs px-1"
-                          />
-                        </td>
-                        <td className="border border-black p-0">
-                          <Input
-                            value={sub.color}
-                            onChange={(e) => handleSubItemChange(index, subIndex, "color", e.target.value)}
-                            placeholder="Colour"
-                            className="border-none focus-visible:ring-0 w-full text-xs px-1"
-                          />
-                        </td>
-                        <td className="border border-black p-0">
-                          <Input type="number" value={sub.quantity} onChange={(e) => handleSubItemChange(index, subIndex, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="1" />
-                        </td>
-                        <td className="border border-black p-0"></td>
-                        <td className="border border-black p-0"></td>
-                        <td className="border border-black p-0"></td>
-                        <td className="border border-black p-0">
-                          <Input type="number" step="0.01" value={sub.amount} onChange={(e) => handleSubItemChange(index, subIndex, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs px-1" min="0" placeholder="0.00" />
-                        </td>
-                        <td className="border border-black px-2 py-1 text-right text-xs">{formatCurrency(sub.line_total)}</td>
-                        <td className="border border-black p-0">
-                          <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(index, subIndex, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
-                        </td>
-                        <td className="border border-black px-2 py-1 text-right text-xs">
-                          {sub.discount_percent && sub.discount_percent > 0
-                            ? formatCurrency(sub.discounted_total || 0)
-                            : formatCurrency(sub.line_total)}
-                        </td>
-                        <td className="border border-black p-1 text-center">
-                          <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(index, subIndex)} className="text-red-600 hover:bg-red-50 h-6 w-6">
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </td>
-                      </tr>
+                          {/* DISCOUNT % */}
+                          <td className="border border-black p-0">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={item.discount_percent || ''}
+                              onChange={(e) => handleItemChange(index, "discount_percent", e.target.value)}
+                              className="border-none text-center focus-visible:ring-0 w-full text-xs"
+                              min="0"
+                              max="100"
+                              placeholder="0"
+                            />
+                          </td>
+
+                          {/* FINAL AMOUNT */}
+                          <td className="border border-black px-2 py-1 text-right">
+                            {item.discount_percent && item.discount_percent > 0 ? (
+                              <div>
+                                <div className="text-xs text-gray-500 line-through">
+                                  {formatCurrency((item.amount || 0) * (item.quantity || 1))}
+                                </div>
+                                <div className="font-semibold text-green-700 text-xs">
+                                  {formatCurrency(item.discounted_total || 0)}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="font-semibold text-xs">
+                                {formatCurrency((item.amount || 0) * (item.quantity || 1))}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* ACTION */}
+                          <td className="border border-black p-1 text-center">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveItem(index)}
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </td>
+                        </tr>
+
+                        {/* SUB-ITEMS */}
+                        {(item.subItems || []).map((sub, subIndex) => (
+                          <tr key={subIndex} className="bg-gray-50">
+                            <td className="border border-black p-0 pl-4">
+                              <Input
+                                value={sub.item}
+                                onChange={(e) => handleSubItemAutoFill(index, subIndex, e.target.value)}
+                                onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleSubItemAutoFill(index, subIndex, val); }}
+                                placeholder="↳ sub-code"
+                                className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
+                              />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input
+                                value={sub.description}
+                                onChange={(e) => handleSubItemChange(index, subIndex, "description", e.target.value)}
+                                placeholder="Sub-item description"
+                                className="border-none focus-visible:ring-0 w-full text-xs px-1"
+                              />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input
+                                value={sub.color}
+                                onChange={(e) => handleSubItemChange(index, subIndex, "color", e.target.value)}
+                                placeholder="Colour"
+                                className="border-none focus-visible:ring-0 w-full text-xs px-1"
+                              />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input type="number" value={sub.quantity} onChange={(e) => handleSubItemChange(index, subIndex, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="1" />
+                            </td>
+                            <td className="border border-black p-0"></td>
+                            <td className="border border-black p-0"></td>
+                            <td className="border border-black p-0"></td>
+                            <td className="border border-black p-0">
+                              <Input type="number" step="0.01" value={sub.amount} onChange={(e) => handleSubItemChange(index, subIndex, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs px-1" min="0" placeholder="0.00" />
+                            </td>
+                            <td className="border border-black px-2 py-1 text-right text-xs">{formatCurrency(sub.line_total)}</td>
+                            <td className="border border-black p-0">
+                              <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(index, subIndex, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
+                            </td>
+                            <td className="border border-black px-2 py-1 text-right text-xs">
+                              {sub.discount_percent && sub.discount_percent > 0
+                                ? formatCurrency(sub.discounted_total || 0)
+                                : formatCurrency(sub.line_total)}
+                            </td>
+                            <td className="border border-black p-1 text-center">
+                              <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(index, subIndex)} className="text-red-600 hover:bg-red-50 h-6 w-6">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+
+                        {/* ADD SUB-ITEM BUTTON ROW */}
+                        <tr>
+                          <td colSpan={12} className="border border-black px-2 py-1 bg-gray-50">
+                            <button
+                              onClick={() => handleAddSubItem(index)}
+                              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              <Plus className="h-3 w-3" /> Add sub-item
+                            </button>
+                          </td>
+                        </tr>
+                      </React.Fragment>
                     ))}
+                  </tbody>
+                </table>
 
-                    {/* ADD SUB-ITEM BUTTON ROW */}
-                    <tr>
-                      <td colSpan={12} className="border border-black px-2 py-1 bg-gray-50">
-                        <button
-                          onClick={() => handleAddSubItem(index)}
-                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                        >
-                          <Plus className="h-3 w-3" /> Add sub-item
-                        </button>
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-3 flex justify-start">
-            <Button onClick={handleAddItem} size="sm" variant="outline">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
-            </Button>
-          </div>
+                <div className="mt-3 flex justify-start">
+                  <Button onClick={() => handleAddItem(section)} size="sm" variant="outline">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Item
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Sections with no items at all — show an "Add to section" picker */}
+          {SECTIONS.filter((section) => !items.some((item) => (item.section || 'Furniture') === section)).length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {SECTIONS.filter((section) => !items.some((item) => (item.section || 'Furniture') === section)).map((section) => (
+                <Button key={section} onClick={() => handleAddItem(section)} size="sm" variant="outline">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add to {section}
+                </Button>
+              ))}
+            </div>
+          )}
         </div>
-
+        
         {/* Totals */}
         <div className="mb-6 flex justify-end">
           <table className="border-collapse" style={{ width: '40%' }}>

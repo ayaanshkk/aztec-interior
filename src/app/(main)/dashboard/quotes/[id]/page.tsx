@@ -7,6 +7,8 @@ import { ArrowLeft, Printer, Download, Edit } from "lucide-react";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
 
+const SECTIONS = ['Furniture', 'Appliances', 'Handles', 'Accessories', 'Fillers and End Panels', 'Fittings'] as const;
+
 export default function ViewQuotePage() {
   const params = useParams();
   const router = useRouter();
@@ -206,87 +208,113 @@ export default function ViewQuotePage() {
 
         {/* Items Table */}
         <div className="mb-4">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-white">
-                  <th className="border border-black px-3 py-2 text-left font-bold">ITEM</th>
-                  <th className="border border-black px-3 py-2 text-left font-bold">DESCRIPTION</th>
-                  <th className="border border-black px-3 py-2 text-left font-bold">COLOUR</th>
-                  <th className="border border-black px-3 py-2 text-center font-bold">QTY</th>
-                  <th className="border border-black px-3 py-2 text-right font-bold">PRICE</th>
-                  <th className="border border-black px-3 py-2 text-right font-bold">AMOUNT</th>
-                  <th className="border border-black px-3 py-2 text-center font-bold">DISC %</th>
-                  <th className="border border-black px-3 py-2 text-right font-bold">FINAL</th>
-                </tr>
-              </thead>
-              <tbody>
+          {(() => {
+            const validItems = items.filter(item => {
+              const hasItem = item.item?.trim() || item.item_name?.trim();
+              const hasDescription = item.description?.trim();
+              const hasAmount = item.amount && parseFloat(item.amount) > 0;
+              return hasItem || hasDescription || hasAmount;
+            });
 
-                {items.filter(item => {
-                  const hasItem = item.item?.trim() || item.item_name?.trim();
-                  const hasDescription = item.description?.trim();
-                  const hasAmount = item.amount && parseFloat(item.amount) > 0;
-                  return hasItem || hasDescription || hasAmount;
-                }).map((item, index) => {
-                  const lineTotal = (item.amount || 0) * (item.quantity || 1);
-                  const discountedTotal = item.discounted_total || item.discounted_amount || lineTotal;
-                  return (
-                    <React.Fragment key={index}>
-                      <tr>
-                        <td className="border border-black px-3 py-2">{item.item || item.item_name || '—'}</td>
-                        <td className="border border-black px-3 py-2">{item.description || '—'}</td>
-                        <td className="border border-black px-3 py-2">{item.color || item.colour || '—'}</td>
-                        <td className="border border-black px-3 py-2 text-center">{item.quantity || 1}</td>
-                        <td className="border border-black px-3 py-2 text-right">{formatCurrency(item.amount || 0)}</td>
-                        <td className="border border-black px-3 py-2 text-right font-semibold">{formatCurrency(lineTotal)}</td>
-                        <td className="border border-black px-3 py-2 text-center">
-                          {item.discount_percent && item.discount_percent > 0 ? `${item.discount_percent}%` : '—'}
-                        </td>
-                        <td className="border border-black px-3 py-2 text-right font-semibold">
-                          {item.discount_percent && item.discount_percent > 0 ? formatCurrency(discountedTotal) : formatCurrency(lineTotal)}
-                        </td>
-                      </tr>
+            if (validItems.length === 0) {
+              return (
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-white">
+                      <th className="border border-black px-3 py-2 text-left font-bold">ITEM</th>
+                      <th className="border border-black px-3 py-2 text-left font-bold">DESCRIPTION</th>
+                      <th className="border border-black px-3 py-2 text-left font-bold">COLOUR</th>
+                      <th className="border border-black px-3 py-2 text-center font-bold">QTY</th>
+                      <th className="border border-black px-3 py-2 text-right font-bold">PRICE</th>
+                      <th className="border border-black px-3 py-2 text-right font-bold">AMOUNT</th>
+                      <th className="border border-black px-3 py-2 text-center font-bold">DISC %</th>
+                      <th className="border border-black px-3 py-2 text-right font-bold">FINAL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td colSpan={8} className="border border-black px-3 py-8 text-center text-gray-500">
+                        No items in this quotation
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              );
+            }
 
-                      {/* SUB-ITEMS */}
-                      {(item.subItems || item.sub_items || []).map((sub: any, subIndex: number) => {
-                        const subLineTotal = (sub.amount || 0) * (sub.quantity || 1);
-                        const subDiscountedTotal = sub.discounted_total || sub.discounted_amount || subLineTotal;
-                        return (
-                          <tr key={`${index}-sub-${subIndex}`} className="bg-gray-50">
-                            <td className="border border-black px-3 py-2 pl-6 text-sm">↳ {sub.item || '—'}</td>
-                            <td className="border border-black px-3 py-2 text-sm">{sub.description || '—'}</td>
-                            <td className="border border-black px-3 py-2 text-sm">{sub.color || sub.colour || '—'}</td>
-                            <td className="border border-black px-3 py-2 text-center text-sm">{sub.quantity || 1}</td>
-                            <td className="border border-black px-3 py-2 text-right text-sm">{formatCurrency(sub.amount || 0)}</td>
-                            <td className="border border-black px-3 py-2 text-right text-sm font-semibold">{formatCurrency(subLineTotal)}</td>
-                            <td className="border border-black px-3 py-2 text-center text-sm">
-                              {sub.discount_percent && sub.discount_percent > 0 ? `${sub.discount_percent}%` : '—'}
-                            </td>
-                            <td className="border border-black px-3 py-2 text-right text-sm font-semibold">
-                              {sub.discount_percent && sub.discount_percent > 0 ? formatCurrency(subDiscountedTotal) : formatCurrency(subLineTotal)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </React.Fragment>
-                  );
-                })}
-                
-                {items.filter(item => {
-                  const hasItem = item.item?.trim() || item.item_name?.trim();
-                  const hasDescription = item.description?.trim();
-                  const hasAmount = item.amount && parseFloat(item.amount) > 0;
-                  return hasItem || hasDescription || hasAmount;
-                }).length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="border border-black px-3 py-8 text-center text-gray-500">
-                      No items in this quotation
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+            return SECTIONS.map((section) => {
+              const sectionItems = validItems.filter((item) => (item.section || 'Furniture') === section);
+              if (sectionItems.length === 0) return null;
+
+              return (
+                <div key={section} className="mb-6">
+                  <h3 className="mb-3 text-lg font-bold">{section}</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-white">
+                          <th className="border border-black px-3 py-2 text-left font-bold">ITEM</th>
+                          <th className="border border-black px-3 py-2 text-left font-bold">DESCRIPTION</th>
+                          <th className="border border-black px-3 py-2 text-left font-bold">COLOUR</th>
+                          <th className="border border-black px-3 py-2 text-center font-bold">QTY</th>
+                          <th className="border border-black px-3 py-2 text-right font-bold">PRICE</th>
+                          <th className="border border-black px-3 py-2 text-right font-bold">AMOUNT</th>
+                          <th className="border border-black px-3 py-2 text-center font-bold">DISC %</th>
+                          <th className="border border-black px-3 py-2 text-right font-bold">FINAL</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sectionItems.map((item, index) => {
+                          const lineTotal = (item.amount || 0) * (item.quantity || 1);
+                          const discountedTotal = item.discounted_total || item.discounted_amount || lineTotal;
+                          return (
+                            <React.Fragment key={index}>
+                              <tr>
+                                <td className="border border-black px-3 py-2">{item.item || item.item_name || '—'}</td>
+                                <td className="border border-black px-3 py-2">{item.description || '—'}</td>
+                                <td className="border border-black px-3 py-2">{item.color || item.colour || '—'}</td>
+                                <td className="border border-black px-3 py-2 text-center">{item.quantity || 1}</td>
+                                <td className="border border-black px-3 py-2 text-right">{formatCurrency(item.amount || 0)}</td>
+                                <td className="border border-black px-3 py-2 text-right font-semibold">{formatCurrency(lineTotal)}</td>
+                                <td className="border border-black px-3 py-2 text-center">
+                                  {item.discount_percent && item.discount_percent > 0 ? `${item.discount_percent}%` : '—'}
+                                </td>
+                                <td className="border border-black px-3 py-2 text-right font-semibold">
+                                  {item.discount_percent && item.discount_percent > 0 ? formatCurrency(discountedTotal) : formatCurrency(lineTotal)}
+                                </td>
+                              </tr>
+
+                              {/* SUB-ITEMS */}
+                              {(item.subItems || item.sub_items || []).map((sub: any, subIndex: number) => {
+                                const subLineTotal = (sub.amount || 0) * (sub.quantity || 1);
+                                const subDiscountedTotal = sub.discounted_total || sub.discounted_amount || subLineTotal;
+                                return (
+                                  <tr key={`${index}-sub-${subIndex}`} className="bg-gray-50">
+                                    <td className="border border-black px-3 py-2 pl-6 text-sm">↳ {sub.item || '—'}</td>
+                                    <td className="border border-black px-3 py-2 text-sm">{sub.description || '—'}</td>
+                                    <td className="border border-black px-3 py-2 text-sm">{sub.color || sub.colour || '—'}</td>
+                                    <td className="border border-black px-3 py-2 text-center text-sm">{sub.quantity || 1}</td>
+                                    <td className="border border-black px-3 py-2 text-right text-sm">{formatCurrency(sub.amount || 0)}</td>
+                                    <td className="border border-black px-3 py-2 text-right text-sm font-semibold">{formatCurrency(subLineTotal)}</td>
+                                    <td className="border border-black px-3 py-2 text-center text-sm">
+                                      {sub.discount_percent && sub.discount_percent > 0 ? `${sub.discount_percent}%` : '—'}
+                                    </td>
+                                    <td className="border border-black px-3 py-2 text-right text-sm font-semibold">
+                                      {sub.discount_percent && sub.discount_percent > 0 ? formatCurrency(subDiscountedTotal) : formatCurrency(subLineTotal)}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            });
+          })()}
         </div>
 
         {/* Totals */}
