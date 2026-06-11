@@ -326,7 +326,7 @@ export default function EditQuotePage() {
   };
 
   // ✅ NEW: Handle item code change with auto-fill
-const handleItemChange = async (index: number, field: string, value: any) => {
+  const handleItemChange = async (index: number, field: string, value: any) => {
     const updatedItems = [...items];
     updatedItems[index] = {
       ...updatedItems[index],
@@ -484,6 +484,89 @@ const handleItemChange = async (index: number, field: string, value: any) => {
       .finally(() => setAutoFilling(null));
     }
   };
+
+const FITTING_CODES_LIST = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW'];
+  const recalcInProgress = useRef(false);
+
+  useEffect(() => {
+    const recalcFittings = async () => {
+      if (recalcInProgress.current) return;
+
+      const currentItems = itemsRef.current;
+      const fittingIndices = currentItems
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => FITTING_CODES_LIST.includes((item.item || '').trim().toUpperCase()));
+
+      if (fittingIndices.length === 0) return;
+
+      recalcInProgress.current = true;
+
+      const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+
+      const nonFittingSnapshot = currentItems
+        .filter(item => !FITTING_CODES_LIST.includes((item.item || '').trim().toUpperCase()))
+        .map(item => ({ item: item.item, description: item.description, quantity: item.quantity }));
+
+      try {
+        const results = await Promise.all(
+          fittingIndices.map(async ({ item, idx }) => {
+            const code = (item.item || '').trim().toUpperCase();
+            try {
+              const res = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+                body: JSON.stringify({ description: code, current_items: nonFittingSnapshot }),
+              });
+              const data = await res.json();
+              return { idx, code, found: data.found, quantity: data.quantity || 0, price: data.price || 0 };
+            } catch {
+              return { idx, code, found: false, quantity: 0, price: 0 };
+            }
+          })
+        );
+
+        setItems(prevItems => {
+          let changed = false;
+          const updated = prevItems
+            .map((item, i) => {
+              const result = results.find(r => r.idx === i);
+              if (!result) return item;
+
+              if (!result.found || result.quantity === 0) {
+                changed = true;
+                return null;
+              }
+
+              if (item.quantity !== result.quantity || item.amount !== result.price) {
+                changed = true;
+                return {
+                  ...item,
+                  quantity: result.quantity,
+                  amount: result.price,
+                  line_total: result.price * result.quantity,
+                  discounted_total: item.discount_percent
+                    ? calculateDiscountedTotal(result.quantity, result.price, item.discount_percent)
+                    : result.price * result.quantity,
+                };
+              }
+              return item;
+            })
+            .filter((item): item is QuoteItem => item !== null);
+
+          return changed ? updated : prevItems;
+        });
+
+      } catch (error) {
+        console.error('Fitting recalc failed:', error);
+      } finally {
+        recalcInProgress.current = false;
+      }
+    };
+
+    const timer = setTimeout(recalcFittings, 800);
+    return () => clearTimeout(timer);
+  }, [items]);
 
   const handleAddItem = () => {
     setItems([

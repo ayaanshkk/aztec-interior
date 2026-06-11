@@ -301,6 +301,90 @@ export default function CreateQuotePage() {
     };
 
   // ============================================================================
+  // DYNAMIC FITTING RECALCULATION - Auto-update fitting rows when items change
+  // ============================================================================
+  const FITTING_CODES_LIST = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW'];
+  const recalcInProgress = useRef(false);
+
+  useEffect(() => {
+    const recalcFittings = async () => {
+      if (recalcInProgress.current) return;
+
+      const currentItems = itemsRef.current;
+      const fittingRows = currentItems.filter(i => FITTING_CODES_LIST.includes((i.item || '').trim().toUpperCase()));
+      if (fittingRows.length === 0) return;
+
+      recalcInProgress.current = true;
+
+      const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+
+      // Snapshot of non-fitting items only
+      const nonFittingSnapshot = currentItems
+        .filter(i => !FITTING_CODES_LIST.includes((i.item || '').trim().toUpperCase()))
+        .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
+
+      try {
+        const results = await Promise.all(
+          fittingRows.map(async (row) => {
+            const code = (row.item || '').trim().toUpperCase();
+            try {
+              const res = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+                body: JSON.stringify({ description: code, current_items: nonFittingSnapshot }),
+              });
+              const data = await res.json();
+              return { id: row.id, code, found: data.found, quantity: data.quantity || 0, price: data.price || 0, name: data.item_name };
+            } catch {
+              return { id: row.id, code, found: false, quantity: 0, price: 0 };
+            }
+          })
+        );
+
+        setItems(prevItems => {
+          let changed = false;
+          const updated = prevItems
+            .map(item => {
+              const result = results.find(r => r.id === item.id);
+              if (!result) return item;
+
+              if (!result.found || result.quantity === 0) {
+                changed = true;
+                return null; // remove this row
+              }
+
+              if (item.quantity !== result.quantity || item.amount !== result.price) {
+                changed = true;
+                return {
+                  ...item,
+                  quantity: result.quantity,
+                  amount: result.price,
+                  line_total: result.price * result.quantity,
+                  discounted_total: item.discount_percent
+                    ? calculateDiscountedTotal(result.quantity, result.price, item.discount_percent)
+                    : result.price * result.quantity,
+                };
+              }
+              return item;
+            })
+            .filter((item): item is QuoteItem => item !== null);
+
+          return changed ? updated : prevItems;
+        });
+
+      } catch (error) {
+        console.error('Fitting recalc failed:', error);
+      } finally {
+        recalcInProgress.current = false;
+      }
+    };
+
+    const timer = setTimeout(recalcFittings, 800); // debounce
+    return () => clearTimeout(timer);
+  }, [items]);
+
+  // ============================================================================
   // DESCRIPTION AUTO-FILL
   // ============================================================================
   const handleDescriptionChange = async (id: string, value: string) => {
