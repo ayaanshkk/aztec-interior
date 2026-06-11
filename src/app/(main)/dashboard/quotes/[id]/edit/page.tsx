@@ -9,6 +9,7 @@ import { ArrowLeft, Save, Trash2, Plus } from "lucide-react";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
 
 interface QuoteItem {
+  id: string;
   item: string;
   description: string;
   color: string;
@@ -22,6 +23,7 @@ interface QuoteItem {
   // ADD THESE:
   discount_percent?: number;
   discounted_total?: number;
+  autoFitting?: boolean;
 }
  
 export default function EditQuotePage() {
@@ -401,6 +403,7 @@ export default function EditQuotePage() {
               line_total: f.price * f.quantity,
               discount_percent: 0,
               discounted_total: f.price * f.quantity,
+              autoFitting: true,
             }));
             return [...newItems, ...newFittingRows];
           });
@@ -495,7 +498,7 @@ const FITTING_CODES_LIST = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR'
       const currentItems = itemsRef.current;
       const fittingIndices = currentItems
         .map((item, idx) => ({ item, idx }))
-        .filter(({ item }) => FITTING_CODES_LIST.includes((item.item || '').trim().toUpperCase()));
+        .filter(({ item }) => item.autoFitting && FITTING_CODES_LIST.includes((item.item || '').trim().toUpperCase()));
 
       if (fittingIndices.length === 0) return;
 

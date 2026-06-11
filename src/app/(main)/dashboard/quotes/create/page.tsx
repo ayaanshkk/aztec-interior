@@ -21,6 +21,7 @@ interface QuoteItem {
   line_total: number;
   discount_percent?: number;
   discounted_total?: number;
+  autoFitting?: boolean;
 }
 
 export default function CreateQuotePage() {
@@ -231,6 +232,7 @@ export default function CreateQuotePage() {
               line_total: f.price * f.quantity,
               discount_percent: 0,
               discounted_total: f.price * f.quantity,
+              autoFitting: true,
             }));
             return [...withoutPlaceholder, ...newFittingRows];
           });
@@ -311,7 +313,7 @@ export default function CreateQuotePage() {
       if (recalcInProgress.current) return;
 
       const currentItems = itemsRef.current;
-      const fittingRows = currentItems.filter(i => FITTING_CODES_LIST.includes((i.item || '').trim().toUpperCase()));
+      const fittingRows = currentItems.filter(i => i.autoFitting && FITTING_CODES_LIST.includes((i.item || '').trim().toUpperCase()));
       if (fittingRows.length === 0) return;
 
       recalcInProgress.current = true;
