@@ -331,6 +331,16 @@ export default function PricelistPage() {
     }
   };
 
+  const TAB_TO_CATEGORY: Record<Category, string> = {
+    'Kitchen': 'Base Units',
+    'Bedrooms': 'Wardrobes',
+    'Appliances': 'Appliances',
+    'Fillers & End Panels': 'Fillers & End Panels',
+    'Accessories': 'Accessories',
+    'Handles': 'Handles',
+    'Fittings': 'Fittings',
+  };
+
   const handleAddItem = async () => {
     try {
       setSaving(true);
@@ -387,10 +397,11 @@ export default function PricelistPage() {
           return;
         }
 
+        const targetCategory = TAB_TO_CATEGORY[activeTab];
         const createPromises = doorTypesWithPrices.map(([doorType, price]) => {
           // @ts-ignore
           return api.createPricelistItem({
-            category: activeTab,
+            category: targetCategory,
             item_code: newItemForm.item_code,
             item_name: newItemForm.item_name,
             description: `${newItemForm.item_name} - ${doorType}`,
