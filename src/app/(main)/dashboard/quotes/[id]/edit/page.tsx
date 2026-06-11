@@ -1,6 +1,6 @@
 "use client";
  
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ interface QuoteItem {
   discount_percent?: number;
   discounted_total?: number;
   autoFitting?: boolean;
+  subItems?: QuoteItem[];
 }
  
 export default function EditQuotePage() {
@@ -231,10 +232,24 @@ export default function EditQuotePage() {
           depth: item.depth || undefined,
           line_total: (item.quantity || 1) * (item.amount || 0),
           price_list_item_id: item.price_list_item_id,
-          // ADD THESE:
           discount_percent: item.discount_percent || 0,
           discounted_total: item.discounted_total || ((item.quantity || 1) * (item.amount || 0)),
+          subItems: (item.subItems || []).map((sub: any) => ({
+            item: sub.item || '',
+            description: sub.description || '',
+            color: sub.color || '',
+            quantity: sub.quantity || 1,
+            amount: sub.amount || 0,
+            width: sub.width || undefined,
+            height: sub.height || undefined,
+            depth: sub.depth || undefined,
+            line_total: (sub.quantity || 1) * (sub.amount || 0),
+            price_list_item_id: sub.price_list_item_id,
+            discount_percent: sub.discount_percent || 0,
+            discounted_total: sub.discounted_total || ((sub.quantity || 1) * (sub.amount || 0)),
+          })),
         }));
+
         setItems(itemsWithTotals);
 
         if (data.global_discount_percent) {
@@ -488,7 +503,7 @@ export default function EditQuotePage() {
     }
   };
 
-const FITTING_CODES_LIST = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW'];
+  const FITTING_CODES_LIST = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW'];
   const recalcInProgress = useRef(false);
 
   useEffect(() => {
@@ -649,6 +664,20 @@ const FITTING_CODES_LIST = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR'
               width: item.width,
               height: item.height,
               depth: item.depth,
+              subItems: (item.subItems || [])
+                .filter(sub => (sub.item && sub.item.trim()) || (sub.description && sub.description.trim()) || sub.line_total > 0)
+                .map(sub => ({
+                  item: sub.item,
+                  description: sub.description,
+                  color: sub.color,
+                  quantity: sub.quantity || 1,
+                  amount: sub.amount || 0,
+                  discount_percent: sub.discount_percent || 0,
+                  discounted_amount: sub.discounted_total || sub.line_total,
+                  width: sub.width,
+                  height: sub.height,
+                  depth: sub.depth,
+                })),
             })),
           subtotal,
           vat,
@@ -692,11 +721,137 @@ const FITTING_CODES_LIST = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR'
 
   // ✅ ADD CALCULATIONS HERE - BEFORE THE RETURN
   const subtotalBeforeDiscount = items.reduce((sum, item) => {
-    const itemTotal = (item.discount_percent && item.discount_percent > 0) 
+    const itemTotal = (item.discount_percent && item.discount_percent > 0)
       ? (item.discounted_total || 0)
       : item.line_total;
-    return sum + itemTotal;
+    const subTotal = (item.subItems || []).reduce((subSum, sub) => {
+      const subItemTotal = (sub.discount_percent && sub.discount_percent > 0)
+        ? (sub.discounted_total || 0)
+        : sub.line_total;
+      return subSum + subItemTotal;
+    }, 0);
+    return sum + itemTotal + subTotal;
   }, 0);
+
+  const handleAddSubItem = (parentIndex: number) => {
+    setItems(prevItems => prevItems.map((item, idx) => {
+      if (idx === parentIndex) {
+        const newSub: QuoteItem = {
+          item: "",
+          description: "",
+          color: "",
+          quantity: 1,
+          amount: 0,
+          line_total: 0,
+          discount_percent: 0,
+          discounted_total: 0,
+        };
+        return { ...item, subItems: [...(item.subItems || []), newSub] };
+      }
+      return item;
+    }));
+  };
+
+  const handleSubItemChange = (parentIndex: number, subIndex: number, field: string, value: any) => {
+    setItems(prevItems => prevItems.map((item, idx) => {
+      if (idx !== parentIndex || !item.subItems) return item;
+      const updatedSubs = [...item.subItems];
+      const sub = { ...updatedSubs[subIndex], [field]: value };
+      if (['quantity', 'amount', 'discount_percent'].includes(field)) {
+        const qty = field === 'quantity' ? parseFloat(value) || 1 : sub.quantity || 1;
+        const amount = field === 'amount' ? parseFloat(value) || 0 : sub.amount || 0;
+        const discountPercent = field === 'discount_percent' ? parseFloat(value) || 0 : sub.discount_percent || 0;
+        sub.line_total = qty * amount;
+        sub.discounted_total = calculateDiscountedTotal(qty, amount, discountPercent);
+      }
+      updatedSubs[subIndex] = sub;
+      return { ...item, subItems: updatedSubs };
+    }));
+  };
+
+  const handleRemoveSubItem = (parentIndex: number, subIndex: number) => {
+    if (!confirm("Remove this sub-item?")) return;
+    setItems(prevItems => prevItems.map((item, idx) => {
+      if (idx !== parentIndex || !item.subItems) return item;
+      return { ...item, subItems: item.subItems.filter((_, i) => i !== subIndex) };
+    }));
+  };
+
+  const handleSubItemAutoFill = async (parentIndex: number, subIndex: number, value: string) => {
+    setItems(prevItems => prevItems.map((item, idx) => {
+      if (idx !== parentIndex || !item.subItems) return item;
+      const updatedSubs = [...item.subItems];
+      updatedSubs[subIndex] = { ...updatedSubs[subIndex], item: value };
+      return { ...item, subItems: updatedSubs };
+    }));
+
+    if (!value || value.trim().length < 1) return;
+    const trimmedValue = value.trim().toUpperCase();
+    if (trimmedValue.includes(' ') || trimmedValue.length > 20) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+      const hasSuffix = trimmedValue.includes('-');
+      const baseCode = trimmedValue.split('-')[0];
+      const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+
+      const requestBody: any = {
+        description: trimmedValue,
+        current_items: [],
+      };
+
+      if (!hasSuffix && !isApplianceCode) {
+        requestBody.door_type = doorType;
+        requestBody.room_type = roomType;
+      } else if (!isApplianceCode) {
+        requestBody.room_type = roomType;
+      }
+
+      const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+        body: JSON.stringify(requestBody),
+      });
+      const data = await response.json();
+
+      if (data.found) {
+        let autoDescription = data.description || data.item_name || '';
+        if (data.is_fitting) autoDescription = data.item_name || '';
+        else if (isApplianceCode && data.brand && data.series_level) {
+          autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
+        }
+        const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
+        const price = data.price || 0;
+
+        setItems(prevItems => prevItems.map((item, idx) => {
+          if (idx !== parentIndex || !item.subItems) return item;
+          const updatedSubs = [...item.subItems];
+          const sub = updatedSubs[subIndex];
+          const qty = fittingQty !== null ? fittingQty : (sub.quantity || 1);
+          updatedSubs[subIndex] = {
+            ...sub,
+            item: data.item_code || trimmedValue,
+            description: autoDescription,
+            amount: price,
+            quantity: qty,
+            width: data.width,
+            height: data.height,
+            depth: data.depth,
+            line_total: price * qty,
+            discounted_total: sub.discount_percent
+              ? calculateDiscountedTotal(qty, price, sub.discount_percent)
+              : price * qty,
+          };
+          return { ...item, subItems: updatedSubs };
+        }));
+      } else {
+        console.log("❌ No pricing found for sub-item code:", trimmedValue);
+      }
+    } catch (error) {
+      console.error("Sub-item auto-price lookup failed:", error);
+    }
+  };
 
   const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
   const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
@@ -901,157 +1056,225 @@ const FITTING_CODES_LIST = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR'
               </thead>
               <tbody>
                 {items.map((item, index) => (
-                  <tr key={index}>
-                    {/* ITEM */}
-                    <td className="border border-black p-1">
-                      <Input
-                        value={item.item}
-                        onChange={(e) => handleItemChange(index, "item", e.target.value)}
-                        placeholder="50B"
-                        className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${
-                          autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
-                        }`}
-                      />
-                    </td>
-                    
-                    {/* DESCRIPTION */}
-                    <td className="border border-black p-1">
-                      <textarea
-                        value={item.description}
-                        onChange={(e) => handleDescriptionChange(index, e.target.value)}
-                        placeholder="Description"
-                        className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${
-                          autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
-                        }`}
-                        rows={2}
-                        style={{ minHeight: '35px', lineHeight: '1.3' }}
-                        onInput={(e) => {
-                          const target = e.target as HTMLTextAreaElement;
-                          target.style.height = 'auto';
-                          target.style.height = `${target.scrollHeight}px`;
-                        }}
-                      />
-                    </td>
-                    
-                    {/* COLOUR */}
-                    <td className="border border-black p-1">
-                      <Input
-                        value={item.color}
-                        onChange={(e) => handleItemChange(index, "color", e.target.value)}
-                        placeholder="Colour"
-                        className="border-none focus-visible:ring-0 min-w-[70px] text-xs"
-                      />
-                    </td>
-                    
-                    {/* QTY */}
-                    <td className="border border-black p-1">
-                      <Input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                        className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                        min="1"
-                      />
-                    </td>
-                    
-                    {/* WIDTH */}
-                    <td className="border border-black p-0">
-                      <Input
-                        type="number"
-                        value={item.width || ''}
-                        onChange={(e) => handleItemChange(index, "width", e.target.value)}
-                        placeholder="—"
-                        className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                        min="0"
-                      />
-                    </td>
-                    
-                    {/* HEIGHT */}
-                    <td className="border border-black p-0">
-                      <Input
-                        type="number"
-                        value={item.height || ''}
-                        onChange={(e) => handleItemChange(index, "height", e.target.value)}
-                        placeholder="—"
-                        className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                        min="0"
-                      />
-                    </td>
-                    
-                    {/* DEPTH */}
-                    <td className="border border-black p-0">
-                      <Input
-                        type="number"
-                        value={item.depth || ''}
-                        onChange={(e) => handleItemChange(index, "depth", e.target.value)}
-                        placeholder="—"
-                        className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
-                        min="0"
-                      />
-                    </td>
-                    
-                    {/* PRICE */}
-                    <td className="border border-black p-0">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={item.amount}
-                        onChange={(e) => handleItemChange(index, "amount", e.target.value)}
-                        className="border-none text-right focus-visible:ring-0 w-full text-xs"
-                        min="0"
-                        placeholder="0.00"
-                      />
-                    </td>
-                    
-                    {/* AMOUNT */}
-                    <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
-                      {formatCurrency((item.amount || 0) * (item.quantity || 1))}
-                    </td>
-                    
-                    {/* DISCOUNT % - NEW COLUMN */}
-                    <td className="border border-black p-0">
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={item.discount_percent || ''}
-                        onChange={(e) => handleItemChange(index, "discount_percent", e.target.value)}
-                        className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                        min="0"
-                        max="100"
-                        placeholder="0"
-                      />
-                    </td>
-                    
-                    {/* FINAL AMOUNT - NEW COLUMN */}
-                    <td className="border border-black px-2 py-1 text-right">
-                      {item.discount_percent && item.discount_percent > 0 ? (
-                        <div>
-                          <div className="text-xs text-gray-500 line-through">
+                  <React.Fragment key={index}>
+                    <tr>
+                      {/* ITEM */}
+                      <td className="border border-black p-1">
+                        <Input
+                          value={item.item}
+                          onChange={(e) => handleItemChange(index, "item", e.target.value)}
+                          placeholder="50B"
+                          className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${
+                            autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
+                          }`}
+                        />
+                      </td>
+                      
+                      {/* DESCRIPTION */}
+                      <td className="border border-black p-1">
+                        <textarea
+                          value={item.description}
+                          onChange={(e) => handleDescriptionChange(index, e.target.value)}
+                          placeholder="Description"
+                          className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${
+                            autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
+                          }`}
+                          rows={2}
+                          style={{ minHeight: '35px', lineHeight: '1.3' }}
+                          onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${target.scrollHeight}px`;
+                          }}
+                        />
+                      </td>
+                      
+                      {/* COLOUR */}
+                      <td className="border border-black p-1">
+                        <Input
+                          value={item.color}
+                          onChange={(e) => handleItemChange(index, "color", e.target.value)}
+                          placeholder="Colour"
+                          className="border-none focus-visible:ring-0 min-w-[70px] text-xs"
+                        />
+                      </td>
+                      
+                      {/* QTY */}
+                      <td className="border border-black p-1">
+                        <Input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
+                          className="border-none text-center focus-visible:ring-0 w-full text-xs"
+                          min="1"
+                        />
+                      </td>
+                      
+                      {/* WIDTH */}
+                      <td className="border border-black p-0">
+                        <Input
+                          type="number"
+                          value={item.width || ''}
+                          onChange={(e) => handleItemChange(index, "width", e.target.value)}
+                          placeholder="—"
+                          className="border-none text-center focus-visible:ring-0 w-full text-xs"
+                          min="0"
+                        />
+                      </td>
+                      
+                      {/* HEIGHT */}
+                      <td className="border border-black p-0">
+                        <Input
+                          type="number"
+                          value={item.height || ''}
+                          onChange={(e) => handleItemChange(index, "height", e.target.value)}
+                          placeholder="—"
+                          className="border-none text-center focus-visible:ring-0 w-full text-xs"
+                          min="0"
+                        />
+                      </td>
+                      
+                      {/* DEPTH */}
+                      <td className="border border-black p-0">
+                        <Input
+                          type="number"
+                          value={item.depth || ''}
+                          onChange={(e) => handleItemChange(index, "depth", e.target.value)}
+                          placeholder="—"
+                          className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
+                          min="0"
+                        />
+                      </td>
+                      
+                      {/* PRICE */}
+                      <td className="border border-black p-0">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.amount}
+                          onChange={(e) => handleItemChange(index, "amount", e.target.value)}
+                          className="border-none text-right focus-visible:ring-0 w-full text-xs"
+                          min="0"
+                          placeholder="0.00"
+                        />
+                      </td>
+                      
+                      {/* AMOUNT */}
+                      <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
+                        {formatCurrency((item.amount || 0) * (item.quantity || 1))}
+                      </td>
+                      
+                      {/* DISCOUNT % */}
+                      <td className="border border-black p-0">
+                        <Input
+                          type="number"
+                          step="0.1"
+                          value={item.discount_percent || ''}
+                          onChange={(e) => handleItemChange(index, "discount_percent", e.target.value)}
+                          className="border-none text-center focus-visible:ring-0 w-full text-xs"
+                          min="0"
+                          max="100"
+                          placeholder="0"
+                        />
+                      </td>
+                      
+                      {/* FINAL AMOUNT */}
+                      <td className="border border-black px-2 py-1 text-right">
+                        {item.discount_percent && item.discount_percent > 0 ? (
+                          <div>
+                            <div className="text-xs text-gray-500 line-through">
+                              {formatCurrency((item.amount || 0) * (item.quantity || 1))}
+                            </div>
+                            <div className="font-semibold text-green-700 text-xs">
+                              {formatCurrency(item.discounted_total || 0)}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="font-semibold text-xs">
                             {formatCurrency((item.amount || 0) * (item.quantity || 1))}
-                          </div>
-                          <div className="font-semibold text-green-700 text-xs">
-                            {formatCurrency(item.discounted_total || 0)}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="font-semibold text-xs">
-                          {formatCurrency((item.amount || 0) * (item.quantity || 1))}
-                        </span>
-                      )}
-                    </td>
-                    
-                    {/* ACTION */}
-                    <td className="border border-black p-1 text-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveItem(index)}
-                        className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </td>
-                  </tr>
+                          </span>
+                        )}
+                      </td>
+                      
+                      {/* ACTION */}
+                      <td className="border border-black p-1 text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveItem(index)}
+                          className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </td>
+                    </tr>
+
+                    {/* SUB-ITEMS */}
+                    {(item.subItems || []).map((sub, subIndex) => (
+                      <tr key={subIndex} className="bg-gray-50">
+                        <td className="border border-black p-0 pl-4">
+                          <Input
+                            value={sub.item}
+                            onChange={(e) => handleSubItemAutoFill(index, subIndex, e.target.value)}
+                            onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleSubItemAutoFill(index, subIndex, val); }}
+                            placeholder="↳ sub-code"
+                            className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
+                          />
+                        </td>
+                        <td className="border border-black p-0">
+                          <Input
+                            value={sub.description}
+                            onChange={(e) => handleSubItemChange(index, subIndex, "description", e.target.value)}
+                            placeholder="Sub-item description"
+                            className="border-none focus-visible:ring-0 w-full text-xs px-1"
+                          />
+                        </td>
+                        <td className="border border-black p-0">
+                          <Input
+                            value={sub.color}
+                            onChange={(e) => handleSubItemChange(index, subIndex, "color", e.target.value)}
+                            placeholder="Colour"
+                            className="border-none focus-visible:ring-0 w-full text-xs px-1"
+                          />
+                        </td>
+                        <td className="border border-black p-0">
+                          <Input type="number" value={sub.quantity} onChange={(e) => handleSubItemChange(index, subIndex, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="1" />
+                        </td>
+                        <td className="border border-black p-0"></td>
+                        <td className="border border-black p-0"></td>
+                        <td className="border border-black p-0"></td>
+                        <td className="border border-black p-0">
+                          <Input type="number" step="0.01" value={sub.amount} onChange={(e) => handleSubItemChange(index, subIndex, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs px-1" min="0" placeholder="0.00" />
+                        </td>
+                        <td className="border border-black px-2 py-1 text-right text-xs">{formatCurrency(sub.line_total)}</td>
+                        <td className="border border-black p-0">
+                          <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(index, subIndex, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
+                        </td>
+                        <td className="border border-black px-2 py-1 text-right text-xs">
+                          {sub.discount_percent && sub.discount_percent > 0
+                            ? formatCurrency(sub.discounted_total || 0)
+                            : formatCurrency(sub.line_total)}
+                        </td>
+                        <td className="border border-black p-1 text-center">
+                          <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(index, subIndex)} className="text-red-600 hover:bg-red-50 h-6 w-6">
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {/* ADD SUB-ITEM BUTTON ROW */}
+                    <tr>
+                      <td colSpan={12} className="border border-black px-2 py-1 bg-gray-50">
+                        <button
+                          onClick={() => handleAddSubItem(index)}
+                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          <Plus className="h-3 w-3" /> Add sub-item
+                        </button>
+                      </td>
+                    </tr>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ interface QuoteItem {
   discount_percent?: number;
   discounted_total?: number;
   autoFitting?: boolean;
+  subItems?: QuoteItem[];
 }
 
 export default function CreateQuotePage() {
@@ -477,7 +478,13 @@ export default function CreateQuotePage() {
       const itemTotal = (item.discount_percent && item.discount_percent > 0)
         ? (item.discounted_total || 0)
         : item.line_total;
-      return sum + itemTotal;
+      const subTotal = (item.subItems || []).reduce((subSum, sub) => {
+        const subItemTotal = (sub.discount_percent && sub.discount_percent > 0)
+        ? (sub.discounted_total || 0)
+        : sub.line_total;
+        return subSum + subItemTotal;
+      }, 0);
+      return sum + itemTotal + subTotal;
     }, 0);
 
     const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
@@ -522,6 +529,20 @@ export default function CreateQuotePage() {
               width: item.width,
               height: item.height,
               depth: item.depth,
+              subItems: (item.subItems || [])
+                .filter(sub => (sub.item && sub.item.trim()) || (sub.description && sub.description.trim()) || sub.line_total > 0)
+                .map(sub => ({
+                  item: sub.item,
+                  description: sub.description,
+                  color: sub.color,
+                  quantity: sub.quantity || 1,
+                  amount: sub.amount || 0,
+                  discount_percent: sub.discount_percent || 0,
+                  discounted_amount: sub.discounted_total || sub.line_total,
+                  width: sub.width,
+                  height: sub.height,
+                  depth: sub.depth,
+                })),
             })),
           subtotal,
           vat,
@@ -554,11 +575,145 @@ export default function CreateQuotePage() {
     }
   };
 
+  const handleAddSubItem = (parentId: string) => {
+    setItems(prevItems => prevItems.map(item => {
+      if (item.id === parentId) {
+        const newSub: QuoteItem = {
+          id: `sub-${Date.now()}-${Math.random()}`,
+          item: "",
+          description: "",
+          color: "",
+          quantity: 1,
+          amount: 0,
+          line_total: 0,
+          discount_percent: 0,
+          discounted_total: 0,
+        };
+        return { ...item, subItems: [...(item.subItems || []), newSub] };
+      }
+      return item;
+    }));
+  };
+
+  const handleSubItemChange = (parentId: string, subId: string, field: keyof QuoteItem, value: any) => {
+    setItems(prevItems => prevItems.map(item => {
+      if (item.id !== parentId || !item.subItems) return item;
+      const updatedSubs = item.subItems.map(sub => {
+        if (sub.id !== subId) return sub;
+        const updatedSub = { ...sub, [field]: value };
+        if (['quantity', 'amount', 'discount_percent'].includes(field)) {
+          const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedSub.quantity || 1;
+          const amount = field === 'amount' ? parseFloat(value) || 0 : updatedSub.amount || 0;
+          const discountPercent = field === 'discount_percent' ? parseFloat(value) || 0 : updatedSub.discount_percent || 0;
+          updatedSub.line_total = qty * amount;
+          updatedSub.discounted_total = calculateDiscountedTotal(qty, amount, discountPercent);
+        }
+        return updatedSub;
+      });
+      return { ...item, subItems: updatedSubs };
+    }));
+  };
+
+  const handleRemoveSubItem = (parentId: string, subId: string) => {
+    if (!confirm("Remove this sub-item?")) return;
+    setItems(prevItems => prevItems.map(item => {
+      if (item.id !== parentId || !item.subItems) return item;
+      return { ...item, subItems: item.subItems.filter(sub => sub.id !== subId) };
+    }));
+  };
+
+const handleSubItemAutoFill = async (parentId: string, subId: string, value: string) => {
+    // First update the item field immediately
+    setItems(prevItems => prevItems.map(item => {
+      if (item.id !== parentId || !item.subItems) return item;
+      return {
+        ...item,
+        subItems: item.subItems.map(sub => sub.id === subId ? { ...sub, item: value } : sub)
+      };
+    }));
+
+    if (!value || value.trim().length < 1) return;
+    const trimmedValue = value.trim().toUpperCase();
+    if (trimmedValue.includes(' ') || trimmedValue.length > 20) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+      const hasSuffix = trimmedValue.includes('-');
+      const baseCode = trimmedValue.split('-')[0];
+      const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+
+      const requestBody: any = {
+        description: trimmedValue,
+        current_items: [],
+      };
+
+      if (!hasSuffix && !isApplianceCode) {
+        requestBody.door_type = doorType;
+        requestBody.room_type = roomType;
+      } else if (!isApplianceCode) {
+        requestBody.room_type = roomType;
+      }
+
+      const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+        body: JSON.stringify(requestBody),
+      });
+      const data = await response.json();
+
+      if (data.found) {
+        let autoDescription = data.description || data.item_name || '';
+        if (data.is_fitting) autoDescription = data.item_name || '';
+        else if (isApplianceCode && data.brand && data.series_level) {
+          autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
+        }
+        const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
+
+        setItems(prevItems => prevItems.map(item => {
+          if (item.id !== parentId || !item.subItems) return item;
+          return {
+            ...item,
+            subItems: item.subItems.map(sub => {
+              if (sub.id !== subId) return sub;
+              const qty = fittingQty !== null ? fittingQty : (sub.quantity || 1);
+              const price = data.price || 0;
+              return {
+                ...sub,
+                item: data.item_code || trimmedValue,
+                description: autoDescription,
+                amount: price,
+                quantity: qty,
+                width: data.width,
+                height: data.height,
+                depth: data.depth,
+                line_total: price * qty,
+                discounted_total: sub.discount_percent
+                  ? calculateDiscountedTotal(qty, price, sub.discount_percent)
+                  : price * qty,
+              };
+            })
+          };
+        }));
+      } else {
+        console.log("❌ No pricing found for sub-item code:", trimmedValue);
+      }
+    } catch (error) {
+      console.error("Sub-item auto-price lookup failed:", error);
+    }
+  };
+
   const subtotalBeforeDiscount = items.reduce((sum, item) => {
     const itemTotal = (item.discount_percent && item.discount_percent > 0)
       ? (item.discounted_total || 0)
       : item.line_total;
-    return sum + itemTotal;
+    const subTotal = (item.subItems || []).reduce((subSum, sub) => {
+      const subItemTotal = (sub.discount_percent && sub.discount_percent > 0)
+        ? (sub.discounted_total || 0)
+        : sub.line_total;
+      return subSum + subItemTotal;
+    }, 0);
+    return sum + itemTotal + subTotal;
   }, 0);
 
   const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
@@ -731,71 +886,139 @@ export default function CreateQuotePage() {
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.id}>
-                    <td className="border border-black p-0">
-                      <Input
-                        value={item.item}
-                        onChange={(e) => handleItemChange(item.id, "item", e.target.value)}
-                        onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
-                        placeholder="50B"
-                        className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
-                      />
-                    </td>
-                    <td className="border border-black p-0">
-                      <textarea
-                        value={item.description}
-                        onChange={(e) => handleDescriptionChange(item.id, e.target.value)}
-                        placeholder="Description"
-                        className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
-                        rows={2}
-                        style={{ minHeight: '35px', lineHeight: '1.3' }}
-                        onInput={(e) => {
-                          const target = e.target as HTMLTextAreaElement;
-                          target.style.height = 'auto';
-                          target.style.height = `${target.scrollHeight}px`;
-                        }}
-                      />
-                    </td>
-                    <td className="border border-black p-0">
-                      <Input value={item.color} onChange={(e) => handleItemChange(item.id, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 min-w-[70px] text-xs" />
-                    </td>
-                    <td className="border border-black p-0">
-                      <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="1" />
-                    </td>
-                    <td className="border border-black p-0">
-                      <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
-                    </td>
-                    <td className="border border-black p-0">
-                      <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
-                    </td>
-                    <td className="border border-black p-0">
-                      <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
-                    </td>
-                    <td className="border border-black p-0">
-                      <Input type="number" step="0.01" value={item.amount} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
-                    </td>
-                    <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
-                      {formatCurrency(item.line_total)}
-                    </td>
-                    <td className="border border-black p-0">
-                      <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(item.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" max="100" placeholder="0" />
-                    </td>
-                    <td className="border border-black px-2 py-1 text-right">
-                      {item.discount_percent && item.discount_percent > 0 ? (
-                        <div>
-                          <div className="text-xs text-gray-500 line-through">{formatCurrency(item.line_total)}</div>
-                          <div className="font-semibold text-green-700 text-xs">{formatCurrency(item.discounted_total || 0)}</div>
-                        </div>
-                      ) : (
-                        <span className="font-semibold text-xs">{formatCurrency(item.line_total)}</span>
-                      )}
-                    </td>
-                    <td className="border border-black p-1 text-center">
-                      <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7">
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </td>
-                  </tr>
+                  <React.Fragment key={item.id}>
+                    <tr>
+                      <td className="border border-black p-0">
+                        <Input
+                          value={item.item}
+                          onChange={(e) => handleItemChange(item.id, "item", e.target.value)}
+                          onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
+                          placeholder="50B"
+                          className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
+                        />
+                      </td>
+                      <td className="border border-black p-0">
+                        <textarea
+                          value={item.description}
+                          onChange={(e) => handleDescriptionChange(item.id, e.target.value)}
+                          placeholder="Description"
+                          className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
+                          rows={2}
+                          style={{ minHeight: '35px', lineHeight: '1.3' }}
+                          onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${target.scrollHeight}px`;
+                          }}
+                        />
+                      </td>
+                      <td className="border border-black p-0">
+                        <Input value={item.color} onChange={(e) => handleItemChange(item.id, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 min-w-[70px] text-xs" />
+                      </td>
+                      <td className="border border-black p-0">
+                        <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="1" />
+                      </td>
+                      <td className="border border-black p-0">
+                        <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                      </td>
+                      <td className="border border-black p-0">
+                        <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                      </td>
+                      <td className="border border-black p-0">
+                        <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                      </td>
+                      <td className="border border-black p-0">
+                        <Input type="number" step="0.01" value={item.amount} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
+                      </td>
+                      <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
+                        {formatCurrency(item.line_total)}
+                      </td>
+                      <td className="border border-black p-0">
+                        <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(item.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" max="100" placeholder="0" />
+                      </td>
+                      <td className="border border-black px-2 py-1 text-right">
+                        {item.discount_percent && item.discount_percent > 0 ? (
+                          <div>
+                            <div className="text-xs text-gray-500 line-through">{formatCurrency(item.line_total)}</div>
+                            <div className="font-semibold text-green-700 text-xs">{formatCurrency(item.discounted_total || 0)}</div>
+                          </div>
+                        ) : (
+                          <span className="font-semibold text-xs">{formatCurrency(item.line_total)}</span>
+                        )}
+                      </td>
+                      <td className="border border-black p-1 text-center">
+                        <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7">
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </td>
+                    </tr>
+
+                    {/* SUB-ITEMS */}
+                    {(item.subItems || []).map((sub) => (
+                      <tr key={sub.id} className="bg-gray-50">
+                        <td className="border border-black p-0 pl-4">
+                          <Input
+                            value={sub.item}
+                            onChange={(e) => handleSubItemAutoFill(item.id, sub.id, e.target.value)}
+                            onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleSubItemAutoFill(item.id, sub.id, val); }}
+                            placeholder="↳ sub-code"
+                            className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
+                          />
+                        </td>
+                        <td className="border border-black p-0">
+                          <Input
+                            value={sub.description}
+                            onChange={(e) => handleSubItemChange(item.id, sub.id, "description", e.target.value)}
+                            placeholder="Sub-item description"
+                            className="border-none focus-visible:ring-0 w-full text-xs px-1"
+                          />
+                        </td>
+                        <td className="border border-black p-0">
+                          <Input
+                            value={sub.color}
+                            onChange={(e) => handleSubItemChange(item.id, sub.id, "color", e.target.value)}
+                            placeholder="Colour"
+                            className="border-none focus-visible:ring-0 w-full text-xs px-1"
+                          />
+                        </td>
+                        <td className="border border-black p-0">
+                          <Input type="number" value={sub.quantity} onChange={(e) => handleSubItemChange(item.id, sub.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="1" />
+                        </td>
+                        <td className="border border-black p-0"></td>
+                        <td className="border border-black p-0"></td>
+                        <td className="border border-black p-0"></td>
+                        <td className="border border-black p-0">
+                          <Input type="number" step="0.01" value={sub.amount} onChange={(e) => handleSubItemChange(item.id, sub.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs px-1" min="0" placeholder="0.00" />
+                        </td>
+                        <td className="border border-black px-2 py-1 text-right text-xs">{formatCurrency(sub.line_total)}</td>
+                        <td className="border border-black p-0">
+                          <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(item.id, sub.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
+                        </td>
+                        <td className="border border-black px-2 py-1 text-right text-xs">
+                          {sub.discount_percent && sub.discount_percent > 0
+                            ? formatCurrency(sub.discounted_total || 0)
+                            : formatCurrency(sub.line_total)}
+                        </td>
+                        <td className="border border-black p-1 text-center">
+                          <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(item.id, sub.id)} className="text-red-600 hover:bg-red-50 h-6 w-6">
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {/* ADD SUB-ITEM BUTTON ROW */}
+                    <tr>
+                      <td colSpan={12} className="border border-black px-2 py-1 bg-gray-50">
+                        <button
+                          onClick={() => handleAddSubItem(item.id)}
+                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          <Plus className="h-3 w-3" /> Add sub-item
+                        </button>
+                      </td>
+                    </tr>
+                  </React.Fragment>
                 ))}
                 {items.length === 0 && (
                   <tr>
