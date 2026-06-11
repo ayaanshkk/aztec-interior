@@ -352,7 +352,7 @@ const handleItemChange = async (index: number, field: string, value: any) => {
         const token = localStorage.getItem("token");
         const tenantId = localStorage.getItem("tenantId") || "7";
 
-        const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'WTJT', 'FITDR', 'PANW'];
+        const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW'];
 
         const currentItemsSnapshot = itemsRef.current
           .filter((_, i) => i !== index)
