@@ -9,7 +9,7 @@ import { ArrowLeft, Save, Trash2, Plus } from "lucide-react";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
 
 interface QuoteItem {
-  id: string;
+  // id: string;
   item: string;
   description: string;
   color: string;
