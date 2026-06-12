@@ -662,43 +662,6 @@ export default function SchedulePage() {
     }
   };
 
-  const handleAddTask = async () => {
-    if (!newTask.start_date || !newTask.end_date || !newTask.type) {
-      alert("Please fill in required fields (Type, Start Date, and End Date)");
-      return;
-    }
-
-    if (!newTask.customer_id) {
-      alert("Please select a customer");
-      return;
-    }
-
-    if (customAssigneeInput.trim()) saveCustomAssignee(customAssigneeInput);
-    if (customTaskInput.trim()) saveCustomJobTask(customTaskInput);
-
-    try {
-      await createTask(newTask);
-      
-      setShowAddDialog(false);
-      
-      setNewTask({
-        type: "job",
-        start_date: formatDateKey(new Date()),
-        end_date: formatDateKey(new Date()),
-        start_time: "09:00",
-        end_time: "17:00",
-        priority: "Medium",
-        status: "Scheduled",
-        estimated_hours: 8,
-      });
-      setCustomAssigneeInput("");
-      setCustomTaskInput("");
-    } catch (err) {
-      console.error("Error creating task:", err);
-      alert(err instanceof Error ? err.message : "Failed to create task");
-    }
-  };
-
   const handleEditTask = async () => {
     if (!selectedTask) return;
     
