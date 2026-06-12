@@ -27,7 +27,7 @@ export default function QuotePDFPage() {
         console.log(`🔑 Token preview: ${token.substring(0, 20)}...`);
         
         const response = await fetch(
-          `${BACKEND_URL}/api/quotations/${quoteId}/pdf`,  // ✅ ADD /api prefix
+          `${BACKEND_URL}/quotations/${quoteId}/pdf`,
           {
             headers: {
               "Authorization": `Bearer ${token}`,

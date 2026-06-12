@@ -208,6 +208,18 @@ export default function ViewQuotePage() {
                   {quotation.customer_phone || quotation.client_phone || '—'}
                 </td>
               </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">CARCASS COLOUR:</td>
+                <td className="border border-black px-3 py-2">{quotation.carcass_colour || '—'}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR COLOUR:</td>
+                <td className="border border-black px-3 py-2">{quotation.door_colour || '—'}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR STYLE:</td>
+                <td className="border border-black px-3 py-2">{quotation.door_style || '—'}</td>
+              </tr>
             </tbody>
           </table>
         </div>

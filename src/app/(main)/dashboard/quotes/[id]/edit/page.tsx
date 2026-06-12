@@ -51,6 +51,9 @@ export default function EditQuotePage() {
   const [roomType, setRoomType] = useState<string>('Kitchen');
   
   const [vatPercentage, setVatPercentage] = useState<number>(20);
+  const [carcassColour, setCarcassColour] = useState<string>('');
+  const [doorColour, setDoorColour] = useState<string>('');
+  const [doorStyle, setDoorStyle] = useState<string>('');
   
   // Customer form data
   const [customerData, setCustomerData] = useState({
@@ -264,6 +267,9 @@ export default function EditQuotePage() {
         }
         if (data.door_type) setDoorType(data.door_type);
         if (data.room_type) setRoomType(data.room_type);
+        setCarcassColour(data.carcass_colour || '');
+        setDoorColour(data.door_colour || '');
+        setDoorStyle(data.door_style || '');
       } else {
         alert("Failed to load quotation");
       }
@@ -650,6 +656,9 @@ export default function EditQuotePage() {
           date: customerData.date,
           door_type: doorType,
           room_type: roomType,
+          carcass_colour: carcassColour,
+          door_colour: doorColour,
+          door_style: doorStyle,
           items: items
             .filter(item => {
               const hasItem = item.item && item.item.trim().length > 0;
@@ -1021,6 +1030,7 @@ export default function EditQuotePage() {
                   />
                 </td>
               </tr>
+
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">TEL:</td>
                 <td className="border border-black p-0">
@@ -1028,6 +1038,39 @@ export default function EditQuotePage() {
                     value={customerData.phone}
                     onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
                     placeholder="Phone number"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">CARCASS COLOUR:</td>
+                <td className="border border-black p-0">
+                  <Input
+                    value={carcassColour}
+                    onChange={(e) => setCarcassColour(e.target.value)}
+                    placeholder="Carcass colour"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR COLOUR:</td>
+                <td className="border border-black p-0">
+                  <Input
+                    value={doorColour}
+                    onChange={(e) => setDoorColour(e.target.value)}
+                    placeholder="Door colour"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR STYLE:</td>
+                <td className="border border-black p-0">
+                  <Input
+                    value={doorStyle}
+                    onChange={(e) => setDoorStyle(e.target.value)}
+                    placeholder="Door style"
                     className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
                   />
                 </td>
