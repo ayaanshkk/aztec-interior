@@ -57,6 +57,8 @@ export default function CreateTaskModal({
   const [availableForms, setAvailableForms] = useState<any[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isCustomTeamMember, setIsCustomTeamMember] = useState(false);
+  const [isCustomCustomer, setIsCustomCustomer] = useState(false);
+  const [isCustomJobType, setIsCustomJobType] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
     job_type: "",
@@ -86,7 +88,7 @@ export default function CreateTaskModal({
       console.log("🔄 Loading data for create task modal...");
       
       // Fetch customers
-      const customersRes = await fetchWithAuth("customers");
+      const customersRes = await fetchWithAuth("customers/active");
       console.log("📡 Customers response:", customersRes.status);
       
       if (customersRes.ok) {
@@ -218,6 +220,9 @@ export default function CreateTaskModal({
         });
         setAttachedForms([]);
         setErrors({});
+        setIsCustomTeamMember(false);
+        setIsCustomCustomer(false);
+        setIsCustomJobType(false);
         
         onOpenChange(false);
         if (onSuccess) onSuccess();
@@ -265,18 +270,55 @@ export default function CreateTaskModal({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <Label>Task Type *</Label>
-                <Select value={formData.job_type} onValueChange={(v) => handleInputChange("job_type", v)}>
-                  <SelectTrigger className={errors.job_type ? "border-red-500" : ""}>
-                    <SelectValue placeholder="Select task type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {JOB_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  {!isCustomJobType ? (
+                    <Select 
+                      value={formData.job_type} 
+                      onValueChange={(v) => {
+                        if (v === "__custom__") {
+                          setIsCustomJobType(true);
+                          handleInputChange("job_type", "");
+                        } else {
+                          handleInputChange("job_type", v);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className={errors.job_type ? "border-red-500" : ""}>
+                        <SelectValue placeholder="Select task type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {JOB_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__custom__" className="text-blue-600 font-medium">
+                          + Enter Custom Type
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Enter task type"
+                        value={formData.job_type}
+                        onChange={(e) => handleInputChange("job_type", e.target.value)}
+                        className={errors.job_type ? "border-red-500" : ""}
+                        autoFocus
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsCustomJobType(false);
+                          handleInputChange("job_type", "");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 {errors.job_type && <p className="mt-1 text-sm text-red-500">{errors.job_type}</p>}
               </div>
 
@@ -320,18 +362,55 @@ export default function CreateTaskModal({
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <Label>Customer *</Label>
-                <Select value={formData.customer_id} onValueChange={(v) => handleInputChange("customer_id", v)}>
-                  <SelectTrigger className={errors.customer_id ? "border-red-500" : ""}>
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  {!isCustomCustomer ? (
+                    <Select 
+                      value={formData.customer_id} 
+                      onValueChange={(v) => {
+                        if (v === "__custom__") {
+                          setIsCustomCustomer(true);
+                          handleInputChange("customer_id", "");
+                        } else {
+                          handleInputChange("customer_id", v);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className={errors.customer_id ? "border-red-500" : ""}>
+                        <SelectValue placeholder="Select customer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {customers.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__custom__" className="text-blue-600 font-medium">
+                          + Enter Customer Manually
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Enter customer name or ID"
+                        value={formData.customer_id}
+                        onChange={(e) => handleInputChange("customer_id", e.target.value)}
+                        className={errors.customer_id ? "border-red-500" : ""}
+                        autoFocus
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsCustomCustomer(false);
+                          handleInputChange("customer_id", "");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 {errors.customer_id && <p className="mt-1 text-sm text-red-500">{errors.customer_id}</p>}
               </div>
 

@@ -39,7 +39,7 @@ import {
   Archive,
 } from "lucide-react";
 import { fetchWithAuth, api, BACKEND_URL } from "@/lib/api";
-
+import CreateTaskModal from "@/components/ui/CreateTaskModal";
 
 // ✅ PERFORMANCE: Improved cache with compression support
 const CACHE_KEY = 'schedule_cache';
@@ -204,27 +204,11 @@ export default function SchedulePage() {
   const [showDayViewDialog, setShowDayViewDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  const [customAssignees, setCustomAssignees] = useState<string[]>([]);
-  const [customJobTasks, setCustomJobTasks] = useState<string[]>([]);
-  const [customAssigneeInput, setCustomAssigneeInput] = useState("");
-  const [customTaskInput, setCustomTaskInput] = useState("");
-
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   
-  const [newTask, setNewTask] = useState<Partial<Task>>({
-    type: "job",
-    start_date: formatDateKey(new Date()),
-    end_date: formatDateKey(new Date()),
-    start_time: "09:00",
-    end_time: "17:00",
-    priority: "Medium",
-    status: "Scheduled",
-    estimated_hours: 8,
-  });
-
   const [viewMode, setViewMode] = useState<"month" | "week" | "year">("month");
 
   // ✅ PERFORMANCE: Memoize expensive calculations
@@ -947,20 +931,7 @@ export default function SchedulePage() {
               <SelectItem value="week">Week</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={() => {
-            setNewTask(prev => ({
-              ...prev,
-              type: prev.type || "job",
-              start_date: formatDateKey(new Date()),
-              end_date: formatDateKey(new Date()),
-              start_time: prev.start_time || "09:00",
-              end_time: prev.end_time || "17:00",
-              priority: prev.priority || "Medium",
-              status: prev.status || "Scheduled",
-              estimated_hours: prev.estimated_hours || 8,
-            }));
-            setShowAddDialog(true);
-          }}>
+          <Button onClick={() => setShowAddDialog(true)}>
             Add Task
           </Button>
         </div>
@@ -1095,204 +1066,14 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {/* Add Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add New Task</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select
-                value={newTask.type}
-                onValueChange={(value: "job" | "off" | "delivery" | "note") => {
-                  setNewTask({ ...newTask, type: value });
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="job">Job</SelectItem>
-                  <SelectItem value="off">Off</SelectItem>
-                  <SelectItem value="delivery">Delivery</SelectItem>
-                  <SelectItem value="note">Note</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start Date *</Label>
-                <Input
-                  type="date"
-                  value={newTask.start_date}
-                  onChange={(e) => setNewTask({ ...newTask, start_date: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>End Date *</Label>
-                <Input
-                  type="date"
-                  value={newTask.end_date}
-                  onChange={(e) => setNewTask({ ...newTask, end_date: e.target.value })}
-                />
-              </div>
-            </div>
-
-            {(newTask.type === "job" || newTask.type === "off") && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Start Time</Label>
-                    <Input
-                      type="time"
-                      value={newTask.start_time || ""}
-                      onChange={(e) => setNewTask({ ...newTask, start_time: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End Time</Label>
-                    <Input
-                      type="time"
-                      value={newTask.end_time || ""}
-                      onChange={(e) => setNewTask({ ...newTask, end_time: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div className="space-y-2">
-              <Label>Assign To</Label>
-              <Input
-                placeholder="Type team member name..."
-                list="assignee-suggestions"
-                value={customAssigneeInput}
-                onChange={(e) => {
-                  setCustomAssigneeInput(e.target.value);
-                  setNewTask({ ...newTask, team_member: e.target.value });
-                }}
-              />
-              <datalist id="assignee-suggestions">
-                {customAssignees.map((name) => (
-                  <option key={name} value={name} />
-                ))}
-              </datalist>
-            </div>
-
-            {newTask.type === "job" && (
-              <div className="space-y-2">
-                <Label>Job/Task</Label>
-                <Select
-                  value={newTask.job_type || newTask.title || ""}
-                  onValueChange={(value) => {
-                    if (value.includes(" - ")) {
-                      const jobId = availableJobs.find(
-                        (j) => `${j.job_reference} - ${j.customer_name}` === value
-                      )?.id;
-                      setNewTask({
-                        ...newTask,
-                        title: value,
-                        job_id: jobId,
-                        job_type: undefined,
-                      });
-                    } else {
-                      setNewTask({
-                        ...newTask,
-                        title: value,
-                        job_type: value,
-                        job_id: undefined,
-                      });
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select job or task" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Standard Tasks</SelectLabel>
-                      {interiorDesignJobTypes.map((task) => (
-                        <SelectItem key={task} value={task}>
-                          {task}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    {customJobTasks.length > 0 && (
-                      <SelectGroup>
-                        <SelectLabel>Custom Tasks</SelectLabel>
-                        {customJobTasks.map((task) => (
-                          <SelectItem key={task} value={task}>
-                            {task}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    )}
-                    {availableJobs.length > 0 && (
-                      <SelectGroup>
-                        <SelectLabel>Available Jobs</SelectLabel>
-                        {availableJobs.map((job) => (
-                          <SelectItem
-                            key={job.id}
-                            value={`${job.job_reference} - ${job.customer_name}`}
-                          >
-                            {job.job_reference} - {job.customer_name}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Customer *</Label>
-              <Select
-                value={newTask.customer_id || ""}
-                onValueChange={(value) => {
-                  setNewTask({
-                    ...newTask,
-                    customer_id: value,
-                  });
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Notes</Label>
-              <textarea
-                className="w-full min-h-[100px] p-2 border rounded-md"
-                value={newTask.notes || ""}
-                onChange={(e) => setNewTask({ ...newTask, notes: e.target.value })}
-                placeholder="Add any additional notes..."
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddTask} disabled={saving}>
-                {saving ? "Adding..." : "Add Task"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CreateTaskModal
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        onSuccess={() => {
+          hasLoadedData.current = false;
+          fetchData();
+        }}
+      />
 
       {/* Task Details Dialog */}
       <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
@@ -1440,20 +1221,8 @@ export default function SchedulePage() {
                 <div className="mt-4">
                   <Button
                     onClick={() => {
-                      if (selectedDate) {
-                        setNewTask({
-                          type: "job",
-                          start_date: formatDateKey(selectedDate),
-                          end_date: formatDateKey(selectedDate),
-                          start_time: "09:00",
-                          end_time: "17:00",
-                          priority: "Medium",
-                          status: "Scheduled",
-                          estimated_hours: 8,
-                        });
-                        setShowDayViewDialog(false);
-                        setShowAddDialog(true);
-                      }
+                      setShowAddDialog(true);
+                      setShowAddDialog(true);
                     }}
                   >
                     Add Task for This Date
@@ -1472,20 +1241,8 @@ export default function SchedulePage() {
                 </Button>
                 <Button
                   onClick={() => {
-                    if (selectedDate) {
-                      setNewTask({
-                        type: "job",
-                        start_date: formatDateKey(selectedDate),
-                        end_date: formatDateKey(selectedDate),
-                        start_time: "09:00",
-                        end_time: "17:00",
-                        priority: "Medium",
-                        status: "Scheduled",
-                        estimated_hours: 8,
-                      });
-                      setShowDayViewDialog(false);
-                      setShowAddDialog(true);
-                    }
+                    setShowDayViewDialog(false);
+                    setShowAddDialog(true);
                   }}
                 >
                   Add New Task

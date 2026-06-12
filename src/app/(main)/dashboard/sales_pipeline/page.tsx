@@ -851,16 +851,13 @@ export default function EnhancedPipelinePage() {
       return;
     }
 
-    let url = '';
-    
-    if (itemType === "client") {
-      url = `/dashboard/clients/${item.customer.id}`;
-    } else if (itemType === "project") {
-      const projectId = itemId.replace("project-", "");
-      url = `/dashboard/projects/${projectId}`;
-    } else if (itemType === "opportunity") {
-      const opportunityId = itemId.replace("opportunity-", "");
-      url = `/dashboard/opportunities/${opportunityId}`;
+    const customerId = item.customer.id;
+    let url = `/dashboard/customers/${customerId}`;
+
+    if (itemType === "project" && item.project) {
+      url += `?project=${item.project.id}`;
+    } else if (itemType === "opportunity" && item.opportunity) {
+      url += `?opportunity=${item.opportunity.id}`;
     }
     
     window.open(url, '_blank');
@@ -868,7 +865,7 @@ export default function EnhancedPipelinePage() {
 
   const handleOpenCustomer = (customerId: string) => {
     const cleanId = customerId.replace('client-', '');
-    router.push(`/dashboard/clients/${cleanId}`);
+    router.push(`/dashboard/customers/${cleanId}`);
   };
 
   const handleCreateCustomer = () => {
