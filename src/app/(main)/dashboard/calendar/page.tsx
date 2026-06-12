@@ -665,16 +665,11 @@ export default function SchedulePage() {
   const handleEditTask = async () => {
     if (!selectedTask) return;
     
-    if (customAssigneeInput.trim()) saveCustomAssignee(customAssigneeInput);
-    if (customTaskInput.trim()) saveCustomJobTask(customTaskInput);
-    
     try {
       await updateTask(selectedTask.id, selectedTask);
       setShowTaskDialog(false);
       setSelectedTask(null);
       setIsEditingTask(false);
-      setCustomAssigneeInput("");
-      setCustomTaskInput("");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update task");
     }
