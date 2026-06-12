@@ -727,22 +727,12 @@ export default function ChecklistViewPage() {
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
-                        {isEditing ? (
-                          <select
-                            className="w-full rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.door_style || ""}
-                            onChange={(e) => handleInputChange("door_style", e.target.value)}
-                          >
-                            <option value="">Select door style</option>
-                            <option value="vinyl">Vinyl</option>
-                            <option value="slab">Slab</option>
-                            <option value="glazed">Glazed</option>
-                            <option value="shaker">Shaker</option>
-                            <option value="N/A">N/A</option>
-                          </select>
-                        ) : (
-                          <Input value={formData.door_style || ""} readOnly className="bg-white" />
-                        )}
+                        <Input
+                          placeholder="Enter door style"
+                          className="w-full bg-white"
+                          value={formData.door_style}
+                          onChange={(e) => handleInputChange("door_style", e.target.value)}
+                        />
                       </div>
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Door Color</label>
@@ -1250,21 +1240,12 @@ export default function ChecklistViewPage() {
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
-                        {isEditing ? (
-                          <select
-                            className="w-full rounded-md border border-gray-300 bg-white p-2"
-                            value={formData.door_style || ""}
-                            onChange={(e) => handleInputChange("door_style", e.target.value)}
-                          >
-                            <option value="">Select door style</option>
-                            <option value="vinyl">Vinyl</option>
-                            <option value="slab">Slab</option>
-                            <option value="shaker">Shaker</option>
-                            <option value="N/A">N/A</option>
-                          </select>
-                        ) : (
-                          <Input value={formData.door_style || ""} readOnly className="bg-white" />
-                        )}
+                        <Input
+                          placeholder="Enter door style"
+                          className="w-full bg-white"
+                          value={formData.door_style}
+                          onChange={(e) => handleInputChange("door_style", e.target.value)}
+                        />
                       </div>
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Door Color</label>

@@ -648,18 +648,12 @@ export default function KitchenChecklist() {
                     <div className="grid grid-cols-3 gap-4">
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Door Style</label>
-                        <select
-                          className="w-full rounded-md border border-gray-300 bg-white p-2"
+                        <Input
+                          placeholder="Enter door style"
+                          className="w-full bg-white"
                           value={formData.door_style}
                           onChange={(e) => handleInputChange("door_style", e.target.value)}
-                        >
-                          <option value="">Select door style</option>
-                          <option value="vinyl">Vinyl</option>
-                          <option value="slab">Slab</option>
-                          <option value="glazed">Glazed</option>
-                          <option value="shaker">Shaker</option>
-                          <option value="N/A">N/A</option>
-                        </select>
+                        />
                       </div>
                       
                       <div>
