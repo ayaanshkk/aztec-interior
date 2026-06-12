@@ -26,7 +26,7 @@ interface QuoteItem {
   section?: string;
 }
 
-const SECTIONS = ['Furniture', 'Appliances', 'Handles', 'Accessories', 'Fillers and End Panels', 'Fittings'] as const;
+const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Fittings'] as const;
 
 export default function CreateQuotePage() {
   const router = useRouter();
@@ -866,8 +866,8 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">TEL:</td>
                 <td className="border border-black p-0">
                   <Input
-                    value={customerData.phone}
-                    onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="Phone number"
                     className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
                   />
