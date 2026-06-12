@@ -18,6 +18,7 @@ export default function ViewQuotePage() {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [vatPercentage, setVatPercentage] = useState<number>(20);
+  const [globalDiscountPercent, setGlobalDiscountPercent] = useState<number>(0);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', {
@@ -63,6 +64,9 @@ export default function ViewQuotePage() {
         if (data.vat_percentage) {
           setVatPercentage(data.vat_percentage);
         }
+        if (data.global_discount_percent) {
+          setGlobalDiscountPercent(data.global_discount_percent);
+        }
       } else {
         alert("Failed to load quotation");
       }
@@ -98,7 +102,7 @@ export default function ViewQuotePage() {
     );
   }
 
-  const subtotal = items.reduce((sum, item) => {
+  const subtotalBeforeDiscount = items.reduce((sum, item) => {
     const itemTotal = (item.discount_percent && item.discount_percent > 0)
       ? (item.discounted_total || item.discounted_amount || ((item.amount || 0) * (item.quantity || 1)))
       : (item.amount || 0) * (item.quantity || 1);
@@ -111,6 +115,8 @@ export default function ViewQuotePage() {
     }, 0);
     return sum + itemTotal + subTotal;
   }, 0);
+  const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
+  const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
   const vat = subtotal * (vatPercentage / 100);
   const total = subtotal + vat;
 
@@ -225,15 +231,11 @@ export default function ViewQuotePage() {
                       <th className="border border-black px-3 py-2 text-left font-bold">DESCRIPTION</th>
                       <th className="border border-black px-3 py-2 text-left font-bold">COLOUR</th>
                       <th className="border border-black px-3 py-2 text-center font-bold">QTY</th>
-                      <th className="border border-black px-3 py-2 text-right font-bold">PRICE</th>
-                      <th className="border border-black px-3 py-2 text-right font-bold">AMOUNT</th>
-                      <th className="border border-black px-3 py-2 text-center font-bold">DISC %</th>
-                      <th className="border border-black px-3 py-2 text-right font-bold">FINAL</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td colSpan={8} className="border border-black px-3 py-8 text-center text-gray-500">
+                      <td colSpan={4} className="border border-black px-3 py-8 text-center text-gray-500">
                         No items in this quotation
                       </td>
                     </tr>
@@ -257,10 +259,6 @@ export default function ViewQuotePage() {
                           <th className="border border-black px-3 py-2 text-left font-bold">DESCRIPTION</th>
                           <th className="border border-black px-3 py-2 text-left font-bold">COLOUR</th>
                           <th className="border border-black px-3 py-2 text-center font-bold">QTY</th>
-                          <th className="border border-black px-3 py-2 text-right font-bold">PRICE</th>
-                          <th className="border border-black px-3 py-2 text-right font-bold">AMOUNT</th>
-                          <th className="border border-black px-3 py-2 text-center font-bold">DISC %</th>
-                          <th className="border border-black px-3 py-2 text-right font-bold">FINAL</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -269,20 +267,12 @@ export default function ViewQuotePage() {
                           const discountedTotal = item.discounted_total || item.discounted_amount || lineTotal;
                           return (
                             <React.Fragment key={index}>
-                              <tr>
-                                <td className="border border-black px-3 py-2">{item.item || item.item_name || '—'}</td>
-                                <td className="border border-black px-3 py-2">{item.description || '—'}</td>
-                                <td className="border border-black px-3 py-2">{item.color || item.colour || '—'}</td>
-                                <td className="border border-black px-3 py-2 text-center">{item.quantity || 1}</td>
-                                <td className="border border-black px-3 py-2 text-right">{formatCurrency(item.amount || 0)}</td>
-                                <td className="border border-black px-3 py-2 text-right font-semibold">{formatCurrency(lineTotal)}</td>
-                                <td className="border border-black px-3 py-2 text-center">
-                                  {item.discount_percent && item.discount_percent > 0 ? `${item.discount_percent}%` : '—'}
-                                </td>
-                                <td className="border border-black px-3 py-2 text-right font-semibold">
-                                  {item.discount_percent && item.discount_percent > 0 ? formatCurrency(discountedTotal) : formatCurrency(lineTotal)}
-                                </td>
-                              </tr>
+                                <tr>
+                                  <td className="border border-black px-3 py-2">{item.item || item.item_name || '—'}</td>
+                                  <td className="border border-black px-3 py-2">{item.description || '—'}</td>
+                                  <td className="border border-black px-3 py-2">{item.color || item.colour || '—'}</td>
+                                  <td className="border border-black px-3 py-2 text-center">{item.quantity || 1}</td>
+                                </tr>
 
                               {/* SUB-ITEMS */}
                               {(item.subItems || item.sub_items || []).map((sub: any, subIndex: number) => {
@@ -294,14 +284,6 @@ export default function ViewQuotePage() {
                                     <td className="border border-black px-3 py-2 text-sm">{sub.description || '—'}</td>
                                     <td className="border border-black px-3 py-2 text-sm">{sub.color || sub.colour || '—'}</td>
                                     <td className="border border-black px-3 py-2 text-center text-sm">{sub.quantity || 1}</td>
-                                    <td className="border border-black px-3 py-2 text-right text-sm">{formatCurrency(sub.amount || 0)}</td>
-                                    <td className="border border-black px-3 py-2 text-right text-sm font-semibold">{formatCurrency(subLineTotal)}</td>
-                                    <td className="border border-black px-3 py-2 text-center text-sm">
-                                      {sub.discount_percent && sub.discount_percent > 0 ? `${sub.discount_percent}%` : '—'}
-                                    </td>
-                                    <td className="border border-black px-3 py-2 text-right text-sm font-semibold">
-                                      {sub.discount_percent && sub.discount_percent > 0 ? formatCurrency(subDiscountedTotal) : formatCurrency(subLineTotal)}
-                                    </td>
                                   </tr>
                                 );
                               })}
@@ -323,7 +305,13 @@ export default function ViewQuotePage() {
             <tbody>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotal)}</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalBeforeDiscount)}</td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DISCOUNT {globalDiscountPercent > 0 ? `(${globalDiscountPercent}%)` : ''}</td>
+                <td className="border border-black px-3 py-2 text-right text-red-600">
+                  {globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}
+                </td>
               </tr>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">VAT ({vatPercentage}%)</td>
