@@ -422,6 +422,7 @@ export default function EditQuotePage() {
               discount_percent: 0,
               discounted_total: f.price * f.quantity,
               autoFitting: true,
+              section: 'Fittings',
             }));
             return [...newItems, ...newFittingRows];
           });
