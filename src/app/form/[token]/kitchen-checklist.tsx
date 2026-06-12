@@ -387,7 +387,7 @@ export default function KitchenChecklist() {
       formData.integ_fridge_order_date?.trim()
     ) {
       finalAppliances.push({
-        make: `INTG Fridge (QTY: ${formData.integ_fridge_qty || "1"}) - ${formData.integ_fridge_make || "No make specified"}`,
+        make: `INTG Fridge/Freezer (QTY: ${formData.integ_fridge_qty || "1"}) - ${formData.integ_fridge_make || "No make specified"}`,
         model: formData.integ_fridge_model || "No model specified",
         order_date: isClientOwned ? formData.integ_fridge_order_date || "" : "",
       });
@@ -1279,7 +1279,7 @@ export default function KitchenChecklist() {
                         {/* Integrated Units */}
                         <div className="space-y-3 border-t border-yellow-300 pt-3">
                           <div className="rounded border border-yellow-300 bg-white p-3">
-                            <label className="mb-2 block text-sm font-bold text-gray-700">INTG Fridge</label>
+                            <label className="mb-2 block text-sm font-bold text-gray-700">INTG Fridge/Freezer</label>
                             <div className={`grid ${integUnitGridTemplate} gap-3`}>
                               <div>
                                 <label className="mb-1 block text-xs font-bold text-gray-600">QTY</label>
@@ -1317,51 +1317,6 @@ export default function KitchenChecklist() {
                                     className="w-full rounded-md border border-gray-300 p-2"
                                     value={formData.integ_fridge_order_date}
                                     onChange={(e) => handleInputChange("integ_fridge_order_date", e.target.value)}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="rounded border border-yellow-300 bg-white p-3">
-                            <label className="mb-2 block text-sm font-bold text-gray-700">INTG Freezer</label>
-                            <div className={`grid ${integUnitGridTemplate} gap-3`}>
-                              <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">QTY</label>
-                                <Input
-                                  placeholder="QTY"
-                                  type="text"
-                                  className="w-full"
-                                  value={formData.integ_freezer_qty}
-                                  onChange={(e) => handleInputChange("integ_freezer_qty", e.target.value)}
-                                />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
-                                <Input
-                                  placeholder="Make"
-                                  className="w-full"
-                                  value={formData.integ_freezer_make}
-                                  onChange={(e) => handleInputChange("integ_freezer_make", e.target.value)}
-                                />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
-                                <Input
-                                  placeholder="Model"
-                                  className="w-full"
-                                  value={formData.integ_freezer_model}
-                                  onChange={(e) => handleInputChange("integ_freezer_model", e.target.value)}
-                                />
-                              </div>
-                              {showOrderDate && (
-                                <div>
-                                  <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
-                                  <input
-                                    type="date"
-                                    className="w-full rounded-md border border-gray-300 p-2"
-                                    value={formData.integ_freezer_order_date}
-                                    onChange={(e) => handleInputChange("integ_freezer_order_date", e.target.value)}
                                   />
                                 </div>
                               )}
