@@ -1180,7 +1180,7 @@ export default function CustomerDetailsPage() {
     const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
     const api  = `${base}/api/form`;
     switch (doc.type) {
-      case 'quotation':     return `${api}/quotations/${doc.id}/pdf`;
+      case 'quotation':     return `${base}/quotations/${doc.id}/pdf`;
       case 'invoice':       return `${api}/invoices/${doc.id}/pdf`;
       case 'proforma':      return `${api}/proformas/${doc.id}/pdf`;
       case 'payment_terms': return `${api}/payment-terms/${doc.id}/pdf`;
