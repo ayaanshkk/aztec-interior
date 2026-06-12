@@ -395,8 +395,8 @@ export default function CreateInvoicePage() {
             <select value={doorType} onChange={e => setDoorType(e.target.value)}
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="Carcass Only">Carcass Only (No Doors/Drawers)</option>
-              <option value="Basic Slab">Basic Slab</option>
-              <option value="Acrylic Gloss/Matt">Acrylic Gloss/Matt</option>
+              <option value="Basic Slab">Slab</option>
+              <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
               <option value="Vinyl Doors">Vinyl Doors</option>
               <option value="Black Glass">Black Glass</option>
             </select>
