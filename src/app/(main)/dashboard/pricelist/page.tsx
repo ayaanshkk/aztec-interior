@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { 
   Search, 
@@ -264,16 +264,37 @@ export default function PricelistPage() {
 
   const saveEdit = async (code: string) => {
     try {
+      const targetCategory = TAB_TO_CATEGORY[activeTab];
+
       const updates = Object.entries(editForm.prices).map(([doorType, data]: [string, any]) => {
-        if (data.pricelist_id) {
+        const priceValue = data?.price;
+        const hasPrice = priceValue !== '' && priceValue !== null && priceValue !== undefined;
+
+        if (data?.pricelist_id) {
+          // Existing row — update (even if price is now blank, set to 0)
           // @ts-ignore
           return api.updatePricelistItem(data.pricelist_id, {
             item_code: editForm.item_code,
             item_name: editForm.item_name,
-            base_price: parseFloat(data.price) || 0,
+            base_price: hasPrice ? parseFloat(priceValue) : 0,
             width: parseInt(editForm.width) || null,
             height: parseInt(editForm.height) || null,
             depth: parseInt(editForm.depth) || null,
+          });
+        } else if (hasPrice && parseFloat(priceValue) > 0) {
+          // No existing row for this door type — create new one
+          // @ts-ignore
+          return api.createPricelistItem({
+            category: targetCategory,
+            item_code: editForm.item_code,
+            item_name: editForm.item_name,
+            description: `${editForm.item_name} - ${doorType}`,
+            base_price: parseFloat(priceValue),
+            door_type: doorType,
+            width: parseInt(editForm.width) || null,
+            height: parseInt(editForm.height) || null,
+            depth: parseInt(editForm.depth) || null,
+            unit: 'each',
           });
         }
         return null;
@@ -564,7 +585,7 @@ export default function PricelistPage() {
                                     className="w-24 px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
                                   />
                                 </td>
-                                
+
                                 <td className="px-4 py-3">
                                   <input
                                     type="text"
@@ -694,14 +715,14 @@ export default function PricelistPage() {
                               {activeTab === 'Appliances' ? (
                                 <>
                                   {['Low', 'Mid', 'High'].map((level) => (
-                                    <>
-                                      <td key={`${level}-model`} className="px-4 py-3 whitespace-nowrap">
+                                    <React.Fragment key={level}>
+                                      <td className="px-4 py-3 whitespace-nowrap">
                                         <input type="text" value={editForm.prices?.[level]?.model || ''} className="w-28 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50" disabled />
                                       </td>
-                                      <td key={`${level}-series`} className="px-4 py-3 whitespace-nowrap">
+                                      <td className="px-4 py-3 whitespace-nowrap">
                                         <input type="text" value={editForm.prices?.[level]?.series || ''} className="w-12 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50" disabled />
                                       </td>
-                                      <td key={`${level}-price`} className="px-4 py-3 whitespace-nowrap">
+                                      <td className="px-4 py-3 whitespace-nowrap">
                                         {editForm.prices?.[level] ? (
                                           <input
                                             type="number"
@@ -715,26 +736,26 @@ export default function PricelistPage() {
                                           />
                                         ) : <span className="text-gray-400">-</span>}
                                       </td>
-                                    </>
+                                    </React.Fragment>
                                   ))}
                                 </>
                               ) : (
                                 doorTypes.map(doorType => (
                                   <td key={doorType} className="px-4 py-3 whitespace-nowrap">
-                                    {editForm.prices[doorType] ? (
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        value={editForm.prices[doorType].price}
-                                        onChange={(e) => setEditForm({
-                                          ...editForm,
-                                          prices: { ...editForm.prices, [doorType]: { ...editForm.prices[doorType], price: e.target.value } }
-                                        })}
-                                        className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
-                                      />
-                                    ) : (
-                                      <span className="text-gray-400 text-sm">-</span>
-                                    )}
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={editForm.prices[doorType]?.price ?? ''}
+                                      onChange={(e) => setEditForm({
+                                        ...editForm,
+                                        prices: {
+                                          ...editForm.prices,
+                                          [doorType]: { ...editForm.prices[doorType], price: e.target.value }
+                                        }
+                                      })}
+                                      placeholder="-"
+                                      className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                    />
                                   </td>
                                 ))
                               )}
@@ -772,11 +793,11 @@ export default function PricelistPage() {
                               {activeTab === 'Appliances' ? (
                                 <>
                                   {['Low', 'Mid', 'High'].map((level) => (
-                                    <>
-                                      <td key={`${level}-model`} className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{item.prices[level]?.model || <span className="text-gray-400">-</span>}</td>
-                                      <td key={`${level}-series`} className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{item.prices[level]?.series || <span className="text-gray-400">-</span>}</td>
-                                      <td key={`${level}-price`} className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.prices[level] ? `£${item.prices[level].price?.toFixed(2) || '0.00'}` : <span className="text-gray-400">-</span>}</td>
-                                    </>
+                                    <React.Fragment key={level}>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{item.prices[level]?.model || <span className="text-gray-400">-</span>}</td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{item.prices[level]?.series || <span className="text-gray-400">-</span>}</td>
+                                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{item.prices[level] ? `£${item.prices[level].price?.toFixed(2) || '0.00'}` : <span className="text-gray-400">-</span>}</td>
+                                    </React.Fragment>
                                   ))}
                                 </>
                               ) : (
