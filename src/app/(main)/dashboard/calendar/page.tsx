@@ -298,44 +298,6 @@ export default function SchedulePage() {
     return tasks.filter((a) => a.user_id === user?.id && a.status === "Declined");
   }, [tasks, user]);
 
-  useEffect(() => {
-    const savedAssignees = localStorage.getItem('custom_assignees');
-    const savedJobTasks = localStorage.getItem('custom_job_tasks');
-    
-    if (savedAssignees) {
-      try {
-        setCustomAssignees(JSON.parse(savedAssignees));
-      } catch (e) {
-        console.error('Failed to parse custom assignees:', e);
-      }
-    }
-    if (savedJobTasks) {
-      try {
-        setCustomJobTasks(JSON.parse(savedJobTasks));
-      } catch (e) {
-        console.error('Failed to parse custom job tasks:', e);
-      }
-    }
-  }, []);
-
-  const saveCustomAssignee = (name: string) => {
-    const trimmedName = name.trim();
-    if (trimmedName && !customAssignees.includes(trimmedName)) {
-      const updated = [...customAssignees, trimmedName];
-      setCustomAssignees(updated);
-      localStorage.setItem('custom_assignees', JSON.stringify(updated));
-    }
-  };
-
-  const saveCustomJobTask = (task: string) => {
-    const trimmedTask = task.trim();
-    if (trimmedTask && !customJobTasks.includes(trimmedTask) && !interiorDesignJobTypes.includes(trimmedTask)) {
-      const updated = [...customJobTasks, trimmedTask];
-      setCustomJobTasks(updated);
-      localStorage.setItem('custom_job_tasks', JSON.stringify(updated));
-    }
-  };
-
   const formatHeaderDate = (date: Date, view: "month" | "week" | "year") => {
     if (view === "year") {
       return date.getFullYear().toString();
