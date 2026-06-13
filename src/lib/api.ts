@@ -673,6 +673,7 @@ export const api = {
     height?: number | null;
     depth?: number | null;
     brand?: string;
+    colour?: string;
   }) {
     const response = await fetchWithAuth("/pricelist", {
       method: "POST",
