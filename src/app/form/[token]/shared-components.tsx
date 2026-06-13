@@ -151,9 +151,6 @@ export function OrderMaterialsDialog({
         if (data.integ_fridge_make || data.integ_fridge_model) {
           items.push(`INTG Fridge/Freezer (Qty: ${data.integ_fridge_qty || '1'}): ${data.integ_fridge_make} ${data.integ_fridge_model}`.trim());
         }
-        if (data.integ_freezer_make || data.integ_freezer_model) {
-          items.push(`INTG Freezer (Qty: ${data.integ_freezer_qty || '1'}): ${data.integ_freezer_make} ${data.integ_freezer_model}`.trim());
-        }
         if (data.sink_details) items.push(`Sink: ${data.sink_details} (Model: ${data.sink_model || 'N/A'})`);
         if (data.tap_details) items.push(`Tap: ${data.tap_details} (Model: ${data.tap_model || 'N/A'})`);
         break;

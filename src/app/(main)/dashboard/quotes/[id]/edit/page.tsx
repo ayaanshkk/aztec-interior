@@ -28,8 +28,8 @@ interface QuoteItem {
   section?: string;
 }
 
-const SECTIONS = ['Furniture', 'Appliances', 'Handles', 'Accessories', 'Fillers and End Panels', 'Fittings'] as const;
- 
+const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Fittings', 'Sink and Tap', 'Worktops'] as const;
+
 export default function EditQuotePage() {
   const params = useParams();
   const router = useRouter();

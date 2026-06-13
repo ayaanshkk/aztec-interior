@@ -17,7 +17,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-type Category = 'Kitchen' | 'Bedrooms' | 'Appliances' | 'Fillers & End Panels' | 'Accessories' | 'Handles' | 'Fittings';
+type Category = 'Kitchen' | 'Bedrooms' | 'Appliances' | 'Fillers & End Panels' | 'Accessories' | 'Handles' | 'Fittings' | 'Sink and Tap' | 'Worktops';
 type DoorType = 'Carcass Only' | 'Basic Slab' | 'Acrylic Gloss/Matt' | 'Vinyl Doors' | 'Black Glass' | 'Base Cabinet Only' | 'Standard' | 'Timber';
 type ApplianceSeries = 'Low' | 'Mid' | 'High';
 
@@ -33,6 +33,7 @@ interface PricelistItem {
   depth: number;
   category: string;
   brand?: string;
+  colour?: string;
 }
 
 interface GroupedItem {
@@ -133,6 +134,14 @@ export default function PricelistPage() {
       } else if (activeTab === 'Fittings') {
         filteredItems = filteredItems.filter((item: PricelistItem) =>
           item.category === 'Fittings'
+        );
+      } else if (activeTab === 'Sink and Tap') {
+        filteredItems = filteredItems.filter((item: PricelistItem) =>
+          item.category === 'Sink and Tap'
+        );
+      } else if (activeTab === 'Worktops') {
+        filteredItems = filteredItems.filter((item: PricelistItem) =>
+          item.category === 'Worktops'
         );
       } else {
         filteredItems = filteredItems.filter((item: PricelistItem) =>
@@ -247,9 +256,12 @@ export default function PricelistPage() {
 
   const startEdit = (item: GroupedItem) => {
     setEditingCode(item.item_code);
+    const rawItem = pricelistItems.find(i => i.item_code === item.item_code);
     setEditForm({
       item_code: item.item_code,
       item_name: item.item_name,
+      description: rawItem?.description || '',
+      colour: (rawItem as any)?.colour || '',
       width: item.width,
       height: item.height,
       depth: item.depth,
@@ -276,6 +288,8 @@ export default function PricelistPage() {
           return api.updatePricelistItem(data.pricelist_id, {
             item_code: editForm.item_code,
             item_name: editForm.item_name,
+            description: editForm.description,
+            colour: editForm.colour,
             base_price: hasPrice ? parseFloat(priceValue) : 0,
             width: parseInt(editForm.width) || null,
             height: parseInt(editForm.height) || null,
@@ -361,6 +375,8 @@ export default function PricelistPage() {
     'Accessories': 'Accessories',
     'Handles': 'Handles',
     'Fittings': 'Fittings',
+    'Sink and Tap': 'Sink and Tap',
+    'Worktops': 'Worktops',
   };
 
   const handleAddItem = async () => {
@@ -393,20 +409,24 @@ export default function PricelistPage() {
           unit: 'each'
         });
 
-      } else if (activeTab === 'Fittings') {
-        if (!newItemForm.base_price || !newItemForm.subcategory) {
-          alert('Please fill in subcategory and price');
+      } else if (activeTab === 'Sink and Tap' || activeTab === 'Worktops') {
+        if (!newItemForm.base_price) {
+          alert('Please enter a price');
           return;
         }
 
         // @ts-ignore
         await api.createPricelistItem({
-          category: 'Fittings',
+          category: activeTab,
           item_code: newItemForm.item_code,
           item_name: newItemForm.item_name,
-          description: newItemForm.subcategory,
+          description: newItemForm.description || newItemForm.item_name,
+          colour: activeTab === 'Worktops' ? (newItemForm.colour || '') : undefined,
           base_price: parseFloat(newItemForm.base_price),
           door_type: 'Standard',
+          width: newItemForm.width ? parseInt(newItemForm.width) : null,
+          height: newItemForm.height ? parseInt(newItemForm.height) : null,
+          depth: newItemForm.depth ? parseInt(newItemForm.depth) : null,
           unit: 'each'
         });
 
@@ -478,7 +498,7 @@ export default function PricelistPage() {
 
           {/* Tabs */}
           <div className="flex flex-wrap items-center gap-3 mb-4">
-            {(['Kitchen', 'Bedrooms', 'Appliances', 'Handles', 'Accessories', 'Fillers & End Panels', 'Fittings'] as Category[]).map(tab => (
+            {(['Kitchen', 'Bedrooms', 'Appliances', 'Handles', 'Accessories', 'Fillers & End Panels', 'Fittings', 'Sink and Tap', 'Worktops'] as Category[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -589,8 +609,8 @@ export default function PricelistPage() {
                                 <td className="px-4 py-3">
                                   <input
                                     type="text"
-                                    value={editForm.item_name}
-                                    onChange={(e) => setEditForm({ ...editForm, item_name: e.target.value })}
+                                    value={editForm.description}
+                                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value, item_name: e.target.value })}
                                     className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
                                   />
                                 </td>
@@ -624,6 +644,112 @@ export default function PricelistPage() {
                                 <td className="px-4 py-3 text-sm text-gray-500">{rawItem?.description || '-'}</td>
                                 <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
                                   {priceData ? `£${priceData.price.toFixed(2)}` : '-'}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button onClick={() => startEdit(item)} className="text-gray-900 hover:text-gray-700"><Edit2 className="w-5 h-5" /></button>
+                                    <button onClick={() => handleDelete(item)} className="text-gray-900 hover:text-gray-700"><Trash2 className="w-5 h-5" /></button>
+                                  </div>
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                ) : activeTab === 'Sink and Tap' || activeTab === 'Worktops' ? (
+
+                  /* ── SINK AND TAP / WORKTOPS TABLE ── */
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-2/5">Description</th>
+                        {activeTab === 'Worktops' && (
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Colour</th>
+                        )}
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Price</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider pl-20 w-40">Dimensions</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {paginatedItems.map((item) => {
+                        const priceData = item.prices['Standard'];
+                        const rawItem = pricelistItems.find(i => i.item_code === item.item_code);
+                        return (
+                          <tr key={item.item_code} className="hover:bg-gray-50">
+                            {editingCode === item.item_code ? (
+                              <>
+                                <td className="px-4 py-3">
+                                  <input
+                                    type="text"
+                                    value={editForm.item_code}
+                                    onChange={(e) => setEditForm({ ...editForm, item_code: e.target.value.toUpperCase() })}
+                                    className="w-24 px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                  />
+                                </td>
+                                <td className="px-4 py-3 w-2/5">
+                                  <input
+                                    type="text"
+                                    value={editForm.description}
+                                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value, item_name: e.target.value })}
+                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                  />
+                                </td>
+                                {activeTab === 'Worktops' && (
+                                  <td className="px-4 py-3 w-32">
+                                    <input
+                                      type="text"
+                                      value={editForm.colour || ''}
+                                      onChange={(e) => setEditForm({ ...editForm, colour: e.target.value })}
+                                      className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                    />
+                                  </td>
+                                )}
+                                <td className="px-4 py-3 text-right w-24">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={editForm.prices?.['Standard']?.price ?? ''}
+                                    onChange={(e) => setEditForm({
+                                      ...editForm,
+                                      prices: {
+                                        ...editForm.prices,
+                                        Standard: { ...editForm.prices?.['Standard'], price: e.target.value }
+                                      }
+                                    })}
+                                    className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                  />
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap pl-20 w-40">
+                                  <div className="flex gap-1">
+                                    <input type="number" value={editForm.width || ''} onChange={(e) => setEditForm({ ...editForm, width: e.target.value })} placeholder="W" className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900" />
+                                    <input type="number" value={editForm.height || ''} onChange={(e) => setEditForm({ ...editForm, height: e.target.value })} placeholder="H" className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900" />
+                                    <input type="number" value={editForm.depth || ''} onChange={(e) => setEditForm({ ...editForm, depth: e.target.value })} placeholder="D" className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900" />
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button onClick={() => saveEdit(item.item_code)} className="text-gray-900 hover:text-gray-700"><Save className="w-5 h-5" /></button>
+                                    <button onClick={cancelEdit} className="text-gray-600 hover:text-gray-900"><X className="w-5 h-5" /></button>
+                                  </div>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-4 py-3 text-sm font-mono font-medium text-gray-900">{item.item_code}</td>
+                                <td className="px-4 py-3 text-sm text-gray-700 w-2/5">{rawItem?.description || item.item_name || '-'}</td>
+                                {activeTab === 'Worktops' && (
+                                  <td className="px-4 py-3 text-sm text-gray-700 w-32">{(rawItem as any)?.colour || '-'}</td>
+                                )}
+                                <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right w-24">
+                                  {priceData ? `£${priceData.price?.toFixed(2) || '0.00'}` : '-'}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-700 pl-20 w-40">
+                                  {item.width && item.height && item.depth ? `${item.width}×${item.height}×${item.depth}` : '-'}
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   <div className="flex items-center justify-end gap-2">
@@ -984,8 +1110,63 @@ export default function PricelistPage() {
                 </>
               )}
 
+              {/* Sink and Tap specific fields */}
+              {(activeTab === 'Sink and Tap' || activeTab === 'Worktops') && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <input
+                      type="text"
+                      value={newItemForm.description || ''}
+                      onChange={(e) => setNewItemForm({ ...newItemForm, description: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                      placeholder={activeTab === 'Worktops' ? 'e.g., 40mm Laminate Worktop' : 'e.g., 1.5 Bowl Stainless Steel Sink'}
+                    />
+                  </div>
+
+                  {activeTab === 'Worktops' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Colour</label>
+                      <input
+                        type="text"
+                        value={newItemForm.colour || ''}
+                        onChange={(e) => setNewItemForm({ ...newItemForm, colour: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                        placeholder="e.g., H1180 Calacatta Marble"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Price (£) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newItemForm.base_price || ''}
+                      onChange={(e) => setNewItemForm({ ...newItemForm, base_price: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Width (mm)</label>
+                      <input type="number" value={newItemForm.width || ''} onChange={(e) => setNewItemForm({ ...newItemForm, width: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Height (mm)</label>
+                      <input type="number" value={newItemForm.height || ''} onChange={(e) => setNewItemForm({ ...newItemForm, height: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Depth (mm)</label>
+                      <input type="number" value={newItemForm.depth || ''} onChange={(e) => setNewItemForm({ ...newItemForm, depth: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900" />
+                    </div>
+                  </div>
+                </>
+              )}
+
               {/* Door type prices for Kitchen/Bedrooms/etc */}
-              {activeTab !== 'Appliances' && activeTab !== 'Fittings' && (
+              {activeTab !== 'Appliances' && activeTab !== 'Fittings' && activeTab !== 'Sink and Tap' && activeTab !== 'Worktops' && (
                 <div className="border-t pt-4">
                   <h3 className="text-sm font-medium text-gray-900 mb-3">Prices by Door Type</h3>
                   <p className="text-xs text-gray-500 mb-4">
@@ -1021,7 +1202,7 @@ export default function PricelistPage() {
               )}
 
               {/* Dimensions for Kitchen/Bedrooms/etc */}
-              {activeTab !== 'Appliances' && activeTab !== 'Fittings' && (
+              {activeTab !== 'Appliances' && activeTab !== 'Fittings' && activeTab !== 'Sink and Tap' && activeTab !== 'Worktops' && (
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Width (mm)</label>
