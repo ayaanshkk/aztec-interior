@@ -591,8 +591,8 @@ export default function BedroomChecklist() {
                           onChange={(e) => handleInputChange("door_type", e.target.value)}
                         >
                           <option value="">Select door type</option>
-                          <option value="Basic Slab">Basic slab frnt door (2250 H) / drawer</option>
-                          <option value="Acrylic Gloss/Matt">Acrylic gloss/Matt</option>
+                          <option value="Basic Slab">Slab</option>
+                          <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
                           <option value="Vinyl">Vinyl doors</option>
                           <option value="Black Glass">Black Glass</option>
                         </select>
@@ -717,8 +717,8 @@ export default function BedroomChecklist() {
                                 onChange={(e) => handleAdditionalDoorChange(idx, "door_type", e.target.value)}
                               >
                                 <option value="">Select type</option>
-                                <option value="Basic Slab">Basic slab frnt door</option>
-                                <option value="Acrylic Gloss/Matt">Acrylic gloss/Matt</option>
+                                <option value="Basic Slab">Slab</option>
+                                <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
                                 <option value="Vinyl">Vinyl doors</option>
                                 <option value="Black Glass">Black Glass</option>
                               </select>

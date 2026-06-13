@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 type Category = 'Kitchen' | 'Bedrooms' | 'Appliances' | 'Fillers & End Panels' | 'Accessories' | 'Handles' | 'Fittings';
-type DoorType = 'Carcass Only' | 'Basic Slab' | 'Acrylic Gloss/Matt' | 'Vinyl Doors' | 'Black Glass' | 'Base Cabinet Only' | 'Standard';
+type DoorType = 'Carcass Only' | 'Basic Slab' | 'Acrylic Gloss/Matt' | 'Vinyl Doors' | 'Black Glass' | 'Base Cabinet Only' | 'Standard' | 'Timber';
 type ApplianceSeries = 'Low' | 'Mid' | 'High';
 
 interface PricelistItem {
@@ -82,7 +82,7 @@ export default function PricelistPage() {
 
   // Door types based on active tab
   const doorTypes: DoorType[] = activeTab === 'Kitchen'
-    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass']
+    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Timber']
     : activeTab === 'Bedrooms'
     ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Base Cabinet Only']
     : activeTab === 'Fillers & End Panels'
@@ -668,7 +668,10 @@ export default function PricelistPage() {
                         ) : (
                           doorTypes.map(doorType => (
                             <th key={doorType} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                              {doorType === 'Carcass Only' ? 'Carcass' : doorType}
+                              {doorType === 'Carcass Only' ? 'Carcass'
+                                : doorType === 'Basic Slab' ? 'Slab'
+                                : doorType === 'Acrylic Gloss/Matt' ? 'Lacquered Slab'
+                                : doorType}
                             </th>
                           ))
                         )}
@@ -992,7 +995,10 @@ export default function PricelistPage() {
                     {doorTypes.map(doorType => (
                       <div key={doorType} className="flex items-center gap-3">
                         <label className={`w-48 text-sm ${doorType === 'Carcass Only' ? 'font-semibold text-blue-900' : 'text-gray-700'}`}>
-                          {doorType === 'Carcass Only' ? '🏗️ ' + doorType : doorType}
+                          {doorType === 'Carcass Only' ? '🏗️ ' + doorType
+                            : doorType === 'Basic Slab' ? 'Slab'
+                            : doorType === 'Acrylic Gloss/Matt' ? 'Lacquered Slab'
+                            : doorType}
                         </label>
                         <div className="flex-1 relative">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">£</span>
