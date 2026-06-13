@@ -51,8 +51,9 @@ export default function EditQuotePage() {
   const [roomType, setRoomType] = useState<string>('Kitchen');
   
   const [vatPercentage, setVatPercentage] = useState<number>(20);
-  const [carcassColour, setCarcassColour] = useState<string>('');
-  const [doorColour, setDoorColour] = useState<string>('');
+  const [carcassColour, setCarcassColour] = useState('');
+  const [doorColour, setDoorColour] = useState('');
+  const [panelworkColour, setPanelworkColour] = useState('');
   const [doorStyle, setDoorStyle] = useState<string>('');
   
   // Customer form data
@@ -269,6 +270,7 @@ export default function EditQuotePage() {
         if (data.room_type) setRoomType(data.room_type);
         setCarcassColour(data.carcass_colour || '');
         setDoorColour(data.door_colour || '');
+        setPanelworkColour(data.panelwork_colour || '');
         setDoorStyle(data.door_style || '');
       } else {
         alert("Failed to load quotation");
@@ -658,6 +660,7 @@ export default function EditQuotePage() {
           room_type: roomType,
           carcass_colour: carcassColour,
           door_colour: doorColour,
+          panelwork_colour: panelworkColour,
           door_style: doorStyle,
           items: items
             .filter(item => {
@@ -955,7 +958,8 @@ export default function EditQuotePage() {
               <option value="Carcass Only">Carcass Only (No Doors/Drawers)</option>
               <option value="Basic Slab">Slab</option>
               <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
-              <option value="Vinyl Doors">Vinyl Doors</option>
+              <option value="Timber">Timber</option>
+              <option value="Vinyl">Vinyl</option>
               <option value="Black Glass">Black Glass</option>
             </select>
           </div>
@@ -1060,6 +1064,17 @@ export default function EditQuotePage() {
                     value={doorColour}
                     onChange={(e) => setDoorColour(e.target.value)}
                     placeholder="Door colour"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">PANELWORK COLOUR:</td>
+                <td className="border border-black p-0">
+                  <Input
+                    value={panelworkColour}
+                    onChange={(e) => setPanelworkColour(e.target.value)}
+                    placeholder="Panelwork colour"
                     className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
                   />
                 </td>

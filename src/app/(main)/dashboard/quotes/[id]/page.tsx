@@ -217,6 +217,10 @@ export default function ViewQuotePage() {
                 <td className="border border-black px-3 py-2">{quotation.door_colour || '—'}</td>
               </tr>
               <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">PANELWORK COLOUR:</td>
+                <td className="border border-black px-3 py-2">{quotation.panelwork_colour || '—'}</td>
+              </tr>
+              <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR STYLE:</td>
                 <td className="border border-black px-3 py-2">{quotation.door_style || '—'}</td>
               </tr>

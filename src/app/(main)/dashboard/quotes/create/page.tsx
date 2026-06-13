@@ -68,8 +68,9 @@ export default function CreateQuotePage() {
   const [doorType, setDoorType] = useState<string>('Carcass Only');
   const [roomType, setRoomType] = useState<string>('Kitchen');
   const [vatPercentage, setVatPercentage] = useState<number>(20);
-  const [carcassColour, setCarcassColour] = useState<string>('');
-  const [doorColour, setDoorColour] = useState<string>('');
+  const [carcassColour, setCarcassColour] = useState('');
+  const [doorColour, setDoorColour] = useState('');
+  const [panelworkColour, setPanelworkColour] = useState('');
   const [doorStyle, setDoorStyle] = useState<string>('');
 
   const formatCurrency = (value: number) => {
@@ -520,7 +521,8 @@ export default function CreateQuotePage() {
           door_type: doorType,
           room_type: roomType,
           carcass_colour: carcassColour,
-          door_colour: doorColour,
+        door_colour: doorColour,
+        panelwork_colour: panelworkColour,
           door_style: doorStyle,
           items: items
             .filter(item => {
@@ -808,7 +810,8 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
               <option value="Carcass Only">Carcass Only (No Doors/Drawers)</option>
               <option value="Basic Slab">Slab</option>
               <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
-              <option value="Vinyl Doors">Vinyl Doors</option>
+              <option value="Timber">Timber</option>
+              <option value="Vinyl">Vinyl</option>
               <option value="Black Glass">Black Glass</option>
             </select>
           </div>
@@ -897,6 +900,17 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                 </td>
               </tr>
               <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">PANELWORK COLOUR:</td>
+                <td className="border border-black p-0">
+                  <Input
+                    value={panelworkColour}
+                    onChange={(e) => setPanelworkColour(e.target.value)}
+                    placeholder="Panelwork colour"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                  />
+                </td>
+              </tr>
+              <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR STYLE:</td>
                 <td className="border border-black p-0">
                   <Input
@@ -918,9 +932,11 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
 
             return (
               <div key={section} className="mb-6">
-                <div className="mb-3">
-                  <h3 className="text-lg font-bold">{section}</h3>
-                </div>
+                {sectionItems.length > 0 && (
+                  <div className="mb-3">
+                    <h3 className="text-lg font-bold">{section}</h3>
+                  </div>
+                )}
 
                 {sectionItems.length > 0 && (
                   <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
@@ -1080,16 +1096,19 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                   </table>
                 )}
 
-                <div className="mt-3 flex justify-start">
-                  <Button onClick={() => handleAddItem(section)} size="sm" variant="outline">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Item
-                  </Button>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+
+            <div className="flex flex-wrap gap-2">
+              {SECTIONS.map((section) => (
+                <Button key={section} onClick={() => handleAddItem(section)} size="sm" variant="outline">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Item to {section}
+                </Button>
+              ))}
+            </div>
+          </div>
 
         {/* Totals */}
         <div className="mb-6 flex justify-end">
