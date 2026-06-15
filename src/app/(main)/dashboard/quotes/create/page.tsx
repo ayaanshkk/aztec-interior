@@ -256,7 +256,7 @@ export default function CreateQuotePage() {
       }
       // ── END FITTING EXPANSION ────────────────────────────────────────
 
-      if (trimmedValue.includes(' ') || trimmedValue.length > 20) return;
+      if (trimmedValue.length > 50) return;
 
       setAutoFilling(id);
       try {
@@ -652,7 +652,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
 
     if (!value || value.trim().length < 1) return;
     const trimmedValue = value.trim().toUpperCase();
-    if (trimmedValue.includes(' ') || trimmedValue.length > 20) return;
+    if (trimmedValue.length > 50) return;
 
     try {
       const token = localStorage.getItem("token");

@@ -446,7 +446,7 @@ export default function EditQuotePage() {
       }
       // ── END FITTING EXPANSION ──────────────────────────────────────
 
-      if (trimmedValue.includes(' ') || trimmedValue.length > 20) return;
+      if (trimmedValue.length > 50) return;
 
       console.log(`🔍 Item code auto-fill: "${trimmedValue}"`);
       setAutoFilling(index);
@@ -812,7 +812,7 @@ export default function EditQuotePage() {
 
     if (!value || value.trim().length < 1) return;
     const trimmedValue = value.trim().toUpperCase();
-    if (trimmedValue.includes(' ') || trimmedValue.length > 20) return;
+    if (trimmedValue.length > 50) return;
 
     try {
       const token = localStorage.getItem("token");
