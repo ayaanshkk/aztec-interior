@@ -18,6 +18,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { fetchWithAuth } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 import {
   leadsChartConfig,
@@ -46,6 +47,7 @@ interface ActionItem {
 }
 
 export function OverviewCards() {
+  const { user } = useAuth();
   const [newLeadsCount, setNewLeadsCount] = useState(0);
   const [leadsChartData, setLeadsChartData] = useState<any[]>([]);
   const [pipelineData, setPipelineData] = useState<any[]>([]);
@@ -53,41 +55,24 @@ export function OverviewCards() {
   
   const [loadingPipeline, setLoadingPipeline] = useState(true);
   const [loadingActions, setLoadingActions] = useState(true);
-  const [userRole, setUserRole] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  // Get user role ONCE
-  useEffect(() => {
-    const role = localStorage.getItem("user_role");
-    console.log("👤 User role:", role);
-    setUserRole(role);
-  }, []);
+  const userRole = user?.role || null;
 
   // Fetch pipeline data (New Leads + Sales Pipeline)
   useEffect(() => {
     const fetchPipelineData = async (showLoading = true) => {
       try {
-        if (showLoading) {
-          setLoadingPipeline(true);
-        }
-        console.log("🔄 Fetching pipeline data...");
+        if (showLoading) setLoadingPipeline(true);
         
         const pipelineRes = await fetchWithAuth("pipeline");
-        
-        if (!pipelineRes.ok) {
-          throw new Error(`Pipeline API error: ${pipelineRes.status}`);
-        }
+        if (!pipelineRes.ok) throw new Error(`Pipeline API error: ${pipelineRes.status}`);
         
         const pipelineItems: PipelineItem[] = await pipelineRes.json();
-        console.log("✅ Pipeline data loaded:", pipelineItems.length, "items");
 
         const clients = pipelineItems.filter(item => item.type === 'client');
-        console.log("📊 Found", clients.length, "clients");
 
-        // --- Monthly breakdown: last 6 months ---
         const monthlyData: Record<string, { newLeads: number; disqualified: number }> = {};
 
-        // Build last 6 months as ordered keys
         for (let i = 5; i >= 0; i--) {
           const d = new Date();
           d.setDate(1);
@@ -96,7 +81,6 @@ export function OverviewCards() {
           monthlyData[key] = { newLeads: 0, disqualified: 0 };
         }
 
-        // Bucket each client into their month
         clients.forEach(item => {
           const dateStr = (item.customer as any).visit_date || item.customer.created_at;
           if (!dateStr) return;
@@ -116,27 +100,20 @@ export function OverviewCards() {
           ...counts,
         }));
 
-        console.log("📊 Monthly chart data:", chartData);
         setLeadsChartData(chartData);
 
-        // Count leads for current month only (for footer)
         const currentMonthKey = new Date().toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
         const currentMonthData = monthlyData[currentMonthKey] || { newLeads: 0 };
         setNewLeadsCount(currentMonthData.newLeads);
 
-        // Process Sales Pipeline funnel
         const stageCounts: Record<string, number> = {
           Lead: 0, Quote: 0, Accepted: 0, Production: 0, Complete: 0,
         };
 
         pipelineItems.forEach((item) => {
           const stage = item.stage || 'Lead';
-          if (stage in stageCounts) {
-            stageCounts[stage]++;
-          }
+          if (stage in stageCounts) stageCounts[stage]++;
         });
-
-        console.log("📊 Stage counts:", stageCounts);
 
         setPipelineData([
           { stage: "Lead", value: stageCounts['Lead'], fill: "var(--color-lead)" },
@@ -145,140 +122,54 @@ export function OverviewCards() {
           { stage: "Production", value: stageCounts['Production'], fill: "var(--color-production)" },
           { stage: "Complete", value: stageCounts['Complete'], fill: "var(--color-complete)" },
         ]);
-
-        console.log("✅ Pipeline processing complete");
         
       } catch (error) {
         console.error("❌ Error fetching pipeline data:", error);
       } finally {
-        if (showLoading) {
-          setLoadingPipeline(false);
-        }
+        if (showLoading) setLoadingPipeline(false);
       }
     };
 
-    // Initial load with spinner
     fetchPipelineData(true);
-    
-    // Background refresh every 60 seconds WITHOUT spinner
     const interval = setInterval(() => fetchPipelineData(false), 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch Action Items SEPARATELY + Create for existing Accepted customers
+  // Fetch Action Items
   useEffect(() => {
-    const fetchActionItems = async (showLoading = true) => {
-      if (!["Platform Admin", "Salesperson", "Production Team"].includes(userRole || "")) {
-        setLoadingActions(false);
-        return;
-      }
-
-      try {
-        if (showLoading) {
-          setLoadingActions(true);
-        }
-        console.log("🔄 Fetching action items...");
-        
-        const actionsRes = await fetchWithAuth("action-items");
-        
-        if (actionsRes.ok) {
-          const actionsData: ActionItem[] = await actionsRes.json();
-          console.log("✅ Action items loaded:", actionsData.length);
-          setActionItems(actionsData);
-
-          if (actionsData.length === 0 && showLoading) {
-            console.log("📋 No action items found, checking for Accepted customers...");
-            await createMissingActionItems();
-          }
-        } else {
-          console.warn("⚠️ Action items API returned:", actionsRes.status);
-          if (showLoading) {
-            await createMissingActionItems();
-          }
-        }
-      } catch (error) {
-        console.error("❌ Error fetching action items:", error);
-        if (showLoading) {
-          await createMissingActionItems();
-        }
-      } finally {
-        if (showLoading) {
-          setLoadingActions(false);
-        }
-      }
-    };
-
     const createMissingActionItems = async () => {
       try {
-        console.log("🔄 Checking for customers in Accepted stage...");
-        
         const pipelineRes = await fetchWithAuth("pipeline");
-        if (!pipelineRes.ok) {
-          console.error("❌ Pipeline request failed:", pipelineRes.status);
-          return;
-        }
+        if (!pipelineRes.ok) return;
         
         const pipelineItems: PipelineItem[] = await pipelineRes.json();
-        console.log("📊 Total pipeline items:", pipelineItems.length);
-        
         const acceptedItems = pipelineItems.filter(
           item => (item.type === 'client' || item.type === 'project') && item.stage === 'Accepted'
         );
-                
-        console.log(`📋 Found ${acceptedItems.length} items in Accepted stage`);
         
-        if (acceptedItems.length === 0) {
-          console.log("ℹ️ No items in Accepted stage");
-          return;
-        }
+        if (acceptedItems.length === 0) return;
         
         const existingRes = await fetchWithAuth("action-items");
         const existingActionItems: ActionItem[] = existingRes.ok ? await existingRes.json() : [];
         const existingCustomerIds = new Set(existingActionItems.map(item => item.customer_id));
         
-        console.log(`📌 Existing action items for ${existingCustomerIds.size} customers`);
-        
         let createdCount = 0;
         for (const item of acceptedItems) {
           const customerId = String(item.customer.id);
+          if (existingCustomerIds.has(customerId)) continue;
           
-          if (existingCustomerIds.has(customerId)) {
-            console.log(`⏭️ Skipping ${item.customer.name} - action item already exists`);
-            continue;
-          }
-          
-          try {
-            console.log(`🔄 Creating action item for: ${item.customer.name}`);
-            
-            const createRes = await fetchWithAuth("action-items", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                client_id: customerId,
-              }),
-            });
-            
-            if (createRes.ok) {
-              console.log(`✅ Created action item for ${item.customer.name}`);
-              createdCount++;
-            } else {
-              const errorText = await createRes.text();
-              console.log(`⚠️ Failed to create action item for ${item.customer.name}:`, errorText);
-            }
-          } catch (error) {
-            console.error(`❌ Error creating action item for ${item.customer.name}:`, error);
-          }
+          const createRes = await fetchWithAuth("action-items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ client_id: customerId }),
+          });
+          if (createRes.ok) createdCount++;
         }
         
-        console.log(`🎉 Created ${createdCount} new action items`);
-        
         if (createdCount > 0) {
-          console.log("🔄 Refreshing action items list...");
           const refreshRes = await fetchWithAuth("action-items");
           if (refreshRes.ok) {
-            const refreshedData: ActionItem[] = await refreshRes.json();
-            console.log(`✅ Loaded ${refreshedData.length} total action items`);
-            setActionItems(refreshedData);
+            setActionItems(await refreshRes.json());
           }
         }
       } catch (error) {
@@ -286,10 +177,44 @@ export function OverviewCards() {
       }
     };
 
+    const fetchActionItems = async (showLoading = true) => {
+      if (!userRole) {
+        setLoadingActions(false);
+        return;
+      }
+      if (!["Platform Admin", "Salesperson", "Production Team"].includes(userRole)) {
+        setLoadingActions(false);
+        return;
+      }
+
+      try {
+        if (showLoading) setLoadingActions(true);
+        
+        const actionsRes = await fetchWithAuth("action-items");
+        
+        if (actionsRes.ok) {
+          const actionsData: ActionItem[] = await actionsRes.json();
+          setActionItems(actionsData);
+          if (actionsData.length === 0 && showLoading) {
+            await createMissingActionItems();
+          }
+        } else if (showLoading) {
+          await createMissingActionItems();
+        }
+      } catch (error) {
+        console.error("❌ Error fetching action items:", error);
+        if (showLoading) await createMissingActionItems();
+      } finally {
+        if (showLoading) setLoadingActions(false);
+      }
+    };
+
     if (userRole) {
       fetchActionItems(true);
       const interval = setInterval(() => fetchActionItems(false), 60000);
       return () => clearInterval(interval);
+    } else {
+      setLoadingActions(false);
     }
   }, [userRole, refreshTrigger]);
 
@@ -344,18 +269,8 @@ export function OverviewCards() {
                   className="text-xs"
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar
-                  dataKey="newLeads"
-                  stackId="a"
-                  fill="var(--color-newLeads)"
-                  radius={[0, 0, 0, 0]}
-                />
-                <Bar
-                  dataKey="disqualified"
-                  stackId="a"
-                  fill="var(--color-disqualified)"
-                  radius={[4, 4, 0, 0]}
-                />
+                <Bar dataKey="newLeads" stackId="a" fill="var(--color-newLeads)" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="disqualified" stackId="a" fill="var(--color-disqualified)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ChartContainer>
           )}
