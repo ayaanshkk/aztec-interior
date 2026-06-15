@@ -136,15 +136,25 @@ export function ProductionMaterialsManagement() {
   const fetchMaterials = async () => {
     setLoading(true);
     try {
-      console.log('📦 Fetching materials...');
-      const timestamp = new Date().getTime();
-      const response = await fetchWithAuth(`materials?_t=${timestamp}`);
+      const token = localStorage.getItem("token");
+      const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+      const response = await fetch(`${BACKEND_URL}/api/materials`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (!response.ok) throw new Error('Failed to fetch materials');
       const data = await response.json();
-      console.log('✅ Materials loaded:', data.length);
-      setMaterials(data);
+      // Normalize client_name → customer_name
+      const normalized = data.map((m: any) => ({
+        ...m,
+        customer_name: m.customer_name || m.client_name || 'Unknown',
+        id: m.id || m.material_id,
+      }));
+      setMaterials(normalized);
     } catch (error) {
-      console.error('❌ Error fetching materials:', error);
+      console.error('Error fetching materials:', error);
       setMaterials([]);
     } finally {
       setLoading(false);
@@ -154,45 +164,32 @@ export function ProductionMaterialsManagement() {
   const fetchCustomers = async () => {
     setCustomersLoading(true);
     try {
-      console.log('🔄 Fetching all customers, then filtering for Accepted stage...');
+      const token = localStorage.getItem("token");
+      const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
       
-      const timestamp = new Date().getTime();
-      const response = await fetchWithAuth(`customers?_t=${timestamp}`);
+      const response = await fetch(`${BACKEND_URL}/customers`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
       
       if (!response.ok) throw new Error('Failed to fetch customers');
       const data = await response.json();
-
-      console.log('📊 Total customers fetched:', data.length);
+      
+      console.log('All customer stages:', data.map((c: any) => ({ name: c.name, stage: c.stage })));
       
       const acceptedCustomers = data.filter((c: any) => 
-        c.stage && c.stage.toLowerCase() === 'accepted'
+        c.stage?.toLowerCase().trim() === 'accepted'
       );
       
-      console.log('✅ Customers in Accepted stage:', acceptedCustomers.length);
-      
-      const mappedCustomers = acceptedCustomers.map((c: any) => ({ 
+      setCustomers(acceptedCustomers.map((c: any) => ({ 
         id: c.id, 
         name: c.name,
-        email: c.email,
-        phone: c.phone,
-        address: c.address,
         stage: c.stage,
-        project_count: c.project_count || 0,
-        total_projects: c.project_count || 0
-      }));
-      
-      setCustomers(mappedCustomers);
-      
-      if (mappedCustomers.length > 0) {
-        console.log('✅ Available customers:', 
-          mappedCustomers.map((c: Customer) => `${c.name} (${c.project_count} project(s))`)
-        );
-      } else {
-        console.log('⚠️ No customers found in Accepted stage');
-      }
-      
+      })));
     } catch (error) {
-      console.error('❌ Error fetching customers:', error);
+      console.error('Error fetching customers:', error);
       setCustomers([]);
     } finally {
       setCustomersLoading(false);
@@ -212,11 +209,11 @@ export function ProductionMaterialsManagement() {
       }
 
       const payload = {
-        customer_id: newMaterialForm.customer_id,
+        client_id: newMaterialForm.customer_id,  // ← rename this
         material_description: newMaterialForm.material_description.trim(),
         supplier_name: newMaterialForm.supplier_name.trim() || null,
         estimated_cost: newMaterialForm.estimated_cost ? parseFloat(newMaterialForm.estimated_cost) : null,
-        order_date: newMaterialForm.order_date || new Date().toISOString().split('T')[0], 
+        order_date: newMaterialForm.order_date || new Date().toISOString().split('T')[0],
         expected_delivery_date: newMaterialForm.expected_delivery_date || null,
         notes: newMaterialForm.notes.trim() || null,
         status: 'ordered',
@@ -488,8 +485,10 @@ export function ProductionMaterialsManagement() {
   const filteredMaterials = useMemo(() => {
     return materials.filter(material => {
       const matchesFilter = filter === 'all' || material.status === filter;
-      const matchesSearch = material.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            material.material_description.toLowerCase().includes(searchTerm.toLowerCase());
+      const customerName = (material.customer_name || material.client_name || '').toLowerCase();
+      const description = (material.material_description || '').toLowerCase();
+      const matchesSearch = customerName.includes(searchTerm.toLowerCase()) ||
+                            description.includes(searchTerm.toLowerCase());
       return matchesFilter && matchesSearch;
     });
   }, [materials, filter, searchTerm]);
@@ -1176,19 +1175,19 @@ export function ProductionMaterialsManagement() {
             <AlertDialogTitle>Delete Material Order?</AlertDialogTitle>
             <AlertDialogDescription>
               {materialToDelete && (
-                <>
-                  <p className="mb-2">
+                <span className="block space-y-2">
+                  <span className="block mb-2">
                     Are you sure you want to delete this material order?
-                  </p>
-                  <div className="bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
-                    <p><strong>Customer:</strong> {materialToDelete.customer_name}</p>
-                    <p><strong>Material:</strong> {materialToDelete.material_description.substring(0, 100)}...</p>
-                    <p><strong>Status:</strong> {materialToDelete.status.replace('_', ' ').toUpperCase()}</p>
-                  </div>
-                  <p className="mt-3 text-red-600 font-medium">
+                  </span>
+                  <span className="block bg-gray-50 p-3 rounded-lg space-y-1 text-sm">
+                    <span className="block"><strong>Customer:</strong> {materialToDelete.customer_name}</span>
+                    <span className="block"><strong>Material:</strong> {materialToDelete.material_description.substring(0, 100)}...</span>
+                    <span className="block"><strong>Status:</strong> {materialToDelete.status.replace('_', ' ').toUpperCase()}</span>
+                  </span>
+                  <span className="block mt-3 text-red-600 font-medium">
                     This action cannot be undone.
-                  </p>
-                </>
+                  </span>
+                </span>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
