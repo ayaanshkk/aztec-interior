@@ -209,6 +209,10 @@ export default function ViewQuotePage() {
                 </td>
               </tr>
               <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ROOM NAME:</td>
+                <td className="border border-black px-3 py-2">{quotation.room_name || '—'}</td>
+              </tr>
+              <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">CARCASS COLOUR:</td>
                 <td className="border border-black px-3 py-2">{quotation.carcass_colour || '—'}</td>
               </tr>

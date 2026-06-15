@@ -549,11 +549,7 @@ export default function CustomerDetailsPage() {
       const allFinancialDocs: FinancialDocument[] = [];
 
       if (quotationsData && Array.isArray(quotationsData)) {
-        console.log('📊 Raw quotations data:', quotationsData);
-        
         quotationsData.forEach((quote: Quotation) => {
-          console.log('Processing quote:', quote);
-          
           const quoteId = quote.id || quote.quotation_id || quote.reference_number;
           
           if (!quoteId) {
@@ -564,7 +560,9 @@ export default function CustomerDetailsPage() {
           allFinancialDocs.push({
             id: quoteId,
             type: 'quotation',
-            title: `Quotation ${quote.reference_number || quoteId}`,
+            title: (quote as any).room_name
+              ? `${(quote as any).room_name}`
+              : `Quotation ${quote.reference_number || quoteId}`,
             reference: quote.reference_number,
             total: quote.total,
             status: quote.status,
@@ -2012,8 +2010,10 @@ export default function CustomerDetailsPage() {
     switch (type) {
       case "remedial":
         return "Remedial Action Checklist";
-      case "bedroom":
-        return "Bedroom Checklist";
+      case "bedroom": {
+        const room = formDataRaw?.room?.trim();
+        return room ? `Bedroom Checklist – ${room}` : "Bedroom Checklist";
+      }
       case "kitchen":
         return "Kitchen Checklist";
       case "document":
@@ -3448,7 +3448,7 @@ export default function CustomerDetailsPage() {
                             </div>
                             <div className="flex-1">
                               <h3 className="font-semibold text-gray-900 line-clamp-1">{doc.title}</h3>
-                              <p className="text-xs text-gray-600 capitalize">{doc.type.replace('_', ' ')}</p>
+                              <p className="text-xs text-gray-600">{doc.reference || doc.type.replace('_', ' ')}</p>
                             </div>
                           </div>
 

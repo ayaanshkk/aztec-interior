@@ -72,6 +72,7 @@ export default function CreateQuotePage() {
   const [doorColour, setDoorColour] = useState('');
   const [panelworkColour, setPanelworkColour] = useState('');
   const [doorStyle, setDoorStyle] = useState<string>('');
+  const [roomName, setRoomName] = useState('');
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
@@ -483,6 +484,7 @@ export default function CreateQuotePage() {
 
     if (!formData.name?.trim()) { alert("Customer name is required"); return; }
     if (!formData.address?.trim()) { alert("Customer address is required"); return; }
+    if (!roomName.trim()) { alert("Room name is required"); return; }
 
     const subtotalBeforeDiscount = items.reduce((sum, item) => {
       const itemTotal = (item.discount_percent && item.discount_percent > 0)
@@ -520,9 +522,10 @@ export default function CreateQuotePage() {
           date: formData.date,
           door_type: doorType,
           room_type: roomType,
+          room_name: roomName,
           carcass_colour: carcassColour,
-        door_colour: doorColour,
-        panelwork_colour: panelworkColour,
+          door_colour: doorColour,
+          panelwork_colour: panelworkColour,
           door_style: doorStyle,
           items: items
             .filter(item => {
@@ -874,6 +877,18 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     placeholder="Phone number"
                     className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                  />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ROOM NAME: <span className="text-red-600">*</span></td>
+                <td className="border border-black p-0">
+                  <Input
+                    value={roomName}
+                    onChange={(e) => setRoomName(e.target.value)}
+                    placeholder="e.g. Kitchen, Master Bedroom"
+                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
+                    required
                   />
                 </td>
               </tr>
