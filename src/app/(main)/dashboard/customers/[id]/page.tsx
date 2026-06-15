@@ -1521,22 +1521,26 @@ export default function CustomerDetailsPage() {
       alert("You don't have permission to edit this form.");
       return;
     }
- 
+
     const type = getFormType(submission);
- 
+
     if (type === "remedial") {
-      // Opens the full-page edit layout
       window.open(`/checklists/remedial/edit/${submission.id}`, "_blank");
       return;
     }
- 
-    // Original dialog-based edit for all other form types
+
+    if (type === "bedroom" || type === "kitchen") {
+      window.open(`/checklist-view?id=${submission.id}&edit=true`, "_blank");
+      return;
+    }
+
+    // For document types (receipts, invoices etc) — keep dialog behaviour
     try {
       const formData =
         typeof submission.form_data === "string"
           ? JSON.parse(submission.form_data)
           : submission.form_data;
- 
+
       setSelectedForm(submission);
       setEditFormData(formData);
       setIsEditingForm(true);

@@ -176,14 +176,14 @@ function ChecklistViewContent() {
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
   const canEdit = () => {
-    if (!user) return false;
-    const allowedRoles = ["platform admin","salesperson", "production team"];
+    if (!user) return true; // Allow edit while loading, button will work once user loads
+    const allowedRoles = ["platform admin", "salesperson"];
     return allowedRoles.includes(user.role.toLowerCase());
   };
 
   const canDelete = () => {
     if (!user) return false;
-    const allowedRoles = ["platform admin","salesperson", "production team"];
+    const allowedRoles = ["platform admin", "salesperson"];
     return allowedRoles.includes(user.role.toLowerCase());
   };
 
@@ -279,6 +279,13 @@ function ChecklistViewContent() {
 
     fetchFormData();
   }, [formSubmissionId]);
+
+  useEffect(() => {
+    const editParam = searchParams.get("edit");
+    if (editParam === "true" && !loading && formData) {
+      setIsEditing(true);
+    }
+  }, [loading, formData]);
 
   const handleInputChange = (field: keyof FormData, value: any) => {
     if (!formData) return;
@@ -911,7 +918,7 @@ function ChecklistViewContent() {
                       <span>Edit</span>
                     </Button>
                   )}
-                  {canDelete() && (
+                  {user && canDelete() && (
                     <Button
                       onClick={handleDelete}
                       variant="destructive"
