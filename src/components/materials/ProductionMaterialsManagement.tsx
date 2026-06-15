@@ -46,6 +46,7 @@ interface MaterialOrder {
   id: string;
   customer_id: string;
   customer_name: string;
+  client_name?: string;  // ← add this
   material_description: string;
   supplier_name: string | null;
   supplier_reference: string | null;
