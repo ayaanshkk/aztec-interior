@@ -34,6 +34,7 @@ interface PricelistItem {
   category: string;
   brand?: string;
   colour?: string;
+  alias_codes?: string;
 }
 
 interface GroupedItem {
@@ -49,6 +50,7 @@ interface GroupedItem {
       pricelist_id: number;
       series?: string;
       model?: string;
+      alias_codes?: string;
     };
   };
 }
@@ -221,7 +223,8 @@ export default function PricelistPage() {
         price: item.base_price,
         pricelist_id: item.pricelist_id,
         series: seriesInfo,
-        model: activeTab === 'Appliances' ? item.item_code : undefined
+        model: activeTab === 'Appliances' ? item.item_code : undefined,
+        alias_codes: activeTab === 'Appliances' ? ((item as any).alias_codes || '') : undefined,
       };
 
       return acc;
@@ -231,10 +234,16 @@ export default function PricelistPage() {
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      items = items.filter(item =>
-        item.item_code.toLowerCase().includes(query) ||
-        item.item_name.toLowerCase().includes(query)
-      );
+      items = items.filter(item => {
+        if (item.item_code.toLowerCase().includes(query)) return true;
+        if (item.item_name.toLowerCase().includes(query)) return true;
+        if (activeTab === 'Appliances') {
+          return Object.values(item.prices).some((priceData: any) =>
+            priceData.model && priceData.model.toLowerCase().includes(query)
+          );
+        }
+        return false;
+      });
     }
 
     items.sort((a, b) => a.item_code.localeCompare(b.item_code));
@@ -257,11 +266,24 @@ export default function PricelistPage() {
   const startEdit = (item: GroupedItem) => {
     setEditingCode(item.item_code);
     const rawItem = pricelistItems.find(i => i.item_code === item.item_code);
+    
+    // ✅ For Appliances, find the Low-level raw item to get alias_codes
+    let aliasCodes = '';
+    if (activeTab === 'Appliances') {
+      const lowLevelPricelistId = item.prices?.['Low']?.pricelist_id;
+      const lowRawItem = lowLevelPricelistId 
+        ? pricelistItems.find(i => i.pricelist_id === lowLevelPricelistId)
+        : null;
+      aliasCodes = (lowRawItem as any)?.alias_codes || '';
+    }
+
     setEditForm({
       item_code: item.item_code,
       item_name: item.item_name,
+      brand: item.brand || '',
       description: rawItem?.description || '',
       colour: (rawItem as any)?.colour || '',
+      alias_codes: aliasCodes,
       width: item.width,
       height: item.height,
       depth: item.depth,
@@ -278,41 +300,84 @@ export default function PricelistPage() {
     try {
       const targetCategory = TAB_TO_CATEGORY[activeTab];
 
-      const updates = Object.entries(editForm.prices).map(([doorType, data]: [string, any]) => {
-        const priceValue = data?.price;
-        const hasPrice = priceValue !== '' && priceValue !== null && priceValue !== undefined;
+      let updates: Promise<any>[] = [];
 
-        if (data?.pricelist_id) {
-          // Existing row — update (even if price is now blank, set to 0)
-          // @ts-ignore
-          return api.updatePricelistItem(data.pricelist_id, {
-            item_code: editForm.item_code,
-            item_name: editForm.item_name,
-            description: editForm.description,
-            colour: editForm.colour,
-            base_price: hasPrice ? parseFloat(priceValue) : 0,
-            width: parseInt(editForm.width) || null,
-            height: parseInt(editForm.height) || null,
-            depth: parseInt(editForm.depth) || null,
-          });
-        } else if (hasPrice && parseFloat(priceValue) > 0) {
-          // No existing row for this door type — create new one
-          // @ts-ignore
-          return api.createPricelistItem({
-            category: targetCategory,
-            item_code: editForm.item_code,
-            item_name: editForm.item_name,
-            description: `${editForm.item_name} - ${doorType}`,
-            base_price: parseFloat(priceValue),
-            door_type: doorType,
-            width: parseInt(editForm.width) || null,
-            height: parseInt(editForm.height) || null,
-            depth: parseInt(editForm.depth) || null,
-            unit: 'each',
-          });
-        }
-        return null;
-      }).filter(Boolean);
+      if (activeTab === 'Appliances') {
+        updates = ['Low', 'Mid', 'High'].map((level) => {
+          const data = editForm.prices?.[level];
+          const modelCode = (data?.model || '').trim();
+          const seriesVal = (data?.series || '').trim();
+          const priceValue = data?.price;
+          const hasPrice = priceValue !== '' && priceValue !== null && priceValue !== undefined && parseFloat(priceValue) > 0;
+          const hasModel = modelCode.length > 0;
+
+          const seriesInfo = seriesVal;
+          const description = `${editForm.item_name} - ${level} Series${seriesInfo ? ` (${seriesInfo})` : ''}`;
+
+          if (data?.pricelist_id) {
+            // ✅ ALWAYS update existing row — even if model code changed
+            // @ts-ignore
+            return api.updatePricelistItem(data.pricelist_id, {
+              item_code: hasModel ? modelCode : data.model,
+              item_name: editForm.item_name,
+              description,
+              base_price: hasPrice ? parseFloat(priceValue) : 0,
+              door_type: level,
+              brand: editForm.brand,
+            });
+          } else if (hasModel && hasPrice) {
+            // ✅ Check if row already exists for this brand+level before creating
+            // @ts-ignore  
+            return api.createPricelistItem({
+              category: 'Appliances',
+              item_code: modelCode,
+              item_name: editForm.item_name,
+              description,
+              base_price: parseFloat(priceValue),
+              door_type: level,
+              brand: editForm.brand,
+              unit: 'each',
+            });
+          }
+          return null;
+        }).filter(Boolean) as Promise<any>[];
+
+      } else {
+        // ✅ All other tabs — existing logic unchanged
+        updates = Object.entries(editForm.prices).map(([doorType, data]: [string, any]) => {
+          const priceValue = data?.price;
+          const hasPrice = priceValue !== '' && priceValue !== null && priceValue !== undefined;
+
+          if (data?.pricelist_id) {
+            // @ts-ignore
+            return api.updatePricelistItem(data.pricelist_id, {
+              item_code: editForm.item_code,
+              item_name: editForm.item_name,
+              description: editForm.description,
+              colour: editForm.colour,
+              base_price: hasPrice ? parseFloat(priceValue) : 0,
+              width: parseInt(editForm.width) || null,
+              height: parseInt(editForm.height) || null,
+              depth: parseInt(editForm.depth) || null,
+            });
+          } else if (hasPrice && parseFloat(priceValue) > 0) {
+            // @ts-ignore
+            return api.createPricelistItem({
+              category: targetCategory,
+              item_code: editForm.item_code,
+              item_name: editForm.item_name,
+              description: `${editForm.item_name} - ${doorType}`,
+              base_price: parseFloat(priceValue),
+              door_type: doorType,
+              width: parseInt(editForm.width) || null,
+              height: parseInt(editForm.height) || null,
+              depth: parseInt(editForm.depth) || null,
+              unit: 'each',
+            });
+          }
+          return null;
+        }).filter(Boolean) as Promise<any>[];
+      }
 
       await Promise.all(updates);
 
@@ -821,6 +886,14 @@ export default function PricelistPage() {
                                   <div>
                                     <div className="text-sm font-medium text-gray-900">{editForm.item_name}</div>
                                     <div className="text-xs text-gray-500">{editForm.brand}</div>
+                                    <input
+                                      type="text"
+                                      value={editForm.alias_codes || ''}
+                                      onChange={(e) => setEditForm({ ...editForm, alias_codes: e.target.value })}
+                                      placeholder="Alt codes e.g. C24MR21G0B"
+                                      className="mt-1 w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                    />
+                                    <p className="text-xs text-gray-400 mt-0.5">Comma-separate multiple codes</p>
                                   </div>
                                 ) : (
                                   <input
@@ -846,24 +919,59 @@ export default function PricelistPage() {
                                   {['Low', 'Mid', 'High'].map((level) => (
                                     <React.Fragment key={level}>
                                       <td className="px-4 py-3 whitespace-nowrap">
-                                        <input type="text" value={editForm.prices?.[level]?.model || ''} className="w-28 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50" disabled />
+                                        <input
+                                          type="text"
+                                          value={editForm.prices?.[level]?.model || ''}
+                                          onChange={(e) => setEditForm({
+                                            ...editForm,
+                                            prices: {
+                                              ...editForm.prices,
+                                              [level]: {
+                                                ...(editForm.prices?.[level] || {}),
+                                                model: e.target.value
+                                              }
+                                            }
+                                          })}
+                                          className="w-28 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                          placeholder="Model code"
+                                        />
                                       </td>
                                       <td className="px-4 py-3 whitespace-nowrap">
-                                        <input type="text" value={editForm.prices?.[level]?.series || ''} className="w-12 px-2 py-1 text-sm border border-gray-300 rounded bg-gray-50" disabled />
+                                        <input
+                                          type="text"
+                                          value={editForm.prices?.[level]?.series || ''}
+                                          onChange={(e) => setEditForm({
+                                            ...editForm,
+                                            prices: {
+                                              ...editForm.prices,
+                                              [level]: {
+                                                ...(editForm.prices?.[level] || {}),
+                                                series: e.target.value
+                                              }
+                                            }
+                                          })}
+                                          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                          placeholder="Series"
+                                        />
                                       </td>
                                       <td className="px-4 py-3 whitespace-nowrap">
-                                        {editForm.prices?.[level] ? (
-                                          <input
-                                            type="number"
-                                            step="0.01"
-                                            value={editForm.prices[level].price || ''}
-                                            onChange={(e) => setEditForm({
-                                              ...editForm,
-                                              prices: { ...editForm.prices, [level]: { ...editForm.prices[level], price: e.target.value } }
-                                            })}
-                                            className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
-                                          />
-                                        ) : <span className="text-gray-400">-</span>}
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={editForm.prices?.[level]?.price ?? ''}
+                                          onChange={(e) => setEditForm({
+                                            ...editForm,
+                                            prices: {
+                                              ...editForm.prices,
+                                              [level]: {
+                                                ...(editForm.prices?.[level] || {}),
+                                                price: e.target.value
+                                              }
+                                            }
+                                          })}
+                                          className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
+                                          placeholder="0.00"
+                                        />
                                       </td>
                                     </React.Fragment>
                                   ))}
@@ -911,6 +1019,11 @@ export default function PricelistPage() {
                                   <div>
                                     <div>{item.item_name}</div>
                                     <div className="text-xs text-gray-500">{item.brand}</div>
+                                    {(item.prices?.['Low'] as any)?.alias_codes && (
+                                      <div className="text-xs text-blue-600 mt-0.5">
+                                        Alt: {(item.prices?.['Low'] as any)?.alias_codes}
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   item.item_code

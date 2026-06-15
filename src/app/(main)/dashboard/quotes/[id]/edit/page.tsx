@@ -446,7 +446,7 @@ export default function EditQuotePage() {
       }
       // ── END FITTING EXPANSION ──────────────────────────────────────
 
-      if (trimmedValue.length > 50) return;
+      if (trimmedValue.length > 100) return;
 
       console.log(`🔍 Item code auto-fill: "${trimmedValue}"`);
       setAutoFilling(index);
@@ -812,7 +812,7 @@ export default function EditQuotePage() {
 
     if (!value || value.trim().length < 1) return;
     const trimmedValue = value.trim().toUpperCase();
-    if (trimmedValue.length > 50) return;
+    if (trimmedValue.length > 100) return;
 
     try {
       const token = localStorage.getItem("token");
@@ -1307,7 +1307,7 @@ export default function EditQuotePage() {
                               <Input
                                 value={sub.item}
                                 onChange={(e) => handleSubItemAutoFill(index, subIndex, e.target.value)}
-                                onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleSubItemAutoFill(index, subIndex, val); }}
+                                onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(index, "item", val); }}
                                 placeholder="↳ sub-code"
                                 className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
                               />

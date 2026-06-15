@@ -256,7 +256,7 @@ export default function CreateQuotePage() {
       }
       // ── END FITTING EXPANSION ────────────────────────────────────────
 
-      if (trimmedValue.length > 50) return;
+      if (trimmedValue.length > 100) return;
 
       setAutoFilling(id);
       try {
@@ -652,7 +652,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
 
     if (!value || value.trim().length < 1) return;
     const trimmedValue = value.trim().toUpperCase();
-    if (trimmedValue.length > 50) return;
+    if (trimmedValue.length > 100) return;
 
     try {
       const token = localStorage.getItem("token");
@@ -1047,7 +1047,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                                 <Input
                                   value={sub.item}
                                   onChange={(e) => handleSubItemAutoFill(item.id, sub.id, e.target.value)}
-                                  onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleSubItemAutoFill(item.id, sub.id, val); }}
+                                  onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
                                   placeholder="↳ sub-code"
                                   className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
                                 />

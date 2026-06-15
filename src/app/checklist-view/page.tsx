@@ -177,13 +177,16 @@ function ChecklistViewContent() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPoint, setLastPoint] = useState<{ x: number; y: number } | null>(null);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
+  const [orderItems, setOrderItems] = useState<{
+    material: string;
+    supplier: string;
+    estimated_cost: string;
+    order_date: string;
+    expected_delivery: string;
+    notes: string;
+    included: boolean;
+  }[]>([]);
   const [orderDialogSection, setOrderDialogSection] = useState("");
-  const [orderMaterials, setOrderMaterials] = useState<string[]>([]);
-  const [orderSupplier, setOrderSupplier] = useState("");
-  const [orderEstimatedCost, setOrderEstimatedCost] = useState("");
-  const [orderDate, setOrderDate] = useState(new Date().toISOString().split("T")[0]);
-  const [orderExpectedDelivery, setOrderExpectedDelivery] = useState("");
-  const [orderNotes, setOrderNotes] = useState("");
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
   const canEdit = () => {
@@ -719,7 +722,15 @@ function ChecklistViewContent() {
   const handleOpenOrderDialog = (sectionTitle: string) => {
     const materials = extractMaterialsFromSection(sectionTitle);
     setOrderDialogSection(sectionTitle);
-    setOrderMaterials(materials);
+    setOrderItems(materials.map(m => ({
+      material: m,
+      supplier: "",
+      estimated_cost: "",
+      order_date: new Date().toISOString().split("T")[0],
+      expected_delivery: "",
+      notes: "",
+      included: true,
+    })));
     setShowOrderDialog(true);
   };
 
@@ -728,54 +739,57 @@ function ChecklistViewContent() {
   };
 
   const handleSubmitOrder = async () => {
-    if (orderMaterials.length === 0 || !formData) {
-      alert("No materials to order");
+    const includedItems = orderItems.filter(item => item.included);
+    if (includedItems.length === 0 || !formData) {
+      alert("No materials selected to order");
       return;
     }
 
     setIsSubmittingOrder(true);
     try {
       const token = localStorage.getItem("token");
-      const materialDescription = `${orderDialogSection}\n${orderMaterials.join('\n')}`;
-      
-      const payload = {
-        client_id: formData.customer_id,  // ← change customer_id to client_id
-        material_description: materialDescription,
-        supplier_name: orderSupplier.trim() || null,
-        estimated_cost: orderEstimatedCost ? parseFloat(orderEstimatedCost) : null,
-        order_date: orderDate,
-        expected_delivery_date: orderExpectedDelivery || null,
-        notes: orderNotes.trim() || null,
-        status: 'ordered',
-      };
+      let successCount = 0;
+      let failCount = 0;
 
-      const response = await fetch(`${BACKEND_URL}/api/materials`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      for (const item of includedItems) {
+        const payload = {
+          client_id: formData.customer_id,
+          material_description: `${orderDialogSection}\n${item.material}`,
+          supplier_name: item.supplier.trim() || null,
+          estimated_cost: item.estimated_cost ? parseFloat(item.estimated_cost) : null,
+          order_date: item.order_date,
+          expected_delivery_date: item.expected_delivery || null,
+          notes: item.notes.trim() || null,
+          status: 'ordered',
+        };
 
-      if (!response.ok) {
-        throw new Error('Failed to create material order');
+        const response = await fetch(`${BACKEND_URL}/api/materials`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          failCount++;
+        }
       }
 
-      alert('Material order created successfully!');
-      
-      // Reset form
+      if (failCount === 0) {
+        alert(`✅ ${successCount} material order${successCount > 1 ? 's' : ''} created successfully!`);
+      } else {
+        alert(`⚠️ ${successCount} created, ${failCount} failed. Please check and retry.`);
+      }
+
       setShowOrderDialog(false);
-      setOrderMaterials([]);
-      setOrderSupplier('');
-      setOrderEstimatedCost('');
-      setOrderDate(new Date().toISOString().split('T')[0]);
-      setOrderExpectedDelivery('');
-      setOrderNotes('');
-      
+      setOrderItems([]);
     } catch (error) {
-      console.error('Error creating material order:', error);
-      alert('Failed to create material order. Please try again.');
+      console.error('Error creating material orders:', error);
+      alert('Failed to create material orders. Please try again.');
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -2934,101 +2948,150 @@ function ChecklistViewContent() {
         {/* Order Materials Dialog */}
         {showOrderDialog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-              <div className="mb-4">
-                <h2 className="text-2xl font-bold">Order Materials</h2>
-                <p className="text-sm text-gray-600">
-                  {orderDialogSection} - {formData?.customer_name}
-                </p>
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white shadow-xl">
+              {/* Header */}
+              <div className="sticky top-0 z-10 border-b bg-white p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold">Order Materials</h2>
+                    <p className="text-sm text-gray-600">{orderDialogSection} — {formData?.customer_name}</p>
+                  </div>
+                  <button onClick={() => setShowOrderDialog(false)} className="text-gray-400 hover:text-gray-600">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
               </div>
 
-              {/* Customer Info Box */}
-              <div className="mb-4 rounded-lg bg-blue-50 p-4">
-                <h3 className="mb-2 font-semibold">Customer Information</h3>
-                <p className="text-sm"><strong>Name:</strong> {formData?.customer_name}</p>
-                <p className="text-sm"><strong>Phone:</strong> {formData?.customer_phone}</p>
-                <p className="text-sm"><strong>Address:</strong> {formData?.customer_address}</p>
-              </div>
+              <div className="p-6 space-y-4">
+                {/* Customer Info */}
+                <div className="rounded-lg bg-blue-50 p-4">
+                  <h3 className="mb-2 font-semibold text-sm text-blue-900">Customer Information</h3>
+                  <p className="text-sm"><strong>Name:</strong> {formData?.customer_name}</p>
+                  <p className="text-sm"><strong>Phone:</strong> {formData?.customer_phone}</p>
+                  <p className="text-sm"><strong>Address:</strong> {formData?.customer_address}</p>
+                </div>
 
-              {/* Materials List */}
-              <div className="mb-4">
-                <label className="mb-2 block text-sm font-bold">Materials to Order</label>
-                <div className="max-h-60 space-y-2 overflow-y-auto rounded border border-gray-300 bg-gray-50 p-3">
-                  {orderMaterials.length === 0 ? (
-                    <p className="text-center text-sm text-gray-500">No materials found</p>
-                  ) : (
-                    orderMaterials.map((material, idx) => (
-                      <div key={idx} className="flex items-center justify-between rounded bg-white p-2">
-                        <span className="text-sm">{material}</span>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleRemoveMaterial(idx)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                {orderItems.length === 0 ? (
+                  <p className="text-center text-sm text-gray-500 py-8">No materials found in this section</p>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm font-bold text-gray-700">
+                      {orderItems.filter(i => i.included).length} of {orderItems.length} items selected
+                    </p>
+                    {orderItems.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`rounded-lg border-2 p-4 transition-colors ${
+                          item.included ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-50 opacity-60"
+                        }`}
+                      >
+                        {/* Material label + toggle */}
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-start gap-3 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={item.included}
+                              onChange={(e) => {
+                                const updated = [...orderItems];
+                                updated[idx] = { ...updated[idx], included: e.target.checked };
+                                setOrderItems(updated);
+                              }}
+                              className="mt-1 h-4 w-4 rounded"
+                            />
+                            <span className="text-sm font-medium text-gray-800">{item.material}</span>
+                          </div>
+                        </div>
+
+                        {item.included && (
+                          <div className="ml-7 space-y-3">
+                            {/* Supplier + Cost */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Supplier</label>
+                                <Input
+                                  placeholder="e.g., Howdens"
+                                  value={item.supplier}
+                                  onChange={(e) => {
+                                    const updated = [...orderItems];
+                                    updated[idx] = { ...updated[idx], supplier: e.target.value };
+                                    setOrderItems(updated);
+                                  }}
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Estimated Cost (£)</label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0.00"
+                                  value={item.estimated_cost}
+                                  onChange={(e) => {
+                                    const updated = [...orderItems];
+                                    updated[idx] = { ...updated[idx], estimated_cost: e.target.value };
+                                    setOrderItems(updated);
+                                  }}
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Dates */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Date Ordered</label>
+                                <input
+                                  type="date"
+                                  value={item.order_date}
+                                  onChange={(e) => {
+                                    const updated = [...orderItems];
+                                    updated[idx] = { ...updated[idx], order_date: e.target.value };
+                                    setOrderItems(updated);
+                                  }}
+                                  className="w-full rounded-md border border-gray-300 p-1.5 text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Expected Delivery</label>
+                                <input
+                                  type="date"
+                                  value={item.expected_delivery}
+                                  onChange={(e) => {
+                                    const updated = [...orderItems];
+                                    updated[idx] = { ...updated[idx], expected_delivery: e.target.value };
+                                    setOrderItems(updated);
+                                  }}
+                                  className="w-full rounded-md border border-gray-300 p-1.5 text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Notes */}
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Notes</label>
+                              <textarea
+                                placeholder="Any special instructions..."
+                                rows={2}
+                                value={item.notes}
+                                onChange={(e) => {
+                                  const updated = [...orderItems];
+                                  updated[idx] = { ...updated[idx], notes: e.target.value };
+                                  setOrderItems(updated);
+                                }}
+                                className="w-full resize-none rounded-md border border-gray-300 p-1.5 text-xs"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Form Fields */}
-              <div className="space-y-4">
-                <div>
-                  <label className="mb-1 block text-sm font-bold">Supplier Name</label>
-                  <Input
-                    value={orderSupplier}
-                    onChange={(e) => setOrderSupplier(e.target.value)}
-                    placeholder="Enter supplier name"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-bold">Estimated Cost (£)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={orderEstimatedCost}
-                    onChange={(e) => setOrderEstimatedCost(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-bold">Date Ordered</label>
-                    <Input
-                      type="date"
-                      value={orderDate}
-                      onChange={(e) => setOrderDate(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-bold">Expected Delivery Date</label>
-                    <Input
-                      type="date"
-                      value={orderExpectedDelivery}
-                      onChange={(e) => setOrderExpectedDelivery(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-bold">Notes</label>
-                  <textarea
-                    className="h-20 w-full resize-none rounded-md border border-gray-300 p-2"
-                    value={orderNotes}
-                    onChange={(e) => setOrderNotes(e.target.value)}
-                    placeholder="Additional notes..."
-                  />
-                </div>
-              </div>
-
-              {/* Footer Buttons */}
-              <div className="mt-6 flex justify-end gap-2">
+              {/* Footer */}
+              <div className="sticky bottom-0 border-t bg-gray-50 p-4 flex justify-end gap-3">
                 <Button
                   type="button"
                   variant="outline"
@@ -3040,9 +3103,11 @@ function ChecklistViewContent() {
                 <Button
                   type="button"
                   onClick={handleSubmitOrder}
-                  disabled={isSubmittingOrder || orderMaterials.length === 0}
+                  disabled={isSubmittingOrder || orderItems.filter(i => i.included).length === 0}
                 >
-                  {isSubmittingOrder ? "Creating..." : "Create Material Order"}
+                  {isSubmittingOrder
+                    ? "Creating Orders..."
+                    : `Create ${orderItems.filter(i => i.included).length} Order${orderItems.filter(i => i.included).length !== 1 ? 's' : ''}`}
                 </Button>
               </div>
             </div>
