@@ -734,10 +734,6 @@ function ChecklistViewContent() {
     setShowOrderDialog(true);
   };
 
-  const handleRemoveMaterial = (index: number) => {
-    setOrderMaterials(prev => prev.filter((_, i) => i !== index));
-  };
-
   const handleSubmitOrder = async () => {
     const includedItems = orderItems.filter(item => item.included);
     if (includedItems.length === 0 || !formData) {
