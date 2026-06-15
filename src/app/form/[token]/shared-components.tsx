@@ -130,14 +130,29 @@ export function OrderMaterialsDialog({
         if (data.under_worktop_lights_color) items.push(`Under Worktop Lights: ${data.under_worktop_lights_color}`);
         break;
         
-      case "Worktop Specifications":
-        if (data.worktop_material_type) items.push(`Worktop Material: ${data.worktop_material_type} - ${data.worktop_material_color}`);
-        if (data.worktop_size) items.push(`Worktop Size: ${data.worktop_size}`);
-        if (data.worktop_features && data.worktop_features.length > 0) {
-          items.push(`Features: ${data.worktop_features.join(', ')}`);
-        }
-        if (data.worktop_other_details) items.push(`Other Details: ${data.worktop_other_details}`);
-        break;
+    case "Worktop Specifications":
+      if (data.worktop_material_type) items.push(`Worktop Material: ${data.worktop_material_type} - ${data.worktop_material_color}`);
+      if (data.worktop_code) items.push(`Worktop Code: ${data.worktop_code}`);
+      if (data.worktop_size) items.push(`Worktop Size: ${data.worktop_size}`);
+      if (data.worktop_features && data.worktop_features.length > 0) {
+        items.push(`Features: ${data.worktop_features.join(', ')}`);
+      }
+      if (data.worktop_other_details) items.push(`Other Details: ${data.worktop_other_details}`);
+      
+      if (data.additional_worktops && data.additional_worktops.length > 0) {
+        data.additional_worktops.forEach((worktop: any, idx: number) => {
+          const hasValues = worktop.worktop_material_type || worktop.worktop_material_color || worktop.worktop_code;
+          if (hasValues) {
+            items.push(`\n--- Additional Worktop ${idx + 1} ---`);
+            if (worktop.worktop_material_type) items.push(`Material: ${worktop.worktop_material_type} - ${worktop.worktop_material_color}`);
+            if (worktop.worktop_code) items.push(`Worktop Code: ${worktop.worktop_code}`);
+            if (worktop.worktop_size) items.push(`Size: ${worktop.worktop_size}`);
+            if (worktop.worktop_features?.length > 0) items.push(`Features: ${worktop.worktop_features.join(', ')}`);
+            if (worktop.worktop_other_details) items.push(`Other: ${worktop.worktop_other_details}`);
+          }
+        });
+      }
+      break;
         
       case "Appliances":
         if (data.appliances && data.appliances.length > 0) {

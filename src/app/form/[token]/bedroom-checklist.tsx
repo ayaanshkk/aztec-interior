@@ -22,7 +22,7 @@ import {
 import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { BACKEND_URL } from "@/lib/api";
 import { OrderButton, NAButton, OrderMaterialsDialog } from "./shared-components";
-import type { BedroomFormData, AdditionalDoor, AdditionalHandle } from "./shared-types";
+import type { BedroomFormData, AdditionalDoor, AdditionalHandle, AdditionalWorktop } from "./shared-types";
 
 export default function BedroomChecklist() {
   const searchParams = useSearchParams();
@@ -84,6 +84,8 @@ export default function BedroomChecklist() {
     gas_electric_info: "",
     signature_name: "",
     signature_date: "",
+    worktop_code: "",
+    additional_worktops: [],
   });
 
   useEffect(() => {
@@ -112,7 +114,7 @@ export default function BedroomChecklist() {
     }
   }, []);
 
-  type SingleField = keyof Omit<BedroomFormData, "floor_protection" | "additional_doors" | "additional_handles">;
+  type SingleField = keyof Omit<BedroomFormData, "floor_protection" | "additional_doors" | "additional_handles" | "additional_worktops">;
 
   const handleInputChange = (field: SingleField, value: string) => {
     setFormData((prev) => ({
@@ -680,6 +682,112 @@ export default function BedroomChecklist() {
                           value={formData.worktop_material_color}
                           onChange={(e) => handleInputChange("worktop_material_color", e.target.value)}
                         />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Code</label>
+                        <Input
+                          placeholder="Enter worktop code"
+                          className="w-full bg-white"
+                          value={formData.worktop_code}
+                          onChange={(e) => handleInputChange("worktop_code", e.target.value)}
+                        />
+                      </div>
+
+                      {/* Additional Worktops */}
+                      <div className="border-t pt-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <label className="text-sm font-bold text-gray-700">Additional Worktops</label>
+                          <Button type="button" size="sm" onClick={addAdditionalWorktop} className="bg-green-600">
+                            + Add Additional Worktop
+                          </Button>
+                        </div>
+                        {formData.additional_worktops.map((worktop, idx) => (
+                          <div key={idx} className="mb-3 space-y-3 rounded border-2 border-green-300 bg-white p-4">
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Material Type</label>
+                                <select
+                                  className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                  value={worktop.worktop_material_type}
+                                  onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_material_type", e.target.value)}
+                                >
+                                  <option value="">Select type</option>
+                                  <option value="stone">Stone</option>
+                                  <option value="laminate">Laminate</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Material Color</label>
+                                <Input
+                                  placeholder="Enter color"
+                                  className="text-sm"
+                                  value={worktop.worktop_material_color}
+                                  onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_material_color", e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Worktop Code</label>
+                                <Input
+                                  placeholder="Enter code"
+                                  className="text-sm"
+                                  value={worktop.worktop_code}
+                                  onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_code", e.target.value)}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Size/Thickness</label>
+                              <select
+                                className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                value={worktop.worktop_size}
+                                onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_size", e.target.value)}
+                              >
+                                <option value="">Select thickness</option>
+                                <option value="12mm">12mm</option>
+                                <option value="18mm">18mm</option>
+                                <option value="20mm">20mm</option>
+                                <option value="25mm">25mm</option>
+                                <option value="30mm">30mm</option>
+                                <option value="38mm">38mm</option>
+                                <option value="N/A">N/A</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Further Info</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {["Upstand","Splashback","Wall Cladding","Sink Cut Out","Drainer Grooves","Hob Cut Out","Window Cill","LED Grooves"].map((item) => (
+                                  <label key={item} className="flex items-center space-x-2">
+                                    <input
+                                      type="checkbox"
+                                      className="rounded"
+                                      checked={worktop.worktop_features?.includes(item) || false}
+                                      onChange={(e) => {
+                                        const current = worktop.worktop_features || [];
+                                        const updated = e.target.checked ? [...current, item] : current.filter((v) => v !== item);
+                                        handleAdditionalWorktopChange(idx, "worktop_features", updated);
+                                      }}
+                                    />
+                                    <span className="text-xs">{item}</span>
+                                  </label>
+                                ))}
+                              </div>
+                              <Input
+                                placeholder="Other worktop details"
+                                className="mt-2 text-sm"
+                                value={worktop.worktop_other_details}
+                                onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_other_details", e.target.value)}
+                              />
+                            </div>
+
+                            <div className="flex justify-end">
+                              <Button type="button" variant="destructive" size="sm" onClick={() => removeAdditionalWorktop(idx)}>
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
  

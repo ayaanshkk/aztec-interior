@@ -54,11 +54,22 @@ export interface BaseFormData {
   signature_date: string;
 }
 
+export interface AdditionalWorktop {
+  worktop_material_type: string;
+  worktop_material_color: string;
+  worktop_code: string;
+  worktop_size: string;
+  worktop_features: string[];
+  worktop_other_details: string;
+}
+
 export interface KitchenFormData extends BaseFormData {
   accessories: string;
   lighting_spec: string;
   worktop_material_type: string;
   worktop_material_color: string;
+  worktop_code: string;
+  additional_worktops: AdditionalWorktop[];
   worktop_features: string[];
   worktop_other_details: string;
   worktop_size: string;
@@ -95,6 +106,8 @@ export interface BedroomFormData extends BaseFormData {
   bedside_cabinets_type: string;
   bedside_cabinets_qty: string;
   dresser_desk: string;
+  worktop_code: string;
+  additional_worktops: AdditionalWorktop[];
   dresser_desk_details: string;
   internal_mirror: string;
   internal_mirror_details: string;

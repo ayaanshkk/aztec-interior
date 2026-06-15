@@ -70,6 +70,15 @@ interface AdditionalDoor {
   quantity: string;
 }
 
+interface AdditionalWorktop {
+  worktop_material_type: string;
+  worktop_material_color: string;
+  worktop_code: string;
+  worktop_size: string;
+  worktop_features: string[];
+  worktop_other_details: string;
+}
+
 interface FormData {
   customer_id: string;
   customer_name: string;
@@ -113,6 +122,8 @@ interface FormData {
   tap_model: string;
   other_appliances: string;
   appliances: Appliance[];
+  worktop_code: string;
+  additional_worktops: AdditionalWorktop[];
   bedside_cabinets_type: string;
   bedside_cabinets_qty: string;
   dresser_desk: string;
@@ -262,6 +273,10 @@ function ChecklistViewContent() {
         if (!parsedFormData.additional_doors || !Array.isArray(parsedFormData.additional_doors)) {
           parsedFormData.additional_doors = [];
         }
+        if (!parsedFormData.additional_worktops || !Array.isArray(parsedFormData.additional_worktops)) {
+          parsedFormData.additional_worktops = [];
+        }
+        if (!parsedFormData.worktop_code) parsedFormData.worktop_code = "";
 
         // Initialize new fields if they don't exist
         if (!parsedFormData.door_manufacturer) parsedFormData.door_manufacturer = "";
@@ -359,6 +374,46 @@ function ChecklistViewContent() {
     setFormData({
       ...formData,
       additional_doors: (formData.additional_doors || []).filter((_, i) => i !== index),
+    });
+  };
+
+  const handleAdditionalWorktopChange = (index: number, field: keyof AdditionalWorktop, value: any) => {
+    if (!formData) return;
+    const additional_worktops = [...(formData.additional_worktops || [])];
+    if (!additional_worktops[index]) {
+      additional_worktops[index] = {
+        worktop_material_type: "",
+        worktop_material_color: "",
+        worktop_code: "",
+        worktop_size: "",
+        worktop_features: [],
+        worktop_other_details: "",
+      };
+    }
+    additional_worktops[index] = { ...additional_worktops[index], [field]: value };
+    setFormData({ ...formData, additional_worktops });
+  };
+
+  const addAdditionalWorktop = () => {
+    if (!formData) return;
+    setFormData({
+      ...formData,
+      additional_worktops: [...(formData.additional_worktops || []), {
+        worktop_material_type: "",
+        worktop_material_color: "",
+        worktop_code: "",
+        worktop_size: "",
+        worktop_features: [],
+        worktop_other_details: "",
+      }],
+    });
+  };
+
+  const removeAdditionalWorktop = (index: number) => {
+    if (!formData) return;
+    setFormData({
+      ...formData,
+      additional_worktops: (formData.additional_worktops || []).filter((_, i) => i !== index),
     });
   };
 
@@ -684,7 +739,7 @@ function ChecklistViewContent() {
       const materialDescription = `${orderDialogSection}\n${orderMaterials.join('\n')}`;
       
       const payload = {
-        customer_id: formData.customer_id,
+        client_id: formData.customer_id,  // ← change customer_id to client_id
         material_description: materialDescription,
         supplier_name: orderSupplier.trim() || null,
         estimated_cost: orderEstimatedCost ? parseFloat(orderEstimatedCost) : null,
@@ -694,7 +749,7 @@ function ChecklistViewContent() {
         status: 'ordered',
       };
 
-      const response = await fetch('${BACKEND_URL}/materials', {
+      const response = await fetch(`${BACKEND_URL}/api/materials`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1357,6 +1412,88 @@ function ChecklistViewContent() {
                         </div>
                       </div>
 
+                      {/* Additional Handles */}
+                      {((formData as any).additional_handles?.length > 0 || isEditing) && (
+                        <div className="border-t pt-4">
+                          <div className="mb-3 flex items-center justify-between">
+                            <label className="text-sm font-bold text-gray-700">Additional Handles</label>
+                            {isEditing && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => {
+                                  const current = (formData as any).additional_handles || [];
+                                  setFormData({ ...formData, additional_handles: [...current, { handles_code: "", handles_quantity: "", handles_size: "" }] } as any);
+                                }}
+                                className="bg-purple-600"
+                              >
+                                + Add Additional Handle
+                              </Button>
+                            )}
+                          </div>
+                          {((formData as any).additional_handles || []).map((handle: any, idx: number) => (
+                            <div key={idx} className="mb-3 space-y-3 rounded border-2 border-purple-300 bg-white p-4">
+                              <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Handle Code</label>
+                                  <Input
+                                    value={handle.handles_code || ""}
+                                    onChange={(e) => {
+                                      const updated = [...((formData as any).additional_handles || [])];
+                                      updated[idx] = { ...updated[idx], handles_code: e.target.value };
+                                      setFormData({ ...formData, additional_handles: updated } as any);
+                                    }}
+                                    readOnly={!isEditing}
+                                    className="text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Handle Quantity</label>
+                                  <Input
+                                    value={handle.handles_quantity || ""}
+                                    onChange={(e) => {
+                                      const updated = [...((formData as any).additional_handles || [])];
+                                      updated[idx] = { ...updated[idx], handles_quantity: e.target.value };
+                                      setFormData({ ...formData, additional_handles: updated } as any);
+                                    }}
+                                    readOnly={!isEditing}
+                                    className="text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Handle Size</label>
+                                  <Input
+                                    value={handle.handles_size || ""}
+                                    onChange={(e) => {
+                                      const updated = [...((formData as any).additional_handles || [])];
+                                      updated[idx] = { ...updated[idx], handles_size: e.target.value };
+                                      setFormData({ ...formData, additional_handles: updated } as any);
+                                    }}
+                                    readOnly={!isEditing}
+                                    className="text-sm"
+                                  />
+                                </div>
+                              </div>
+                              {isEditing && (
+                                <div className="flex justify-end">
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => {
+                                      const updated = ((formData as any).additional_handles || []).filter((_: any, i: number) => i !== idx);
+                                      setFormData({ ...formData, additional_handles: updated } as any);
+                                    }}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Accessories (e.g., Pullouts)</label>
                         <textarea
@@ -1377,7 +1514,6 @@ function ChecklistViewContent() {
                         />
                       </div>
 
-                      {/* Lighting Details */}
                       <div>
                         <label className="mb-1 block text-sm font-bold text-gray-700">Under Wall Unit Lights</label>
                         {isEditing ? (
@@ -1458,49 +1594,51 @@ function ChecklistViewContent() {
                         </div>
                         <div>
                           <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Material Color</label>
-                          <Input 
-                            value={formData.worktop_material_color || ""} 
+                          <Input
+                            value={formData.worktop_material_color || ""}
                             onChange={(e) => handleInputChange("worktop_material_color", e.target.value)}
-                            readOnly={!isEditing} 
-                            className="bg-white" 
+                            readOnly={!isEditing}
+                            className="bg-white"
                           />
                         </div>
                         <div>
-                          <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Size/Thickness</label>
-                          {isEditing ? (
-                            <select
-                              className="w-full rounded-md border border-gray-300 bg-white p-2"
-                              value={formData.worktop_size || ""}
-                              onChange={(e) => handleInputChange("worktop_size", e.target.value)}
-                            >
-                              <option value="">Select thickness</option>
-                              <option value="12mm">12mm</option>
-                              <option value="18mm">18mm</option>
-                              <option value="20mm">20mm</option>
-                              <option value="25mm">25mm</option>
-                              <option value="30mm">30mm</option>
-                              <option value="38mm">38mm</option>
-                              <option value="N/A">N/A</option>
-                            </select>
-                          ) : (
-                            <Input value={formData.worktop_size || ""} readOnly className="bg-white" />
-                          )}
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Code</label>
+                          <Input
+                            placeholder="Enter worktop code"
+                            value={formData.worktop_code || ""}
+                            onChange={(e) => handleInputChange("worktop_code", e.target.value)}
+                            readOnly={!isEditing}
+                            className="bg-white"
+                          />
                         </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Size/Thickness</label>
+                        {isEditing ? (
+                          <select
+                            className="w-full rounded-md border border-gray-300 bg-white p-2"
+                            value={formData.worktop_size || ""}
+                            onChange={(e) => handleInputChange("worktop_size", e.target.value)}
+                          >
+                            <option value="">Select thickness</option>
+                            <option value="12mm">12mm</option>
+                            <option value="18mm">18mm</option>
+                            <option value="20mm">20mm</option>
+                            <option value="25mm">25mm</option>
+                            <option value="30mm">30mm</option>
+                            <option value="38mm">38mm</option>
+                            <option value="N/A">N/A</option>
+                          </select>
+                        ) : (
+                          <Input value={formData.worktop_size || ""} readOnly className="bg-white" />
+                        )}
                       </div>
 
                       <div>
                         <label className="mb-2 block text-sm font-bold text-gray-700">Worktop Further Info</label>
                         <div className="grid grid-cols-2 gap-2">
-                          {[
-                            "Upstand",
-                            "Splashback",
-                            "Wall Cladding",
-                            "Sink Cut Out",
-                            "Drainer Grooves",
-                            "Hob Cut Out",
-                            "Window Cill",
-                            "LED Grooves",
-                          ].map((item) => (
+                          {["Upstand","Splashback","Wall Cladding","Sink Cut Out","Drainer Grooves","Hob Cut Out","Window Cill","LED Grooves"].map((item) => (
                             <label key={item} className="flex items-center space-x-2">
                               <input
                                 type="checkbox"
@@ -1513,13 +1651,126 @@ function ChecklistViewContent() {
                             </label>
                           ))}
                         </div>
-                        <Input 
+                        <Input
                           placeholder="Other worktop details"
                           className="mt-3 w-full bg-white"
                           value={formData.worktop_other_details || ""}
                           onChange={(e) => handleInputChange("worktop_other_details", e.target.value)}
                           readOnly={!isEditing}
                         />
+                      </div>
+
+                      {/* Additional Worktops */}
+                      <div className="border-t pt-4">
+                        <div className="mb-3 flex items-center justify-between">
+                          <label className="text-sm font-bold text-gray-700">Additional Worktops</label>
+                          {isEditing && (
+                            <Button type="button" size="sm" onClick={addAdditionalWorktop} className="bg-orange-600">
+                              + Add Additional Worktop
+                            </Button>
+                          )}
+                        </div>
+                        {formData.additional_worktops && formData.additional_worktops.map((worktop, idx) => (
+                          <div key={idx} className="mb-3 space-y-3 rounded border-2 border-orange-300 bg-white p-4">
+                            <div className="grid grid-cols-3 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Material Type</label>
+                                {isEditing ? (
+                                  <select
+                                    className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                    value={worktop.worktop_material_type || ""}
+                                    onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_material_type", e.target.value)}
+                                  >
+                                    <option value="">Select type</option>
+                                    <option value="stone">Stone</option>
+                                    <option value="laminate">Laminate</option>
+                                  </select>
+                                ) : (
+                                  <Input value={worktop.worktop_material_type || ""} readOnly className="text-sm" />
+                                )}
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Material Color</label>
+                                <Input
+                                  placeholder="Enter color"
+                                  className="text-sm"
+                                  value={worktop.worktop_material_color || ""}
+                                  onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_material_color", e.target.value)}
+                                  readOnly={!isEditing}
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Worktop Code</label>
+                                <Input
+                                  placeholder="Enter code"
+                                  className="text-sm"
+                                  value={worktop.worktop_code || ""}
+                                  onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_code", e.target.value)}
+                                  readOnly={!isEditing}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Size/Thickness</label>
+                              {isEditing ? (
+                                <select
+                                  className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                  value={worktop.worktop_size || ""}
+                                  onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_size", e.target.value)}
+                                >
+                                  <option value="">Select thickness</option>
+                                  <option value="12mm">12mm</option>
+                                  <option value="18mm">18mm</option>
+                                  <option value="20mm">20mm</option>
+                                  <option value="25mm">25mm</option>
+                                  <option value="30mm">30mm</option>
+                                  <option value="38mm">38mm</option>
+                                  <option value="N/A">N/A</option>
+                                </select>
+                              ) : (
+                                <Input value={worktop.worktop_size || ""} readOnly className="text-sm" />
+                              )}
+                            </div>
+
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Further Info</label>
+                              <div className="grid grid-cols-2 gap-2">
+                                {["Upstand","Splashback","Wall Cladding","Sink Cut Out","Drainer Grooves","Hob Cut Out","Window Cill","LED Grooves"].map((item) => (
+                                  <label key={item} className="flex items-center space-x-2">
+                                    <input
+                                      type="checkbox"
+                                      className="rounded"
+                                      checked={worktop.worktop_features?.includes(item) || false}
+                                      onChange={(e) => {
+                                        const current = worktop.worktop_features || [];
+                                        const updated = e.target.checked ? [...current, item] : current.filter((v) => v !== item);
+                                        handleAdditionalWorktopChange(idx, "worktop_features", updated);
+                                      }}
+                                      disabled={!isEditing}
+                                    />
+                                    <span className="text-xs">{item}</span>
+                                  </label>
+                                ))}
+                              </div>
+                              <Input
+                                placeholder="Other worktop details"
+                                className="mt-2 text-sm"
+                                value={worktop.worktop_other_details || ""}
+                                onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_other_details", e.target.value)}
+                                readOnly={!isEditing}
+                              />
+                            </div>
+
+                            {isEditing && (
+                              <div className="flex justify-end">
+                                <Button type="button" variant="destructive" size="sm" onClick={() => removeAdditionalWorktop(idx)}>
+                                  Remove
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -1849,6 +2100,129 @@ function ChecklistViewContent() {
                             className="bg-white" 
                           />
                         </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Code</label>
+                          <Input
+                            placeholder="Enter worktop code"
+                            value={formData.worktop_code || ""}
+                            onChange={(e) => handleInputChange("worktop_code", e.target.value)}
+                            readOnly={!isEditing}
+                            className="bg-white"
+                          />
+                        </div>
+
+                        {/* Additional Worktops */}
+                        <div className="border-t pt-4">
+                          <div className="mb-3 flex items-center justify-between">
+                            <label className="text-sm font-bold text-gray-700">Additional Worktops</label>
+                            {isEditing && (
+                              <Button type="button" size="sm" onClick={addAdditionalWorktop} className="bg-orange-600">
+                                + Add Additional Worktop
+                              </Button>
+                            )}
+                          </div>
+                          {formData.additional_worktops && formData.additional_worktops.map((worktop, idx) => (
+                            <div key={idx} className="mb-3 space-y-3 rounded border-2 border-orange-300 bg-white p-4">
+                              <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Material Type</label>
+                                  {isEditing ? (
+                                    <select
+                                      className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                      value={worktop.worktop_material_type || ""}
+                                      onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_material_type", e.target.value)}
+                                    >
+                                      <option value="">Select type</option>
+                                      <option value="stone">Stone</option>
+                                      <option value="laminate">Laminate</option>
+                                    </select>
+                                  ) : (
+                                    <Input value={worktop.worktop_material_type || ""} readOnly className="text-sm" />
+                                  )}
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Material Color</label>
+                                  <Input
+                                    placeholder="Enter color"
+                                    className="text-sm"
+                                    value={worktop.worktop_material_color || ""}
+                                    onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_material_color", e.target.value)}
+                                    readOnly={!isEditing}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Worktop Code</label>
+                                  <Input
+                                    placeholder="Enter code"
+                                    className="text-sm"
+                                    value={worktop.worktop_code || ""}
+                                    onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_code", e.target.value)}
+                                    readOnly={!isEditing}
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Size/Thickness</label>
+                                {isEditing ? (
+                                  <select
+                                    className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                                    value={worktop.worktop_size || ""}
+                                    onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_size", e.target.value)}
+                                  >
+                                    <option value="">Select thickness</option>
+                                    <option value="12mm">12mm</option>
+                                    <option value="18mm">18mm</option>
+                                    <option value="20mm">20mm</option>
+                                    <option value="25mm">25mm</option>
+                                    <option value="30mm">30mm</option>
+                                    <option value="38mm">38mm</option>
+                                    <option value="N/A">N/A</option>
+                                  </select>
+                                ) : (
+                                  <Input value={worktop.worktop_size || ""} readOnly className="text-sm" />
+                                )}
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Further Info</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {["Upstand","Splashback","Wall Cladding","Sink Cut Out","Drainer Grooves","Hob Cut Out","Window Cill","LED Grooves"].map((item) => (
+                                    <label key={item} className="flex items-center space-x-2">
+                                      <input
+                                        type="checkbox"
+                                        className="rounded"
+                                        checked={worktop.worktop_features?.includes(item) || false}
+                                        onChange={(e) => {
+                                          const current = worktop.worktop_features || [];
+                                          const updated = e.target.checked ? [...current, item] : current.filter((v) => v !== item);
+                                          handleAdditionalWorktopChange(idx, "worktop_features", updated);
+                                        }}
+                                        disabled={!isEditing}
+                                      />
+                                      <span className="text-xs">{item}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                                <Input
+                                  placeholder="Other worktop details"
+                                  className="mt-2 text-sm"
+                                  value={worktop.worktop_other_details || ""}
+                                  onChange={(e) => handleAdditionalWorktopChange(idx, "worktop_other_details", e.target.value)}
+                                  readOnly={!isEditing}
+                                />
+                              </div>
+
+                              {isEditing && (
+                                <div className="flex justify-end">
+                                  <Button type="button" variant="destructive" size="sm" onClick={() => removeAdditionalWorktop(idx)}>
+                                    Remove
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
 
                       {/* Additional Doors */}
@@ -2013,34 +2387,118 @@ function ChecklistViewContent() {
                         onClick={() => handleOpenOrderDialog("Hardware Specifications")}
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
-                        <Input 
-                          value={formData.handles_code || ""} 
-                          onChange={(e) => handleInputChange("handles_code", e.target.value)}
-                          readOnly={!isEditing} 
-                          className="bg-white" 
-                        />
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Handle Code</label>
+                          <Input 
+                            value={formData.handles_code || ""} 
+                            onChange={(e) => handleInputChange("handles_code", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Handle Quantity</label>
+                          <Input 
+                            value={formData.handles_quantity || ""} 
+                            onChange={(e) => handleInputChange("handles_quantity", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Handle Size</label>
+                          <Input 
+                            value={formData.handles_size || ""} 
+                            onChange={(e) => handleInputChange("handles_size", e.target.value)}
+                            readOnly={!isEditing} 
+                            className="bg-white" 
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Quantity</label>
-                        <Input 
-                          value={formData.handles_quantity || ""} 
-                          onChange={(e) => handleInputChange("handles_quantity", e.target.value)}
-                          readOnly={!isEditing} 
-                          className="bg-white" 
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Handle Size</label>
-                        <Input 
-                          value={formData.handles_size || ""} 
-                          onChange={(e) => handleInputChange("handles_size", e.target.value)}
-                          readOnly={!isEditing} 
-                          className="bg-white" 
-                        />
-                      </div>
+
+                      {/* Additional Handles */}
+                      {((formData as any).additional_handles?.length > 0 || isEditing) && (
+                        <div className="border-t pt-4">
+                          <div className="mb-3 flex items-center justify-between">
+                            <label className="text-sm font-bold text-gray-700">Additional Handles</label>
+                            {isEditing && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => {
+                                  const current = (formData as any).additional_handles || [];
+                                  setFormData({ ...formData, additional_handles: [...current, { handles_code: "", handles_quantity: "", handles_size: "" }] } as any);
+                                }}
+                                className="bg-purple-600"
+                              >
+                                + Add Additional Handle
+                              </Button>
+                            )}
+                          </div>
+                          {((formData as any).additional_handles || []).map((handle: any, idx: number) => (
+                            <div key={idx} className="mb-3 space-y-3 rounded border-2 border-purple-300 bg-white p-4">
+                              <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Handle Code</label>
+                                  <Input
+                                    value={handle.handles_code || ""}
+                                    onChange={(e) => {
+                                      const updated = [...((formData as any).additional_handles || [])];
+                                      updated[idx] = { ...updated[idx], handles_code: e.target.value };
+                                      setFormData({ ...formData, additional_handles: updated } as any);
+                                    }}
+                                    readOnly={!isEditing}
+                                    className="text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Handle Quantity</label>
+                                  <Input
+                                    value={handle.handles_quantity || ""}
+                                    onChange={(e) => {
+                                      const updated = [...((formData as any).additional_handles || [])];
+                                      updated[idx] = { ...updated[idx], handles_quantity: e.target.value };
+                                      setFormData({ ...formData, additional_handles: updated } as any);
+                                    }}
+                                    readOnly={!isEditing}
+                                    className="text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Handle Size</label>
+                                  <Input
+                                    value={handle.handles_size || ""}
+                                    onChange={(e) => {
+                                      const updated = [...((formData as any).additional_handles || [])];
+                                      updated[idx] = { ...updated[idx], handles_size: e.target.value };
+                                      setFormData({ ...formData, additional_handles: updated } as any);
+                                    }}
+                                    readOnly={!isEditing}
+                                    className="text-sm"
+                                  />
+                                </div>
+                              </div>
+                              {isEditing && (
+                                <div className="flex justify-end">
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => {
+                                      const updated = ((formData as any).additional_handles || []).filter((_: any, i: number) => i !== idx);
+                                      setFormData({ ...formData, additional_handles: updated } as any);
+                                    }}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
