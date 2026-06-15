@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, Plus, Edit, Trash2, ChevronDown, Filter, AlertCircle, Clock, FolderOpen, ChevronRight, ChevronLeft, ChevronLast, ChevronFirst, Save, X } from "lucide-react";
+import { Search, Plus, Edit, Trash2, ChevronDown, Filter, AlertCircle, Clock, FolderOpen, ChevronRight, ChevronLeft, ChevronLast, ChevronFirst, Save, X, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -33,6 +33,7 @@ import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
 // import { CustomerProjectTimeline } from "@/components/materials/CustomerProjectTimeline";
 import { useAuth } from "@/contexts/AuthContext";
 import { BACKEND_URL } from "@/lib/api";
+import { MaterialsWizardModal } from "@/components/materials/MaterialsWizardModal";
 
 // ---------------- Constants ----------------
 const CUSTOMERS_PER_PAGE = 25;
@@ -190,6 +191,11 @@ export default function CustomersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [salespeople, setSalespeople] = useState<Salesperson[]>([]);
+  const [showMaterialsPrompt, setShowMaterialsPrompt] = useState(false);
+  const [materialPromptCustomer, setMaterialPromptCustomer] = useState<Customer | null>(null);
+  const [showMaterialsWizard, setShowMaterialsWizard] = useState(false);
+  const [wizardCustomerId, setWizardCustomerId] = useState('');
+  const [wizardCustomerName, setWizardCustomerName] = useState('');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -359,12 +365,20 @@ export default function CustomersPage() {
 
       if (!response.ok) throw new Error("Failed to update stage");
 
-      // Update local state
       setAllCustomers((prev) =>
         prev.map((c) =>
           c.id === customerId ? { ...c, stage: newStage, updated_at: new Date().toISOString() } : c
         )
       );
+
+      // ← NEW: prompt if moved to Accepted
+      if (newStage === 'Accepted') {
+        const customer = allCustomers.find(c => c.id === customerId);
+        if (customer) {
+          setMaterialPromptCustomer(customer);
+          setShowMaterialsPrompt(true);
+        }
+      }
 
       console.log(`✅ Customer ${customerId} stage updated to ${newStage}`);
     } catch (err) {
@@ -1133,6 +1147,60 @@ export default function CustomersPage() {
           )}
         </DialogContent>
       </Dialog> */}
+
+      {/* Materials Order Prompt */}
+      {showMaterialsPrompt && materialPromptCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-purple-100 rounded-full">
+                <Package className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Customer Accepted! 🎉</h2>
+                <p className="text-sm text-gray-500">Would you like to order materials?</p>
+              </div>
+            </div>
+            <p className="text-gray-700 mb-6">
+              <strong>{materialPromptCustomer.name}</strong> has been moved to <span className="text-purple-600 font-semibold">Accepted</span> stage. 
+              Would you like to order materials for this customer now?
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowMaterialsPrompt(false);
+                  setMaterialPromptCustomer(null);
+                }}
+              >
+                Not Now
+              </Button>
+              <Button
+                className="flex-1 bg-purple-600 hover:bg-purple-700"
+                onClick={() => {
+                  setShowMaterialsPrompt(false);
+                  setWizardCustomerId(materialPromptCustomer.id);
+                  setWizardCustomerName(materialPromptCustomer.name);
+                  setShowMaterialsWizard(true);
+                  setMaterialPromptCustomer(null);
+                }}
+              >
+                Order Materials
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Materials Wizard */}
+      {showMaterialsWizard && (
+        <MaterialsWizardModal
+          customerId={wizardCustomerId}
+          customerName={wizardCustomerName}
+          onClose={() => setShowMaterialsWizard(false)}
+        />
+      )}
     </div>
   );
 }
