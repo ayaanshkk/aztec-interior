@@ -215,6 +215,45 @@ export default function BedroomChecklist() {
     }));
   };
 
+  const handleAdditionalWorktopChange = (index: number, field: keyof AdditionalWorktop, value: any) => {
+    setFormData((prev) => {
+      const additional_worktops = [...prev.additional_worktops];
+      if (!additional_worktops[index]) {
+        additional_worktops[index] = {
+          worktop_material_type: "",
+          worktop_material_color: "",
+          worktop_code: "",
+          worktop_size: "",
+          worktop_features: [],
+          worktop_other_details: "",
+        };
+      }
+      additional_worktops[index] = { ...additional_worktops[index], [field]: value };
+      return { ...prev, additional_worktops };
+    });
+  };
+
+  const addAdditionalWorktop = () => {
+    setFormData((prev) => ({
+      ...prev,
+      additional_worktops: [...prev.additional_worktops, {
+        worktop_material_type: "",
+        worktop_material_color: "",
+        worktop_code: "",
+        worktop_size: "",
+        worktop_features: [],
+        worktop_other_details: "",
+      }],
+    }));
+  };
+
+  const removeAdditionalWorktop = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      additional_worktops: prev.additional_worktops.filter((_, i) => i !== index),
+    }));
+  };
+
   const handleSectionNA = (sectionType: string) => {
     if (!window.confirm(`Set all fields in this section to "N/A"?`)) return;
 
