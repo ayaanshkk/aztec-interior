@@ -86,8 +86,12 @@ export default function BedroomChecklist() {
     signature_date: "",
     worktop_code: "",
     additional_worktops: [],
+    worktop_material_type: "",
+    worktop_size: "",
+    worktop_features: [],
+    worktop_other_details: "",
   });
-
+  
   useEffect(() => {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
