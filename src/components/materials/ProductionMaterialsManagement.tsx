@@ -153,6 +153,7 @@ export function ProductionMaterialsManagement() {
     expected_delivery_date: string;
     notes: string;
     status: string;
+    quantity: string;
   } | null>(null);
 
   // Manual form (fallback)
@@ -521,7 +522,7 @@ export function ProductionMaterialsManagement() {
           order_date: item.order_date,
           expected_delivery_date: item.expected_delivery || null,
           notes: item.notes.trim() || null,
-          quantity: (editForm as any).quantity ? parseInt((editForm as any).quantity) : 1,
+          quantity: item.quantity ? parseInt(item.quantity) : 1,
           status: 'ordered',
         };
         const response = await fetch(`${BACKEND_URL}/api/materials`, {
