@@ -185,6 +185,7 @@ function ChecklistViewContent() {
     expected_delivery: string;
     notes: string;
     included: boolean;
+    quantity: string;
   }[]>([]);
   const [orderDialogSection, setOrderDialogSection] = useState("");
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
@@ -730,6 +731,7 @@ function ChecklistViewContent() {
       expected_delivery: "",
       notes: "",
       included: true,
+      quantity: "1",
     })));
     setShowOrderDialog(true);
   };
@@ -3100,37 +3102,36 @@ function ChecklistViewContent() {
                           <div className="ml-7 space-y-3">
                             {/* Supplier + Cost */}
                             <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Supplier</label>
-                                <Input
-                                  placeholder="e.g., Howdens"
-                                  value={item.supplier}
-                                  onChange={(e) => {
-                                    const updated = [...orderItems];
-                                    updated[idx] = { ...updated[idx], supplier: e.target.value };
-                                    setOrderItems(updated);
-                                  }}
-                                  className="h-8 text-xs"
-                                />
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Supplier</label>
+                                  <Input
+                                    placeholder="e.g., Howdens"
+                                    value={item.supplier}
+                                    onChange={(e) => {
+                                      const updated = [...orderItems];
+                                      updated[idx] = { ...updated[idx], supplier: e.target.value };
+                                      setOrderItems(updated);
+                                    }}
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    placeholder="1"
+                                    value={item.quantity}
+                                    onChange={(e) => {
+                                      const updated = [...orderItems];
+                                      updated[idx] = { ...updated[idx], quantity: e.target.value };
+                                      setOrderItems(updated);
+                                    }}
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
                               </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Estimated Cost (£)</label>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  placeholder="0.00"
-                                  value={item.estimated_cost}
-                                  onChange={(e) => {
-                                    const updated = [...orderItems];
-                                    updated[idx] = { ...updated[idx], estimated_cost: e.target.value };
-                                    setOrderItems(updated);
-                                  }}
-                                  className="h-8 text-xs"
-                                />
-                              </div>
-                            </div>
-
                             {/* Dates */}
                             <div className="grid grid-cols-2 gap-3">
                               <div>

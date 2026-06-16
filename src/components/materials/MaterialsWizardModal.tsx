@@ -14,6 +14,7 @@ interface OrderItem {
   expected_delivery: string;
   notes: string;
   included: boolean;
+  quantity: string;
 }
 
 interface Checklist {
@@ -276,6 +277,7 @@ export function MaterialsWizardModal({ customerId, customerName, onClose }: Prop
         expected_delivery: '',
         notes: '',
         included: !m.startsWith('\n---'),
+        quantity: '1',
       })));
       setStep('review_items');
     } catch {
@@ -288,6 +290,7 @@ export function MaterialsWizardModal({ customerId, customerName, onClose }: Prop
       material: '', supplier: '', estimated_cost: '',
       order_date: new Date().toISOString().split('T')[0],
       expected_delivery: '', notes: '', included: true,
+      quantity: '1',
     }]);
   };
 
@@ -311,6 +314,7 @@ export function MaterialsWizardModal({ customerId, customerName, onClose }: Prop
             order_date: item.order_date,
             expected_delivery_date: item.expected_delivery || null,
             notes: item.notes.trim() || null,
+            quantity: item.quantity ? parseInt(item.quantity) : 1,
             status: 'ordered',
           }),
         });
@@ -495,11 +499,17 @@ export function MaterialsWizardModal({ customerId, customerName, onClose }: Prop
                               className="h-10 text-sm" />
                           </div>
                           <div>
-                            <label className="mb-1 block text-xs font-bold text-gray-600">Estimated Cost (£)</label>
-                            <Input type="number" step="0.01" min="0" placeholder="0.00" value={item.estimated_cost}
-                              onChange={e => { const u=[...orderItems]; u[idx]={...u[idx],estimated_cost:e.target.value}; setOrderItems(u); }}
+                            <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
+                            <Input type="number" min="1" placeholder="1" value={item.quantity}
+                              onChange={e => { const u=[...orderItems]; u[idx]={...u[idx],quantity:e.target.value}; setOrderItems(u); }}
                               className="h-10 text-sm" />
                           </div>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-gray-600">Estimated Cost (£)</label>
+                          <Input type="number" step="0.01" min="0" placeholder="0.00" value={item.estimated_cost}
+                            onChange={e => { const u=[...orderItems]; u[idx]={...u[idx],estimated_cost:e.target.value}; setOrderItems(u); }}
+                            className="h-10 text-sm" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>

@@ -62,6 +62,7 @@ interface MaterialOrder {
   ordered_by: string | null;
   notes: string | null;
   created_at: string;
+  quantity?: number | null;
 }
 
 interface Customer {
@@ -102,6 +103,7 @@ interface OrderItem {
   expected_delivery: string;
   notes: string;
   included: boolean;
+  quantity: string;
 }
 
 interface NewMaterialForm {
@@ -469,7 +471,8 @@ export function ProductionMaterialsManagement() {
         order_date: new Date().toISOString().split('T')[0],
         expected_delivery: '',
         notes: '',
-        included: !m.startsWith('\n---'), // exclude separator lines
+        included: !m.startsWith('\n---'),
+        quantity: '1',
       })));
       setWizardStep('review_items');
     } catch (err) {
@@ -492,6 +495,7 @@ export function ProductionMaterialsManagement() {
       expected_delivery: '',
       notes: '',
       included: true,
+      quantity: '1',
     }]);
   };
 
@@ -517,6 +521,7 @@ export function ProductionMaterialsManagement() {
           order_date: item.order_date,
           expected_delivery_date: item.expected_delivery || null,
           notes: item.notes.trim() || null,
+          quantity: (editForm as any).quantity ? parseInt((editForm as any).quantity) : 1,
           status: 'ordered',
         };
         const response = await fetch(`${BACKEND_URL}/api/materials`, {
@@ -643,6 +648,7 @@ export function ProductionMaterialsManagement() {
       expected_delivery_date: material.expected_delivery_date || '',
       notes: material.notes || '',
       status: material.status,
+      quantity: (material as any).quantity?.toString() || '1',
     });
     setIsEditing(false);
     setIsDetailsDialogOpen(true);
@@ -930,21 +936,36 @@ export function ProductionMaterialsManagement() {
                                 />
                               </div>
                               <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Estimated Cost (£)</label>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
                                 <Input
                                   type="number"
-                                  step="0.01"
-                                  min="0"
-                                  placeholder="0.00"
-                                  value={item.estimated_cost}
+                                  min="1"
+                                  placeholder="1"
+                                  value={item.quantity}
                                   onChange={e => {
                                     const updated = [...orderItems];
-                                    updated[idx] = { ...updated[idx], estimated_cost: e.target.value };
+                                    updated[idx] = { ...updated[idx], quantity: e.target.value };
                                     setOrderItems(updated);
                                   }}
                                   className="h-10 text-sm"
                                 />
                               </div>
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Estimated Cost (£)</label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                value={item.estimated_cost}
+                                onChange={e => {
+                                  const updated = [...orderItems];
+                                  updated[idx] = { ...updated[idx], estimated_cost: e.target.value };
+                                  setOrderItems(updated);
+                                }}
+                                className="h-10 text-sm"
+                              />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                               <div>
@@ -1198,7 +1219,7 @@ export function ProductionMaterialsManagement() {
         setIsDetailsDialogOpen(open);
         if (!open) { setIsEditing(false); setSelectedMaterial(null); setEditForm(null); }
       }}>
-        <DialogContent className="!max-w-[85vw] w-[85vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="!max-w-[600px] w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEditing ? 'Edit Material Order' : 'Material Order Details'}</DialogTitle>
             <DialogDescription>{isEditing ? 'Update material order information' : 'View material order information'}</DialogDescription>
@@ -1229,6 +1250,10 @@ export function ProductionMaterialsManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <div><Label>Supplier</Label><p className="mt-1 text-gray-900">{selectedMaterial.supplier_name || '-'}</p></div>
                     <div><Label>Estimated Cost</Label><p className="mt-1 text-gray-900">{formatCurrency(selectedMaterial.estimated_cost)}</p></div>
+                  </div>
+                  <div>
+                    <Label>Quantity</Label>
+                    <p className="mt-1 text-gray-900">{(selectedMaterial as any).quantity || 1}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div><Label>Order Date</Label><p className="mt-1 text-gray-900">{formatDate(selectedMaterial.order_date)}</p></div>

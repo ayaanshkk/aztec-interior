@@ -126,12 +126,14 @@ const getProjectTypeColor = (jobType: string | undefined) => {
 };
 
 // Helper function to calculate days in stage
-const calculateDaysInStage = (createdAt: string | null | undefined): number => {
-  if (!createdAt) return 0;
+const calculateDaysInStage = (stageUpdatedAt: string | null | undefined, createdAt: string | null | undefined): number => {
+  // Use stage_updated_at if available, fall back to created_at
+  const dateToUse = stageUpdatedAt || createdAt;
+  if (!dateToUse) return 0;
   try {
-    const createdDate = new Date(createdAt);
+    const date = new Date(dateToUse);
     const today = new Date();
-    return differenceInDays(today, createdDate);
+    return differenceInDays(today, date);
   } catch {
     return 0;
   }
@@ -183,6 +185,7 @@ type Customer = {
   is_allocated?: boolean;
   is_cleansed?: boolean;
   created_at?: string | null;
+  stage_updated_at?: string | null;
 };
 
 type Project = {
@@ -1094,7 +1097,7 @@ export default function EnhancedPipelinePage() {
                                 stage: feature.stage,
                               } as PipelineItem);
 
-                              const daysInStage = calculateDaysInStage(feature.customer.created_at);
+                              const daysInStage = calculateDaysInStage(feature.customer.stage_updated_at, feature.customer.created_at);
 
                               return (
                                 <KanbanCard
@@ -1262,7 +1265,7 @@ export default function EnhancedPipelinePage() {
             {/* Table Rows */}
             {filteredListItems.map((item) => {
               const isEditable = canUserEditItem(item);
-              const daysInStage = calculateDaysInStage(item.customer.created_at);
+              const daysInStage = calculateDaysInStage(item.customer.stage_updated_at, item.customer.created_at);
 
               return (
                 <Card
