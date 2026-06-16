@@ -46,6 +46,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { fetchWithAuth, BACKEND_URL } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { CreateCustomerModal } from "@/components/ui/CreateCustomerModal";
+import { MaterialsWizardModal } from "@/components/materials/MaterialsWizardModal";
 
 // --- START OF STAGE AND ROLE DEFINITIONS ---
 
@@ -259,7 +260,12 @@ export default function EnhancedPipelinePage() {
     itemId: null,
   });
   const prevFeaturesRef = useRef<any[]>([]);
-  
+  const [showMaterialsPrompt, setShowMaterialsPrompt] = useState(false);
+  const [materialPromptCustomer, setMaterialPromptCustomer] = useState<{ id: string; name: string } | null>(null);
+  const [showMaterialsWizard, setShowMaterialsWizard] = useState(false);
+  const [wizardCustomerId, setWizardCustomerId] = useState('');
+  const [wizardCustomerName, setWizardCustomerName] = useState('');
+    
   // State for Create Customer Modal
   const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] = useState(false);
   
@@ -333,17 +339,15 @@ export default function EnhancedPipelinePage() {
         opportunity: item.opportunity,
         reference: item.reference,
         stage: item.stage,
-        jobType: item.jobType, // Pass through the job type
+        jobType: item.jobType,
         project_count: item.project_count || 0,
       };
     });
-  }, []);
+  }, []); 
 
   // Fetch data from backend
   useEffect(() => {
-    if (authLoading) {
-      return;
-    }
+    if (authLoading) return;
 
     if (!user || !token) {
       setError("User not authenticated.");
@@ -357,40 +361,27 @@ export default function EnhancedPipelinePage() {
       try {
         setLoading(true);
         setError(null);
- 
         const pipelineResponse = await fetchWithAuth("pipeline");
- 
-        if (!pipelineResponse.ok) {
-          throw new Error(`Failed to fetch: ${pipelineResponse.status}`);
-        }
- 
+        if (!pipelineResponse.ok) throw new Error(`Failed to fetch: ${pipelineResponse.status}`);
         const rawPipelineData = await pipelineResponse.json();
-        
         if (isCancelled) return;
-        
         processPipelineData(rawPipelineData);
- 
       } catch (err: any) {
         if (isCancelled) return;
-        
         if (err.name === 'AbortError') {
           setError("Request timeout. Please refresh the page.");
         } else {
           setError(err instanceof Error ? err.message : "Failed to load data");
         }
       } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
+        if (!isCancelled) setLoading(false);
       }
     };
- 
+
     fetchData();
- 
-    return () => {
-      isCancelled = true;
-    };
-  }, [authLoading, token, user]);
+
+    return () => { isCancelled = true; };
+  }, [authLoading, token, user]); 
 
   // Extract the data processing logic into a separate function
   const processPipelineData = useCallback((rawPipelineData: any[]) => {
@@ -404,24 +395,20 @@ export default function EnhancedPipelinePage() {
           const backendStage = item.stage?.trim() || "Lead";
           const validStage = STAGES.includes(backendStage as Stage) ? backendStage : "Lead" as Stage;
 
-          // Generate reference based on type
           let reference = "";
           let jobType = undefined;
           
           if (isProjectItem) {
             const projectId = String(item.project?.id || '').slice(-4).toUpperCase();
             reference = `PROJ-${projectId}`;
-            // Extract project type from project data
             jobType = item.project?.project_type || item.project?.type;
           } else if (isOpportunityItem) {
             const oppId = String(item.opportunity?.id || '').slice(-4).toUpperCase();
             reference = `OPP-${oppId}`;
-            // Extract opportunity type if available
             jobType = item.opportunity?.opportunity_type || item.opportunity?.type;
           } else {
             const clientId = String(item.customer?.id || '').slice(-4).toUpperCase();
             reference = `CLIENT-${clientId}`;
-            // ✅ For pure clients, extract from customer.project_types array
             if (item.customer?.project_types && Array.isArray(item.customer.project_types) && item.customer.project_types.length > 0) {
               jobType = item.customer.project_types.join(", ");
             }
@@ -460,15 +447,37 @@ export default function EnhancedPipelinePage() {
         })
         .filter(Boolean);
 
-      const filteredItems = pipelineItemsRetrieved.filter((item: PipelineItem) => canUserAccessItem(item));
+      const filteredItems = pipelineItemsRetrieved.filter((item: PipelineItem) => !!item.customer);
       
       setPipelineItems(filteredItems);
       
-      const mappedFeatures = mapPipelineToFeatures(filteredItems);
+      // Inline the mapping instead of calling mapPipelineToFeatures
+      const mappedFeatures = filteredItems.map((item: PipelineItem) => {
+        const isProjectItem = item.type === "project";
+        const isOpportunityItem = item.type === "opportunity";
+        let displayName = item.customer.name;
+        if (isProjectItem && item.project) displayName = `${item.customer.name} - ${item.project.title}`;
+        else if (isOpportunityItem && item.opportunity) displayName = `${item.customer.name} - ${item.opportunity.title}`;
+        return {
+          id: item.id,
+          name: `${item.reference} — ${displayName}`,
+          column: stageToColumnId(item.stage),
+          itemId: item.id,
+          itemType: item.type,
+          customer: item.customer,
+          project: item.project,
+          opportunity: item.opportunity,
+          reference: item.reference,
+          stage: item.stage,
+          jobType: item.jobType,
+          project_count: item.project_count || 0,
+        };
+      });
+
       setFeatures(mappedFeatures);
       prevFeaturesRef.current = mappedFeatures;
     });
-  }, [mapPipelineToFeatures]);
+  }, []);
 
   const handleDataChange = async (next: any[]) => {
     console.log("=".repeat(60));
@@ -511,7 +520,12 @@ export default function EnhancedPipelinePage() {
     console.log("🎯 Moved items details:");
     moved.forEach(item => {
       const newStage = columnIdToStage(item.column);
-      console.log(`  - ${item.name}: ${item.column} → Stage: ${newStage}`);
+      if (newStage === 'Accepted') {
+        // Extract the real customer ID (strip "client-" prefix if present)
+        const customerId = item.customer?.id || '';
+        const customerName = item.customer?.name || '';
+        triggerMaterialsPrompt(customerId, customerName, newStage);
+      }
     });
 
     // Create stage updates map
@@ -766,6 +780,10 @@ export default function EnhancedPipelinePage() {
 
       await refetchPipelineData();
 
+      if (newStage === 'Accepted') {
+        triggerMaterialsPrompt(item.customer.id, item.customer.name, newStage);
+      }
+
     } catch (e) {
       console.error("Failed to quick change stage:", e);
       alert("Failed to move to Rejected. Please try again.");
@@ -823,6 +841,10 @@ export default function EnhancedPipelinePage() {
       }
 
       await refetchPipelineData();
+
+      if (newStage === 'Accepted') {
+        triggerMaterialsPrompt(item.customer.id, item.customer.name, newStage);
+      }
 
       // Log audit entry
       const auditEntry: AuditLog = {
@@ -894,6 +916,13 @@ export default function EnhancedPipelinePage() {
       return "Invalid Date";
     }
   };
+
+  const triggerMaterialsPrompt = useCallback((customerId: string, customerName: string, newStage: Stage) => {
+    if (newStage === 'Accepted') {
+      setMaterialPromptCustomer({ id: customerId, name: customerName });
+      setShowMaterialsPrompt(true);
+    }
+  }, []);
 
   // Loading state with skeleton
   if (loading) {
@@ -1408,6 +1437,61 @@ export default function EnhancedPipelinePage() {
           await refetchPipelineData();
         }}
       />
+
+      {/* Materials Order Prompt */}
+      {showMaterialsPrompt && materialPromptCustomer && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-purple-100 rounded-full">
+                <Briefcase className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Customer Accepted! 🎉</h2>
+                <p className="text-sm text-gray-500">Would you like to order materials?</p>
+              </div>
+            </div>
+            <p className="text-gray-700 mb-6">
+              <strong>{materialPromptCustomer.name}</strong> has been moved to{' '}
+              <span className="text-purple-600 font-semibold">Accepted</span> stage.
+              Would you like to order materials for this customer now?
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowMaterialsPrompt(false);
+                  setMaterialPromptCustomer(null);
+                }}
+              >
+                Not Now
+              </Button>
+              <Button
+                className="flex-1 bg-purple-600 hover:bg-purple-700"
+                onClick={() => {
+                  setShowMaterialsPrompt(false);
+                  setWizardCustomerId(materialPromptCustomer.id);
+                  setWizardCustomerName(materialPromptCustomer.name);
+                  setShowMaterialsWizard(true);
+                  setMaterialPromptCustomer(null);
+                }}
+              >
+                Order Materials
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline Materials Wizard */}
+      {showMaterialsWizard && (
+        <MaterialsWizardModal
+          customerId={wizardCustomerId}
+          customerName={wizardCustomerName}
+          onClose={() => setShowMaterialsWizard(false)}
+        />
+      )}
     </div>
   );
 }

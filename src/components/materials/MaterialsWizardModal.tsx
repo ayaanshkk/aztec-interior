@@ -73,95 +73,189 @@ export function MaterialsWizardModal({ customerId, customerName, onClose }: Prop
 
   const isNA = (v: any) => !v || String(v).trim().toLowerCase() === 'n/a' || String(v).trim() === '0';
 
-  const extractMaterials = (formData: any): string[] => {
-    const items: string[] = [];
-    const isKitchen = (formData.form_type || '').toLowerCase().includes('kitchen');
+	const extractMaterials = (formData: any): string[] => {
+		const items: string[] = [];
+		const isKitchen = (formData.form_type || '').toLowerCase().includes('kitchen');
 
-    const push = (label: string, value: any) => {
-      if (!value) return;
-      const str = String(value).trim();
-      if (!str) return;
-      const cleaned = str.replace(/N\/A/gi, '').replace(/[-\/\s]/g, '');
-      if (!cleaned) return;
-      items.push(`${label}: ${value}`);
-    };
+		const isNA = (v: any) => !v || String(v).trim().toLowerCase() === 'n/a' || String(v).trim() === '0';
 
-    push('Door Style', formData.door_style);
-    push('Door Type', formData.door_type);
-    push('Door Color', formData.door_color);
-    push('Door Manufacturer', formData.door_manufacturer);
-    push('Door Name', formData.door_name);
-    push('Glazing Material', formData.glazing_material);
-    push('Panel Color', formData.end_panel_color);
-    push('Plinth/Filler Color', formData.plinth_filler_color);
-    push('Cabinet Color', formData.cabinet_color);
-    push('Worktop Color', formData.worktop_material_color);
+		const push = (label: string, value: any) => {
+			if (!value) return;
+			const str = String(value).trim();
+			if (!str) return;
+			const cleaned = str.replace(/N\/A/gi, '').replace(/[-\/\s]/g, '');
+			if (!cleaned) return;
+			items.push(`${label}: ${value}`);
+		};
 
-    (formData.additional_doors || []).forEach((d: any, i: number) => {
-      if (d.door_style || d.door_color) {
-        items.push(`\n--- Additional Door ${i + 1} ---`);
-        push('Door Style', d.door_style); push('Door Color', d.door_color);
-        push('Panel Color', d.panel_color); push('Cabinet Color', d.cabinet_color);
-        push('Quantity', d.quantity);
-      }
-    });
+		// ── Material Specs ──
+		push('Door Style', formData.door_style);
+		push('Door Type', formData.door_type);
+		push('Door Color', formData.door_color);
+		push('Door Manufacturer', formData.door_manufacturer);
+		push('Door Name', formData.door_name);
+		push('Glazing Material', formData.glazing_material);
+		push('Panel Color', formData.end_panel_color);
+		push('Plinth/Filler Color', formData.plinth_filler_color);
+		push('Cabinet Color', formData.cabinet_color);
+		push('Worktop Color', formData.worktop_material_color);
 
-    push('Handle Code', formData.handles_code);
-    push('Handle Quantity', formData.handles_quantity);
-    push('Handle Size', formData.handles_size);
+		(formData.additional_doors || []).forEach((d: any, i: number) => {
+			if (d.door_style || d.door_color) {
+				items.push(`\n--- Additional Door ${i + 1} ---`);
+				push('Door Style', d.door_style);
+				push('Door Type', d.door_type);
+				push('Door Color', d.door_color);
+				push('Door Manufacturer', d.door_manufacturer);
+				push('Door Name', d.door_name);
+				push('Glazing Material', d.glazing_material);
+				push('Panel Color', d.panel_color);
+				push('Plinth Color', d.plinth_color);
+				push('Cabinet Color', d.cabinet_color);
+				push('Worktop Color', d.worktop_color);
+				push('Quantity', d.quantity);
+			}
+		});
 
-    (formData.additional_handles || []).forEach((h: any, i: number) => {
-      if (h.handles_code) {
-        items.push(`\n--- Additional Handle ${i + 1} ---`);
-        push('Handle Code', h.handles_code);
-        push('Handle Quantity', h.handles_quantity);
-        push('Handle Size', h.handles_size);
-      }
-    });
+		// ── Hardware ──
+		push('Handle Code', formData.handles_code);
+		push('Handle Quantity', formData.handles_quantity);
+		push('Handle Size', formData.handles_size);
 
-    if (isKitchen) {
-      push('Accessories', formData.accessories);
-      if (!isNA(formData.under_wall_unit_lights_color) && !isNA(formData.under_wall_unit_lights_profile)) {
-        push('Under Wall Unit Lights', `${formData.under_wall_unit_lights_color} / ${formData.under_wall_unit_lights_profile}`);
-      }
-      if (!isNA(formData.under_worktop_lights_color)) push('Under Worktop Lights', formData.under_worktop_lights_color);
-      push('Worktop Material', formData.worktop_material_type);
-      push('Worktop Code', formData.worktop_code);
-      push('Worktop Size', formData.worktop_size);
-      if (formData.worktop_features?.length) push('Worktop Features', formData.worktop_features.join(', '));
+		(formData.additional_handles || []).forEach((h: any, i: number) => {
+			if (h.handles_code) {
+				items.push(`\n--- Additional Handle ${i + 1} ---`);
+				push('Handle Code', h.handles_code);
+				push('Handle Quantity', h.handles_quantity);
+				push('Handle Size', h.handles_size);
+			}
+		});
 
-      const appLabels = ['Oven', 'Microwave', 'Washing Machine', 'Dryer', 'HOB', 'Extractor', 'INTG Dishwasher'];
-      (formData.appliances || []).forEach((a: any, i: number) => {
-        if (a.make || a.model) push(appLabels[i] || `Appliance ${i + 1}`, `${a.make || ''} ${a.model || ''}`.trim());
-      });
-      if (!isNA(formData.sink_details)) push('Sink', `${formData.sink_details} (Model: ${formData.sink_model || 'N/A'})`);
-      if (!isNA(formData.tap_details)) push('Tap', `${formData.tap_details} (Model: ${formData.tap_model || 'N/A'})`);
-    } else {
-      push('Worktop Code', formData.worktop_code);
-      if (!isNA(formData.bedside_cabinets_type) && !isNA(formData.bedside_cabinets_qty)) {
-        push('Bedside Cabinets', `${formData.bedside_cabinets_type} (Qty: ${formData.bedside_cabinets_qty})`);
-      }
-      if (!isNA(formData.mirror_type) && !isNA(formData.mirror_qty)) {
-        push('Mirror', `${formData.mirror_type} (Qty: ${formData.mirror_qty})`);
-      }
-      if (!isNA(formData.soffit_lights_type) && !isNA(formData.soffit_lights_color)) {
-        push('Soffit Lights', `${formData.soffit_lights_type} - ${formData.soffit_lights_color}`);
-      }
-      if (!isNA(formData.gable_lights_type) && !isNA(formData.gable_lights_main_color)) {
-        push('Gable Lights', `${formData.gable_lights_type} - ${formData.gable_lights_main_color} / ${formData.gable_lights_profile_color || ''}`);
-      }
-      if (!isNA(formData.other_accessories)) push('Accessories', formData.other_accessories);
-    }
+		if (isKitchen) {
+			push('Accessories', formData.accessories);
+			push('Lighting Spec', formData.lighting_spec);
 
-    return items.filter(i => {
-      if (!i.trim()) return false;
-      if (i.startsWith('\n---')) return true;
-      const colonIdx = i.indexOf(':');
-      if (colonIdx === -1) return true;
-      const value = i.substring(colonIdx + 1).trim();
-      return value.replace(/N\/A/gi, '').replace(/[-\/\s]/g, '').length > 0;
-    });
-  };
+			if (!isNA(formData.under_wall_unit_lights_color) && !isNA(formData.under_wall_unit_lights_profile)) {
+				push('Under Wall Unit Lights', `${formData.under_wall_unit_lights_color} / ${formData.under_wall_unit_lights_profile}`);
+			}
+			if (!isNA(formData.under_worktop_lights_color)) {
+				push('Under Worktop Lights', formData.under_worktop_lights_color);
+			}
+
+			// ── Worktop ──
+			push('Worktop Material', formData.worktop_material_type);
+			push('Worktop Code', formData.worktop_code);
+			push('Worktop Size', formData.worktop_size);
+			if (formData.worktop_features?.length) {
+				push('Worktop Features', formData.worktop_features.join(', '));
+			}
+			push('Worktop Other', formData.worktop_other_details);
+
+			(formData.additional_worktops || []).forEach((w: any, i: number) => {
+				if (w.worktop_material_type || w.worktop_code) {
+					items.push(`\n--- Additional Worktop ${i + 1} ---`);
+					push('Material', w.worktop_material_type);
+					push('Color', w.worktop_material_color);
+					push('Code', w.worktop_code);
+					push('Size', w.worktop_size);
+					if (w.worktop_features?.length) push('Features', w.worktop_features.join(', '));
+					push('Other', w.worktop_other_details);
+				}
+			});
+
+			// ── Appliances ──
+			const appLabels = ['Oven', 'Microwave', 'Washing Machine', 'Dryer', 'HOB', 'Extractor', 'INTG Dishwasher'];
+			(formData.appliances || []).forEach((a: any, i: number) => {
+				if (!a.make && !a.model) return;
+				const makeStr = String(a.make || '').trim();
+				const modelStr = String(a.model || '').trim();
+				if (isNA(makeStr) && isNA(modelStr)) return;
+				const makeLower = makeStr.toLowerCase();
+				if (
+					makeLower.includes('intg fridge') ||
+					makeLower.includes('intg freezer') ||
+					makeLower.includes('no make specified') ||
+					makeLower.includes('no model specified') ||
+					(makeLower.includes('n/a') && modelStr === '') ||
+					(isNA(makeStr) && isNA(modelStr))
+				) return;
+				if (i >= 7) return;
+				push(appLabels[i] || `Appliance ${i + 1}`, `${makeStr} ${modelStr}`.trim());
+			});
+
+			if (formData.integ_fridge_make && !isNA(formData.integ_fridge_make) && !isNA(formData.integ_fridge_qty)) {
+				push(
+					`INTG Fridge/Freezer (Qty: ${formData.integ_fridge_qty || 1})`,
+					`${formData.integ_fridge_make} ${formData.integ_fridge_model || ''}`.trim()
+				);
+			}
+			if (formData.integ_freezer_make && !isNA(formData.integ_freezer_make) && !isNA(formData.integ_freezer_qty)) {
+				push(
+					`INTG Freezer (Qty: ${formData.integ_freezer_qty || 1})`,
+					`${formData.integ_freezer_make} ${formData.integ_freezer_model || ''}`.trim()
+				);
+			}
+			if (!isNA(formData.sink_details)) {
+				push('Sink', `${formData.sink_details} (Model: ${formData.sink_model || 'N/A'})`);
+			}
+			if (!isNA(formData.tap_details)) {
+				push('Tap', `${formData.tap_details} (Model: ${formData.tap_model || 'N/A'})`);
+			}
+
+		} else {
+			// ── Bedroom ──
+			push('Worktop Code', formData.worktop_code);
+
+			(formData.additional_worktops || []).forEach((w: any, i: number) => {
+				if (w.worktop_material_type || w.worktop_code) {
+					items.push(`\n--- Additional Worktop ${i + 1} ---`);
+					push('Material', w.worktop_material_type);
+					push('Color', w.worktop_material_color);
+					push('Code', w.worktop_code);
+					push('Size', w.worktop_size);
+					if (w.worktop_features?.length) push('Features', w.worktop_features.join(', '));
+				}
+			});
+
+			if (!isNA(formData.bedside_cabinets_type) && !isNA(formData.bedside_cabinets_qty)) {
+				push('Bedside Cabinets', `${formData.bedside_cabinets_type} (Qty: ${formData.bedside_cabinets_qty})`);
+			}
+			if (formData.dresser_desk === 'yes' && !isNA(formData.dresser_desk_details)) {
+				push('Dresser/Desk', formData.dresser_desk_details || 'Yes');
+			}
+			if (formData.internal_mirror === 'yes' && !isNA(formData.internal_mirror_details)) {
+				push('Internal Mirror', formData.internal_mirror_details || 'Yes');
+			}
+			if (!isNA(formData.mirror_type) && !isNA(formData.mirror_qty)) {
+				push('Mirror', `${formData.mirror_type} (Qty: ${formData.mirror_qty})`);
+			}
+			if (!isNA(formData.soffit_lights_type) && !isNA(formData.soffit_lights_color)) {
+				push('Soffit Lights', `${formData.soffit_lights_type} - ${formData.soffit_lights_color}`);
+			}
+			if (!isNA(formData.gable_lights_type) && !isNA(formData.gable_lights_main_color)) {
+				push('Gable Lights', `${formData.gable_lights_type} - ${formData.gable_lights_main_color || ''} / ${formData.gable_lights_profile_color || ''}`);
+			}
+			if (!isNA(formData.other_accessories)) {
+				push('Accessories', formData.other_accessories);
+			}
+			if (formData.floor_protection?.length) {
+				const nonNA = formData.floor_protection.filter(
+					(f: string) => !isNA(f) && f !== 'No Floor Protection Required'
+				);
+				if (nonNA.length > 0) push('Floor Protection', nonNA.join(', '));
+			}
+		}
+
+		return items.filter(i => {
+			if (!i.trim()) return false;
+			if (i.startsWith('\n---')) return true;
+			const colonIdx = i.indexOf(':');
+			if (colonIdx === -1) return true;
+			const value = i.substring(colonIdx + 1).trim();
+			const cleaned = value.replace(/N\/A/gi, '').replace(/[-\/\s]/g, '');
+			return cleaned.length > 0;
+		});
+	};
 
   const handleChecklistSelected = async (checklistId: string) => {
     try {
@@ -259,13 +353,52 @@ export function MaterialsWizardModal({ customerId, customerName, onClose }: Prop
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
                   <span className="ml-3 text-gray-500">Loading checklists...</span>
                 </div>
-              ) : checklists.length === 0 ? (
-                <div className="text-center py-12">
-                  <ClipboardList className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-600 mb-1">No checklists found for this customer</p>
-                  <p className="text-sm text-gray-400 mb-4">A checklist must be submitted first before ordering materials</p>
-                  <Button variant="outline" onClick={onClose}>Close</Button>
-                </div>
+							) : checklists.length === 0 ? (
+								<div className="text-center py-8">
+									<ClipboardList className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+									<p className="text-gray-600 mb-1 font-medium">No checklists found for this customer</p>
+									<p className="text-sm text-gray-400 mb-6">Please fill in a checklist first, then come back to order materials.</p>
+									<div className="flex flex-col sm:flex-row gap-3 justify-center">
+										<button
+											onClick={() => {
+												const params = new URLSearchParams({
+													customerId: customerId,
+													customerName: customerName,
+												});
+												window.open(`/checklists/kitchen?${params.toString()}`, '_blank');
+											}}
+											className="flex items-center justify-center gap-3 p-4 rounded-lg border-2 border-green-200 bg-green-50 hover:border-green-400 hover:bg-green-100 transition-colors text-left w-full sm:w-48"
+										>
+											<div className="p-2 rounded-lg bg-green-100">
+												<ClipboardList className="h-5 w-5 text-green-600" />
+											</div>
+											<div>
+												<p className="font-semibold text-green-900 text-sm">Kitchen</p>
+												<p className="text-xs text-green-600">Fill checklist</p>
+											</div>
+										</button>
+										<button
+											onClick={() => {
+												const params = new URLSearchParams({
+													customerId: customerId,
+													customerName: customerName,
+												});
+												window.open(`/checklists/bedroom?${params.toString()}`, '_blank');
+											}}
+											className="flex items-center justify-center gap-3 p-4 rounded-lg border-2 border-purple-200 bg-purple-50 hover:border-purple-400 hover:bg-purple-100 transition-colors text-left w-full sm:w-48"
+										>
+											<div className="p-2 rounded-lg bg-purple-100">
+												<ClipboardList className="h-5 w-5 text-purple-600" />
+											</div>
+											<div>
+												<p className="font-semibold text-purple-900 text-sm">Bedroom</p>
+												<p className="text-xs text-purple-600">Fill checklist</p>
+											</div>
+										</button>
+									</div>
+									<p className="text-xs text-gray-400 mt-4">After submitting, close this dialog and try again.</p>
+									<Button variant="outline" onClick={onClose} className="mt-3">Close</Button>
+								</div>
               ) : (
                 <>
                   <p className="text-sm text-gray-500 mb-4">Select a checklist to auto-extract materials:</p>

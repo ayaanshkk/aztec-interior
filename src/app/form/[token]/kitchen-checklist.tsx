@@ -575,31 +575,6 @@ export default function KitchenChecklist() {
           </div>
         </header>
 
-        {isWalkinMode && (
-          <div className="mx-2 mt-2 rounded-lg border-2 border-blue-300 bg-blue-50 p-4 print:hidden">
-            <div className="flex items-start gap-3">
-              <div className="rounded-full bg-blue-500 p-2">
-                <UserPlus className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-blue-900">Walk-in Customer Mode</h3>
-                <p className="text-sm text-blue-700 mt-1">
-                  This form is in <strong>walk-in mode</strong>. When you submit this checklist:
-                </p>
-                <ul className="text-sm text-blue-700 mt-2 space-y-1 list-disc list-inside">
-                  <li>Customer information will be <strong>automatically extracted</strong> from the form</li>
-                  <li>A new customer will be <strong>created in your database</strong></li>
-                  <li>The checklist will be <strong>linked to this new customer</strong></li>
-                  <li>You'll be redirected to the customer's profile page</li>
-                </ul>
-                <p className="text-xs text-blue-600 mt-3 font-medium">
-                  ℹ️ Make sure to fill in customer name, phone, address, and postcode fields
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         <div className="flex flex-1 flex-col gap-2 p-2" ref={formRef}>
           <form className="rounded-lg border bg-white p-4 shadow-sm print:shadow-none print:border-0">
             <h2 className="mb-1 text-center text-lg font-semibold">Kitchen Installation Checklist</h2>
@@ -816,18 +791,12 @@ export default function KitchenChecklist() {
                           <div className="grid grid-cols-3 gap-3">
                             <div>
                               <label className="mb-1 block text-xs font-bold text-gray-600">Door Style</label>
-                              <select
-                                className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                              <Input
+                                placeholder="Enter door style"
+                                className="text-sm"
                                 value={door.door_style}
                                 onChange={(e) => handleAdditionalDoorChange(idx, "door_style", e.target.value)}
-                              >
-                                <option value="">Select</option>
-                                <option value="vinyl">Vinyl</option>
-                                <option value="slab">Slab</option>
-                                <option value="glazed">Glazed</option>
-                                <option value="shaker">Shaker</option>
-                                <option value="N/A">N/A</option>
-                              </select>
+                              />
                             </div>
                             
                             <div>
