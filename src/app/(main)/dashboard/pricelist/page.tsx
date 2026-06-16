@@ -238,9 +238,15 @@ export default function PricelistPage() {
         if (item.item_code.toLowerCase().includes(query)) return true;
         if (item.item_name.toLowerCase().includes(query)) return true;
         if (activeTab === 'Appliances') {
-          return Object.values(item.prices).some((priceData: any) =>
-            priceData.model && priceData.model.toLowerCase().includes(query)
-          );
+          return Object.values(item.prices).some((priceData: any) => {
+            if (priceData.model && priceData.model.toLowerCase().includes(query)) return true;
+            if (priceData.alias_codes) {
+              return priceData.alias_codes
+                .split(',')
+                .some((alias: string) => alias.trim().toLowerCase().includes(query));
+            }
+            return false;
+          });
         }
         return false;
       });
@@ -315,8 +321,6 @@ export default function PricelistPage() {
           const description = `${editForm.item_name} - ${level} Series${seriesInfo ? ` (${seriesInfo})` : ''}`;
 
           if (data?.pricelist_id) {
-            // ✅ ALWAYS update existing row — even if model code changed
-            // @ts-ignore
             return api.updatePricelistItem(data.pricelist_id, {
               item_code: hasModel ? modelCode : data.model,
               item_name: editForm.item_name,
@@ -324,6 +328,7 @@ export default function PricelistPage() {
               base_price: hasPrice ? parseFloat(priceValue) : 0,
               door_type: level,
               brand: editForm.brand,
+              alias_codes: level === 'Low' ? (editForm.alias_codes || null) : undefined,
             });
           } else if (hasModel && hasPrice) {
             // ✅ Check if row already exists for this brand+level before creating
@@ -1021,7 +1026,10 @@ export default function PricelistPage() {
                                     <div className="text-xs text-gray-500">{item.brand}</div>
                                     {(item.prices?.['Low'] as any)?.alias_codes && (
                                       <div className="text-xs text-blue-600 mt-0.5">
-                                        Alt: {(item.prices?.['Low'] as any)?.alias_codes}
+                                        {(item.prices?.['Low'] as any)?.alias_codes
+                                          .split(',')
+                                          .map((c: string) => c.trim())
+                                          .join(' / ')}
                                       </div>
                                     )}
                                   </div>
