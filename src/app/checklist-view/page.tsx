@@ -3100,38 +3100,38 @@ function ChecklistViewContent() {
 
                         {item.included && (
                           <div className="ml-7 space-y-3">
-                            {/* Supplier + Cost */}
+                            {/* Supplier + Quantity */}
                             <div className="grid grid-cols-2 gap-3">
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="mb-1 block text-xs font-bold text-gray-600">Supplier</label>
-                                  <Input
-                                    placeholder="e.g., Howdens"
-                                    value={item.supplier}
-                                    onChange={(e) => {
-                                      const updated = [...orderItems];
-                                      updated[idx] = { ...updated[idx], supplier: e.target.value };
-                                      setOrderItems(updated);
-                                    }}
-                                    className="h-8 text-xs"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    placeholder="1"
-                                    value={item.quantity}
-                                    onChange={(e) => {
-                                      const updated = [...orderItems];
-                                      updated[idx] = { ...updated[idx], quantity: e.target.value };
-                                      setOrderItems(updated);
-                                    }}
-                                    className="h-8 text-xs"
-                                  />
-                                </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Supplier</label>
+                                <Input
+                                  placeholder="e.g., Howdens"
+                                  value={item.supplier}
+                                  onChange={(e) => {
+                                    const updated = [...orderItems];
+                                    updated[idx] = { ...updated[idx], supplier: e.target.value };
+                                    setOrderItems(updated);
+                                  }}
+                                  className="h-8 text-xs"
+                                />
                               </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  placeholder="1"
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const updated = [...orderItems];
+                                    updated[idx] = { ...updated[idx], quantity: e.target.value };
+                                    setOrderItems(updated);
+                                  }}
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                            </div>  {/* ← THIS CLOSING TAG WAS MISSING */}
+
                             {/* Dates */}
                             <div className="grid grid-cols-2 gap-3">
                               <div>
