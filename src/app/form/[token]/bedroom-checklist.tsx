@@ -114,7 +114,7 @@ export default function BedroomChecklist() {
     }
   }, []);
 
-  type SingleField = keyof Omit<BedroomFormData, "floor_protection" | "additional_doors" | "additional_handles" | "additional_worktops">;
+  type SingleField = keyof Omit<BedroomFormData, "floor_protection" | "additional_doors" | "additional_handles" | "additional_worktops" | "worktop_features">;
 
   const handleInputChange = (field: SingleField, value: string) => {
     setFormData((prev) => ({
@@ -299,8 +299,12 @@ export default function BedroomChecklist() {
           break;
 
         case "worktop_specs":
+          updates.worktop_material_type = "N/A";
           updates.worktop_material_color = "N/A";
           updates.worktop_code = "N/A";
+          updates.worktop_size = "N/A";
+          updates.worktop_features = [];
+          updates.worktop_other_details = "N/A";
           break;
 
         case "accessories":
