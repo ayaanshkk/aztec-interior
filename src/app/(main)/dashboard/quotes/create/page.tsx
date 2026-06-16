@@ -26,7 +26,7 @@ interface QuoteItem {
   section?: string;
 }
 
-const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Fittings', 'Sink and Tap', 'Worktops'] as const;
+const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings'] as const;
 
 export default function CreateQuotePage() {
   const router = useRouter();
