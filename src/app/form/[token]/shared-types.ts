@@ -121,10 +121,10 @@ export interface BedroomFormData extends BaseFormData {
   other_accessories: string;
   floor_protection: string[];
   worktop_material_color: string;
-  worktop_material_type: "",
-  worktop_size: "",
-  worktop_features: [],
-  worktop_other_details: "",
+  worktop_material_type: string;
+  worktop_size: string;
+  worktop_features: string[];
+  worktop_other_details: string;
 }
 
 export interface OrderMaterialsDialogProps {
