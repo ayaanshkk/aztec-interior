@@ -1091,8 +1091,8 @@ function ChecklistViewContent() {
                               onChange={(e) => handleInputChange("door_type", e.target.value)}
                             >
                               <option value="">Select door type</option>
-                              <option value="Basic Slab">Slab</option>
-                              <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
+                              <option value="Slab">Slab</option>
+                              <option value="Lacquered Slab">Lacquered Slab</option>
                               <option value="Vinyl">Vinyl doors</option>
                               <option value="Black Glass">Black Glass</option>
                             </select>
@@ -1245,8 +1245,8 @@ function ChecklistViewContent() {
                                     onChange={(e) => handleAdditionalDoorChange(idx, "door_type", e.target.value)}
                                   >
                                     <option value="">Select type</option>
-                                    <option value="Basic Slab">Slab</option>
-                                    <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
+                                    <option value="Slab">Slab</option>
+                                    <option value="Lacquered Slab">Lacquered Slab</option>
                                     <option value="Vinyl">Vinyl doors</option>
                                     <option value="Black Glass">Black Glass</option>
                                   </select>
@@ -1873,6 +1873,106 @@ function ChecklistViewContent() {
 
                           {/* Integrated Units */}
                           <div className="space-y-3 border-t border-yellow-300 pt-3">
+
+                            {/* INTG Fridge */}
+                            <div className="rounded border border-yellow-300 bg-white p-3">
+                              <label className="mb-2 block text-sm font-bold text-gray-700">INTG Fridge</label>
+                              <div className={`grid ${integUnitGridTemplate} gap-3`}>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">QTY</label>
+                                  <Input
+                                    placeholder="QTY"
+                                    type="text"
+                                    className="w-full"
+                                    value={formData.integ_fridge_qty}
+                                    onChange={(e) => handleInputChange("integ_fridge_qty", e.target.value)}
+                                    readOnly={!isEditing}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
+                                  <Input
+                                    placeholder="Make"
+                                    className="w-full"
+                                    value={formData.integ_fridge_make}
+                                    onChange={(e) => handleInputChange("integ_fridge_make", e.target.value)}
+                                    readOnly={!isEditing}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
+                                  <Input
+                                    placeholder="Model"
+                                    className="w-full"
+                                    value={formData.integ_fridge_model}
+                                    onChange={(e) => handleInputChange("integ_fridge_model", e.target.value)}
+                                    readOnly={!isEditing}
+                                  />
+                                </div>
+                                {showOrderDate && (
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
+                                    <input
+                                      type="date"
+                                      className="w-full rounded-md border border-gray-300 p-2"
+                                      value={formData.integ_fridge_order_date}
+                                      onChange={(e) => handleInputChange("integ_fridge_order_date", e.target.value)}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* INTG Freezer */}
+                            <div className="rounded border border-yellow-300 bg-white p-3">
+                              <label className="mb-2 block text-sm font-bold text-gray-700">INTG Freezer</label>
+                              <div className={`grid ${integUnitGridTemplate} gap-3`}>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">QTY</label>
+                                  <Input
+                                    placeholder="QTY"
+                                    type="text"
+                                    className="w-full"
+                                    value={formData.integ_freezer_qty}
+                                    onChange={(e) => handleInputChange("integ_freezer_qty", e.target.value)}
+                                    readOnly={!isEditing}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
+                                  <Input
+                                    placeholder="Make"
+                                    className="w-full"
+                                    value={formData.integ_freezer_make}
+                                    onChange={(e) => handleInputChange("integ_freezer_make", e.target.value)}
+                                    readOnly={!isEditing}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
+                                  <Input
+                                    placeholder="Model"
+                                    className="w-full"
+                                    value={formData.integ_freezer_model}
+                                    onChange={(e) => handleInputChange("integ_freezer_model", e.target.value)}
+                                    readOnly={!isEditing}
+                                  />
+                                </div>
+                                {showOrderDate && (
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
+                                    <input
+                                      type="date"
+                                      className="w-full rounded-md border border-gray-300 p-2"
+                                      value={formData.integ_freezer_order_date}
+                                      onChange={(e) => handleInputChange("integ_freezer_order_date", e.target.value)}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* INTG Fridge/Freezer - existing block unchanged */}
                             <div className="rounded border border-yellow-300 bg-white p-3">
                               <label className="mb-2 block text-sm font-bold text-gray-700">INTG Fridge/Freezer</label>
                               <div className={`grid ${integUnitGridTemplate} gap-3`}>
@@ -1894,6 +1994,7 @@ function ChecklistViewContent() {
                                     className="w-full"
                                     value={formData.integ_fridge_make}
                                     onChange={(e) => handleInputChange("integ_fridge_make", e.target.value)}
+                                    readOnly={!isEditing}
                                   />
                                 </div>
                                 <div>
@@ -1903,6 +2004,7 @@ function ChecklistViewContent() {
                                     className="w-full"
                                     value={formData.integ_fridge_model}
                                     onChange={(e) => handleInputChange("integ_fridge_model", e.target.value)}
+                                    readOnly={!isEditing}
                                   />
                                 </div>
                                 {showOrderDate && (
@@ -1918,6 +2020,7 @@ function ChecklistViewContent() {
                                 )}
                               </div>
                             </div>
+
                           </div>
                           
                           {(isEditing || formData.other_appliances) && (
@@ -2046,8 +2149,8 @@ function ChecklistViewContent() {
                             onChange={(e) => handleInputChange("door_type", e.target.value)}
                           >
                             <option value="">Select door type</option>
-                            <option value="Basic Slab">Slab</option>
-                            <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
+                            <option value="Slab">Slab</option>
+                            <option value="Lacquered Slab">Lacquered Slab</option>
                             <option value="Vinyl">Vinyl doors</option>
                             <option value="Black Glass">Black Glass</option>
                           </select>
@@ -2166,8 +2269,8 @@ function ChecklistViewContent() {
                                   onChange={(e) => handleAdditionalDoorChange(idx, "door_type", e.target.value)}
                                 >
                                   <option value="">Select type</option>
-                                  <option value="Basic Slab">Slab</option>
-                                  <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
+                                  <option value="Slab">Slab</option>
+                                  <option value="Lacquered Slab">Lacquered Slab</option>
                                   <option value="Vinyl">Vinyl doors</option>
                                   <option value="Black Glass">Black Glass</option>
                                 </select>

@@ -73,6 +73,9 @@ export default function CreateQuotePage() {
   const [panelworkColour, setPanelworkColour] = useState('');
   const [doorStyle, setDoorStyle] = useState<string>('');
   const [roomName, setRoomName] = useState('');
+  const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
+  const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
+  
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
@@ -486,21 +489,26 @@ export default function CreateQuotePage() {
     if (!formData.address?.trim()) { alert("Customer address is required"); return; }
     if (!roomName.trim()) { alert("Room name is required"); return; }
 
-    const subtotalBeforeDiscount = items.reduce((sum, item) => {
-      const itemTotal = (item.discount_percent && item.discount_percent > 0)
-        ? (item.discounted_total || 0)
-        : item.line_total;
-      const subTotal = (item.subItems || []).reduce((subSum, sub) => {
-        const subItemTotal = (sub.discount_percent && sub.discount_percent > 0)
+  const subtotalBeforeDiscount = items.reduce((sum, item) => {
+    const section = item.section || 'Furniture';
+    const sectionDiscountPct = sectionDiscounts[section] || 0;
+
+    const itemTotal = (item.discount_percent && item.discount_percent > 0)
+      ? (item.discounted_total || 0)
+      : item.line_total;
+    const subTotal = (item.subItems || []).reduce((subSum, sub) => {
+      const subItemTotal = (sub.discount_percent && sub.discount_percent > 0)
         ? (sub.discounted_total || 0)
         : sub.line_total;
-        return subSum + subItemTotal;
-      }, 0);
-      return sum + itemTotal + subTotal;
+      return subSum + subItemTotal;
     }, 0);
 
-    const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
-    const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
+    const itemPlusSubTotal = itemTotal + subTotal;
+    return sum + itemPlusSubTotal * (1 - sectionDiscountPct / 100);
+  }, 0);
+
+  const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
+  const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
 
     if (subtotal <= 0) { alert("Please add at least one item with a valid price"); return; }
 
@@ -526,6 +534,7 @@ export default function CreateQuotePage() {
           carcass_colour: carcassColour,
           door_colour: doorColour,
           panelwork_colour: panelworkColour,
+          section_discounts: sectionDiscounts,
           door_style: doorStyle,
           items: items
             .filter(item => {
@@ -944,6 +953,29 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
         <div className="mb-4">
           {SECTIONS.map((section) => {
             const sectionItems = items.filter((item) => (item.section || 'Furniture') === section);
+            if (sectionItems.length === 0) return null;
+
+            // ✅ Section totals
+            const sectionSubtotal = sectionItems.reduce((sum, item) => {
+              const itemTotal = item.line_total || 0;
+              const subTotal = (item.subItems || []).reduce((s, sub) => s + (sub.line_total || 0), 0);
+              return sum + itemTotal + subTotal;
+            }, 0);
+
+            const sectionDiscounted = sectionItems.reduce((sum, item) => {
+              const itemTotal = (item.discount_percent && item.discount_percent > 0)
+                ? (item.discounted_total || item.line_total || 0)
+                : (item.line_total || 0);
+              const subTotal = (item.subItems || []).reduce((s, sub) => {
+                return s + ((sub.discount_percent && sub.discount_percent > 0)
+                  ? (sub.discounted_total || sub.line_total || 0)
+                  : (sub.line_total || 0));
+              }, 0);
+              return sum + itemTotal + subTotal;
+            }, 0);
+
+            const sectionDiscount = sectionSubtotal - sectionDiscounted;
+            const hasDiscount = sectionDiscount > 0;
 
             return (
               <div key={section} className="mb-6">
@@ -954,26 +986,27 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                 )}
 
                 {sectionItems.length > 0 && (
-                  <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-                    <thead>
-                      <tr className="bg-white">
-                        <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '8%' }}>ITEM</th>
-                        <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '20%' }}>DESCRIPTION</th>
-                        <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '7%' }}>COLOUR</th>
-                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>QTY</th>
-                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>W</th>
-                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>H</th>
-                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>D</th>
-                        <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '8%' }}>PRICE</th>
-                        <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>AMOUNT</th>
-                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '6%' }}>DISC %</th>
-                        <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>FINAL</th>
-                        <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sectionItems.map((item) => (
-                        <React.Fragment key={item.id}>
+                  <>
+                    <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                      <thead>
+                        <tr className="bg-white">
+                          <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '8%' }}>ITEM</th>
+                          <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '20%' }}>DESCRIPTION</th>
+                          <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '7%' }}>COLOUR</th>
+                          <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>QTY</th>
+                          <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>W</th>
+                          <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>H</th>
+                          <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>D</th>
+                          <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '8%' }}>PRICE</th>
+                          <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>AMOUNT</th>
+                          <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '6%' }}>DISC %</th>
+                          <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>FINAL</th>
+                          <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sectionItems.map((item) => (
+                          <React.Fragment key={item.id}>
                           <tr>
                             <td className="border border-black p-0">
                               <Input
@@ -1047,8 +1080,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                                 <Input
                                   value={sub.item}
                                   onChange={(e) => handleSubItemAutoFill(item.id, sub.id, e.target.value)}
-                                  onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
-                                  placeholder="↳ sub-code"
+                                  placeholder="↳ sub-code"  
                                   className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
                                 />
                               </td>
@@ -1109,21 +1141,116 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                       ))}
                     </tbody>
                   </table>
-                )}
 
-                </div>
-              );
-            })}
+                  {/* ✅ Section Totals */}
+                  {(() => {
+                    const sectionDiscountPct = sectionDiscounts[section] || 0;
+                    const sectionDiscountAmt = sectionSubtotal * (sectionDiscountPct / 100);
+                    const sectionTotal = sectionSubtotal - sectionDiscountAmt;
+                    const hasItemDiscount = sectionDiscount > 0;
 
-            <div className="flex flex-wrap gap-2">
-              {SECTIONS.map((section) => (
-                <Button key={section} onClick={() => handleAddItem(section)} size="sm" variant="outline">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Item to {section}
-                </Button>
-              ))}
+                    return (
+                      <div className="flex justify-end mt-2 mb-4">
+                        <table className="border-collapse text-sm" style={{ width: '40%' }}>
+                          <tbody>
+                            <tr>
+                              <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs">
+                                {section} Subtotal
+                              </td>
+                              <td className="border border-gray-300 px-3 py-1 text-right text-xs">
+                                {formatCurrency(sectionSubtotal)}
+                              </td>
+                            </tr>
+                            {hasItemDiscount && (
+                              <tr>
+                                <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs text-red-600">
+                                  Item Discounts
+                                </td>
+                                <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
+                                  -{formatCurrency(sectionDiscount)}
+                                </td>
+                              </tr>
+                            )}
+                          <tr>
+                            <td className="border border-gray-300 px-3 py-1 bg-gray-50 text-xs">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium">Section Discount</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      value={sectionDiscountPct || ''}
+                                      onChange={(e) => {
+                                        const pct = parseFloat(e.target.value) || 0;
+                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
+                                      }}
+                                      className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"
+                                      min="0"
+                                      max="100"
+                                      step="0.1"
+                                      placeholder="0"
+                                    />
+                                    <span className="text-xs text-gray-500">%</span>
+                                  </div>
+                                  <span className="text-xs text-gray-400">or</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-gray-500">£</span>
+                                    <Input
+                                      type="number"
+                                      value={sectionDiscountAmounts[section] ?? (sectionDiscountAmt > 0 ? sectionDiscountAmt.toFixed(2) : '')}
+                                      onChange={(e) => {
+                                        // Update raw display value immediately
+                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }));
+                                      }}
+                                      onBlur={(e) => {
+                                        // Only convert to % on blur (when user finishes typing)
+                                        const amt = parseFloat(e.target.value) || 0;
+                                        const pct = sectionSubtotal > 0 ? (amt / sectionSubtotal) * 100 : 0;
+                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
+                                      }}
+                                      className="border border-gray-300 rounded px-1 py-0.5 w-20 text-right text-xs"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="0.00"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
+                              {sectionDiscountPct > 0 ? `-${formatCurrency(sectionDiscountAmt)}` : '—'}
+                            </td>
+                          </tr>
+                            <tr>
+                              <td className="border border-gray-300 px-3 py-1 font-bold bg-gray-100 text-xs">
+                                {section} Total
+                              </td>
+                              <td className="border border-gray-300 px-3 py-1 text-right font-bold text-xs">
+                                {formatCurrency(sectionTotal)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
             </div>
-          </div>
+          );
+        })}
+
+        <div className="flex flex-wrap gap-2">
+          {SECTIONS.map((section) => (
+            <Button key={section} onClick={() => handleAddItem(section)} size="sm" variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item to {section}
+            </Button>
+          ))}
+        </div>
+      </div>
 
         {/* Totals */}
         <div className="mb-6 flex justify-end">

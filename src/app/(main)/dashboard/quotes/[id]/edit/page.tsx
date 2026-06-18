@@ -44,7 +44,7 @@ export default function EditQuotePage() {
   const [saving, setSaving] = useState(false);
   const [autoFilling, setAutoFilling] = useState<number | null>(null);
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState<number>(0);
-
+  const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   
   // ✅ NEW: Door type and room type with URL param initialization
   const [doorType, setDoorType] = useState<string>('Carcass Only');
@@ -56,7 +56,8 @@ export default function EditQuotePage() {
   const [panelworkColour, setPanelworkColour] = useState('');
   const [doorStyle, setDoorStyle] = useState<string>('');
   const [roomName, setRoomName] = useState('');
-  
+  const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
+
   // Customer form data
   const [customerData, setCustomerData] = useState({
     name: '',
@@ -110,39 +111,31 @@ export default function EditQuotePage() {
   // ✅ NEW: Update all prices when door type or room type changes
   useEffect(() => {
     const updateAllPrices = async () => {
-      // Skip if no items loaded yet
       if (items.length === 0 || loading) return;
 
-      console.log(`🔄 Door/Room type changed - updating all prices...`);
-      console.log(`   New Door Type: ${doorType}`);
-      console.log(`   New Room Type: ${roomType}`);
-  
       const token = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
-  
-      // Create array of promises for all items that have a description
+
+      const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW', 'FITTING'];
+
       const updatePromises = items.map(async (item, index) => {
-        // Skip if no description
-        if (!item.description || item.description.trim().length === 0) {
-          return null;
+        const itemCode = (item.item || '').trim();
+        if (!itemCode) return null;
+        if (FITTING_CODES.includes(itemCode.toUpperCase())) return null;
+
+        const hasSuffix = itemCode.includes('-');
+        const baseCode = itemCode.split('-')[0];
+        const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+
+        const requestBody: any = { description: itemCode };
+
+        if (!hasSuffix && !isApplianceCode) {
+          requestBody.door_type = doorType;
+          requestBody.room_type = roomType;
+        } else if (!isApplianceCode) {
+          requestBody.room_type = roomType;
         }
-  
-        const description = item.description.trim();
-        
-        // Detect if this is an appliance code
-        const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(description) && description.length >= 9;      
-        const requestBody: any = {
-          description: description,
-          door_type: doorType,
-          room_type: roomType,
-        };
-  
-        // If it's an appliance code, don't send door_type
-        if (isApplianceCode) {
-          delete requestBody.door_type;
-          delete requestBody.room_type;
-        }
-  
+
         try {
           const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
             method: "POST",
@@ -153,32 +146,32 @@ export default function EditQuotePage() {
             },
             body: JSON.stringify(requestBody),
           });
-  
+
           const data = await response.json();
-  
+
           if (data.found) {
-            console.log(`✅ Updated price for ${description}: £${data.price}`);
+            let autoDescription = data.description || data.item_name || '';
+            if (isApplianceCode && data.brand && data.series_level) {
+              autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
+            }
             return {
               index,
               price: data.price,
+              description: autoDescription,
               width: data.width,
               height: data.height,
               depth: data.depth,
             };
-          } else {
-            console.log(`⚠️ No price found for ${description} with new door type`);
-            return null;
           }
+          return null;
         } catch (error) {
-          console.error(`Error updating price for ${description}:`, error);
+          console.error(`Error updating price for ${itemCode}:`, error);
           return null;
         }
       });
-  
-      // Wait for all price lookups to complete
+
       const results = await Promise.all(updatePromises);
-  
-      // Update items with new prices
+
       setItems((prevItems) =>
         prevItems.map((item, index) => {
           const result = results.find((r) => r && r.index === index);
@@ -186,26 +179,26 @@ export default function EditQuotePage() {
             return {
               ...item,
               amount: result.price,
+              description: result.description || item.description,
               width: result.width,
               height: result.height,
               depth: result.depth,
               line_total: result.price * (item.quantity || 1),
+              discounted_total: item.discount_percent
+                ? calculateDiscountedTotal(item.quantity || 1, result.price, item.discount_percent)
+                : result.price * (item.quantity || 1),
             };
           }
           return item;
         })
       );
-  
-      console.log(`🎯 Finished updating all prices`);
     };
-  
-    // Only run if we have items with descriptions
-    const hasItemsWithDescriptions = items.some(item => item.description && item.description.trim().length > 0);
-    
-    if (hasItemsWithDescriptions && !loading) {
+
+    const hasItemsWithCodes = items.some(item => item.item && item.item.trim().length > 0);
+    if (hasItemsWithCodes && !loading) {
       updateAllPrices();
     }
-  }, [doorType, roomType]); // Re-run whenever doorType or roomType changes
+  }, [doorType, roomType]);// Re-run whenever doorType or roomType changes
  
   const fetchQuotation = async () => {
     try {
@@ -267,13 +260,21 @@ export default function EditQuotePage() {
         if (data.vat_percentage) {
           setVatPercentage(data.vat_percentage);
         }
-        if (data.door_type) setDoorType(data.door_type);
-        if (data.room_type) setRoomType(data.room_type);
+        if (data.section_discounts) {
+          setSectionDiscounts(data.section_discounts);
+        }
+        const urlDoorType = searchParams.get("doorType");
+        const urlRoomType = searchParams.get("roomType");
+        if (!urlDoorType && data.door_type) setDoorType(data.door_type);
+        if (!urlRoomType && data.room_type) setRoomType(data.room_type);
         setCarcassColour(data.carcass_colour || '');
         setDoorColour(data.door_colour || '');
         setPanelworkColour(data.panelwork_colour || '');
         setDoorStyle(data.door_style || '');
         setRoomName(data.room_name || '');
+        if (data.section_discounts) {
+          setSectionDiscounts(data.section_discounts);
+        }
       } else {
         alert("Failed to load quotation");
       }
@@ -664,10 +665,12 @@ export default function EditQuotePage() {
           date: customerData.date,
           door_type: doorType,
           room_type: roomType,
+          section_discounts: sectionDiscounts,
           room_name: roomName,
           carcass_colour: carcassColour,
           door_colour: doorColour,
           panelwork_colour: panelworkColour,
+          section_discounts: sectionDiscounts,
           door_style: doorStyle,
           items: items
             .filter(item => {
@@ -746,6 +749,9 @@ export default function EditQuotePage() {
 
   // ✅ ADD CALCULATIONS HERE - BEFORE THE RETURN
   const subtotalBeforeDiscount = items.reduce((sum, item) => {
+    const section = item.section || 'Furniture';
+    const sectionDiscountPct = sectionDiscounts[section] || 0;
+
     const itemTotal = (item.discount_percent && item.discount_percent > 0)
       ? (item.discounted_total || 0)
       : item.line_total;
@@ -755,7 +761,9 @@ export default function EditQuotePage() {
         : sub.line_total;
       return subSum + subItemTotal;
     }, 0);
-    return sum + itemTotal + subTotal;
+
+    const itemPlusSubTotal = itemTotal + subTotal;
+    return sum + itemPlusSubTotal * (1 - sectionDiscountPct / 100);
   }, 0);
 
   const handleAddSubItem = (parentIndex: number) => {
@@ -960,13 +968,13 @@ export default function EditQuotePage() {
             <select
               value={doorType}
               onChange={(e) => setDoorType(e.target.value)}
-              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm"
             >
               <option value="Carcass Only">Carcass Only (No Doors/Drawers)</option>
               <option value="Basic Slab">Slab</option>
               <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
               <option value="Timber">Timber</option>
-              <option value="Vinyl">Vinyl</option>
+              <option value="Vinyl Doors">Vinyl</option>
               <option value="Black Glass">Black Glass</option>
             </select>
           </div>
@@ -1122,6 +1130,28 @@ export default function EditQuotePage() {
 
             if (indexedItems.length === 0) return null;
 
+            // ✅ Section totals
+            const sectionSubtotal = indexedItems.reduce((sum, { item }) => {
+              const itemTotal = (item.amount || 0) * (item.quantity || 1);
+              const subTotal = (item.subItems || []).reduce((s, sub) => s + (sub.amount || 0) * (sub.quantity || 1), 0);
+              return sum + itemTotal + subTotal;
+            }, 0);
+
+            const sectionDiscounted = indexedItems.reduce((sum, { item }) => {
+              const itemTotal = (item.discount_percent && item.discount_percent > 0)
+                ? (item.discounted_total || (item.amount || 0) * (item.quantity || 1))
+                : (item.amount || 0) * (item.quantity || 1);
+              const subTotal = (item.subItems || []).reduce((s, sub) => {
+                return s + ((sub.discount_percent && sub.discount_percent > 0)
+                  ? (sub.discounted_total || (sub.amount || 0) * (sub.quantity || 1))
+                  : (sub.amount || 0) * (sub.quantity || 1));
+              }, 0);
+              return sum + itemTotal + subTotal;
+            }, 0);
+
+            const sectionDiscount = sectionSubtotal - sectionDiscounted;
+            const hasDiscount = sectionDiscount > 0;
+
             return (
               <div key={section} className="mb-6">
                 <div className="mb-3">
@@ -1149,27 +1179,20 @@ export default function EditQuotePage() {
                     {indexedItems.map(({ item, index }) => (
                       <React.Fragment key={index}>
                         <tr>
-                          {/* ITEM */}
                           <td className="border border-black p-1">
                             <Input
                               value={item.item}
                               onChange={(e) => handleItemChange(index, "item", e.target.value)}
                               placeholder="50B"
-                              className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${
-                                autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
-                              }`}
+                              className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === index ? 'bg-blue-50 animate-pulse' : ''}`}
                             />
                           </td>
-
-                          {/* DESCRIPTION */}
                           <td className="border border-black p-1">
                             <textarea
                               value={item.description}
                               onChange={(e) => handleDescriptionChange(index, e.target.value)}
                               placeholder="Description"
-                              className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${
-                                autoFilling === index ? 'bg-blue-50 animate-pulse' : ''
-                              }`}
+                              className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${autoFilling === index ? 'bg-blue-50 animate-pulse' : ''}`}
                               rows={2}
                               style={{ minHeight: '35px', lineHeight: '1.3' }}
                               onInput={(e) => {
@@ -1179,122 +1202,42 @@ export default function EditQuotePage() {
                               }}
                             />
                           </td>
-
-                          {/* COLOUR */}
                           <td className="border border-black p-1">
-                            <Input
-                              value={item.color}
-                              onChange={(e) => handleItemChange(index, "color", e.target.value)}
-                              placeholder="Colour"
-                              className="border-none focus-visible:ring-0 min-w-[70px] text-xs"
-                            />
+                            <Input value={item.color} onChange={(e) => handleItemChange(index, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 min-w-[70px] text-xs" />
                           </td>
-
-                          {/* QTY */}
                           <td className="border border-black p-1">
-                            <Input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => handleItemChange(index, "quantity", e.target.value)}
-                              className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                              min="1"
-                            />
+                            <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(index, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="1" />
                           </td>
-
-                          {/* WIDTH */}
                           <td className="border border-black p-0">
-                            <Input
-                              type="number"
-                              value={item.width || ''}
-                              onChange={(e) => handleItemChange(index, "width", e.target.value)}
-                              placeholder="—"
-                              className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                              min="0"
-                            />
+                            <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(index, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
                           </td>
-
-                          {/* HEIGHT */}
                           <td className="border border-black p-0">
-                            <Input
-                              type="number"
-                              value={item.height || ''}
-                              onChange={(e) => handleItemChange(index, "height", e.target.value)}
-                              placeholder="—"
-                              className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                              min="0"
-                            />
+                            <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(index, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
                           </td>
-
-                          {/* DEPTH */}
                           <td className="border border-black p-0">
-                            <Input
-                              type="number"
-                              value={item.depth || ''}
-                              onChange={(e) => handleItemChange(index, "depth", e.target.value)}
-                              placeholder="—"
-                              className="border-none text-center focus-visible:ring-0 w-[55px] text-xs"
-                              min="0"
-                            />
+                            <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(index, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" min="0" />
                           </td>
-
-                          {/* PRICE */}
                           <td className="border border-black p-0">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={item.amount}
-                              onChange={(e) => handleItemChange(index, "amount", e.target.value)}
-                              className="border-none text-right focus-visible:ring-0 w-full text-xs"
-                              min="0"
-                              placeholder="0.00"
-                            />
+                            <Input type="number" step="0.01" value={item.amount} onChange={(e) => handleItemChange(index, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
                           </td>
-
-                          {/* AMOUNT */}
                           <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
                             {formatCurrency((item.amount || 0) * (item.quantity || 1))}
                           </td>
-
-                          {/* DISCOUNT % */}
                           <td className="border border-black p-0">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              value={item.discount_percent || ''}
-                              onChange={(e) => handleItemChange(index, "discount_percent", e.target.value)}
-                              className="border-none text-center focus-visible:ring-0 w-full text-xs"
-                              min="0"
-                              max="100"
-                              placeholder="0"
-                            />
+                            <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(index, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" max="100" placeholder="0" />
                           </td>
-
-                          {/* FINAL AMOUNT */}
                           <td className="border border-black px-2 py-1 text-right">
                             {item.discount_percent && item.discount_percent > 0 ? (
                               <div>
-                                <div className="text-xs text-gray-500 line-through">
-                                  {formatCurrency((item.amount || 0) * (item.quantity || 1))}
-                                </div>
-                                <div className="font-semibold text-green-700 text-xs">
-                                  {formatCurrency(item.discounted_total || 0)}
-                                </div>
+                                <div className="text-xs text-gray-500 line-through">{formatCurrency((item.amount || 0) * (item.quantity || 1))}</div>
+                                <div className="font-semibold text-green-700 text-xs">{formatCurrency(item.discounted_total || 0)}</div>
                               </div>
                             ) : (
-                              <span className="font-semibold text-xs">
-                                {formatCurrency((item.amount || 0) * (item.quantity || 1))}
-                              </span>
+                              <span className="font-semibold text-xs">{formatCurrency((item.amount || 0) * (item.quantity || 1))}</span>
                             )}
                           </td>
-
-                          {/* ACTION */}
                           <td className="border border-black p-1 text-center">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoveItem(index)}
-                              className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7"
-                            >
+                            <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(index)} className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7">
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </td>
@@ -1304,29 +1247,13 @@ export default function EditQuotePage() {
                         {(item.subItems || []).map((sub, subIndex) => (
                           <tr key={subIndex} className="bg-gray-50">
                             <td className="border border-black p-0 pl-4">
-                              <Input
-                                value={sub.item}
-                                onChange={(e) => handleSubItemAutoFill(index, subIndex, e.target.value)}
-                                onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(index, "item", val); }}
-                                placeholder="↳ sub-code"
-                                className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
-                              />
+                              <Input value={sub.item} onChange={(e) => handleSubItemAutoFill(index, subIndex, e.target.value)} placeholder="↳ sub-code" className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono" />
                             </td>
                             <td className="border border-black p-0">
-                              <Input
-                                value={sub.description}
-                                onChange={(e) => handleSubItemChange(index, subIndex, "description", e.target.value)}
-                                placeholder="Sub-item description"
-                                className="border-none focus-visible:ring-0 w-full text-xs px-1"
-                              />
+                              <Input value={sub.description} onChange={(e) => handleSubItemChange(index, subIndex, "description", e.target.value)} placeholder="Sub-item description" className="border-none focus-visible:ring-0 w-full text-xs px-1" />
                             </td>
                             <td className="border border-black p-0">
-                              <Input
-                                value={sub.color}
-                                onChange={(e) => handleSubItemChange(index, subIndex, "color", e.target.value)}
-                                placeholder="Colour"
-                                className="border-none focus-visible:ring-0 w-full text-xs px-1"
-                              />
+                              <Input value={sub.color} onChange={(e) => handleSubItemChange(index, subIndex, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 w-full text-xs px-1" />
                             </td>
                             <td className="border border-black p-0">
                               <Input type="number" value={sub.quantity} onChange={(e) => handleSubItemChange(index, subIndex, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="1" />
@@ -1342,9 +1269,7 @@ export default function EditQuotePage() {
                               <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(index, subIndex, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
                             </td>
                             <td className="border border-black px-2 py-1 text-right text-xs">
-                              {sub.discount_percent && sub.discount_percent > 0
-                                ? formatCurrency(sub.discounted_total || 0)
-                                : formatCurrency(sub.line_total)}
+                              {sub.discount_percent && sub.discount_percent > 0 ? formatCurrency(sub.discounted_total || 0) : formatCurrency(sub.line_total)}
                             </td>
                             <td className="border border-black p-1 text-center">
                               <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(index, subIndex)} className="text-red-600 hover:bg-red-50 h-6 w-6">
@@ -1357,10 +1282,7 @@ export default function EditQuotePage() {
                         {/* ADD SUB-ITEM BUTTON ROW */}
                         <tr>
                           <td colSpan={12} className="border border-black px-2 py-1 bg-gray-50">
-                            <button
-                              onClick={() => handleAddSubItem(index)}
-                              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                            >
+                            <button onClick={() => handleAddSubItem(index)} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
                               <Plus className="h-3 w-3" /> Add sub-item
                             </button>
                           </td>
@@ -1370,6 +1292,106 @@ export default function EditQuotePage() {
                   </tbody>
                 </table>
 
+                {/* ✅ Section Totals */}
+                {(() => {
+                  const sectionDiscountPct = sectionDiscounts[section] || 0;
+                  const sectionDiscountAmt = sectionSubtotal * (sectionDiscountPct / 100);
+                  const sectionTotal = sectionSubtotal - sectionDiscountAmt;
+                  const hasItemDiscount = sectionDiscount > 0;
+
+                  return (
+                    <div className="flex justify-end mt-2 mb-2">
+                      <table className="border-collapse text-sm" style={{ width: '40%' }}>
+                        <tbody>
+                          <tr>
+                            <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs">
+                              {section} Subtotal
+                            </td>
+                            <td className="border border-gray-300 px-3 py-1 text-right text-xs">
+                              {formatCurrency(sectionSubtotal)}
+                            </td>
+                          </tr>
+                          {hasItemDiscount && (
+                            <tr>
+                              <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs text-red-600">
+                                Item Discounts
+                              </td>
+                              <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
+                                -{formatCurrency(sectionDiscount)}
+                              </td>
+                            </tr>
+                          )}
+                          <tr>
+                            <td className="border border-gray-300 px-3 py-1 bg-gray-50 text-xs">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium">Section Discount</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      value={sectionDiscountPct ? parseFloat(sectionDiscountPct.toFixed(2)) : ''}
+                                      onChange={(e) => {
+                                        const pct = parseFloat(e.target.value) || 0;
+                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                                        // Clear the manual amount so % takes over display
+                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
+                                      }}
+                                      className="border border-gray-300 rounded px-1 py-0.5 w-20 text-right text-xs"
+                                      min="0"
+                                      max="100"
+                                      step="0.1"
+                                      placeholder="0"
+                                    />
+                                    <span className="text-xs text-gray-500">%</span>
+                                  </div>
+                                  <span className="text-xs text-gray-400">or</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-gray-500">£</span>
+                                    <Input
+                                      type="number"
+                                      value={
+                                        sectionDiscountAmounts[section] !== undefined && sectionDiscountAmounts[section] !== ''
+                                          ? sectionDiscountAmounts[section]
+                                          : sectionDiscountAmt > 0 ? sectionDiscountAmt.toFixed(2) : ''
+                                      }
+                                      onChange={(e) => {
+                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }));
+                                      }}
+                                      onBlur={(e) => {
+                                        const amt = parseFloat(e.target.value) || 0;
+                                        const pct = sectionSubtotal > 0 ? (amt / sectionSubtotal) * 100 : 0;
+                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                                        // Keep the typed amount visible — derive display from pct going forward
+                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: amt > 0 ? amt.toFixed(2) : '' }));
+                                      }}
+                                      className="border border-gray-300 rounded px-1 py-0.5 w-24 text-right text-xs"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="0.00"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
+                              {sectionDiscountPct > 0 ? `-${formatCurrency(sectionDiscountAmt)}` : '—'}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border border-gray-300 px-3 py-1 font-bold bg-gray-100 text-xs">
+                              {section} Total
+                            </td>
+                            <td className="border border-gray-300 px-3 py-1 text-right font-bold text-xs">
+                              {formatCurrency(sectionTotal)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+
+              {/* Sections with no items at all — show an "Add to section" picker */}
                 <div className="mt-3 flex justify-start">
                   <Button onClick={() => handleAddItem(section)} size="sm" variant="outline">
                     <Plus className="mr-2 h-4 w-4" />
@@ -1380,13 +1402,13 @@ export default function EditQuotePage() {
             );
           })}
 
-          {/* Sections with no items at all — show an "Add to section" picker */}
-          {SECTIONS.filter((section) => !items.some((item) => (item.section || 'Furniture') === section)).length > 0 && (
+          {/* Sections with no items — show an "Add to section" picker */}
+          {SECTIONS.filter((s) => !items.some((item) => (item.section || 'Furniture') === s)).length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2">
-              {SECTIONS.filter((section) => !items.some((item) => (item.section || 'Furniture') === section)).map((section) => (
-                <Button key={section} onClick={() => handleAddItem(section)} size="sm" variant="outline">
+              {SECTIONS.filter((s) => !items.some((item) => (item.section || 'Furniture') === s)).map((s) => (
+                <Button key={s} onClick={() => handleAddItem(s)} size="sm" variant="outline">
                   <Plus className="mr-2 h-4 w-4" />
-                  Add to {section}
+                  Add to {s}
                 </Button>
               ))}
             </div>
