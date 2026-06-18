@@ -1386,7 +1386,7 @@ export default function KitchenChecklist() {
                                   className="w-full"
                                   value={formData.integ_fridge_qty}
                                   onChange={(e) => handleInputChange("integ_fridge_qty", e.target.value)}
-                                  readOnly={!isEditing}
+                                  readOnly={false}
                                 />
                               </div>
                               <div>
@@ -1396,7 +1396,7 @@ export default function KitchenChecklist() {
                                   className="w-full"
                                   value={formData.integ_fridge_make}
                                   onChange={(e) => handleInputChange("integ_fridge_make", e.target.value)}
-                                  readOnly={!isEditing}
+                                  readOnly={false}
                                 />
                               </div>
                               <div>
@@ -1406,7 +1406,7 @@ export default function KitchenChecklist() {
                                   className="w-full"
                                   value={formData.integ_fridge_model}
                                   onChange={(e) => handleInputChange("integ_fridge_model", e.target.value)}
-                                  readOnly={!isEditing}
+                                  readOnly={false}
                                 />
                               </div>
                               {showOrderDate && (
@@ -1435,7 +1435,7 @@ export default function KitchenChecklist() {
                                   className="w-full"
                                   value={formData.integ_freezer_qty}
                                   onChange={(e) => handleInputChange("integ_freezer_qty", e.target.value)}
-                                  readOnly={!isEditing}
+                                  readOnly={false}
                                 />
                               </div>
                               <div>
@@ -1445,7 +1445,7 @@ export default function KitchenChecklist() {
                                   className="w-full"
                                   value={formData.integ_freezer_make}
                                   onChange={(e) => handleInputChange("integ_freezer_make", e.target.value)}
-                                  readOnly={!isEditing}
+                                  readOnly={false}
                                 />
                               </div>
                               <div>
@@ -1455,7 +1455,7 @@ export default function KitchenChecklist() {
                                   className="w-full"
                                   value={formData.integ_freezer_model}
                                   onChange={(e) => handleInputChange("integ_freezer_model", e.target.value)}
-                                  readOnly={!isEditing}
+                                  readOnly={false}
                                 />
                               </div>
                               {showOrderDate && (
@@ -1484,7 +1484,7 @@ export default function KitchenChecklist() {
                                   className="w-full"
                                   value={formData.integ_fridge_qty}
                                   onChange={(e) => handleInputChange("integ_fridge_qty", e.target.value)}
-                                  readOnly={!isEditing}
+                                  readOnly={false}
                                 />
                               </div>
                               <div>
@@ -1494,7 +1494,7 @@ export default function KitchenChecklist() {
                                   className="w-full"
                                   value={formData.integ_fridge_make}
                                   onChange={(e) => handleInputChange("integ_fridge_make", e.target.value)}
-                                  readOnly={!isEditing}
+                                  readOnly={false}
                                 />
                               </div>
                               <div>
@@ -1504,7 +1504,7 @@ export default function KitchenChecklist() {
                                   className="w-full"
                                   value={formData.integ_fridge_model}
                                   onChange={(e) => handleInputChange("integ_fridge_model", e.target.value)}
-                                  readOnly={!isEditing}
+                                  readOnly={false}
                                 />
                               </div>
                               {showOrderDate && (
