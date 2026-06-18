@@ -117,12 +117,12 @@ const allSidebarItems: NavGroup[] = [
         roles: ["Platform Admin", "Salesperson"],
         isNew: true, 
       },
-      {
-        title: "Chatbot",
-        url: "/dashboard/chatbot",
-        icon: Bot,
-        roles: ["Platform Admin", "Salesperson", "Production Team"],
-      },
+      // {
+      //   title: "Chatbot",
+      //   url: "/dashboard/chatbot",
+      //   icon: Bot,
+      //   roles: ["Platform Admin", "Salesperson", "Production Team"],
+      // },
       {
         title: "Notifications",
         url: "/dashboard/notifications",

@@ -793,9 +793,27 @@ function ChecklistViewContent() {
     }
   };
 
-  const handlePrintPDF = () => {
-  window.print();
-};
+  const handlePrintPDF = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${BACKEND_URL}/api/form/form-submissions/${formSubmissionId}/pdf`,
+        {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to generate PDF');
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (error) {
+      console.error('PDF generation failed:', error);
+      alert('Failed to generate PDF. Please try again.');
+    }
+  };
 
   const clearSignature = () => {
     if (!canvasRef.current || !formData) return;

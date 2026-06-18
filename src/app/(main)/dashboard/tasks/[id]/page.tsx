@@ -615,78 +615,25 @@ export default function JobDetailsPage() {
                       
                       return (
                         <div key={form.id} className="rounded border p-4 hover:bg-gray-50">
-                          <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
                               <CheckSquare className="h-5 w-5 text-green-500" />
                               <div>
                                 <p className="font-medium">{formName}</p>
                                 <p className="text-sm text-gray-500">
-                                  Submitted: {formatDate(form.submitted_at)}
-                                  {form.submitted_by && ` • by ${form.submitted_by}`}
+                                  Submitted: {formatDate(form.submitted_at || form.created_at)}
+                                  {form.submitted_by && form.submitted_by !== 'Public Form' ? ` • by ${form.submitted_by}` : ''}
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-3">
-                              {form.approval_status && getApprovalStatusBadge(form.approval_status)}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  // Open checklist in new tab
-                                  window.open(`/streemlyne/checklist-view?id=${form.id}`, '_blank');
-                                }}
-                              >
-                                View Details
-                              </Button>
-                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(`/checklist-view/?id=${form.id}`, '_blank')}
+                            >
+                              View Details
+                            </Button>
                           </div>
-
-                          {/* Progress Bar */}
-                          {formKeys.length > 0 && (
-                            <div className="mb-2">
-                              <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
-                                <span>Completion</span>
-                                <span>{completedFields}/{formKeys.length} fields</span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div
-                                  className="bg-green-500 h-2 rounded-full transition-all"
-                                  style={{ width: `${(completedFields / formKeys.length) * 100}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Show preview of key fields */}
-                          {formKeys.length > 0 && (
-                            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                              {formKeys.slice(0, 4).map((key) => {
-                                // Skip internal fields
-                                if (['form_type', 'checklistType', 'signature_data'].includes(key)) {
-                                  return null;
-                                }
-                                
-                                const value = formData[key];
-                                if (!value) return null;
-                                
-                                const displayValue = typeof value === 'object' 
-                                  ? JSON.stringify(value) 
-                                  : String(value);
-                                
-                                return (
-                                  <div key={key} className="text-gray-600">
-                                    <span className="font-medium capitalize">
-                                      {key.replace(/_/g, ' ')}:
-                                    </span>{' '}
-                                    <span className="text-gray-900">
-                                      {displayValue.substring(0, 30)}
-                                      {displayValue.length > 30 ? '...' : ''}
-                                    </span>
-                                  </div>
-                                );
-                              }).filter(Boolean)}
-                            </div>
-                          )}
                         </div>
                       );
                     })}

@@ -139,10 +139,10 @@ export default function ViewQuotePage() {
               <Edit className="mr-2 h-4 w-4" />
               Edit Quote
             </Button>
-            <Button onClick={handlePrint} variant="outline">
+            {/* <Button onClick={handlePrint} variant="outline">
               <Printer className="mr-2 h-4 w-4" />
               Print
-            </Button>
+            </Button> */}
             <Button onClick={() => window.open(`${BACKEND_URL}/quotations/${quoteId}/pdf`, '_blank')}>
               <Download className="mr-2 h-4 w-4" />
               Download PDF

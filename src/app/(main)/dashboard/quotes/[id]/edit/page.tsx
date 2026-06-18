@@ -670,7 +670,6 @@ export default function EditQuotePage() {
           carcass_colour: carcassColour,
           door_colour: doorColour,
           panelwork_colour: panelworkColour,
-          section_discounts: sectionDiscounts,
           door_style: doorStyle,
           items: items
             .filter(item => {
