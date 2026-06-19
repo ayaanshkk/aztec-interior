@@ -689,17 +689,29 @@ export function ProductionMaterialsManagement() {
 
   const handleDeleteMaterial = async () => {
     if (!materialToDelete) return;
+    const deletedId = materialToDelete.id;
+
+    // Instantly remove from UI
+    setMaterials(prev => prev.filter(m => m.id !== deletedId));
+    setDeleteDialogOpen(false);
+    setMaterialToDelete(null);
+    setIsDetailsDialogOpen(false);
+    setSelectedMaterial(null);
+    setEditForm(null);
+    setIsEditing(false);
+
+    // Fire delete in background
     try {
-      const res = await fetchWithAuth(`materials/${materialToDelete.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error();
-      setDeleteDialogOpen(false);
-      setMaterialToDelete(null);
-      setIsDetailsDialogOpen(false);
-      setSelectedMaterial(null);
-      setEditForm(null);
-      setIsEditing(false);
+      const res = await fetchWithAuth(`materials/${deletedId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        // Revert if it failed
+        await fetchMaterials();
+        alert('Failed to delete. Please try again.');
+      }
+    } catch {
       await fetchMaterials();
-    } catch { alert('Failed to delete.'); }
+      alert('Failed to delete. Please try again.');
+    }
   };
 
   const handleMaterialClick = (material: MaterialOrder) => {
@@ -1180,10 +1192,10 @@ export function ProductionMaterialsManagement() {
                   {/* Status buttons */}
                   <div className="flex flex-col gap-2 min-w-[170px]">
                     {[
-                      { status: 'ordered',               label: 'Ordered',            Icon: FileText,    active: 'bg-blue-600 hover:bg-blue-700' },
-                      { status: 'delivered',             label: 'Delivered',          Icon: Truck,       active: 'bg-yellow-600 hover:bg-yellow-700' },
-                      { status: 'delivered_to_customer', label: 'To Customer',        Icon: CheckCircle, active: 'bg-green-600 hover:bg-green-700' },
-                      { status: 'in_stock',              label: 'In Stock',           Icon: Package,     active: 'bg-purple-600 hover:bg-purple-700' },
+                      { status: 'ordered',               label: 'Ordered',      Icon: FileText,    active: 'bg-blue-600 hover:bg-blue-700' },
+                      { status: 'delivered',             label: 'Delivered',    Icon: Truck,       active: 'bg-yellow-600 hover:bg-yellow-700' },
+                      { status: 'delivered_to_customer', label: 'To Customer',  Icon: CheckCircle, active: 'bg-green-600 hover:bg-green-700' },
+                      { status: 'in_stock',              label: 'In Stock',     Icon: Package,     active: 'bg-purple-600 hover:bg-purple-700' },
                     ].map(btn => (
                       <Button key={btn.status} size="sm"
                         variant={material.status === btn.status ? 'default' : 'outline'}
@@ -1193,6 +1205,12 @@ export function ProductionMaterialsManagement() {
                         <btn.Icon className="h-3 w-3 mr-1" />{btn.label}
                       </Button>
                     ))}
+                    <Button size="sm" variant="outline"
+                      className="justify-start text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200 mt-1"
+                      onClick={e => { e.stopPropagation(); setMaterialToDelete(material); setDeleteDialogOpen(true); }}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />Delete
+                    </Button>
                   </div>
                 </div>
               </CardContent>

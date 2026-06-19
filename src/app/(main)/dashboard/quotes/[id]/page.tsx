@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Printer, Download, Edit } from "lucide-react";
+import Image from 'next/image';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
 
@@ -154,23 +155,30 @@ export default function ViewQuotePage() {
       {/* Quotation Content */}
       <div className="mx-auto max-w-6xl px-8 py-8">
         {/* Company Header */}
-        <div className="mb-8 text-center">
-          <div className="mb-4 text-4xl font-bold tracking-wider text-gray-800">
-            AZTEC INTERIORS
+        <div className="mb-8 flex items-center justify-center gap-3">
+          <Image
+            src="/images/logo3.png"
+            alt="Logo"
+            width={80}
+            height={80}
+            className="object-contain"
+          />
+          <div className="text-4xl font-bold tracking-wider text-gray-800">
+            ATELIER LUXE INTERIORS
           </div>
         </div>
 
         {/* Company Registration Details */}
         <div className="mb-6 space-y-1 bg-green-200 p-3 text-sm">
           <p className="font-semibold">Registered to England No 5246881</p>
-          <p className="font-semibold">VAT Reg No.686 8010 72</p>
+          {/* <p className="font-semibold">VAT Reg No.686 8010 72</p> */}
         </div>
 
         <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
-          <p className="font-semibold">Acc name : Aztec Interiors Leicester LTD</p>
-          <p className="font-semibold">Bank : HSBC</p>
-          <p className="font-semibold">s/code: 40 28 06</p>
-          <p className="font-semibold">acc no: 43820343</p>
+          <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
+          <p className="font-semibold">Bank : Tide</p>
+          <p className="font-semibold">Sort Code: 04 06 05</p>
+          <p className="font-semibold">Acc No: 31621197</p>
         </div>
 
         <div className="mb-6 bg-gray-100 p-3 text-sm">

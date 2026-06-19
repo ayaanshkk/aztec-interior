@@ -3,12 +3,12 @@ import packageJson from "../../package.json";
 const currentYear = new Date().getFullYear();
 
 export const APP_CONFIG = {
-  name: "Aztec Interiors",
+  name: "Atelier Luxe Interiors",
   version: packageJson.version,
-  copyright: `© ${currentYear}, Aztec Interiors.`,
+  copyright: `© ${currentYear}, Atelier Luxe Interiors.`,
   meta: {
-    title: "Aztec Interiors",
-    description: "Aztec Interiors",
+    title: "Atelier Luxe Interiors",
+    description: "Atelier Luxe Interiors",
   },
   // ✅ Add your base path here
   basePath: "/streemlyne",

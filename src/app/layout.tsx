@@ -8,7 +8,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext"; // ✅ Ad
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Aztec Interiors CRM",
+  title: "Atelier Luxe CRM",
   description: "Customer relationship management system",
 };
 

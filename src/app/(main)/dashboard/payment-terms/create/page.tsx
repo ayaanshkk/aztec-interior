@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save } from "lucide-react";
 import { BACKEND_URL } from "@/lib/api";
+import Image from 'next/image';
 
 const API_FORM = `${BACKEND_URL}/api/form`;
 
@@ -145,18 +146,25 @@ export default function CreatePaymentTermsPage() {
 
       <div className="mx-auto max-w-4xl px-8 py-8">
         {/* Company header */}
-        <div className="mb-6 text-center">
-          <div className="text-4xl font-bold tracking-wider text-gray-800">AZTEC INTERIORS</div>
+        <div className="mb-8 flex items-center justify-center gap-3">
+          <Image
+            src="/images/logo3.png"
+            alt="Logo"
+            width={80}
+            height={80}
+            className="object-contain"
+          />
+          <div className="text-4xl font-bold tracking-wider text-gray-800">ATELIER LUXE INTERIORS</div>
         </div>
 
         {/* BACS details — green + yellow bars */}
         <div className="mb-1 bg-green-200 p-2 text-sm font-semibold">Bacs details:</div>
         <div className="mb-3 bg-yellow-200 p-2 text-sm">
           <p className="font-semibold">Please use your name and/or road name as reference:</p>
-          <p>Acc name : Aztec Interiors Leicester LTD</p>
-          <p>Bank : HSBC</p>
-          <p>s/code: 40 28 06</p>
-          <p>acc no: 43820343</p>
+          <p>Acc name : Atelier Luxe Interiors LTD</p>
+          <p>Bank : Tide</p>
+          <p>Sort Code: 04 06 05</p>
+          <p>Acc No: 31621197</p>
         </div>
 
         {/* Date + customer info */}

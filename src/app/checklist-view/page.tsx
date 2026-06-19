@@ -155,6 +155,25 @@ interface FormData {
   integ_freezer_order_date: string;
 }
 
+interface OrderItem {
+  label: string;
+  isSection: boolean;
+  included: boolean;
+  style: string;
+  type: string;
+  colour: string;
+  size: string;
+  code: string;
+  material: string;
+  features: string;
+  supplier: string;
+  quantity: string;
+  estimated_cost: string;
+  order_date: string;
+  expected_delivery: string;
+  notes: string;
+}
+
 function ChecklistViewContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -177,18 +196,9 @@ function ChecklistViewContent() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastPoint, setLastPoint] = useState<{ x: number; y: number } | null>(null);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
-  const [orderItems, setOrderItems] = useState<{
-    material: string;
-    supplier: string;
-    estimated_cost: string;
-    order_date: string;
-    expected_delivery: string;
-    notes: string;
-    included: boolean;
-    quantity: string;
-  }[]>([]);
   const [orderDialogSection, setOrderDialogSection] = useState("");
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
   const canEdit = () => {
     if (!user) return true; // Allow edit while loading, button will work once user loads
@@ -639,158 +649,242 @@ function ChecklistViewContent() {
     }
   };
 
-  const extractMaterialsFromSection = (sectionTitle: string): string[] => {
+  const isNAVal = (v: any) =>
+    !v || ['n/a', 'na', '0', '', '[]'].includes(String(v).trim().toLowerCase());
+
+  const safeVal = (v: any): string => isNAVal(v) ? '' : String(v).trim();
+
+  function blankOrderItem(label: string): OrderItem {
+    return {
+      label, isSection: false, included: true,
+      style: '', type: '', colour: '', size: '', code: '', material: '', features: '',
+      supplier: '', quantity: '1', estimated_cost: '',
+      order_date: new Date().toISOString().split('T')[0],
+      expected_delivery: '', notes: '',
+    };
+  }
+
+  function serialiseOrderItem(item: OrderItem): string {
+    const lines: string[] = [`[${item.label}]`];
+    if (item.style)    lines.push(`Style: ${item.style}`);
+    if (item.type)     lines.push(`Type: ${item.type}`);
+    if (item.colour)   lines.push(`Colour: ${item.colour}`);
+    if (item.size)     lines.push(`Size: ${item.size}`);
+    if (item.code)     lines.push(`Code: ${item.code}`);
+    if (item.material) lines.push(`Material: ${item.material}`);
+    if (item.features) lines.push(`Features: ${item.features}`);
+    return lines.join('\n');
+  }
+
+  const DETAIL_FIELDS: Array<{ key: keyof OrderItem; label: string }> = [
+    { key: 'style',    label: 'Make / Style' },
+    { key: 'type',     label: 'Type' },
+    { key: 'colour',   label: 'Colour' },
+    { key: 'size',     label: 'Size' },
+    { key: 'code',     label: 'Code / Model' },
+    { key: 'material', label: 'Material' },
+    { key: 'features', label: 'Features' },
+  ];
+
+  const extractGroupedItemsFromSection = (sectionTitle: string): OrderItem[] => {
     if (!formData) return [];
-    
-    const materials: string[] = [];
+    const items: OrderItem[] = [];
 
     switch (sectionTitle) {
-      case "Material Specifications":
-        if (formData.door_style) materials.push(`Door Style: ${formData.door_style}`);
-        if (formData.door_color) materials.push(`Door Color: ${formData.door_color}`);
-        if (formData.door_manufacturer) materials.push(`Door Manufacturer: ${formData.door_manufacturer}`);
-        if (formData.door_name) materials.push(`Door Name: ${formData.door_name}`);
-        if (formData.glazing_material) materials.push(`Glazing Material: ${formData.glazing_material}`);
-        if (formData.end_panel_color) materials.push(`Panel Color: ${formData.end_panel_color}`);
-        if (formData.plinth_filler_color) materials.push(`Plinth/Filler Color: ${formData.plinth_filler_color}`);
-        if (formData.cabinet_color) materials.push(`Cabinet Color: ${formData.cabinet_color}`);
-        if (formData.worktop_material_color) materials.push(`Worktop Color: ${formData.worktop_material_color}`);
-        
-        // Additional doors
-        formData.additional_doors?.forEach((door, idx) => {
-          if (door.door_style || door.door_color || door.quantity) {
-            materials.push(`Additional Door ${idx + 1}: ${door.door_style} - ${door.door_color} (Qty: ${door.quantity})`);
+      case "Material Specifications": {
+        const hasDoor = !isNAVal(formData.door_style) || !isNAVal(formData.door_color) || !isNAVal(formData.door_type);
+        if (hasDoor) {
+          const d = blankOrderItem('Door');
+          d.style    = safeVal(formData.door_style);
+          d.type     = safeVal(formData.door_type);
+          d.colour   = safeVal(formData.door_color);
+          d.code     = [safeVal(formData.door_manufacturer), safeVal(formData.door_name)].filter(Boolean).join(' – ');
+          d.material = safeVal(formData.glazing_material);
+          items.push(d);
+        }
+        (formData.additional_doors || []).forEach((door, i) => {
+          if (isNAVal(door.door_style) && isNAVal(door.door_color)) return;
+          const d = blankOrderItem(`Door (Additional ${i + 1})`);
+          d.style    = safeVal(door.door_style);
+          d.type     = safeVal(door.door_type);
+          d.colour   = safeVal(door.door_color);
+          d.code     = [safeVal(door.door_manufacturer), safeVal(door.door_name)].filter(Boolean).join(' – ');
+          d.quantity = safeVal(door.quantity) || '1';
+          items.push(d);
+        });
+        if (!isNAVal(formData.end_panel_color)) {
+          const p = blankOrderItem('End Panel'); p.colour = safeVal(formData.end_panel_color); items.push(p);
+        }
+        if (!isNAVal(formData.plinth_filler_color)) {
+          const p = blankOrderItem('Plinth / Filler'); p.colour = safeVal(formData.plinth_filler_color); items.push(p);
+        }
+        if (!isNAVal(formData.cabinet_color)) {
+          const c = blankOrderItem('Cabinet'); c.colour = safeVal(formData.cabinet_color); items.push(c);
+        }
+        break;
+      }
+      case "Hardware Specifications": {
+        if (!isNAVal(formData.handles_code) || !isNAVal(formData.handles_quantity)) {
+          const h = blankOrderItem('Handles');
+          h.code     = safeVal(formData.handles_code);
+          h.size     = safeVal(formData.handles_size);
+          h.quantity = safeVal(formData.handles_quantity) || '1';
+          items.push(h);
+        }
+        ((formData as any).additional_handles || []).forEach((h: any, i: number) => {
+          if (isNAVal(h.handles_code)) return;
+          const item = blankOrderItem(`Handles (Additional ${i + 1})`);
+          item.code     = safeVal(h.handles_code);
+          item.size     = safeVal(h.handles_size);
+          item.quantity = safeVal(h.handles_quantity) || '1';
+          items.push(item);
+        });
+        if (!isNAVal(formData.accessories)) {
+          const a = blankOrderItem('Accessories'); a.features = safeVal(formData.accessories); items.push(a);
+        }
+        if (!isNAVal(formData.lighting_spec)) {
+          const l = blankOrderItem('Lighting'); l.type = safeVal(formData.lighting_spec);
+          const uwParts = [safeVal(formData.under_wall_unit_lights_color), safeVal(formData.under_wall_unit_lights_profile)].filter(Boolean);
+          if (uwParts.length) l.colour = `Under wall: ${uwParts.join(' / ')}`;
+          if (!isNAVal(formData.under_worktop_lights_color)) {
+            l.colour += (l.colour ? '; ' : '') + `Under worktop: ${formData.under_worktop_lights_color}`;
           }
+          items.push(l);
+        }
+        break;
+      }
+      case "Worktop Specifications": {
+        if (!isNAVal(formData.worktop_material_type) || !isNAVal(formData.worktop_code) || !isNAVal(formData.worktop_material_color)) {
+          const w = blankOrderItem('Worktop');
+          w.material = safeVal(formData.worktop_material_type);
+          w.colour   = safeVal(formData.worktop_material_color);
+          w.code     = safeVal(formData.worktop_code);
+          w.size     = safeVal(formData.worktop_size);
+          w.features = (formData.worktop_features || []).filter((f: string) => !isNAVal(f)).join(', ');
+          if (!isNAVal(formData.worktop_other_details)) w.notes = safeVal(formData.worktop_other_details);
+          items.push(w);
+        }
+        (formData.additional_worktops || []).forEach((wt, i) => {
+          if (isNAVal(wt.worktop_code) && isNAVal(wt.worktop_material_color)) return;
+          const w = blankOrderItem(`Worktop (Additional ${i + 1})`);
+          w.material = safeVal(wt.worktop_material_type);
+          w.colour   = safeVal(wt.worktop_material_color);
+          w.code     = safeVal(wt.worktop_code);
+          w.size     = safeVal(wt.worktop_size);
+          w.features = (wt.worktop_features || []).filter((f: string) => !isNAVal(f)).join(', ');
+          items.push(w);
         });
         break;
-
-      case "Hardware Specifications":
-        if (formData.handles_code) materials.push(`Handle Code: ${formData.handles_code} (Qty: ${formData.handles_quantity || "N/A"}, Size: ${formData.handles_size || "N/A"})`);
-        if (formData.accessories) materials.push(`Accessories: ${formData.accessories}`);
-        if (formData.lighting_spec) materials.push(`Lighting: ${formData.lighting_spec}`);
-        if (formData.under_wall_unit_lights_color) materials.push(`Under Wall Unit Lights: ${formData.under_wall_unit_lights_color} - ${formData.under_wall_unit_lights_profile || ""}`);
-        if (formData.under_worktop_lights_color) materials.push(`Under Worktop Lights: ${formData.under_worktop_lights_color}`);
-        break;
-
-      case "Worktop Specifications":
-        if (formData.worktop_material_type) materials.push(`Worktop Material: ${formData.worktop_material_type}`);
-        if (formData.worktop_material_color) materials.push(`Worktop Color: ${formData.worktop_material_color}`);
-        if (formData.worktop_size) materials.push(`Worktop Size: ${formData.worktop_size}`);
-        formData.worktop_features?.forEach(feature => materials.push(`Worktop Feature: ${feature}`));
-        if (formData.worktop_other_details) materials.push(`Other Details: ${formData.worktop_other_details}`);
-        break;
-
-      case "Appliances":
-        formData.appliances?.forEach((app, idx) => {
-          if (app.make || app.model) {
-            const appName = standardAppliances[idx] || `Appliance ${idx + 1}`;
-            materials.push(`${appName}: ${app.make} ${app.model}`.trim());
-          }
+      }
+      case "Appliances": {
+        const appLabels = ['Oven', 'Microwave', 'Washing Machine', 'Dryer', 'Hob', 'Extractor', 'INTG Dishwasher'];
+        (formData.appliances || []).forEach((a, i) => {
+          if (isNAVal(a.make) && isNAVal(a.model)) return;
+          const item = blankOrderItem(appLabels[i] || `Appliance ${i + 1}`);
+          item.style = safeVal(a.make);
+          item.code  = safeVal(a.model);
+          items.push(item);
         });
-        
-        if (formData.integ_fridge_make || formData.integ_fridge_model) {
-          materials.push(`INTG Fridge: ${formData.integ_fridge_make} ${formData.integ_fridge_model} (Qty: ${formData.integ_fridge_qty || "1"})`.trim());
+        if (!isNAVal(formData.integ_fridge_make)) {
+          const f = blankOrderItem('INTG Fridge / Freezer');
+          f.style = safeVal(formData.integ_fridge_make); f.code = safeVal(formData.integ_fridge_model);
+          f.quantity = safeVal(formData.integ_fridge_qty) || '1'; items.push(f);
         }
-        if (formData.integ_freezer_make || formData.integ_freezer_model) {
-          materials.push(`INTG Freezer: ${formData.integ_freezer_make} ${formData.integ_freezer_model} (Qty: ${formData.integ_freezer_qty || "1"})`.trim());
+        if (!isNAVal(formData.integ_freezer_make)) {
+          const f = blankOrderItem('INTG Freezer');
+          f.style = safeVal(formData.integ_freezer_make); f.code = safeVal(formData.integ_freezer_model);
+          f.quantity = safeVal(formData.integ_freezer_qty) || '1'; items.push(f);
         }
-        
-        if (formData.sink_details) materials.push(`Sink: ${formData.sink_details} (Model: ${formData.sink_model || "N/A"})`);
-        if (formData.tap_details) materials.push(`Tap: ${formData.tap_details} (Model: ${formData.tap_model || "N/A"})`);
+        if (!isNAVal(formData.sink_details)) {
+          const s = blankOrderItem('Sink'); s.type = safeVal(formData.sink_details); s.code = safeVal(formData.sink_model); items.push(s);
+        }
+        if (!isNAVal(formData.tap_details)) {
+          const t = blankOrderItem('Tap'); t.type = safeVal(formData.tap_details); t.code = safeVal(formData.tap_model); items.push(t);
+        }
         break;
-
-      case "Bedroom Furniture":
-        if (formData.bedside_cabinets_type) materials.push(`Bedside Cabinets: ${formData.bedside_cabinets_type} (Qty: ${formData.bedside_cabinets_qty || "N/A"})`);
-        if (formData.dresser_desk === "yes") materials.push(`Dresser/Desk: ${formData.dresser_desk_details || "Yes"}`);
-        if (formData.internal_mirror === "yes") materials.push(`Internal Mirror: ${formData.internal_mirror_details || "Yes"}`);
-        if (formData.mirror_type) materials.push(`Mirror: ${formData.mirror_type} (Qty: ${formData.mirror_qty || "N/A"})`);
+      }
+      case "Bedroom Furniture": {
+        if (!isNAVal(formData.bedside_cabinets_type)) {
+          const b = blankOrderItem('Bedside Cabinets');
+          b.type = safeVal(formData.bedside_cabinets_type); b.quantity = safeVal(formData.bedside_cabinets_qty) || '1'; items.push(b);
+        }
+        if (formData.dresser_desk === 'yes' && !isNAVal(formData.dresser_desk_details)) {
+          const d = blankOrderItem('Dresser / Desk'); d.type = safeVal(formData.dresser_desk_details); items.push(d);
+        }
+        if (formData.internal_mirror === 'yes' && !isNAVal(formData.internal_mirror_details)) {
+          const m = blankOrderItem('Internal Mirror'); m.type = safeVal(formData.internal_mirror_details); items.push(m);
+        }
+        if (!isNAVal(formData.mirror_type)) {
+          const m = blankOrderItem('Mirror'); m.type = safeVal(formData.mirror_type); m.quantity = safeVal(formData.mirror_qty) || '1'; items.push(m);
+        }
         break;
-
-      case "Lighting":
-        if (formData.soffit_lights_type) materials.push(`Soffit Lights: ${formData.soffit_lights_type} - ${formData.soffit_lights_color || ""}`);
-        if (formData.gable_lights_type) materials.push(`Gable Lights: ${formData.gable_lights_type} - ${formData.gable_lights_main_color || ""} / ${formData.gable_lights_profile_color || ""}`);
+      }
+      case "Lighting": {
+        if (!isNAVal(formData.soffit_lights_type)) {
+          const l = blankOrderItem('Soffit Lights');
+          l.type = safeVal(formData.soffit_lights_type); l.colour = safeVal(formData.soffit_lights_color); items.push(l);
+        }
+        if (!isNAVal(formData.gable_lights_type)) {
+          const l = blankOrderItem('Gable Lights');
+          l.type = safeVal(formData.gable_lights_type);
+          l.colour = [safeVal(formData.gable_lights_main_color), safeVal(formData.gable_lights_profile_color)].filter(Boolean).join(' / ');
+          items.push(l);
+        }
         break;
-
-      case "Accessories":
-        if (formData.other_accessories) materials.push(`Accessories: ${formData.other_accessories}`);
-        formData.floor_protection?.forEach(item => materials.push(`Floor Protection: ${item}`));
+      }
+      case "Accessories": {
+        if (!isNAVal(formData.other_accessories)) {
+          const a = blankOrderItem('Accessories'); a.features = safeVal(formData.other_accessories); items.push(a);
+        }
+        const fp = (formData.floor_protection || []).filter((f: string) => !isNAVal(f) && f !== 'No Floor Protection Required');
+        if (fp.length) {
+          const f = blankOrderItem('Floor Protection'); f.features = fp.join(', '); items.push(f);
+        }
         break;
+      }
     }
-
-    return materials.filter(m => m.trim().length > 0);
+    return items;
   };
 
   const handleOpenOrderDialog = (sectionTitle: string) => {
-    const materials = extractMaterialsFromSection(sectionTitle);
     setOrderDialogSection(sectionTitle);
-    setOrderItems(materials.map(m => ({
-      material: m,
-      supplier: "",
-      estimated_cost: "",
-      order_date: new Date().toISOString().split("T")[0],
-      expected_delivery: "",
-      notes: "",
-      included: true,
-      quantity: "1",
-    })));
+    setOrderItems(extractGroupedItemsFromSection(sectionTitle));
     setShowOrderDialog(true);
   };
 
   const handleSubmitOrder = async () => {
-    const includedItems = orderItems.filter(item => item.included);
-    if (includedItems.length === 0 || !formData) {
-      alert("No materials selected to order");
-      return;
-    }
+    const included = orderItems.filter(i => i.included && !i.isSection);
+    if (included.length === 0 || !formData) { alert('No materials selected'); return; }
 
     setIsSubmittingOrder(true);
+    let ok = 0, fail = 0;
     try {
-      const token = localStorage.getItem("token");
-      let successCount = 0;
-      let failCount = 0;
-
-      for (const item of includedItems) {
+      const token = localStorage.getItem('token');
+      for (const item of included) {
         const payload = {
           client_id: formData.customer_id,
-          material_description: `${orderDialogSection}\n${item.material}`,
+          material_description: serialiseOrderItem(item),
           supplier_name: item.supplier.trim() || null,
           estimated_cost: item.estimated_cost ? parseFloat(item.estimated_cost) : null,
-          order_date: item.order_date,
+          order_date: item.order_date || null,
           expected_delivery_date: item.expected_delivery || null,
           notes: item.notes.trim() || null,
+          quantity: parseInt(item.quantity) || 1,
           status: 'ordered',
         };
-
-        const response = await fetch(`${BACKEND_URL}/api/materials`, {
+        const res = await fetch(`${BACKEND_URL}/api/materials`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload),
         });
-
-        if (response.ok) {
-          successCount++;
-        } else {
-          failCount++;
-        }
+        res.ok ? ok++ : fail++;
       }
-
-      if (failCount === 0) {
-        alert(`✅ ${successCount} material order${successCount > 1 ? 's' : ''} created successfully!`);
-      } else {
-        alert(`⚠️ ${successCount} created, ${failCount} failed. Please check and retry.`);
-      }
-
+      if (fail === 0) alert(`✅ ${ok} material order${ok !== 1 ? 's' : ''} created!`);
+      else alert(`⚠️ ${ok} created, ${fail} failed.`);
       setShowOrderDialog(false);
       setOrderItems([]);
-    } catch (error) {
-      console.error('Error creating material orders:', error);
-      alert('Failed to create material orders. Please try again.');
-    } finally {
-      setIsSubmittingOrder(false);
-    }
+    } catch { alert('Failed to create orders. Please try again.'); }
+    finally { setIsSubmittingOrder(false); }
   };
 
   const handlePrintPDF = async () => {
@@ -904,7 +998,7 @@ function ChecklistViewContent() {
             <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-900 text-white">
               <span className="text-sm font-bold">AI</span>
             </div>
-            <span className="text-lg font-semibold">Aztec Interiors</span>
+            <span className="text-lg font-semibold">Atelier Luxe Interiors</span>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -3166,7 +3260,6 @@ function ChecklistViewContent() {
         {showOrderDialog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white shadow-xl">
-              {/* Header */}
               <div className="sticky top-0 z-10 border-b bg-white p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -3179,150 +3272,117 @@ function ChecklistViewContent() {
                 </div>
               </div>
 
-              <div className="p-6 space-y-4">
-                {/* Customer Info */}
-                <div className="rounded-lg bg-blue-50 p-4">
-                  <h3 className="mb-2 font-semibold text-sm text-blue-900">Customer Information</h3>
-                  <p className="text-sm"><strong>Name:</strong> {formData?.customer_name}</p>
-                  <p className="text-sm"><strong>Phone:</strong> {formData?.customer_phone}</p>
-                  <p className="text-sm"><strong>Address:</strong> {formData?.customer_address}</p>
-                </div>
-
+              <div className="p-6 space-y-3">
                 {orderItems.length === 0 ? (
-                  <p className="text-center text-sm text-gray-500 py-8">No materials found in this section</p>
+                  <p className="py-8 text-center text-sm text-gray-500">No materials found in this section</p>
                 ) : (
-                  <div className="space-y-3">
-                    <p className="text-sm font-bold text-gray-700">
+                  <>
+                    <p className="text-sm font-medium text-gray-700">
                       {orderItems.filter(i => i.included).length} of {orderItems.length} items selected
                     </p>
                     {orderItems.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className={`rounded-lg border-2 p-4 transition-colors ${
-                          item.included ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-50 opacity-60"
+                      <div key={idx}
+                        className={`rounded-xl border-2 transition-colors ${
+                          item.included ? 'border-blue-200 bg-white shadow-sm' : 'border-gray-200 bg-gray-50 opacity-50'
                         }`}
                       >
-                        {/* Material label + toggle */}
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-start gap-3 flex-1">
-                            <input
-                              type="checkbox"
-                              checked={item.included}
-                              onChange={(e) => {
-                                const updated = [...orderItems];
-                                updated[idx] = { ...updated[idx], included: e.target.checked };
-                                setOrderItems(updated);
-                              }}
-                              className="mt-1 h-4 w-4 rounded"
-                            />
-                            <span className="text-sm font-medium text-gray-800">{item.material}</span>
-                          </div>
+                        {/* Card header */}
+                        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+                          <input
+                            type="checkbox"
+                            checked={item.included}
+                            onChange={e => {
+                              const updated = [...orderItems];
+                              updated[idx] = { ...updated[idx], included: e.target.checked };
+                              setOrderItems(updated);
+                            }}
+                            className="h-4 w-4 rounded accent-blue-600"
+                          />
+                          <span className="font-semibold text-gray-800 text-sm flex-1">{item.label}</span>
                         </div>
 
                         {item.included && (
-                          <div className="ml-7 space-y-3">
-                            {/* Supplier + Quantity */}
+                          <div className="px-4 py-4 space-y-3">
+                            {/* Auto-filled detail fields */}
                             <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Supplier</label>
-                                <Input
-                                  placeholder="e.g., Howdens"
-                                  value={item.supplier}
-                                  onChange={(e) => {
-                                    const updated = [...orderItems];
-                                    updated[idx] = { ...updated[idx], supplier: e.target.value };
-                                    setOrderItems(updated);
-                                  }}
-                                  className="h-8 text-xs"
-                                />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Quantity</label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  placeholder="1"
-                                  value={item.quantity}
-                                  onChange={(e) => {
-                                    const updated = [...orderItems];
-                                    updated[idx] = { ...updated[idx], quantity: e.target.value };
-                                    setOrderItems(updated);
-                                  }}
-                                  className="h-8 text-xs"
-                                />
-                              </div>
-                            </div>  {/* ← THIS CLOSING TAG WAS MISSING */}
+                              {DETAIL_FIELDS.map(({ key, label }) => (
+                                <div key={key}>
+                                  <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">{label}</label>
+                                  <Input
+                                    value={item[key] as string}
+                                    onChange={e => {
+                                      const updated = [...orderItems];
+                                      updated[idx] = { ...updated[idx], [key]: e.target.value };
+                                      setOrderItems(updated);
+                                    }}
+                                    placeholder="—"
+                                    className="h-8 text-sm bg-gray-50 focus:bg-white"
+                                  />
+                                </div>
+                              ))}
+                            </div>
 
-                            {/* Dates */}
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="border-t border-dashed border-gray-200 pt-3" />
+
+                            {/* Order fields */}
+                            <div className="grid grid-cols-3 gap-3">
                               <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Date Ordered</label>
-                                <input
-                                  type="date"
-                                  value={item.order_date}
-                                  onChange={(e) => {
-                                    const updated = [...orderItems];
-                                    updated[idx] = { ...updated[idx], order_date: e.target.value };
-                                    setOrderItems(updated);
-                                  }}
-                                  className="w-full rounded-md border border-gray-300 p-1.5 text-xs"
-                                />
+                                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Supplier</label>
+                                <Input value={item.supplier}
+                                  onChange={e => { const u = [...orderItems]; u[idx] = { ...u[idx], supplier: e.target.value }; setOrderItems(u); }}
+                                  placeholder="e.g. Howdens" className="h-8 text-sm" />
                               </div>
                               <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Expected Delivery</label>
-                                <input
-                                  type="date"
-                                  value={item.expected_delivery}
-                                  onChange={(e) => {
-                                    const updated = [...orderItems];
-                                    updated[idx] = { ...updated[idx], expected_delivery: e.target.value };
-                                    setOrderItems(updated);
-                                  }}
-                                  className="w-full rounded-md border border-gray-300 p-1.5 text-xs"
-                                />
+                                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Quantity</label>
+                                <Input type="number" min="1" value={item.quantity}
+                                  onChange={e => { const u = [...orderItems]; u[idx] = { ...u[idx], quantity: e.target.value }; setOrderItems(u); }}
+                                  className="h-8 text-sm" />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Est. Cost (£)</label>
+                                <Input type="number" step="0.01" min="0" placeholder="0.00" value={item.estimated_cost}
+                                  onChange={e => { const u = [...orderItems]; u[idx] = { ...u[idx], estimated_cost: e.target.value }; setOrderItems(u); }}
+                                  className="h-8 text-sm" />
                               </div>
                             </div>
 
-                            {/* Notes */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Date Ordered</label>
+                                <input type="date" value={item.order_date}
+                                  onChange={e => { const u = [...orderItems]; u[idx] = { ...u[idx], order_date: e.target.value }; setOrderItems(u); }}
+                                  className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm h-8" />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Expected Delivery</label>
+                                <input type="date" value={item.expected_delivery}
+                                  onChange={e => { const u = [...orderItems]; u[idx] = { ...u[idx], expected_delivery: e.target.value }; setOrderItems(u); }}
+                                  className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm h-8" />
+                              </div>
+                            </div>
+
                             <div>
-                              <label className="mb-1 block text-xs font-bold text-gray-600">Notes</label>
-                              <textarea
-                                placeholder="Any special instructions..."
-                                rows={2}
-                                value={item.notes}
-                                onChange={(e) => {
-                                  const updated = [...orderItems];
-                                  updated[idx] = { ...updated[idx], notes: e.target.value };
-                                  setOrderItems(updated);
-                                }}
-                                className="w-full resize-none rounded-md border border-gray-300 p-1.5 text-xs"
-                              />
+                              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Notes</label>
+                              <textarea rows={2} placeholder="Any special instructions..." value={item.notes}
+                                onChange={e => { const u = [...orderItems]; u[idx] = { ...u[idx], notes: e.target.value }; setOrderItems(u); }}
+                                className="w-full resize-none rounded-md border border-gray-300 p-2 text-sm" />
                             </div>
                           </div>
                         )}
                       </div>
                     ))}
-                  </div>
+                  </>
                 )}
               </div>
 
-              {/* Footer */}
               <div className="sticky bottom-0 border-t bg-gray-50 p-4 flex justify-end gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowOrderDialog(false)}
-                  disabled={isSubmittingOrder}
-                >
+                <Button variant="outline" onClick={() => setShowOrderDialog(false)} disabled={isSubmittingOrder}>
                   Cancel
                 </Button>
-                <Button
-                  type="button"
-                  onClick={handleSubmitOrder}
-                  disabled={isSubmittingOrder || orderItems.filter(i => i.included).length === 0}
-                >
+                <Button onClick={handleSubmitOrder}
+                  disabled={isSubmittingOrder || orderItems.filter(i => i.included).length === 0}>
                   {isSubmittingOrder
-                    ? "Creating Orders..."
+                    ? 'Creating Orders...'
                     : `Create ${orderItems.filter(i => i.included).length} Order${orderItems.filter(i => i.included).length !== 1 ? 's' : ''}`}
                 </Button>
               </div>

@@ -261,7 +261,7 @@ const RemedialActionChecklistContent = () => {
 
   const downloadAsCsv = () => {
     let csv =
-      `AZTEC INTERIORS\nREMEDIAL WORK CHECKLIST\n\n` +
+      `ATELIER LUXE INTERIORS\nREMEDIAL WORK CHECKLIST\n\n` +
       `DATE:,${date}\n` +
       `CUSTOMER NAME:,${customer.name}\n` +
       `CUSTOMER ADDRESS:,${customer.address}\n` +
@@ -303,7 +303,7 @@ const RemedialActionChecklistContent = () => {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200">
               <CheckSquare className="h-6 w-6 text-gray-800" />
             </div>
-            <h2 className="text-3xl font-bold text-black">AZTEC INTERIORS</h2>
+            <h2 className="text-3xl font-bold text-black">ATELIER LUXE INTERIORS</h2>
           </div>
           <p className="mt-1 text-xl font-semibold">REMEDIAL WORK CHECKLIST</p>
         </div>

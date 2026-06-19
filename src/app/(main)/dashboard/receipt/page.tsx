@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save } from "lucide-react";
 import { BACKEND_URL } from "@/lib/api";
+import Image from 'next/image';
 
 const API_FORM = `${BACKEND_URL}/api/form`;
 
@@ -181,9 +182,18 @@ export default function CreateReceiptPage() {
       <div className="mx-auto max-w-3xl px-8 py-8">
         {/* Company header */}
         <div className="mb-8 text-center">
-          <div className="text-4xl font-bold tracking-wider text-gray-800">AZTEC INTERIORS</div>
+        <div className="mb-8 flex items-center justify-center gap-3">
+          <Image
+            src="/images/logo3.png"
+            alt="Logo"
+            width={80}
+            height={80}
+            className="object-contain"
+          />
+          <div className="text-4xl font-bold tracking-wider text-gray-800">ATELIER LUXE INTERIORS</div>
+        </div>
           <p className="mt-1 text-sm text-gray-500">20 Victoria Road East, Leicester, LE5 5FD</p>
-          <p className="text-sm text-gray-500">Tel: 0116 2761866 | Email: aztecinteriors@hotmail.co.uk</p>
+          <p className="text-sm text-gray-500">Tel: 07821 328849 | Email: info@atelierluxe.co.uk</p>
         </div>
 
         {/* Receipt type selector */}
@@ -348,7 +358,7 @@ export default function CreateReceiptPage() {
             {/* Signature */}
             <div className="border-t pt-4 text-sm text-gray-700">
               <p>Many Thanks,</p>
-              <p className="mt-1 font-semibold italic text-base">Tanvir Shaikh</p>
+              <p className="mt-1 font-semibold italic text-base">Atelier Luxe Interiors</p>
             </div>
           </div>
         </div>

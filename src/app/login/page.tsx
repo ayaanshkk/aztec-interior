@@ -12,10 +12,10 @@ export default function LoginV2Enhanced() {
         <div className="flex h-full flex-col items-center justify-center p-12 text-center">
           <div className="space-y-6">
             <Image
-              src="/images/file1.svg"
+              src="/images/logo3.png"
               alt="Logo"
-              width={80}
-              height={80}
+              width={125}
+              height={125}
               className="mx-auto"
             />
             <div className="space-y-2">

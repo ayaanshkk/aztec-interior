@@ -501,7 +501,7 @@ export default function ChecklistViewPage() {
               <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-900 text-white">
                 <span className="text-sm font-bold">AI</span>
               </div>
-              <span className="text-lg font-semibold">Aztec Interiors</span>
+              <span className="text-lg font-semibold">Atelier Luxe Interiors</span>
             </div>
             <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
               <CloseIcon className="h-6 w-6" />
