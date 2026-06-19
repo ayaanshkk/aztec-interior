@@ -48,10 +48,10 @@ export default function ViewInvoicePage() {
     customer_email:   "",
     invoice_date:     "",
     due_date:         "",
-    status:           "Draft",
     notes:            "",
   });
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState(0);
+  const [deposit, setDeposit] = useState(0);
   const [nextId, setNextId] = useState(1000);
 
   const fmt = (v: number) =>
@@ -98,7 +98,6 @@ export default function ViewInvoicePage() {
       customer_email:   data.customer_email   || "",
       invoice_date:     (data.invoice_date || "").split("T")[0],
       due_date:         (data.due_date     || "").split("T")[0],
-      status:           data.status || "Draft",
       notes:            data.notes  || "",
     });
     const mapped: InvoiceItem[] = (data.items || []).map((i: any) => ({
@@ -118,6 +117,7 @@ export default function ViewInvoicePage() {
     }));
     setItems(mapped);
     setNextId((mapped.length || 0) + 1000);
+    setDeposit(data.deposit_paid || 0);
   };
 
   const startEditing = () => {
@@ -252,21 +252,9 @@ export default function ViewInvoicePage() {
               <Download className="mr-2 h-4 w-4" /> Download PDF
             </Button>
 
-            {isEditing ? (
-              <>
-                <Button variant="outline" onClick={cancelEditing}>
-                  <X className="mr-2 h-4 w-4" /> Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={isSaving}>
-                  <CheckSquare className="mr-2 h-4 w-4" />
-                  {isSaving ? "Saving..." : "Save Invoice"}
-                </Button>
-              </>
-            ) : (
-              <Button onClick={startEditing}>
-                <Edit className="mr-2 h-4 w-4" /> Edit Invoice
-              </Button>
-            )}
+            <Button onClick={() => router.push(`/dashboard/invoices/${invoiceId}/edit`)}>
+              <Edit className="mr-2 h-4 w-4" /> Edit Invoice
+            </Button>
           </div>
         </div>
         {isEditing && (
@@ -341,6 +329,48 @@ export default function ViewInvoicePage() {
                   </td>
                 </tr>
               ))}
+
+              {/* Extra fields — always visible */}
+              {[
+                { label: "EMAIL:",            key: "customer_email",  type: "email"    },
+                { label: "ROOM NAME:",        key: "room_name",       type: "text"     },
+                { label: "CARCASS COLOUR:",   key: "carcass_colour",  type: "text"     },
+                { label: "DOOR COLOUR:",      key: "door_colour",     type: "text"     },
+                { label: "PANELWORK COLOUR:", key: "panelwork_colour",type: "text"     },
+                { label: "DOOR STYLE:",       key: "door_style",      type: "text"     },
+              ].map(({ label, key, type }) => {
+                const viewValue = (invoice as any)?.[key] || "";
+                const editValue = (formData as any)[key] || "";
+                if (!isEditing && !viewValue) return null; // hide empty fields in view mode
+                return (
+                  <tr key={key}>
+                    <td className="border border-black bg-gray-50 px-3 py-2 font-semibold" style={{ width: "20%" }}>
+                      {label}
+                    </td>
+                    <td className={`border border-black px-3 py-2 ${key === "room_name" && !isEditing ? "text-orange-600 font-medium" : ""}`}>
+                      {isEditing ? (
+                        type === "select" ? (
+                          <select value={editValue}
+                            onChange={e => setFormData(prev => ({ ...prev, [key]: e.target.value }))}
+                            className="w-full border-none text-sm focus:outline-none">
+                            <option value="Draft">Draft</option>
+                            <option value="Sent">Sent</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Overdue">Overdue</option>
+                            <option value="Cancelled">Cancelled</option>
+                          </select>
+                        ) : (
+                          <Input type={type} value={editValue}
+                            onChange={e => setFormData(prev => ({ ...prev, [key]: e.target.value }))}
+                            className="border-none p-0 focus-visible:ring-0 text-sm h-auto" />
+                        )
+                      ) : (
+                        viewValue || "—"
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -532,6 +562,46 @@ export default function ViewInvoicePage() {
               <tr>
                 <td className="border border-black bg-gray-50 px-3 py-2 font-bold">TOTAL</td>
                 <td className="border border-black px-3 py-2 text-right font-bold">{fmt(total)}</td>
+              </tr>
+
+              {/* Deposit */}
+              <tr>
+                <td className="border border-black bg-gray-50 px-3 py-2 font-semibold">
+                  {isEditing ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <span>DEPOSIT PAID</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm text-gray-500">£</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={deposit || ""}
+                          onChange={e => setDeposit(parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                          className="w-24 rounded border border-gray-300 px-2 py-1 text-right text-sm"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    "DEPOSIT PAID"
+                  )}
+                </td>
+                <td className="border border-black px-3 py-2 text-right text-green-700 font-semibold">
+                  {deposit > 0 ? fmt(deposit) : "—"}
+                </td>
+              </tr>
+
+              {/* Total Remaining */}
+              <tr>
+                <td className="border border-black bg-gray-50 px-3 py-2 font-bold text-base">
+                  TOTAL REMAINING
+                </td>
+                <td className={`border border-black px-3 py-2 text-right font-bold text-base ${
+                  total - deposit < 0 ? "text-red-600" : ""
+                }`}>
+                  {fmt(Math.max(0, total - deposit))}
+                </td>
               </tr>
             </tbody>
           </table>

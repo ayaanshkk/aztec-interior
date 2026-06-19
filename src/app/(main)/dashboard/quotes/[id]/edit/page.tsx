@@ -1436,20 +1436,17 @@ export default function EditQuotePage() {
                     <span>DISCOUNT</span>
                     <div className="flex items-center gap-1">
                       <Input
-                        type="number"
+                        type="number" min="0" max="100" step="0.1"
                         value={globalDiscountPercent}
-                        onChange={(e) => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)}
+                        onChange={e => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)}
                         className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm"
-                        min="0"
-                        max="100"
-                        step="0.1"
                       />
                       <span className="text-sm">%</span>
                     </div>
                   </div>
                 </td>
                 <td className="border border-black px-3 py-2 text-right text-red-600">
-                  {globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}
+                  {globalDiscountPercent > 0 ? `-${fmt(subtotalBeforeDiscount * (globalDiscountPercent / 100))}` : "—"}
                 </td>
               </tr>
               

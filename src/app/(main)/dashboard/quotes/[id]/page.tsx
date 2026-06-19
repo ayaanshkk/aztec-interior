@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Printer, Download, Edit } from "lucide-react";
 import Image from 'next/image';
+import { FileText } from "lucide-react";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
 
@@ -83,6 +84,49 @@ export default function ViewQuotePage() {
     window.print();
   };
 
+  const handleGenerateInvoice = () => {
+    if (!quotation) return;
+
+    localStorage.setItem("invoiceFromQuote", JSON.stringify({
+      customer_name:    quotation.customer_name    || "",
+      customer_address: quotation.customer_address || quotation.address || "",
+      customer_phone:   quotation.customer_phone   || quotation.phone   || "",
+      customer_email:   quotation.customer_email   || quotation.email   || "",
+      room_name:        quotation.room_name        || "",
+      door_type:        quotation.door_type        || "Carcass Only",
+      room_type:        quotation.room_type        || "Kitchen",
+      carcass_colour:   quotation.carcass_colour   || "",
+      door_colour:      quotation.door_colour      || "",
+      panelwork_colour: quotation.panelwork_colour || "",
+      door_style:       quotation.door_style       || "",
+      vat_percentage:   quotation.vat_percentage   || quotation.vat_rate || 20,
+      client_id:        quotation.client_id        || quotation.customer_id || null,
+      section_discounts: quotation.section_discounts || {},
+      items: (quotation.items || []).map((item: any) => ({
+        item:             item.item        || item.item_code || "",
+        description:      item.description || "",
+        color:            item.colour      || item.color     || "",
+        quantity:         item.quantity    || 1,
+        amount:           item.unit_price  || item.amount    || 0,
+        width:            item.width,
+        height:           item.height,
+        depth:            item.depth,
+        discount_percent: item.discount_percent || 0,
+        section:          item.section     || "Furniture",
+        subItems: (item.subItems || item.sub_items || []).map((sub: any) => ({
+          item:             sub.item        || sub.item_code || "",
+          description:      sub.description || "",
+          color:            sub.colour      || sub.color     || "",
+          quantity:         sub.quantity    || 1,
+          amount:           sub.unit_price  || sub.amount    || 0,
+          discount_percent: sub.discount_percent || 0,
+        })),
+      })),
+    }));
+
+    window.open(`/dashboard/invoices/create?fromQuote=1&customerId=${quotation.client_id || quotation.customer_id || ""}`);
+  };
+
   const handleEdit = () => {
     router.push(`/dashboard/quotes/${quoteId}/edit`);
   };
@@ -147,6 +191,12 @@ export default function ViewQuotePage() {
             <Button onClick={() => window.open(`${BACKEND_URL}/quotations/${quoteId}/pdf`, '_blank')}>
               <Download className="mr-2 h-4 w-4" />
               Download PDF
+            </Button>
+            <Button
+              onClick={handleGenerateInvoice}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <FileText className="mr-2 h-4 w-4" /> Generate Invoice
             </Button>
           </div>
         </div>
