@@ -1446,7 +1446,7 @@ export default function EditQuotePage() {
                   </div>
                 </td>
                 <td className="border border-black px-3 py-2 text-right text-red-600">
-                  {globalDiscountPercent > 0 ? `-${fmt(subtotalBeforeDiscount * (globalDiscountPercent / 100))}` : "—"}
+                  {globalDiscountPercent > 0 ? `-${formatCurrency(subtotalBeforeDiscount * (globalDiscountPercent / 100))}` : "—"}
                 </td>
               </tr>
               
