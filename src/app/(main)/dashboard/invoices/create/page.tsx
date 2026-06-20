@@ -745,40 +745,35 @@ export default function CreateInvoicePage() {
           section_discounts: sectionDiscounts,
           door_style: doorStyle,
           items: items
-            .filter(item => {
-              const hasItem = item.item && item.item.trim().length > 0;
-              const hasDescription = item.description && item.description.trim().length > 0;
-              const hasAmount = item.line_total > 0;
-              return hasItem || hasDescription || hasAmount;
-            })
-            .map(item => ({
-              item: item.item,
-              description: item.description,
-              colour: item.color,
-              quantity: item.quantity || 1,
-              unit_price: item.amount || 0,
-              amount: item.amount || 0,
-              discount_percent: item.discount_percent || 0,
-              discounted_amount: item.discounted_total || item.line_total,
-              width: item.width,
-              height: item.height,
-              depth: item.depth,
-              section: item.section || 'Furniture',
-              subItems: (item.subItems || [])
-                .filter(sub => (sub.item && sub.item.trim()) || (sub.description && sub.description.trim()) || sub.line_total > 0)
-                .map(sub => ({
-                  item: sub.item,
-                  description: sub.description,
-                  color: sub.color,
-                  quantity: sub.quantity || 1,
-                  amount: sub.amount || 0,
-                  discount_percent: sub.discount_percent || 0,
-                  discounted_amount: sub.discounted_total || sub.line_total,
-                  width: sub.width,
-                  height: sub.height,
-                  depth: sub.depth,
+            .filter(i => i.item || i.description || i.line_total > 0)
+            .flatMap(i => [
+              {
+                item:             i.item,
+                description:      i.description,
+                color:            i.color,
+                quantity:         i.quantity || 1,
+                amount:           i.line_total,
+                discount_percent: i.discount_percent || 0,
+                discounted_total: i.discounted_total || i.line_total,
+                width: i.width, height: i.height, depth: i.depth,
+                section: i.section || "Furniture",
+                is_sub_item: false,
+              },
+              ...(i.subItems || [])
+                .filter(s => (s.item && s.item.trim()) || (s.description && s.description.trim()) || s.line_total > 0)
+                .map(s => ({
+                  item:             s.item || "",
+                  description:      s.description || "",
+                  color:            s.color || "",
+                  quantity:         s.quantity || 1,
+                  amount:           (s.amount || 0) * (s.quantity || 1),
+                  discount_percent: s.discount_percent || 0,
+                  discounted_total: s.discounted_total || (s.amount || 0) * (s.quantity || 1),
+                  width: s.width, height: s.height, depth: s.depth,
+                  section: i.section || "Furniture",
+                  is_sub_item: true,
                 })),
-            })),
+            ]),
           subtotal,
           vat,
           total,

@@ -417,12 +417,16 @@ export default function CustomerDetailsPage() {
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [quoteToDelete, setQuoteToDelete] = useState<{ id: number; reference: string } | null>(null);
+  const [deletingInvoiceId, setDeletingInvoiceId] = useState<number | null>(null);
+  const [deleteInvoiceDialogOpen, setDeleteInvoiceDialogOpen] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<{ id: number; title: string } | null>(null);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [editCustomerData, setEditCustomerData] = useState<Partial<Customer>>({});
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   const [showDeleteCustomerDialog, setShowDeleteCustomerDialog] = useState(false);
   const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
   const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
+
 
   useEffect(() => {
     if (!id) return;
@@ -577,7 +581,7 @@ export default function CustomerDetailsPage() {
           allFinancialDocs.push({
             id: invoice.id,
             type: invoice.invoice_number?.toLowerCase().includes('proforma') ? 'proforma' : 'invoice',
-            title: invoice.invoice_number || `Invoice #${invoice.id}`,
+            title: (invoice as any).room_name || invoice.invoice_number || `Invoice #${invoice.id}`,
             reference: invoice.invoice_number,
             total: invoice.total,
             status: invoice.status,
@@ -1291,6 +1295,30 @@ export default function CustomerDetailsPage() {
       setDeletingQuoteId(null);
       setDeleteDialogOpen(false);
       setQuoteToDelete(null);
+    }
+  };
+
+  const handleDeleteInvoice = async (invoiceId: number) => {
+    setDeletingInvoiceId(invoiceId);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BACKEND_URL}/api/form/invoices/${invoiceId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to delete invoice (${response.status})`);
+      }
+      setFinancialDocuments(prev => prev.filter(doc =>
+        !(doc.type === 'invoice' && doc.id === invoiceId)
+      ));
+    } catch (error) {
+      alert(`Failed to delete invoice: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setDeletingInvoiceId(null);
+      setDeleteInvoiceDialogOpen(false);
+      setInvoiceToDelete(null);
     }
   };
 
@@ -3528,21 +3556,30 @@ export default function CustomerDetailsPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             const quoteId = typeof doc.id === 'string' ? parseInt(doc.id) : doc.id;
-                            if (!quoteId || isNaN(quoteId)) {
-                              alert('Error: Cannot delete quotation - invalid ID');
-                              return;
-                            }
-                            setQuoteToDelete({ id: quoteId, reference: doc.reference || doc.title });
+                            if (!quoteId || isNaN(quoteId as number)) { alert('Error: Cannot delete - invalid ID'); return; }
+                            setQuoteToDelete({ id: quoteId as number, reference: doc.reference || doc.title });
                             setDeleteDialogOpen(true);
                           }}
                           disabled={deletingQuoteId === doc.id}
                           className="w-9 flex-shrink-0 px-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                         >
-                          {deletingQuoteId === doc.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
+                          {deletingQuoteId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        </Button>
+                      ) : doc.type === 'invoice' ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const invId = typeof doc.id === 'string' ? parseInt(doc.id) : doc.id;
+                            if (!invId || isNaN(invId as number)) { alert('Error: Cannot delete - invalid ID'); return; }
+                            setInvoiceToDelete({ id: invId as number, title: doc.title });
+                            setDeleteInvoiceDialogOpen(true);
+                          }}
+                          disabled={deletingInvoiceId === doc.id}
+                          className="w-9 flex-shrink-0 px-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        >
+                          {deletingInvoiceId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                         </Button>
                       ) : (
                         // Invisible spacer — keeps View+PDF the same width on non-quotation cards
@@ -3608,6 +3645,30 @@ export default function CustomerDetailsPage() {
               ) : (
                 'Delete Quotation'
               )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Invoice Dialog */}
+      <AlertDialog open={deleteInvoiceDialogOpen} onOpenChange={setDeleteInvoiceDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{invoiceToDelete?.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingInvoiceId !== null}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => invoiceToDelete && handleDeleteInvoice(invoiceToDelete.id)}
+              disabled={deletingInvoiceId !== null}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deletingInvoiceId !== null ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</>
+              ) : 'Delete Invoice'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

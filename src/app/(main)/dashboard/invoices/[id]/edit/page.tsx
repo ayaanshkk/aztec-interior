@@ -510,27 +510,36 @@ export default function EditInvoicePage() {
           section_discounts:       sectionDiscounts,
 					global_discount_percent: globalDiscountPercent,
 					global_discount_amount:  discAmt,
-          items: items
-            .filter(i => i.item || i.description || i.line_total > 0)
-            .map(i => ({
-              item:             i.item,
-              description:      i.description,
-              color:            i.color,
-              quantity:         i.quantity || 1,
-              amount:           i.line_total,
-              discount_percent: i.discount_percent || 0,
-              discounted_total: i.discounted_total || i.line_total,
-              width: i.width, height: i.height, depth: i.depth,
-              section: i.section || "Furniture",
-              subItems: (i.subItems || [])
-                .filter(s => (s.item && s.item.trim()) || (s.description && s.description.trim()) || s.line_total > 0)
-                .map(s => ({
-                  item: s.item, description: s.description, color: s.color,
-                  quantity: s.quantity || 1, amount: s.amount || 0,
-                  discount_percent: s.discount_percent || 0, discounted_total: s.discounted_total || s.line_total,
-                  width: s.width, height: s.height, depth: s.depth,
-                })),
-            })),
+					items: items
+						.filter(i => i.item || i.description || i.line_total > 0)
+						.flatMap(i => [
+							{
+								item:             i.item,
+								description:      i.description,
+								color:            i.color,
+								quantity:         i.quantity || 1,
+								amount:           i.line_total,
+								discount_percent: i.discount_percent || 0,
+								discounted_total: i.discounted_total || i.line_total,
+								width: i.width, height: i.height, depth: i.depth,
+								section: i.section || "Furniture",
+								is_sub_item: false,
+							},
+							...(i.subItems || [])
+								.filter(s => (s.item && s.item.trim()) || (s.description && s.description.trim()) || s.line_total > 0)
+								.map(s => ({
+									item:             s.item || "",
+									description:      s.description || "",
+									color:            s.color || "",
+									quantity:         s.quantity || 1,
+									amount:           (s.amount || 0) * (s.quantity || 1),
+									discount_percent: s.discount_percent || 0,
+									discounted_total: s.discounted_total || (s.amount || 0) * (s.quantity || 1),
+									width: s.width, height: s.height, depth: s.depth,
+									section: i.section || "Furniture",
+									is_sub_item: true,
+								})),
+						]),
         }),
       });
 
