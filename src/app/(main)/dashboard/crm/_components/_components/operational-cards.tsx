@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { fetchWithAuth } from "@/lib/api";
-import { salesPipelineChartConfig, generateSalesPipelineData } from "./crm.config";
+import { salesPipelineChartConfig } from "./crm.config";
 import { format } from "date-fns";
 
 type ActionItem = {
@@ -39,7 +39,14 @@ export function OperationalCards() {
 
         if (pipelineRes.ok) {
           const pipelineData = await pipelineRes.json();
-          setSalesPipelineChartData(generateSalesPipelineData(pipelineData));
+          const stageCounts: Record<string, number> = {};
+          pipelineData.forEach((item: any) => {
+            const stage = item.stage || 'Lead';
+            stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+          });
+          setSalesPipelineChartData(
+            Object.entries(stageCounts).map(([stage, value]) => ({ stage, value }))
+          );
         }
 
         if (actionsRes.ok) {
