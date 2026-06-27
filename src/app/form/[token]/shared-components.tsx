@@ -5,18 +5,277 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Package, X } from "lucide-react";
 import { BACKEND_URL } from "@/lib/api";
-import type { OrderMaterialsDialogProps, AdditionalDoor, AdditionalHandle, Appliance } from "./shared-types";
+import type { OrderMaterialsDialogProps } from "./shared-types";
 
-export function OrderButton({ sectionTitle, onClick, userRole }: { 
-  sectionTitle: string; 
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+interface OrderItem {
+  label: string;
+  included: boolean;
+  style: string;
+  type: string;
+  colour: string;
+  size: string;
+  code: string;
+  material: string;
+  features: string;
+  supplier: string;
+  quantity: string;
+  estimated_cost: string;
+  order_date: string;
+  expected_delivery: string;
+  notes: string;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+const isNAVal = (v: any) =>
+  !v || ['n/a', 'na', '0', '', '[]'].includes(String(v).trim().toLowerCase());
+
+const safeVal = (v: any): string => (isNAVal(v) ? '' : String(v).trim());
+
+function blankItem(label: string): OrderItem {
+  return {
+    label,
+    included: true,
+    style: '', type: '', colour: '', size: '', code: '', material: '', features: '',
+    supplier: '',
+    quantity: '1',
+    estimated_cost: '',
+    order_date: new Date().toISOString().split('T')[0],
+    expected_delivery: '',
+    notes: '',
+  };
+}
+
+function serialiseItem(item: OrderItem): string {
+  const lines: string[] = [`[${item.label}]`];
+  if (item.style)    lines.push(`Style: ${item.style}`);
+  if (item.type)     lines.push(`Type: ${item.type}`);
+  if (item.colour)   lines.push(`Colour: ${item.colour}`);
+  if (item.size)     lines.push(`Size: ${item.size}`);
+  if (item.code)     lines.push(`Code: ${item.code}`);
+  if (item.material) lines.push(`Material: ${item.material}`);
+  if (item.features) lines.push(`Features: ${item.features}`);
+  return lines.join('\n');
+}
+
+const DETAIL_FIELDS: Array<{ key: keyof OrderItem; label: string }> = [
+  { key: 'style',    label: 'Make / Style' },
+  { key: 'type',     label: 'Type' },
+  { key: 'colour',   label: 'Colour' },
+  { key: 'size',     label: 'Size' },
+  { key: 'code',     label: 'Code / Model' },
+  { key: 'material', label: 'Material' },
+  { key: 'features', label: 'Features' },
+];
+
+function extractGroupedItems(sectionTitle: string, data: Record<string, any>): OrderItem[] {
+  const items: OrderItem[] = [];
+
+  switch (sectionTitle) {
+    case 'Material Specifications': {
+      const hasDoor = !isNAVal(data.door_style) || !isNAVal(data.door_color) || !isNAVal(data.door_type);
+      if (hasDoor) {
+        const d = blankItem('Door');
+        d.style    = safeVal(data.door_style);
+        d.type     = safeVal(data.door_type);
+        d.colour   = safeVal(data.door_color);
+        d.code     = [safeVal(data.door_manufacturer), safeVal(data.door_name)].filter(Boolean).join(' – ');
+        d.material = safeVal(data.glazing_material);
+        items.push(d);
+      }
+      (data.additional_doors || []).forEach((door: any, i: number) => {
+        if (isNAVal(door.door_style) && isNAVal(door.door_color)) return;
+        const d = blankItem(`Door (Additional ${i + 1})`);
+        d.style    = safeVal(door.door_style);
+        d.type     = safeVal(door.door_type);
+        d.colour   = safeVal(door.door_color);
+        d.code     = [safeVal(door.door_manufacturer), safeVal(door.door_name)].filter(Boolean).join(' – ');
+        d.quantity = safeVal(door.quantity) || '1';
+        items.push(d);
+      });
+      if (!isNAVal(data.end_panel_color)) {
+        const p = blankItem('End Panel'); p.colour = safeVal(data.end_panel_color); items.push(p);
+      }
+      if (!isNAVal(data.plinth_filler_color)) {
+        const p = blankItem('Plinth / Filler'); p.colour = safeVal(data.plinth_filler_color); items.push(p);
+      }
+      if (!isNAVal(data.cabinet_color)) {
+        const c = blankItem('Cabinet'); c.colour = safeVal(data.cabinet_color); items.push(c);
+      }
+      break;
+    }
+
+    case 'Hardware Specifications': {
+      if (!isNAVal(data.handles_code) || !isNAVal(data.handles_quantity)) {
+        const h = blankItem('Handles');
+        h.code     = safeVal(data.handles_code);
+        h.size     = safeVal(data.handles_size);
+        h.quantity = safeVal(data.handles_quantity) || '1';
+        items.push(h);
+      }
+      (data.additional_handles || []).forEach((h: any, i: number) => {
+        if (isNAVal(h.handles_code)) return;
+        const item = blankItem(`Handles (Additional ${i + 1})`);
+        item.code     = safeVal(h.handles_code);
+        item.size     = safeVal(h.handles_size);
+        item.quantity = safeVal(h.handles_quantity) || '1';
+        items.push(item);
+      });
+      if (!isNAVal(data.accessories)) {
+        const a = blankItem('Accessories'); a.features = safeVal(data.accessories); items.push(a);
+      }
+      if (!isNAVal(data.lighting_spec) || !isNAVal(data.under_wall_unit_lights_color)) {
+        const l = blankItem('Lighting');
+        l.type = safeVal(data.lighting_spec);
+        const uwParts = [safeVal(data.under_wall_unit_lights_color), safeVal(data.under_wall_unit_lights_profile)].filter(Boolean);
+        if (uwParts.length) l.colour = `Under wall: ${uwParts.join(' / ')}`;
+        if (!isNAVal(data.under_worktop_lights_color)) {
+          l.colour += (l.colour ? '; ' : '') + `Under worktop: ${data.under_worktop_lights_color}`;
+        }
+        items.push(l);
+      }
+      break;
+    }
+
+    case 'Worktop Specifications': {
+      if (!isNAVal(data.worktop_material_type) || !isNAVal(data.worktop_code) || !isNAVal(data.worktop_material_color)) {
+        const w = blankItem('Worktop');
+        w.material = safeVal(data.worktop_material_type);
+        w.colour   = safeVal(data.worktop_material_color);
+        w.code     = safeVal(data.worktop_code);
+        w.size     = safeVal(data.worktop_size);
+        w.features = (data.worktop_features || []).filter((f: string) => !isNAVal(f)).join(', ');
+        if (!isNAVal(data.worktop_other_details)) w.notes = safeVal(data.worktop_other_details);
+        items.push(w);
+      }
+      (data.additional_worktops || []).forEach((wt: any, i: number) => {
+        if (isNAVal(wt.worktop_code) && isNAVal(wt.worktop_material_color)) return;
+        const w = blankItem(`Worktop (Additional ${i + 1})`);
+        w.material = safeVal(wt.worktop_material_type);
+        w.colour   = safeVal(wt.worktop_material_color);
+        w.code     = safeVal(wt.worktop_code);
+        w.size     = safeVal(wt.worktop_size);
+        w.features = (wt.worktop_features || []).filter((f: string) => !isNAVal(f)).join(', ');
+        items.push(w);
+      });
+      break;
+    }
+
+    case 'Appliances': {
+      const appLabels = ['Oven', 'Microwave', 'Washing Machine', 'Dryer', 'Hob', 'Extractor', 'INTG Dishwasher'];
+      (data.appliances || []).forEach((a: any, i: number) => {
+        if (isNAVal(a.make) && isNAVal(a.model)) return;
+        const item = blankItem(appLabels[i] || `Appliance ${i + 1}`);
+        item.style = safeVal(a.make);
+        item.code  = safeVal(a.model);
+        items.push(item);
+      });
+      if (!isNAVal(data.integ_fridge_make)) {
+        const f = blankItem('INTG Fridge / Freezer');
+        f.style    = safeVal(data.integ_fridge_make);
+        f.code     = safeVal(data.integ_fridge_model);
+        f.quantity = safeVal(data.integ_fridge_qty) || '1';
+        items.push(f);
+      }
+      if (!isNAVal(data.integ_freezer_make)) {
+        const f = blankItem('INTG Freezer');
+        f.style    = safeVal(data.integ_freezer_make);
+        f.code     = safeVal(data.integ_freezer_model);
+        f.quantity = safeVal(data.integ_freezer_qty) || '1';
+        items.push(f);
+      }
+      if (!isNAVal(data.sink_details)) {
+        const s = blankItem('Sink');
+        s.type = safeVal(data.sink_details);
+        s.code = safeVal(data.sink_model);
+        items.push(s);
+      }
+      if (!isNAVal(data.tap_details)) {
+        const t = blankItem('Tap');
+        t.type = safeVal(data.tap_details);
+        t.code = safeVal(data.tap_model);
+        items.push(t);
+      }
+      break;
+    }
+
+    case 'Bedroom Furniture': {
+      if (!isNAVal(data.bedside_cabinets_type)) {
+        const b = blankItem('Bedside Cabinets');
+        b.type     = safeVal(data.bedside_cabinets_type);
+        b.quantity = safeVal(data.bedside_cabinets_qty) || '1';
+        items.push(b);
+      }
+      if (data.dresser_desk === 'yes' && !isNAVal(data.dresser_desk_details)) {
+        const d = blankItem('Dresser / Desk');
+        d.type = safeVal(data.dresser_desk_details);
+        items.push(d);
+      }
+      if (data.internal_mirror === 'yes' && !isNAVal(data.internal_mirror_details)) {
+        const m = blankItem('Internal Mirror');
+        m.type = safeVal(data.internal_mirror_details);
+        items.push(m);
+      }
+      if (!isNAVal(data.mirror_type)) {
+        const m = blankItem('Mirror');
+        m.type     = safeVal(data.mirror_type);
+        m.quantity = safeVal(data.mirror_qty) || '1';
+        items.push(m);
+      }
+      break;
+    }
+
+    case 'Lighting': {
+      if (!isNAVal(data.soffit_lights_type)) {
+        const l = blankItem('Soffit Lights');
+        l.type   = safeVal(data.soffit_lights_type);
+        l.colour = safeVal(data.soffit_lights_color);
+        items.push(l);
+      }
+      if (!isNAVal(data.gable_lights_type)) {
+        const l = blankItem('Gable Lights');
+        l.type   = safeVal(data.gable_lights_type);
+        l.colour = [safeVal(data.gable_lights_main_color), safeVal(data.gable_lights_profile_color)].filter(Boolean).join(' / ');
+        items.push(l);
+      }
+      break;
+    }
+
+    case 'Accessories': {
+      if (!isNAVal(data.other_accessories)) {
+        const a = blankItem('Accessories');
+        a.features = safeVal(data.other_accessories);
+        items.push(a);
+      }
+      const fp = (data.floor_protection || []).filter(
+        (f: string) => !isNAVal(f) && f !== 'No Floor Protection Required'
+      );
+      if (fp.length) {
+        const f = blankItem('Floor Protection');
+        f.features = fp.join(', ');
+        items.push(f);
+      }
+      break;
+    }
+  }
+
+  return items;
+}
+
+// ── OrderButton ────────────────────────────────────────────────────────────────
+
+export function OrderButton({
+  sectionTitle,
+  onClick,
+  userRole,
+}: {
+  sectionTitle: string;
   onClick: () => void;
   userRole: string;
 }) {
-  // Hide order button for Sales and HR roles
-  if (userRole === "sales" || userRole === "hr") {
-    return null;
-  }
-  
+  if (userRole === 'sales' || userRole === 'hr') return null;
   return (
     <Button
       type="button"
@@ -30,6 +289,8 @@ export function OrderButton({ sectionTitle, onClick, userRole }: {
     </Button>
   );
 }
+
+// ── NAButton ───────────────────────────────────────────────────────────────────
 
 export function NAButton({ sectionType, onClick }: { sectionType: string; onClick: () => void }) {
   return (
@@ -46,207 +307,61 @@ export function NAButton({ sectionType, onClick }: { sectionType: string; onClic
   );
 }
 
-export function OrderMaterialsDialog({ 
-  isOpen, 
-  onClose, 
-  sectionTitle, 
+// ── OrderMaterialsDialog ───────────────────────────────────────────────────────
+
+export function OrderMaterialsDialog({
+  isOpen,
+  onClose,
+  sectionTitle,
   sectionData,
-  customerInfo 
+  customerInfo,
 }: OrderMaterialsDialogProps) {
-  const [materials, setMaterials] = useState<string[]>([]);
-  const [supplier, setSupplier] = useState('');
-  const [estimatedCost, setEstimatedCost] = useState('');
-  const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0]);
-  const [expectedDelivery, setExpectedDelivery] = useState('');
-  const [notes, setNotes] = useState('');
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      const extractedMaterials = extractMaterialsFromSection(sectionTitle, sectionData);
-      setMaterials(extractedMaterials);
+      setOrderItems(extractGroupedItems(sectionTitle, sectionData));
     }
   }, [isOpen, sectionTitle, sectionData]);
 
-  const extractMaterialsFromSection = (section: string, data: Record<string, any>): string[] => {
-    const items: string[] = [];
-    
-    switch(section) {
-      case "Material Specifications":
-        if (data.door_style) items.push(`Door Style: ${data.door_style}`);
-        if (data.door_color) items.push(`Door Color: ${data.door_color}`);
-        if (data.door_manufacturer) items.push(`Door Manufacturer: ${data.door_manufacturer}`);
-        if (data.door_name) items.push(`Door Name: ${data.door_name}`);
-        if (data.glazing_material) items.push(`Glazing Material: ${data.glazing_material}`);
-        if (data.end_panel_color) items.push(`Panel Color: ${data.end_panel_color}`);
-        if (data.plinth_filler_color) items.push(`Plinth/Filler Color: ${data.plinth_filler_color}`);
-        if (data.cabinet_color) items.push(`Cabinet Color: ${data.cabinet_color}`);
-        if (data.worktop_material_color) items.push(`Worktop Color: ${data.worktop_material_color}`);
-        
-        if (data.additional_doors && data.additional_doors.length > 0) {
-          data.additional_doors.forEach((door: any, idx: number) => {
-            const hasValues = door.door_style || door.door_color || door.panel_color || 
-                            door.plinth_color || door.cabinet_color || door.worktop_color ||
-                            door.door_manufacturer || door.door_name || door.glazing_material;
-            
-            if (hasValues) {
-              items.push(`\n--- Additional Door ${idx + 1} ---`);
-              if (door.door_style) items.push(`Door Style: ${door.door_style}`);
-              if (door.door_color) items.push(`Door Color: ${door.door_color}`);
-              if (door.door_manufacturer) items.push(`Door Manufacturer: ${door.door_manufacturer}`);
-              if (door.door_name) items.push(`Door Name: ${door.door_name}`);
-              if (door.glazing_material) items.push(`Glazing Material: ${door.glazing_material}`);
-              if (door.panel_color) items.push(`Panel Color: ${door.panel_color}`);
-              if (door.plinth_color) items.push(`Plinth/Filler Color: ${door.plinth_color}`);
-              if (door.cabinet_color) items.push(`Cabinet Color: ${door.cabinet_color}`);
-              if (door.worktop_color) items.push(`Worktop Color: ${door.worktop_color}`);
-              if (door.quantity) items.push(`Quantity: ${door.quantity}`);
-            }
-          });
-        }
-        break;
-        
-      case "Hardware Specifications":
-        if (data.handles_code) items.push(`Handle Code: ${data.handles_code}`);
-        if (data.handles_quantity) items.push(`Handle Quantity: ${data.handles_quantity}`);
-        if (data.handles_size) items.push(`Handle Size: ${data.handles_size}`);
-        
-        if (data.additional_handles && data.additional_handles.length > 0) {
-          data.additional_handles.forEach((handle: any, idx: number) => {
-            const hasValues = handle.handles_code || handle.handles_quantity || handle.handles_size;
-            
-            if (hasValues) {
-              items.push(`\n--- Additional Handle ${idx + 1} ---`);
-              if (handle.handles_code) items.push(`Handle Code: ${handle.handles_code}`);
-              if (handle.handles_quantity) items.push(`Handle Quantity: ${handle.handles_quantity}`);
-              if (handle.handles_size) items.push(`Handle Size: ${handle.handles_size}`);
-            }
-          });
-        }
-        
-        if (data.accessories) items.push(`Accessories: ${data.accessories}`);
-        if (data.lighting_spec) items.push(`Lighting: ${data.lighting_spec}`);
-        if (data.under_wall_unit_lights_color) items.push(`Under Wall Unit Lights: ${data.under_wall_unit_lights_color} - ${data.under_wall_unit_lights_profile}`);
-        if (data.under_worktop_lights_color) items.push(`Under Worktop Lights: ${data.under_worktop_lights_color}`);
-        break;
-        
-    case "Worktop Specifications":
-      if (data.worktop_material_type) items.push(`Worktop Material: ${data.worktop_material_type} - ${data.worktop_material_color}`);
-      if (data.worktop_code) items.push(`Worktop Code: ${data.worktop_code}`);
-      if (data.worktop_size) items.push(`Worktop Size: ${data.worktop_size}`);
-      if (data.worktop_features && data.worktop_features.length > 0) {
-        items.push(`Features: ${data.worktop_features.join(', ')}`);
-      }
-      if (data.worktop_other_details) items.push(`Other Details: ${data.worktop_other_details}`);
-      
-      if (data.additional_worktops && data.additional_worktops.length > 0) {
-        data.additional_worktops.forEach((worktop: any, idx: number) => {
-          const hasValues = worktop.worktop_material_type || worktop.worktop_material_color || worktop.worktop_code;
-          if (hasValues) {
-            items.push(`\n--- Additional Worktop ${idx + 1} ---`);
-            if (worktop.worktop_material_type) items.push(`Material: ${worktop.worktop_material_type} - ${worktop.worktop_material_color}`);
-            if (worktop.worktop_code) items.push(`Worktop Code: ${worktop.worktop_code}`);
-            if (worktop.worktop_size) items.push(`Size: ${worktop.worktop_size}`);
-            if (worktop.worktop_features?.length > 0) items.push(`Features: ${worktop.worktop_features.join(', ')}`);
-            if (worktop.worktop_other_details) items.push(`Other: ${worktop.worktop_other_details}`);
-          }
-        });
-      }
-      break;
-        
-      case "Appliances":
-        if (data.appliances && data.appliances.length > 0) {
-          data.appliances.forEach((app: any, idx: number) => {
-            if (app.make || app.model) {
-              const labels = ['Oven', 'Microwave', 'Washing Machine', 'Dryer', 'HOB', 'Extractor', 'INTG Dishwasher'];
-              items.push(`${labels[idx]}: ${app.make} ${app.model}`.trim());
-            }
-          });
-        }
-        if (data.integ_fridge_make || data.integ_fridge_model) {
-          items.push(`INTG Fridge/Freezer (Qty: ${data.integ_fridge_qty || '1'}): ${data.integ_fridge_make} ${data.integ_fridge_model}`.trim());
-        }
-        if (data.sink_details) items.push(`Sink: ${data.sink_details} (Model: ${data.sink_model || 'N/A'})`);
-        if (data.tap_details) items.push(`Tap: ${data.tap_details} (Model: ${data.tap_model || 'N/A'})`);
-        break;
-        
-      case "Bedroom Furniture":
-        if (data.bedside_cabinets_type) items.push(`Bedside Cabinets: ${data.bedside_cabinets_type} (Qty: ${data.bedside_cabinets_qty})`);
-        if (data.dresser_desk === 'yes') items.push(`Dresser/Desk: ${data.dresser_desk_details}`);
-        if (data.internal_mirror === 'yes') items.push(`Internal Mirror: ${data.internal_mirror_details}`);
-        if (data.mirror_type) items.push(`Mirror: ${data.mirror_type} (Qty: ${data.mirror_qty})`);
-        break;
-        
-      case "Lighting":
-        if (data.soffit_lights_type) items.push(`Soffit Lights: ${data.soffit_lights_type} - ${data.soffit_lights_color}`);
-        if (data.gable_lights_type) items.push(`Gable Lights: ${data.gable_lights_type} - ${data.gable_lights_main_color} / ${data.gable_lights_profile_color}`);
-        break;
-        
-      case "Accessories":
-        if (data.other_accessories) items.push(`Accessories: ${data.other_accessories}`);
-        if (data.floor_protection && data.floor_protection.length > 0) {
-          items.push(`Floor Protection: ${data.floor_protection.join(', ')}`);
-        }
-        break;
-    }
-    
-    return items.filter(item => item.trim() !== '');
-  };
-
-  const removeMaterial = (index: number) => {
-    setMaterials(materials.filter((_, i) => i !== index));
+  const updateItem = (idx: number, patch: Partial<OrderItem>) => {
+    setOrderItems(prev => prev.map((item, i) => (i === idx ? { ...item, ...patch } : item)));
   };
 
   const handleSubmitOrder = async () => {
-    if (materials.length === 0) {
-      alert('No materials to order');
-      return;
-    }
+    const included = orderItems.filter(i => i.included);
+    if (included.length === 0) { alert('No materials selected'); return; }
 
     setSubmitting(true);
+    let ok = 0, fail = 0;
     try {
-      const materialDescription = `${sectionTitle}\n${materials.join('\n')}`;
-      
-      const payload = {
-        customer_id: customerInfo.id,
-        material_description: materialDescription,
-        supplier_name: supplier.trim() || null,
-        estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
-        order_date: orderDate,
-        expected_delivery_date: expectedDelivery || null,
-        notes: notes.trim() || null,
-        status: 'ordered',
-      };
-
       const token = localStorage.getItem('token');
-
-      const response = await fetch(`${BACKEND_URL}/materials`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create material order');
+      for (const item of included) {
+        const payload = {
+          customer_id: customerInfo.id,
+          material_description: serialiseItem(item),
+          supplier_name: item.supplier.trim() || null,
+          estimated_cost: item.estimated_cost ? parseFloat(item.estimated_cost) : null,
+          order_date: item.order_date || null,
+          expected_delivery_date: item.expected_delivery || null,
+          notes: item.notes.trim() || null,
+          quantity: parseInt(item.quantity) || 1,
+          status: 'ordered',
+        };
+        const res = await fetch(`${BACKEND_URL}/api/materials`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload),
+        });
+        res.ok ? ok++ : fail++;
       }
-
-      alert('Material order created successfully!');
+      if (fail === 0) alert(`✅ ${ok} material order${ok !== 1 ? 's' : ''} created!`);
+      else alert(`⚠️ ${ok} created, ${fail} failed.`);
       onClose();
-      
-      // Reset form
-      setMaterials([]);
-      setSupplier('');
-      setEstimatedCost('');
-      setOrderDate(new Date().toISOString().split('T')[0]);
-      setExpectedDelivery('');
-      setNotes('');
-      
-    } catch (error) {
-      console.error('Error creating material order:', error);
-      alert('Failed to create material order. Please try again.');
+      setOrderItems([]);
+    } catch {
+      alert('Failed to create orders. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -254,137 +369,155 @@ export function OrderMaterialsDialog({
 
   if (!isOpen) return null;
 
+  const includedCount = orderItems.filter(i => i.included).length;
+
   return (
-    <div className="fixed inset-0 bg-white bg-opacity-20 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+
+        {/* Header */}
         <div className="p-6 border-b sticky top-0 bg-white z-10">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold">Order Materials - {sectionTitle}</h2>
-              <p className="text-sm text-gray-500 mt-1">Create material order for {customerInfo.name}</p>
+              <h2 className="text-xl font-bold">Order Materials</h2>
+              <p className="text-sm text-gray-500 mt-1">{sectionTitle} — {customerInfo.name}</p>
             </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X className="h-6 w-6" />
             </button>
           </div>
         </div>
 
-        <div className="p-6 space-y-4">
-          {/* Customer Info */}
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h3 className="font-semibold text-sm text-blue-900 mb-2">Customer Information</h3>
-            <div className="text-sm space-y-1">
-              <p><strong>Name:</strong> {customerInfo.name}</p>
-              <p><strong>Phone:</strong> {customerInfo.phone}</p>
-              <p><strong>Address:</strong> {customerInfo.address}</p>
-            </div>
-          </div>
+        <div className="p-6 space-y-3">
+          {orderItems.length === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-500">No materials found in this section</p>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-gray-700">
+                {includedCount} of {orderItems.length} items selected
+              </p>
 
-          {/* Materials List */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
-              Materials to Order * ({materials.length} items)
-            </label>
-            <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-3 bg-gray-50">
-              {materials.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4">
-                  No materials found in this section
-                </p>
-              ) : (
-                materials.map((material, index) => (
-                  <div key={index} className="flex items-start justify-between bg-white p-2 rounded border">
-                    <p className="text-sm flex-1">{material}</p>
-                    <button
-                      onClick={() => removeMaterial(index)}
-                      className="ml-2 text-red-500 hover:text-red-700"
-                      title="Remove item"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+              {orderItems.map((item, idx) => (
+                <div
+                  key={idx}
+                  className={`rounded-xl border-2 transition-colors ${
+                    item.included ? 'border-blue-200 bg-white shadow-sm' : 'border-gray-200 bg-gray-50 opacity-50'
+                  }`}
+                >
+                  {/* Card header */}
+                  <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+                    <input
+                      type="checkbox"
+                      checked={item.included}
+                      onChange={e => updateItem(idx, { included: e.target.checked })}
+                      className="h-4 w-4 rounded accent-blue-600"
+                    />
+                    <span className="font-semibold text-gray-800 text-sm flex-1">{item.label}</span>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
 
-          {/* Supplier */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Supplier</label>
-            <Input
-              placeholder="e.g., Howdens, B&Q"
-              value={supplier}
-              onChange={(e) => setSupplier(e.target.value)}
-            />
-          </div>
+                  {item.included && (
+                    <div className="px-4 py-4 space-y-3">
+                      {/* Auto-filled detail fields */}
+                      <div className="grid grid-cols-2 gap-3">
+                        {DETAIL_FIELDS.map(({ key, label }) => (
+                          <div key={key}>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">
+                              {label}
+                            </label>
+                            <Input
+                              value={item[key] as string}
+                              onChange={e => updateItem(idx, { [key]: e.target.value })}
+                              placeholder="—"
+                              className="h-8 text-sm bg-gray-50 focus:bg-white"
+                            />
+                          </div>
+                        ))}
+                      </div>
 
-          {/* Estimated Cost */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Estimated Cost (£)</label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              value={estimatedCost}
-              onChange={(e) => setEstimatedCost(e.target.value)}
-            />
-          </div>
+                      <div className="border-t border-dashed border-gray-200 pt-3" />
 
-          {/* Date Ordered */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Date Ordered</label>
-            <Input
-              type="date"
-              value={orderDate}
-              onChange={(e) => setOrderDate(e.target.value)}
-            />
-          </div>
+                      {/* Order fields */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Supplier</label>
+                          <Input
+                            value={item.supplier}
+                            onChange={e => updateItem(idx, { supplier: e.target.value })}
+                            placeholder="e.g. Howdens"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Quantity</label>
+                          <Input
+                            type="number" min="1"
+                            value={item.quantity}
+                            onChange={e => updateItem(idx, { quantity: e.target.value })}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Est. Cost (£)</label>
+                          <Input
+                            type="number" step="0.01" min="0" placeholder="0.00"
+                            value={item.estimated_cost}
+                            onChange={e => updateItem(idx, { estimated_cost: e.target.value })}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      </div>
 
-          {/* Expected Delivery Date */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Expected Delivery Date</label>
-            <Input
-              type="date"
-              value={expectedDelivery}
-              onChange={(e) => setExpectedDelivery(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
-            />
-          </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Date Ordered</label>
+                          <input
+                            type="date"
+                            value={item.order_date}
+                            onChange={e => updateItem(idx, { order_date: e.target.value })}
+                            className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Expected Delivery</label>
+                          <input
+                            type="date"
+                            value={item.expected_delivery}
+                            onChange={e => updateItem(idx, { expected_delivery: e.target.value })}
+                            className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm h-8"
+                          />
+                        </div>
+                      </div>
 
-          {/* Notes */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Notes</label>
-            <textarea
-              className="w-full resize-none rounded-md border border-gray-300 bg-white p-2 text-sm"
-              placeholder="Any special instructions or details..."
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Notes</label>
+                        <textarea
+                          rows={2}
+                          placeholder="Any special instructions..."
+                          value={item.notes}
+                          onChange={e => updateItem(idx, { notes: e.target.value })}
+                          className="w-full resize-none rounded-md border border-gray-300 p-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t bg-gray-50 flex justify-end gap-3 sticky bottom-0">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={submitting}
-          >
+        <div className="p-4 border-t bg-gray-50 flex justify-end gap-3 sticky bottom-0">
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
             Cancel
           </Button>
           <Button
             onClick={handleSubmitOrder}
-            disabled={materials.length === 0 || submitting}
+            disabled={submitting || includedCount === 0}
           >
-            {submitting ? 'Creating Order...' : 'Create Material Order'}
+            {submitting
+              ? 'Creating Orders...'
+              : `Create ${includedCount} Order${includedCount !== 1 ? 's' : ''}`}
           </Button>
         </div>
       </div>

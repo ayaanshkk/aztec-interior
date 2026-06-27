@@ -303,11 +303,11 @@ export default function BedroomChecklist() {
           break;
 
         case "worktop_specs":
-          updates.worktop_material_type = "N/A";
+          updates.worktop_material_type = "N/A";  // add N/A option to the select (Fix 2 below)
           updates.worktop_material_color = "N/A";
           updates.worktop_code = "N/A";
           updates.worktop_size = "N/A";
-          updates.worktop_features = [];
+          updates.worktop_features = ["N/A"];     // needs a value to pass validation
           updates.worktop_other_details = "N/A";
           break;
 
@@ -994,6 +994,7 @@ export default function BedroomChecklist() {
                           <option value="">Select material type</option>
                           <option value="stone">Stone</option>
                           <option value="laminate">Laminate</option>
+                          <option value="N/A">N/A</option>
                         </select>
                       </div>
                       <div>

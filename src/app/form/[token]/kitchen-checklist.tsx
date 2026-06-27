@@ -319,13 +319,14 @@ export default function KitchenChecklist() {
           updates.under_worktop_lights_color = "N/A";
           break;
 
-        case "worktop_specs":
-          updates.worktop_material_type = "";
-          updates.worktop_material_color = "N/A";
-          updates.worktop_size = "N/A";
-          updates.worktop_features = [];
-          updates.worktop_other_details = "N/A";
-          break;
+          case "worktop_specs":
+            updates.worktop_material_type = "N/A";  // add N/A option to the select (Fix 2 below)
+            updates.worktop_material_color = "N/A";
+            updates.worktop_code = "N/A";
+            updates.worktop_size = "N/A";
+            updates.worktop_features = ["N/A"];     // needs a value to pass validation
+            updates.worktop_other_details = "N/A";
+            break;
 
         case "appliances":
           updates.appliances_customer_owned = "N/A";
@@ -376,10 +377,11 @@ export default function KitchenChecklist() {
     if (!formData.handles_code?.trim()) errors.push("Handles Code");
     if (!formData.handles_quantity?.trim()) errors.push("Handles Quantity");
     if (!formData.handles_size?.trim()) errors.push("Handles Size");
+    const worktopIsNA = formData.worktop_material_type === 'N/A';
     if (!formData.worktop_material_type?.trim()) errors.push("Worktop Material Type");
-    if (!formData.worktop_material_color?.trim()) errors.push("Worktop Material Color");
-    if (formData.worktop_features.length === 0) errors.push("Worktop Further Info");
-    if (!formData.worktop_size?.trim()) errors.push("Worktop Size");
+    if (!worktopIsNA && !formData.worktop_material_color?.trim()) errors.push("Worktop Material Color");
+    if (!worktopIsNA && formData.worktop_features.length === 0) errors.push("Worktop Further Info");
+    if (!worktopIsNA && !formData.worktop_size?.trim()) errors.push("Worktop Size");
 
     if (!formData.terms_date?.trim()) errors.push("Date Terms and Conditions Given");
     if (!formData.gas_electric_info?.trim()) errors.push("Gas and Electric Installation Information");
@@ -676,7 +678,7 @@ export default function KitchenChecklist() {
                         <label className="mb-1 block text-sm font-bold text-gray-700">Door Type</label>
                         <select
                           className="w-full rounded-md border border-gray-300 bg-white p-2"
-                          value={formData.door_type}
+                          value={formData.door_type || ""}
                           onChange={(e) => handleInputChange("door_type", e.target.value)}
                         >
                           <option value="">Select door type</option>
@@ -684,6 +686,7 @@ export default function KitchenChecklist() {
                           <option value="Lacquered Slab">Lacquered Slab</option>
                           <option value="Vinyl">Vinyl doors</option>
                           <option value="Black Glass">Black Glass</option>
+                          <option value="Timber">Timber</option>
                         </select>
                       </div>
                       
@@ -811,6 +814,7 @@ export default function KitchenChecklist() {
                                 <option value="Lacquered Slab">Lacquered Slab</option>
                                 <option value="Vinyl">Vinyl doors</option>
                                 <option value="Black Glass">Black Glass</option>
+                                <option value="Timber">Timber</option>
                               </select>
                             </div>
                             
@@ -1120,12 +1124,13 @@ export default function KitchenChecklist() {
                         <label className="mb-1 block text-sm font-bold text-gray-700">Worktop Material Type</label>
                         <select
                           className="w-full rounded-md border border-gray-300 bg-white p-2"
-                          value={formData.worktop_material_type}
-                          onChange={(e) => handleInputChange("worktop_material_type", e.target.value)}
+                          value={formData.worktop_material_type || ""}
+                          onChange={(e) => handleInputChange("worktop_material_type" as any, e.target.value)}
                         >
                           <option value="">Select material type</option>
                           <option value="stone">Stone</option>
                           <option value="laminate">Laminate</option>
+                          <option value="N/A">N/A</option>
                         </select>
                       </div>
                       <div>

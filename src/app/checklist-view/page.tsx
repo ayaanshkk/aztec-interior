@@ -482,6 +482,19 @@ function ChecklistViewContent() {
     }
   };
 
+  const handleMarkWorktopNA = () => {
+    if (!formData) return;
+    setFormData({
+      ...formData,
+      worktop_material_type: '',
+      worktop_material_color: 'N/A',
+      worktop_code: 'N/A',
+      worktop_size: 'N/A',
+      worktop_features: [],
+      worktop_other_details: 'N/A',
+    });
+  };
+
   const handleDelete = () => {
     if (!canDelete()) {
       alert("You don't have permission to delete this checklist.");
@@ -1175,11 +1188,24 @@ function ChecklistViewContent() {
                   {/* 1. Material Specifications - Green Section */}
                   <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-bold text-green-900">1. Material Specifications (Ordering)</h3>
-                      <OrderButton
-                        sectionTitle="Material Specifications"
-                        onClick={() => handleOpenOrderDialog("Material Specifications")}
-                      />
+                      <h3 className="text-xl font-bold text-orange-900">3. Worktop Specifications</h3>
+                      <div className="flex items-center gap-2">
+                        {isEditing && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleMarkWorktopNA}
+                            className="flex items-center gap-1 text-xs border-gray-400 text-gray-700 hover:bg-gray-100 print:hidden"
+                          >
+                            <X className="h-3 w-3" /> Mark All N/A
+                          </Button>
+                        )}
+                        <OrderButton
+                          sectionTitle="Worktop Specifications"
+                          onClick={() => handleOpenOrderDialog("Worktop Specifications")}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-4">
                       {/* Dynamic Grid based on door style - NOW 3 COLUMNS */}
@@ -1207,7 +1233,9 @@ function ChecklistViewContent() {
                               <option value="Lacquered Slab">Lacquered Slab</option>
                               <option value="Vinyl">Vinyl doors</option>
                               <option value="Black Glass">Black Glass</option>
+                              <option value="Timber">Timber</option>
                             </select>
+
                           ) : (
                             <Input value={formData.door_type || ""} readOnly className="bg-white" />
                           )}
@@ -1694,10 +1722,23 @@ function ChecklistViewContent() {
                   <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-xl font-bold text-orange-900">3. Worktop Specifications</h3>
-                      <OrderButton
-                        sectionTitle="Worktop Specifications"
-                        onClick={() => handleOpenOrderDialog("Worktop Specifications")}
-                      />
+                      <div className="flex items-center gap-2">
+                        {isEditing && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleMarkWorktopNA}
+                            className="flex items-center gap-1 text-xs border-gray-400 text-gray-700 hover:bg-gray-100 print:hidden"
+                          >
+                            <X className="h-3 w-3" /> Mark All N/A
+                          </Button>
+                        )}
+                        <OrderButton
+                          sectionTitle="Worktop Specifications"
+                          onClick={() => handleOpenOrderDialog("Worktop Specifications")}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-4">
                       {/* Material Type, Color, Code - 3 columns */}
@@ -2625,10 +2666,23 @@ function ChecklistViewContent() {
                   <div className="rounded-lg border-2 border-orange-200 bg-orange-50 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-xl font-bold text-orange-900">3. Worktop Specifications</h3>
-                      <OrderButton
-                        sectionTitle="Worktop Specifications"
-                        onClick={() => handleOpenOrderDialog("Worktop Specifications")}
-                      />
+                      <div className="flex items-center gap-2">
+                        {isEditing && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleMarkWorktopNA}
+                            className="flex items-center gap-1 text-xs border-gray-400 text-gray-700 hover:bg-gray-100 print:hidden"
+                          >
+                            <X className="h-3 w-3" /> Mark All N/A
+                          </Button>
+                        )}
+                        <OrderButton
+                          sectionTitle="Worktop Specifications"
+                          onClick={() => handleOpenOrderDialog("Worktop Specifications")}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-4">
                       {/* Material Type, Color, Code - 3 columns */}
