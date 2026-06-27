@@ -377,6 +377,26 @@ export default function CustomersPage() {
         if (customer) {
           setMaterialPromptCustomer(customer);
           setShowMaterialsPrompt(true);
+
+          // Auto-create action item in background
+          try {
+            const token = localStorage.getItem("token");
+            await fetch(`${BACKEND_URL}/action-items`, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                client_id: customerId,
+                stage: "Accepted",
+                priority: "High",
+                notes: "Customer moved to Accepted stage - order materials",
+              }),
+            });
+          } catch (e) {
+            console.error("Failed to create action item:", e);
+          }
         }
       }
 

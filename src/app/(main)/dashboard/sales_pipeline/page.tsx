@@ -920,10 +920,25 @@ export default function EnhancedPipelinePage() {
     }
   };
 
-  const triggerMaterialsPrompt = useCallback((customerId: string, customerName: string, newStage: Stage) => {
+  const triggerMaterialsPrompt = useCallback(async (customerId: string, customerName: string, newStage: Stage) => {
     if (newStage === 'Accepted') {
       setMaterialPromptCustomer({ id: customerId, name: customerName });
       setShowMaterialsPrompt(true);
+
+      // Auto-create action item in the background
+      try {
+        await fetchWithAuth("action-items", {
+          method: "POST",
+          body: JSON.stringify({
+            client_id: customerId,
+            stage: "Accepted",
+            priority: "High",
+            notes: "Customer moved to Accepted stage - order materials",
+          }),
+        });
+      } catch (e) {
+        console.error("Failed to create action item:", e);
+      }
     }
   }, []);
 
