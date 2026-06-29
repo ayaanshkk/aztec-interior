@@ -89,7 +89,7 @@ export default function PricelistPage() {
     : activeTab === 'Bedrooms'
     ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Base Cabinet Only']
     : activeTab === 'Fillers & End Panels'
-    ? ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors']
+    ? ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Timber']
     : activeTab === 'Accessories'
     ? ['Standard']
     : activeTab === 'Handles'

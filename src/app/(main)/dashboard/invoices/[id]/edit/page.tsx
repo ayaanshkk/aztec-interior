@@ -657,13 +657,19 @@ export default function EditInvoicePage() {
           <div className="mt-3 border-t border-blue-200 pt-3">
             <p className="text-xs font-semibold text-blue-900 mb-1">🎯 Component-Only Pricing (Advanced):</p>
             <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
-              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = {doorType === "Carcass Only" ? "Carcass only" : `Carcass + ${doorType} total (auto)`}</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code>   = Carcass only (when door type selected)</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-BS</code>  = Basic Slab door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-AG</code>  = Acrylic door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code>  = Vinyl door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code>  = Black Glass door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = {doorType === 'Carcass Only' ? 'Carcass only' : `Carcass + ${doorType} total (auto)`}</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only (when door type selected)</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-S</code> = Slab door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-LS</code> = Lacquered Slab door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">FITTING</code> = Auto-detect all fittings from invoice items</li>
+              {doorType === 'Carcass Only' && <>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-ST</code> = Carcass + Slab total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-LST</code> = Carcass + Lacquered Slab total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
+              </>}
             </ul>
           </div>
         </div>
@@ -895,11 +901,25 @@ export default function EditInvoicePage() {
                             <div className="flex items-center gap-2">
                               <div className="flex items-center gap-1">
                                 <Input type="number" value={sectionDiscountPct || ""}
-                                  onChange={e => {
-                                    const pct = parseFloat(e.target.value) || 0;
-                                    setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
-                                    setSectionDiscountAmounts(prev => ({ ...prev, [section]: "" }));
-                                  }}
+                                      onChange={(e) => {
+                                        const pct = parseFloat(e.target.value) || 0;
+                                        const prevSectionPct = sectionDiscounts[section] || 0;
+                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
+                                        setItems(prevItems => prevItems.map(item => {
+                                          if ((item.section || 'Furniture') !== section) return item;
+                                          const itemDisc = item.discount_percent || 0;
+                                          // Update if: no discount, or discount matches previous section discount
+                                          if (itemDisc > 0 && itemDisc !== prevSectionPct) return item;
+                                          const qty = item.quantity || 1;
+                                          const amt = item.amount || 0;
+                                          return {
+                                            ...item,
+                                            discount_percent: pct,
+                                            discounted_total: calculateDiscountedTotal(qty, amt, pct),
+                                          };
+                                        }));
+                                      }}
                                   className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"
                                   min="0" max="100" step="0.1" placeholder="0" />
                                 <span className="text-xs text-gray-500">%</span>

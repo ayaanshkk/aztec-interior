@@ -851,13 +851,13 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
             <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
               <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = {doorType === 'Carcass Only' ? 'Carcass only' : `Carcass + ${doorType} total (auto)`}</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only (when door type selected)</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-BS</code> = Basic Slab door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-AG</code> = Acrylic door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-S</code> = Slab door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-LS</code> = Lacquered Slab door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
               {doorType === 'Carcass Only' && <>
-                <li>• <code className="bg-blue-100 px-1 rounded">50B-BST</code> = Carcass + Basic Slab total</li>
-                <li>• <code className="bg-blue-100 px-1 rounded">50B-AGT</code> = Carcass + Acrylic total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-ST</code> = Carcass + Slab total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-LST</code> = Carcass + Lacquered Slab total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">FITTING</code> = Auto-detect all fittings from quote items</li>
@@ -1192,8 +1192,22 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                                       value={sectionDiscountPct || ''}
                                       onChange={(e) => {
                                         const pct = parseFloat(e.target.value) || 0;
+                                        const prevSectionPct = sectionDiscounts[section] || 0;
                                         setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
                                         setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
+                                        setItems(prevItems => prevItems.map(item => {
+                                          if ((item.section || 'Furniture') !== section) return item;
+                                          const itemDisc = item.discount_percent || 0;
+                                          // Update if: no discount, or discount matches previous section discount
+                                          if (itemDisc > 0 && itemDisc !== prevSectionPct) return item;
+                                          const qty = item.quantity || 1;
+                                          const amt = item.amount || 0;
+                                          return {
+                                            ...item,
+                                            discount_percent: pct,
+                                            discounted_total: calculateDiscountedTotal(qty, amt, pct),
+                                          };
+                                        }));
                                       }}
                                       className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"
                                       min="0"
@@ -1214,11 +1228,23 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                                         setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }));
                                       }}
                                       onBlur={(e) => {
-                                        // Only convert to % on blur (when user finishes typing)
-                                        const amt = parseFloat(e.target.value) || 0;
-                                        const pct = sectionSubtotal > 0 ? (amt / sectionSubtotal) * 100 : 0;
+                                        const amtVal = parseFloat(e.target.value) || 0;
+                                        const pct = sectionSubtotal > 0 ? (amtVal / sectionSubtotal) * 100 : 0;
+                                        const prevSectionPct = sectionDiscounts[section] || 0;
                                         setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
-                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
+                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: amtVal > 0 ? amtVal.toFixed(2) : '' }));
+                                        setItems(prevItems => prevItems.map(item => {
+                                          if ((item.section || 'Furniture') !== section) return item;
+                                          const itemDisc = item.discount_percent || 0;
+                                          if (itemDisc > 0 && itemDisc !== prevSectionPct) return item;
+                                          const qty = item.quantity || 1;
+                                          const amt = item.amount || 0;
+                                          return {
+                                            ...item,
+                                            discount_percent: pct,
+                                            discounted_total: calculateDiscountedTotal(qty, amt, pct),
+                                          };
+                                        }));
                                       }}
                                       className="border border-gray-300 rounded px-1 py-0.5 w-20 text-right text-xs"
                                       min="0"
