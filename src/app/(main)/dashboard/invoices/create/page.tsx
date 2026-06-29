@@ -1246,14 +1246,14 @@ export default function CreateInvoicePage() {
                                         setItems(prevItems => prevItems.map(item => {
                                           if ((item.section || 'Furniture') !== section) return item;
                                           const itemDisc = item.discount_percent || 0;
-                                          // Update if: no discount, or discount matches previous section discount
                                           if (itemDisc > 0 && itemDisc !== prevSectionPct) return item;
                                           const qty = item.quantity || 1;
                                           const amt = item.amount || 0;
+                                          const baseTotal = qty * amt;
                                           return {
                                             ...item,
                                             discount_percent: pct,
-                                            discounted_total: calculateDiscountedTotal(qty, amt, pct),
+                                            discounted_total: pct > 0 ? baseTotal - baseTotal * (pct / 100) : baseTotal,
                                           };
                                         }));
                                       }}
@@ -1283,10 +1283,11 @@ export default function CreateInvoicePage() {
                                           if (itemDisc > 0 && itemDisc !== prevSectionPct) return item;
                                           const qty = item.quantity || 1;
                                           const amt = item.amount || 0;
+                                          const baseTotal = qty * amt;
                                           return {
                                             ...item,
                                             discount_percent: pct,
-                                            discounted_total: calculateDiscountedTotal(qty, amt, pct),
+                                            discounted_total: pct > 0 ? baseTotal - baseTotal * (pct / 100) : baseTotal,
                                           };
                                         }));
                                       }}
