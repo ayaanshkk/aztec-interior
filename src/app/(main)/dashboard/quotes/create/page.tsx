@@ -731,21 +731,23 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
     }
   };
 
-  const subtotalBeforeDiscount = items.reduce((sum, item) => {
+  const subtotalAfterSectionDiscounts = items.reduce((sum, item) => {
+    const section = item.section || 'Furniture';
+    const sectionDiscountPct = sectionDiscounts[section] || 0;
     const itemTotal = (item.discount_percent && item.discount_percent > 0)
       ? (item.discounted_total || 0)
       : item.line_total;
     const subTotal = (item.subItems || []).reduce((subSum, sub) => {
-      const subItemTotal = (sub.discount_percent && sub.discount_percent > 0)
+      return subSum + ((sub.discount_percent && sub.discount_percent > 0)
         ? (sub.discounted_total || 0)
-        : sub.line_total;
-      return subSum + subItemTotal;
+        : sub.line_total);
     }, 0);
-    return sum + itemTotal + subTotal;
+    const itemPlusSubTotal = itemTotal + subTotal;
+    return sum + itemPlusSubTotal * (1 - sectionDiscountPct / 100);
   }, 0);
 
-  const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
-  const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
+  const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
+  const subtotal = subtotalAfterSectionDiscounts - globalDiscountAmount;
   const vat = subtotal * (vatPercentage / 100);
   const total = subtotal + vat;
 
@@ -1266,7 +1268,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
             <tbody>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalBeforeDiscount)}</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalAfterSectionDiscounts)}</td>
               </tr>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">

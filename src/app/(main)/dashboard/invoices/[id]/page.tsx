@@ -77,21 +77,26 @@ export default function ViewInvoicePage() {
     (item.amount && parseFloat(item.amount) > 0)
   );
 
-  const subtotalBeforeDiscount = validItems.reduce((sum, item) => {
+  const sectionDiscountsData = invoice?.section_discounts || {};
+
+  const subtotalAfterSectionDiscounts = validItems.reduce((sum, item) => {
+    const section = item.section || 'Furniture';
+    const sectionDiscountPct = sectionDiscountsData[section] || 0;
     const lineTotal = (item.amount || 0) * (item.quantity || 1);
     const itemTotal = (item.discount_percent && item.discount_percent > 0)
       ? (item.discounted_total || item.discounted_amount || lineTotal)
       : lineTotal;
-    const subTotal  = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) => {
+    const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) => {
       const subLine = (sub.amount || 0) * (sub.quantity || 1);
       return s + ((sub.discount_percent && sub.discount_percent > 0)
         ? (sub.discounted_total || sub.discounted_amount || subLine) : subLine);
     }, 0);
-    return sum + itemTotal + subTotal;
+    const itemPlusSubTotal = itemTotal + subTotal;
+    return sum + itemPlusSubTotal * (1 - sectionDiscountPct / 100);
   }, 0);
 
-  const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
-  const subtotal             = subtotalBeforeDiscount - globalDiscountAmount;
+  const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
+  const subtotal             = subtotalAfterSectionDiscounts - globalDiscountAmount;
   const vat                  = subtotal * (vatPercentage / 100);
   const total                = subtotal + vat;
   const deposit              = invoice.deposit_paid    || 0;
@@ -359,7 +364,7 @@ export default function ViewInvoicePage() {
             <tbody>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{fmt(subtotalBeforeDiscount)}</td>
+                <td className="border border-black px-3 py-2 text-right">{fmt(subtotalAfterSectionDiscounts)}</td>
               </tr>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">

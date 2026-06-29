@@ -748,7 +748,7 @@ export default function EditQuotePage() {
   }
 
   // ✅ ADD CALCULATIONS HERE - BEFORE THE RETURN
-  const subtotalBeforeDiscount = items.reduce((sum, item) => {
+  const subtotalAfterSectionDiscounts = items.reduce((sum, item) => {
     const section = item.section || 'Furniture';
     const sectionDiscountPct = sectionDiscounts[section] || 0;
 
@@ -886,8 +886,8 @@ export default function EditQuotePage() {
     }
   };
 
-  const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
-  const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
+  const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
+  const subtotal = subtotalAfterSectionDiscounts - globalDiscountAmount;
   const vat = subtotal * (vatPercentage / 100);
   const total = subtotal + vat;
  
@@ -1426,7 +1426,7 @@ export default function EditQuotePage() {
             <tbody>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalBeforeDiscount)}</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalAfterSectionDiscounts)}</td>
               </tr>
               
               {/* NEW: Global Discount Row */}
@@ -1446,7 +1446,7 @@ export default function EditQuotePage() {
                   </div>
                 </td>
                 <td className="border border-black px-3 py-2 text-right text-red-600">
-                  {globalDiscountPercent > 0 ? `-${formatCurrency(subtotalBeforeDiscount * (globalDiscountPercent / 100))}` : "—"}
+                  {globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : "—"}
                 </td>
               </tr>
               

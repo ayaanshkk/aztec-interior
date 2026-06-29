@@ -147,21 +147,26 @@ export default function ViewQuotePage() {
     );
   }
 
-  const subtotalBeforeDiscount = items.reduce((sum, item) => {
+  const sectionDiscountsData = quotation?.section_discounts || {};
+
+  const subtotalAfterSectionDiscounts = items.reduce((sum, item) => {
+    const section = item.section || 'Furniture';
+    const sectionDiscountPct = sectionDiscountsData[section] || 0;
     const itemTotal = (item.discount_percent && item.discount_percent > 0)
-      ? (item.discounted_total || item.discounted_amount || ((item.amount || 0) * (item.quantity || 1)))
+      ? (item.discounted_total || item.discounted_amount || (item.amount || 0) * (item.quantity || 1))
       : (item.amount || 0) * (item.quantity || 1);
-    const subTotal = (item.subItems || item.sub_items || []).reduce((subSum: number, sub: any) => {
-      const subLineTotal = (sub.amount || 0) * (sub.quantity || 1);
-      const subItemTotal = (sub.discount_percent && sub.discount_percent > 0)
-        ? (sub.discounted_total || sub.discounted_amount || subLineTotal)
-        : subLineTotal;
-      return subSum + subItemTotal;
+    const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) => {
+      return s + ((sub.discount_percent && sub.discount_percent > 0)
+        ? (sub.discounted_total || sub.discounted_amount || (sub.amount || 0) * (sub.quantity || 1))
+        : (sub.amount || 0) * (sub.quantity || 1));
     }, 0);
-    return sum + itemTotal + subTotal;
+
+    const itemPlusSubTotal = itemTotal + subTotal;
+    return sum + itemPlusSubTotal * (1 - sectionDiscountPct / 100);
   }, 0);
-  const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
-  const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
+
+  const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
+  const subtotal = subtotalAfterSectionDiscounts - globalDiscountAmount;
   const vat = subtotal * (vatPercentage / 100);
   const total = subtotal + vat;
 
@@ -399,10 +404,25 @@ export default function ViewQuotePage() {
                             <td className="border border-gray-300 px-3 py-1 text-right text-sm text-red-600">-{formatCurrency(sectionDiscount)}</td>
                           </tr>
                         )}
-                        <tr>
-                          <td className="border border-gray-300 px-3 py-1 font-bold bg-gray-100 text-sm">{section} Total</td>
-                          <td className="border border-gray-300 px-3 py-1 text-right font-bold text-sm">{formatCurrency(sectionDiscounted)}</td>
-                        </tr>
+                        {(() => {
+                          const secDiscPct = sectionDiscountsData[section] || 0;
+                          const secDiscAmt = sectionDiscounted * (secDiscPct / 100);
+                          const secTotal = sectionDiscounted - secDiscAmt;
+                          return (
+                            <>
+                              {secDiscPct > 0 && (
+                                <tr>
+                                  <td className="border border-gray-300 px-3 py-1 text-sm text-red-600">Section Discount</td>
+                                  <td className="border border-gray-300 px-3 py-1 text-right text-sm text-red-600">-{formatCurrency(secDiscAmt)}</td>
+                                </tr>
+                              )}
+                              <tr>
+                                <td className="border border-gray-300 px-3 py-1 font-bold bg-gray-100 text-sm">{section} Total</td>
+                                <td className="border border-gray-300 px-3 py-1 text-right font-bold text-sm">{formatCurrency(secTotal)}</td>
+                              </tr>
+                            </>
+                          );
+                        })()}
                       </tbody>
                     </table>
                   </div>
@@ -418,7 +438,7 @@ export default function ViewQuotePage() {
             <tbody>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalBeforeDiscount)}</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalAfterSectionDiscounts)}</td>
               </tr>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DISCOUNT {globalDiscountPercent > 0 ? `(${globalDiscountPercent}%)` : ''}</td>
