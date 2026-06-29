@@ -953,7 +953,7 @@ export default function EditInvoicePage() {
             <tbody>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalAfterSectionDiscounts)}</td>
+                <td className="border border-black px-3 py-2 text-right">{fmt(subtotalAfterSectionDiscounts)}</td>
               </tr>
 							<tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
