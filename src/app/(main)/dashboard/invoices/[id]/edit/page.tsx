@@ -514,7 +514,7 @@ export default function EditInvoicePage() {
           total_remaining:         Math.max(0, total - deposit),
           section_discounts:       sectionDiscounts,
 					global_discount_percent: globalDiscountPercent,
-					global_discount_amount:  discAmt,
+					global_discount_amount:  globalDiscountAmount,
 					items: items
 						.filter(i => i.item || i.description || i.line_total > 0)
 						.flatMap(i => [
