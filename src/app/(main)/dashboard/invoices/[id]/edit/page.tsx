@@ -971,10 +971,10 @@ export default function EditInvoicePage() {
                   </div>
                 </td>
                 <td className="border border-black px-3 py-2 text-right text-red-600">
-                  {discAmt > 0 ? `-${fmt(discAmt)}` : "—"}
+                  {globalDiscountAmount > 0 ? `-${fmt(globalDiscountAmount)}` : "—"}
                 </td>
               </tr>
-              {discAmt > 0 && (
+              {globalDiscountAmount > 0 && (
                 <tr>
                   <td className="border border-black px-3 py-2 font-semibold bg-blue-50">SUBTOTAL AFTER DISCOUNT</td>
                   <td className="border border-black px-3 py-2 text-right font-semibold">{fmt(subtotal)}</td>
