@@ -378,7 +378,7 @@ export default function ViewQuotePage() {
                             </tr>
                             {(item.subItems || item.sub_items || []).map((sub: any, subIndex: number) => (
                               <tr key={`${index}-sub-${subIndex}`} className="bg-gray-50">
-                                <td className="border border-black px-3 py-2 pl-6 text-sm">↳ {sub.item || '—'}</td>
+                                <td className="border border-black px-3 py-2 pl-6 text-sm">{sub.item || '—'}</td>
                                 <td className="border border-black px-3 py-2 text-sm">{sub.description || '—'}</td>
                                 <td className="border border-black px-3 py-2 text-sm">{sub.color || sub.colour || '—'}</td>
                                 <td className="border border-black px-3 py-2 text-center text-sm">{sub.quantity || 1}</td>

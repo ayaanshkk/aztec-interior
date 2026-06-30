@@ -294,7 +294,7 @@ export default function ViewInvoicePage() {
                           return (
                             <tr key={idx} className={isSubItem ? "bg-gray-50" : "hover:bg-gray-50"}>
                               <td className={`border border-black px-3 py-2 font-mono text-sm ${isSubItem ? "pl-6 text-gray-600" : ""}`}>
-                                {isSubItem ? `↳ ${item.item || item.item_name || "—"}` : (item.item || item.item_name || "—")}
+                                {isSubItem ? `${item.item || item.item_name || "—"}` : (item.item || item.item_name || "—")}
                               </td>
                               <td className="border border-black px-3 py-2 text-sm">{item.description || "—"}</td>
                               <td className="border border-black px-3 py-2 text-sm">{item.color || item.colour || "—"}</td>
@@ -368,7 +368,7 @@ export default function ViewInvoicePage() {
               </tr>
               <tr>
                 <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
-                  DISCOUNT {globalDiscountPercent > 0 ? `(${globalDiscountPercent}%)` : ""}
+                  DISCOUNT {globalDiscountPercent > 0 ? `(${globalDiscountPercent}%)` : ""}  
                 </td>
                 <td className="border border-black px-3 py-2 text-right text-red-600">
                   {globalDiscountPercent > 0 ? `-${fmt(globalDiscountAmount)}` : "—"}
