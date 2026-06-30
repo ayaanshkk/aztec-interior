@@ -126,7 +126,7 @@ export default function EditQuotePage() {
 
         const hasSuffix = itemCode.includes('-');
         const baseCode = itemCode.split('-')[0];
-        const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+        const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
 
         const requestBody: any = { description: itemCode };
 
@@ -827,7 +827,7 @@ export default function EditQuotePage() {
       const tenantId = localStorage.getItem("tenantId") || "7";
       const hasSuffix = trimmedValue.includes('-');
       const baseCode = trimmedValue.split('-')[0];
-      const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+      const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
 
       const requestBody: any = {
         description: trimmedValue,

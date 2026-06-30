@@ -124,7 +124,8 @@ export default function CreateQuotePage() {
         const itemCode = item.item.trim();
         const hasSuffix = itemCode.includes('-');
         const baseCode = itemCode.split('-')[0];
-        const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+        const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+
 
         const requestBody: any = { description: itemCode };
 
@@ -268,7 +269,7 @@ export default function CreateQuotePage() {
         const tenantId = localStorage.getItem("tenantId") || "7";
         const hasSuffix = trimmedValue.includes('-');
         const baseCode = trimmedValue.split('-')[0];
-        const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+        const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
         const currentItemsSnapshot = itemsRef.current
           .filter(i => i.id !== id)
           .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
@@ -669,7 +670,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
       const tenantId = localStorage.getItem("tenantId") || "7";
       const hasSuffix = trimmedValue.includes('-');
       const baseCode = trimmedValue.split('-')[0];
-      const isApplianceCode = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+      const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
 
       const requestBody: any = {
         description: trimmedValue,
