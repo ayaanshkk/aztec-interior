@@ -159,8 +159,31 @@ These serve as the fallback; there is no separate default.css file. */
   body {
     @apply bg-background text-foreground overscroll-none;
   }
+
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield !important;
+    appearance: textfield !important;
+  }
 }
 
 .disable-transitions * {
   transition: none !important;
+}
+
+/* Remove number input spinner arrows everywhere */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }

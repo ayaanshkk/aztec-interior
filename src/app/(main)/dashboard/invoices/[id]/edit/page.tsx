@@ -661,12 +661,14 @@ export default function EditInvoicePage() {
               <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only (when door type selected)</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-S</code> = Slab door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-LS</code> = Lacquered Slab door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-T</code> = Timber door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">FITTING</code> = Auto-detect all fittings from invoice items</li>
               {doorType === 'Carcass Only' && <>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-ST</code> = Carcass + Slab total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-LST</code> = Carcass + Lacquered Slab total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-TT</code> = Carcass + Timber total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
               </>}
@@ -765,11 +767,15 @@ export default function EditInvoicePage() {
                       <React.Fragment key={item.id}>
                         <tr>
                           <td className="border border-black p-0">
-                            <Input value={item.item}
-                              onChange={e => handleItemChange(item.id, "item", e.target.value)}
-                              onBlur={e => { const v = e.target.value.trim(); if (v.length >= 1) handleItemChange(item.id, "item", v); }}
+                            <Input
+                              value={item.item}
+                              onChange={(e) => {
+                                setItems(prevItems => prevItems.map(i => i.id === item.id ? { ...i, item: e.target.value } : i));
+                              }}
+                              onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
                               placeholder="50B"
-                              className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? "bg-blue-50 animate-pulse" : ""}`} />
+                              className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
+                            />
                           </td>
                           <td className="border border-black p-0">
                             <textarea value={item.description}
@@ -826,8 +832,21 @@ export default function EditInvoicePage() {
                         {(item.subItems || []).map(sub => (
                           <tr key={sub.id} className="bg-gray-50">
                             <td className="border border-black p-0 pl-4">
-                              <Input value={sub.item} onChange={e => handleSubItemAutoFill(item.id, sub.id, e.target.value)}
-                                placeholder="↳ sub-code" className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono" />
+                              <Input
+                                value={sub.item}
+                                onChange={(e) => {
+                                  setItems(prevItems => prevItems.map(it => {
+                                    if (it.id !== item.id || !it.subItems) return it;
+                                    return {
+                                      ...it,
+                                      subItems: it.subItems.map(s => s.id === sub.id ? { ...s, item: e.target.value } : s)
+                                    };
+                                  }));
+                                }}
+                                onBlur={(e) => handleSubItemAutoFill(item.id, sub.id, e.target.value)}
+                                placeholder="↳ sub-code"
+                                className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
+                              />
                             </td>
                             <td className="border border-black p-0">
                               <Input value={sub.description} onChange={e => handleSubItemChange(item.id, sub.id, "description", e.target.value)}

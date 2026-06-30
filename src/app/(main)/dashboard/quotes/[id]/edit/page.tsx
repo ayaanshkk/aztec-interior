@@ -1003,11 +1003,13 @@ export default function EditQuotePage() {
               <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only (when door type selected)</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-S</code> = Slab door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-LS</code> = Lacquered Slab door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-T</code> = Timber door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
               {doorType === 'Carcass Only' && <>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-ST</code> = Carcass + Slab total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-LST</code> = Carcass + Lacquered Slab total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-TT</code> = Carcass + Timber total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">FITTING</code> = Auto-detect all fittings from quote items</li>
@@ -1187,7 +1189,10 @@ export default function EditQuotePage() {
                           <td className="border border-black p-1">
                             <Input
                               value={item.item}
-                              onChange={(e) => handleItemChange(index, "item", e.target.value)}
+                              onChange={(e) => {
+                                setItems(prevItems => prevItems.map((it, i) => i === index ? { ...it, item: e.target.value } : it));
+                              }}
+                              onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(index, "item", val); }}
                               placeholder="50B"
                               className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === index ? 'bg-blue-50 animate-pulse' : ''}`}
                             />
@@ -1252,7 +1257,20 @@ export default function EditQuotePage() {
                         {(item.subItems || []).map((sub, subIndex) => (
                           <tr key={subIndex} className="bg-gray-50">
                             <td className="border border-black p-0 pl-4">
-                              <Input value={sub.item} onChange={(e) => handleSubItemAutoFill(index, subIndex, e.target.value)} placeholder="↳ sub-code" className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono" />
+                              <Input
+                                value={sub.item}
+                                onChange={(e) => {
+                                  setItems(prevItems => prevItems.map((it, i) => {
+                                    if (i !== index || !it.subItems) return it;
+                                    const updatedSubs = [...it.subItems];
+                                    updatedSubs[subIndex] = { ...updatedSubs[subIndex], item: e.target.value };
+                                    return { ...it, subItems: updatedSubs };
+                                  }));
+                                }}
+                                onBlur={(e) => handleSubItemAutoFill(index, subIndex, e.target.value)}
+                                placeholder="↳ sub-code"
+                                className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
+                              />
                             </td>
                             <td className="border border-black p-0">
                               <Input value={sub.description} onChange={(e) => handleSubItemChange(index, subIndex, "description", e.target.value)} placeholder="Sub-item description" className="border-none focus-visible:ring-0 w-full text-xs px-1" />

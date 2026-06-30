@@ -492,11 +492,12 @@ export default function CreateProformaPage() {
                     <td className="border border-black p-1">
                       <Input
                         value={item.item}
-                        onChange={e => handleItemChange(item.id, "item", e.target.value)}
+                        onChange={(e) => {
+                          setItems(prevItems => prevItems.map(i => i.id === item.id ? { ...i, item: e.target.value } : i));
+                        }}
+                        onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
                         placeholder="50B"
-                        className={`border-none focus-visible:ring-0 font-mono text-xs ${
-                          autoFilling === item.id ? "animate-pulse bg-blue-50" : ""
-                        }`}
+                        className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
                       />
                     </td>
 
