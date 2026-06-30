@@ -1268,7 +1268,7 @@ export default function EditQuotePage() {
                                   }));
                                 }}
                                 onBlur={(e) => handleSubItemAutoFill(index, subIndex, e.target.value)}
-                                placeholder="↳ sub-code"
+                                placeholder="sub-code"
                                 className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
                               />
                             </td>

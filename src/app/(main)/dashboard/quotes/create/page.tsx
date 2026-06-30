@@ -1103,7 +1103,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                                     }));
                                   }}
                                   onBlur={(e) => handleSubItemAutoFill(item.id, sub.id, e.target.value)}
-                                  placeholder="↳ sub-code"
+                                  placeholder="sub-code"
                                   className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
                                 />
                               </td>
