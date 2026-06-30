@@ -298,6 +298,9 @@ function ChecklistViewContent() {
         // Initialize new fields if they don't exist
         if (!parsedFormData.door_manufacturer) parsedFormData.door_manufacturer = "";
         if (!parsedFormData.door_name) parsedFormData.door_name = "";
+        if (!parsedFormData.integ_fridge_freezer_make) parsedFormData.integ_fridge_freezer_make = "";
+        if (!parsedFormData.integ_fridge_freezer_model) parsedFormData.integ_fridge_freezer_model = "";
+        if (!parsedFormData.integ_fridge_freezer_order_date) parsedFormData.integ_fridge_freezer_order_date = "";
 
         setFormData(parsedFormData);
         setOriginalFormData(JSON.parse(JSON.stringify(parsedFormData)));
