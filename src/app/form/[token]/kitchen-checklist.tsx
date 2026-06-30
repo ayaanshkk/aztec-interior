@@ -775,9 +775,9 @@ export default function KitchenChecklist() {
 
                     {/* Cabinet Color */}
                     <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Cabinet Color</label>
+                      <label className="mb-1 block text-sm font-bold text-gray-700">Carcass Color</label>
                       <Input
-                        placeholder="Enter cabinet color"
+                        placeholder="Enter carcass color"
                         className="w-full bg-white"
                         value={formData.cabinet_color}
                         onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
@@ -899,9 +899,9 @@ export default function KitchenChecklist() {
                           </div>
 
                           <div>
-                            <label className="mb-1 block text-xs font-bold text-gray-600">Cabinet Color</label>
+                            <label className="mb-1 block text-xs font-bold text-gray-600">Carcass Color</label>
                             <Input
-                              placeholder="Enter cabinet color"
+                              placeholder="Enter carcass color"
                               className="text-sm"
                               value={door.cabinet_color || ""}
                               onChange={(e) => handleAdditionalDoorChange(idx, "cabinet_color", e.target.value)}

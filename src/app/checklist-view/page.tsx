@@ -1338,7 +1338,7 @@ function ChecklistViewContent() {
                       {/* Cabinet Color */}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="mb-1 block text-sm font-bold text-gray-700">Cabinet Color</label>
+                          <label className="mb-1 block text-sm font-bold text-gray-700">Carcass Color</label>
                           <Input 
                             value={formData.cabinet_color || ""} 
                             onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
@@ -1491,7 +1491,7 @@ function ChecklistViewContent() {
 
                             {/* Cabinet Color (full width) */}
                             <div>
-                              <label className="mb-1 block text-xs font-bold text-gray-600">Cabinet Color</label>
+                              <label className="mb-1 block text-xs font-bold text-gray-600">Carcass Color</label>
                               <Input 
                                 value={door.cabinet_color || ""} 
                                 onChange={(e) => handleAdditionalDoorChange(idx, "cabinet_color", e.target.value)}
@@ -2341,7 +2341,7 @@ function ChecklistViewContent() {
 
                       {/* Cabinet Color */}
                       <div>
-                        <label className="mb-1 block text-sm font-bold text-gray-700">Cabinet Color</label>
+                        <label className="mb-1 block text-sm font-bold text-gray-700">Carcass Color</label>
                         <Input
                           value={formData.cabinet_color || ""}
                           onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
@@ -2459,7 +2459,7 @@ function ChecklistViewContent() {
 
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Cabinet Color</label>
+                                <label className="mb-1 block text-xs font-bold text-gray-600">Carcass Color</label>
                                 <Input
                                   value={door.cabinet_color || ""}
                                   onChange={(e) => handleAdditionalDoorChange(idx, "cabinet_color", e.target.value)}

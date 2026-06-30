@@ -792,9 +792,9 @@ export default function ChecklistViewPage() {
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Cabinet Color</label>
+                      <label className="mb-1 block text-sm font-bold text-gray-700">Carcass Color</label>
                       <Input
-                        placeholder="Enter cabinet color"
+                        placeholder="Enter carcass color"
                         className="w-full bg-white"
                         value={formData.cabinet_color || ""}
                         onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
@@ -1283,9 +1283,9 @@ export default function ChecklistViewPage() {
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-sm font-bold text-gray-700">Cabinet Color</label>
+                      <label className="mb-1 block text-sm font-bold text-gray-700">Carcass Color</label>
                       <Input
-                        placeholder="Enter cabinet color"
+                        placeholder="Enter carcass color"
                         className="w-full bg-white"
                         value={formData.cabinet_color || ""}
                         onChange={(e) => handleInputChange("cabinet_color", e.target.value)}
