@@ -960,7 +960,7 @@ function ChecklistViewContent() {
   const formType = (formData.form_type || "").toLowerCase().includes("kitchen") ? "kitchen" : "bedroom";
   const showOrderDate = formData.appliances_customer_owned === "no";
   const standardApplianceGridTemplate = showOrderDate ? "grid-cols-[1fr_1fr_1fr]" : "grid-cols-[1fr_1fr]";
-  const integUnitGridTemplate = showOrderDate ? "grid-cols-[0.5fr_1fr_1fr_1fr]" : "grid-cols-[0.5fr_1fr_1fr]";
+  const integUnitGridTemplate = showOrderDate ? "grid-cols-[1fr_1fr_1fr]" : "grid-cols-[1fr_1fr]";
   const standardAppliances = ["Oven", "Microwave", "Washing Machine", "Dryer", "HOB", "Extractor", "INTG Dishwasher"];
 
   const OrderButton = ({ sectionTitle, onClick }: { sectionTitle: string; onClick: () => void }) => {
@@ -2032,17 +2032,6 @@ function ChecklistViewContent() {
                               <label className="mb-2 block text-sm font-bold text-gray-700">INTG Fridge</label>
                               <div className={`grid ${integUnitGridTemplate} gap-3`}>
                                 <div>
-                                  <label className="mb-1 block text-xs font-bold text-gray-600">QTY</label>
-                                  <Input
-                                    placeholder="QTY"
-                                    type="text"
-                                    className="w-full"
-                                    value={formData.integ_fridge_qty}
-                                    onChange={(e) => handleInputChange("integ_fridge_qty", e.target.value)}
-                                    readOnly={!isEditing}
-                                  />
-                                </div>
-                                <div>
                                   <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
                                   <Input
                                     placeholder="Make"
@@ -2080,17 +2069,6 @@ function ChecklistViewContent() {
                             <div className="rounded border border-yellow-300 bg-white p-3">
                               <label className="mb-2 block text-sm font-bold text-gray-700">INTG Freezer</label>
                               <div className={`grid ${integUnitGridTemplate} gap-3`}>
-                                <div>
-                                  <label className="mb-1 block text-xs font-bold text-gray-600">QTY</label>
-                                  <Input
-                                    placeholder="QTY"
-                                    type="text"
-                                    className="w-full"
-                                    value={formData.integ_freezer_qty}
-                                    onChange={(e) => handleInputChange("integ_freezer_qty", e.target.value)}
-                                    readOnly={!isEditing}
-                                  />
-                                </div>
                                 <div>
                                   <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
                                   <Input
@@ -2130,24 +2108,12 @@ function ChecklistViewContent() {
                               <label className="mb-2 block text-sm font-bold text-gray-700">INTG Fridge/Freezer</label>
                               <div className={`grid ${integUnitGridTemplate} gap-3`}>
                                 <div>
-                                  <label className="mb-1 block text-xs font-bold text-gray-600">QTY</label>
-                                  <Input
-                                    placeholder="QTY"
-                                    type="text"
-                                    className="w-full"
-                                    value={formData.integ_fridge_qty}
-                                    onChange={(e) => handleInputChange("integ_fridge_qty", e.target.value)}
-                                    readOnly={!isEditing}
-                                  />
-                                </div>
-                                <div>
                                   <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
                                   <Input
                                     placeholder="Make"
                                     className="w-full"
-                                    value={formData.integ_fridge_make}
-                                    onChange={(e) => handleInputChange("integ_fridge_make", e.target.value)}
-                                    readOnly={!isEditing}
+                                    value={formData.integ_fridge_freezer_make}
+                                    onChange={(e) => handleInputChange("integ_fridge_freezer_make", e.target.value)}
                                   />
                                 </div>
                                 <div>
@@ -2155,9 +2121,8 @@ function ChecklistViewContent() {
                                   <Input
                                     placeholder="Model"
                                     className="w-full"
-                                    value={formData.integ_fridge_model}
-                                    onChange={(e) => handleInputChange("integ_fridge_model", e.target.value)}
-                                    readOnly={!isEditing}
+                                    value={formData.integ_fridge_freezer_model}
+                                    onChange={(e) => handleInputChange("integ_fridge_freezer_model", e.target.value)}
                                   />
                                 </div>
                                 {showOrderDate && (
@@ -2166,8 +2131,8 @@ function ChecklistViewContent() {
                                     <input
                                       type="date"
                                       className="w-full rounded-md border border-gray-300 p-2"
-                                      value={formData.integ_fridge_order_date}
-                                      onChange={(e) => handleInputChange("integ_fridge_order_date", e.target.value)}
+                                      value={formData.integ_fridge_freezer_order_date}
+                                      onChange={(e) => handleInputChange("integ_fridge_freezer_order_date", e.target.value)}
                                     />
                                   </div>
                                 )}

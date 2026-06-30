@@ -99,6 +99,9 @@ export interface KitchenFormData extends BaseFormData {
   installation_date: string;
   completion_date: string;
   deposit_date: string;
+  integ_fridge_freezer_make: string;
+  integ_fridge_freezer_model: string;
+  integ_fridge_freezer_order_date: string;
 }
 
 export interface BedroomFormData extends BaseFormData {

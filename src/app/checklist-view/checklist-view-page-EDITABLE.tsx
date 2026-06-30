@@ -487,7 +487,7 @@ export default function ChecklistViewPage() {
   const formType = (formData.form_type || "").toLowerCase().includes("kitchen") ? "kitchen" : "bedroom";
   const showOrderDate = formData.appliances_customer_owned === "no";
   const standardApplianceGridTemplate = showOrderDate ? "grid-cols-[1fr_1fr_1fr]" : "grid-cols-[1fr_1fr]";
-  const integUnitGridTemplate = showOrderDate ? "grid-cols-[0.5fr_1fr_1fr_1fr]" : "grid-cols-[0.5fr_1fr_1fr]";
+  const integUnitGridTemplate = showOrderDate ? "grid-cols-[1fr_1fr_1fr]" : "grid-cols-[1fr_1fr]";
   const standardAppliances = ["Oven", "Microwave", "Washing Machine", "Dryer", "HOB", "Extractor", "INTG Dishwasher"];
 
   return (
