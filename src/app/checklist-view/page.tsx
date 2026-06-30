@@ -153,6 +153,9 @@ interface FormData {
   integ_freezer_make: string;
   integ_freezer_model: string;
   integ_freezer_order_date: string;
+  integ_fridge_freezer_make: string;
+  integ_fridge_freezer_model: string;
+  integ_fridge_freezer_order_date: string;
 }
 
 interface OrderItem {
