@@ -107,6 +107,12 @@ interface FormData {
   signature_date: string;
   signature_data: string;
   form_type: string;
+  additional_appliances: Array<{
+    label: string;
+    make: string;
+    model: string;
+    order_date: string;
+  }>;
 }
 
 export default function ChecklistViewPage() {
@@ -233,6 +239,10 @@ export default function ChecklistViewPage() {
         }
         if (!parsedFormData.additional_doors || !Array.isArray(parsedFormData.additional_doors)) {
           parsedFormData.additional_doors = [];
+        }
+
+        if (!parsedFormData.additional_appliances || !Array.isArray(parsedFormData.additional_appliances)) {
+          parsedFormData.additional_appliances = [];
         }
 
         setFormData(parsedFormData);
@@ -1156,6 +1166,68 @@ export default function ChecklistViewPage() {
                           );
                         })}
 
+                        {formData.additional_appliances && formData.additional_appliances.length > 0 && (
+                          <div className="border-t border-yellow-200 pt-3 space-y-3">
+                            <label className="text-sm font-bold text-gray-700">Additional Appliances</label>
+                            {formData.additional_appliances.map((extra, idx) => {
+                              if (!isEditing && !extra.make && !extra.model) return null;
+                              return (
+                                <div key={idx} className="rounded border border-yellow-200 bg-yellow-50 p-3">
+                                  <label className="mb-2 block text-sm font-bold text-gray-700">
+                                    {extra.label} {idx + 2}
+                                  </label>
+                                  <div className={`grid ${standardApplianceGridTemplate} gap-3`}>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
+                                      <Input
+                                        placeholder="Make"
+                                        className="w-full"
+                                        value={extra.make || ""}
+                                        onChange={(e) => {
+                                          const updated = [...formData.additional_appliances];
+                                          updated[idx] = { ...updated[idx], make: e.target.value };
+                                          handleInputChange("additional_appliances", updated as any);
+                                        }}
+                                        disabled={!isEditing}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
+                                      <Input
+                                        placeholder="Model"
+                                        className="w-full"
+                                        value={extra.model || ""}
+                                        onChange={(e) => {
+                                          const updated = [...formData.additional_appliances];
+                                          updated[idx] = { ...updated[idx], model: e.target.value };
+                                          handleInputChange("additional_appliances", updated as any);
+                                        }}
+                                        disabled={!isEditing}
+                                      />
+                                    </div>
+                                    {showOrderDate && (
+                                      <div>
+                                        <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
+                                        <input
+                                          type="date"
+                                          className={`w-full rounded-md border border-gray-300 p-2 ${!isEditing ? "cursor-not-allowed" : ""}`}
+                                          value={extra.order_date || ""}
+                                          onChange={(e) => {
+                                            const updated = [...formData.additional_appliances];
+                                            updated[idx] = { ...updated[idx], order_date: e.target.value };
+                                            handleInputChange("additional_appliances", updated as any);
+                                          }}
+                                          disabled={!isEditing}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        
                         <div>
                           <label className="mb-1 block text-xs font-bold text-gray-600">Other / Misc Appliances</label>
                           <Input

@@ -102,6 +102,12 @@ export interface KitchenFormData extends BaseFormData {
   integ_fridge_freezer_make: string;
   integ_fridge_freezer_model: string;
   integ_fridge_freezer_order_date: string;
+  additional_appliances: Array<{
+    label: string;
+    make: string;
+    model: string;
+    order_date: string;
+  }>;
 }
 
 export interface BedroomFormData extends BaseFormData {

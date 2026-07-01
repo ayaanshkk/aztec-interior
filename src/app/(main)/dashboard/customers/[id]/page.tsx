@@ -1709,16 +1709,27 @@ export default function CustomerDetailsPage() {
       
       console.log("🔄 Generating quote from checklist:", checklistForQuote);
       
+      const tenantId = localStorage.getItem("tenantId") || localStorage.getItem("tenant_id") || "7";
       const response = await fetch(
-        `https://aztec-interior.onrender.com/quotations/generate-from-checklist/${checklistForQuote.id}`,
+        `${BACKEND_URL}/quotations/generate-from-checklist/${checklistForQuote.id}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
+            "X-Tenant-ID": tenantId,
           },
         }
       );
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("❌ Response status:", response.status, "Body:", text);
+        let errorMsg = "Unknown error";
+        try { errorMsg = JSON.parse(text).error || errorMsg; } catch {}
+        alert(`Failed to generate quote: ${errorMsg}`);
+        return;
+      }
 
       console.log("📡 Response status:", response.status);
 
@@ -1731,9 +1742,11 @@ export default function CustomerDetailsPage() {
         await loadCustomerData();
         console.log("✅ Customer data reloaded");
         
-        const detailsUrl = `/dashboard/quotes/${data.quotation_id}`;
-        console.log("🔗 Opening quote details:", detailsUrl);
-        window.open(detailsUrl, '_blank');
+        const doorType = data.door_type || 'Basic Slab';
+        const roomType = data.room_type || 'Kitchen';
+        const editUrl = `/dashboard/quotes/${data.quotation_id}/edit?source=checklist&doorType=${encodeURIComponent(doorType)}&roomType=${encodeURIComponent(roomType)}`;
+        console.log("🔗 Opening quote editor:", editUrl);
+        window.open(editUrl, '_blank');
         
         alert(
           `✅ Quote ${data.message?.includes('already exists') ? 'opened' : 'generated'} successfully!\n\n` +
@@ -4126,25 +4139,15 @@ export default function CustomerDetailsPage() {
       </Dialog>
 
       {/* QUOTE GENERATION DIALOG */}
-      <Dialog open={showQuoteGenerationDialog} onOpenChange={setShowQuoteGenerationDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={showQuoteGenerationDialog} onOpenChange={(open) => {
+        setShowQuoteGenerationDialog(open);
+        if (!open) setChecklistForQuote(null);
+      }}>
+        <DialogContent className="max-w-lg w-full mx-4">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-xl font-semibold">Generate Quotation</DialogTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  setShowQuoteGenerationDialog(false);
-                  setChecklistForQuote(null);
-                }}
-                className="h-8 w-8 rounded-full"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            <DialogTitle className="text-xl font-semibold">Generate Quotation</DialogTitle>
           </DialogHeader>
-          
+
           <div className="py-6">
             <p className="mb-6 text-base text-gray-700">
               You have a <span className="font-semibold text-blue-600">{checklistForQuote?.type}</span> checklist on file.
@@ -4154,26 +4157,28 @@ export default function CustomerDetailsPage() {
             </p>
           </div>
 
-          <DialogFooter className="flex flex-col space-y-2 sm:flex-row sm:space-x-2 sm:space-y-0">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowQuoteGenerationDialog(false);
-                createBlankQuote();
-                setChecklistForQuote(null);
-              }}
-              className="w-full sm:w-auto"
-            >
-              <X className="mr-2 h-4 w-4" />
-              No - Create Blank Quote
-            </Button>
-            <Button
-              onClick={handleGenerateFromChecklist}
-              className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto"
-            >
-              <CheckSquare className="mr-2 h-4 w-4" />
-              Yes - Generate from Checklist
-            </Button>
+          <DialogFooter>
+            <div className="flex w-full flex-wrap items-center justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowQuoteGenerationDialog(false);
+                  createBlankQuote();
+                  setChecklistForQuote(null);
+                }}
+                className="flex-shrink-0"
+              >
+                <X className="mr-2 h-4 w-4" />
+                No - Create Blank Quote
+              </Button>
+              <Button
+                onClick={handleGenerateFromChecklist}
+                className="flex-shrink-0 bg-blue-600 hover:bg-blue-700"
+              >
+                <CheckSquare className="mr-2 h-4 w-4" />
+                Yes - Generate from Checklist
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

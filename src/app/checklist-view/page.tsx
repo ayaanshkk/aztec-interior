@@ -156,6 +156,12 @@ interface FormData {
   integ_fridge_freezer_make: string;
   integ_fridge_freezer_model: string;
   integ_fridge_freezer_order_date: string;
+  additional_appliances: Array<{
+    label: string;
+    make: string;
+    model: string;
+    order_date: string;
+  }>;
 }
 
 interface OrderItem {
@@ -289,6 +295,9 @@ function ChecklistViewContent() {
         }
         if (!parsedFormData.additional_doors || !Array.isArray(parsedFormData.additional_doors)) {
           parsedFormData.additional_doors = [];
+        }
+        if (!parsedFormData.additional_appliances || !Array.isArray(parsedFormData.additional_appliances)) {
+          parsedFormData.additional_appliances = [];
         }
         if (!parsedFormData.additional_worktops || !Array.isArray(parsedFormData.additional_worktops)) {
           parsedFormData.additional_worktops = [];
@@ -1987,13 +1996,37 @@ function ChecklistViewContent() {
                         <div className="space-y-3">
                           {standardAppliances.map((appliance, idx) => {
                             const appData = formData.appliances[idx] || { make: "", model: "", order_date: "" };
-                            
-                            // Skip if completely empty in view mode
-                            if (!isEditing && !appData.make && !appData.model && !appData.order_date) return null;
+                            const extras = (formData.additional_appliances || [])
+                              .map((a, i) => ({ ...a, globalIdx: i }))
+                              .filter((a) => a.label === appliance);
+
+                            if (!isEditing && !appData.make && !appData.model && !appData.order_date && extras.length === 0) return null;
 
                             return (
-                              <div key={appliance} className="rounded border border-yellow-300 bg-white p-3">
-                                <label className="mb-2 block text-sm font-bold text-gray-700">{appliance}</label>
+                              <div key={appliance} className="rounded border border-yellow-300 bg-white p-3 space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-sm font-bold text-gray-700">{appliance}</label>
+                                  {isEditing && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-7 px-2 border-yellow-400 text-yellow-700 hover:bg-yellow-50"
+                                      onClick={() => {
+                                        if (!formData) return;
+                                        setFormData({
+                                          ...formData,
+                                          additional_appliances: [
+                                            ...(formData.additional_appliances || []),
+                                            { label: appliance, make: "", model: "", order_date: "" },
+                                          ],
+                                        });
+                                      }}
+                                    >
+                                      + Add {appliance}
+                                    </Button>
+                                  )}
+                                </div>
                                 <div className={`grid ${standardApplianceGridTemplate} gap-3`}>
                                   <div>
                                     <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
@@ -2026,9 +2059,84 @@ function ChecklistViewContent() {
                                     </div>
                                   )}
                                 </div>
+
+                                {extras.map((extra, extraIdx) => {
+                                  if (!isEditing && !extra.make && !extra.model) return null;
+                                  return (
+                                    <div key={extraIdx} className="rounded border border-yellow-300 bg-white p-3 space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <label className="text-xs font-bold text-gray-600">{appliance} {extraIdx + 2}</label>
+                                        {isEditing && (
+                                          <Button
+                                            type="button"
+                                            variant="destructive"
+                                            size="sm"
+                                            className="h-6 px-2 text-xs"
+                                            onClick={() => {
+                                              if (!formData) return;
+                                              setFormData({
+                                                ...formData,
+                                                additional_appliances: (formData.additional_appliances || []).filter((_, i) => i !== extra.globalIdx),
+                                              });
+                                            }}
+                                          >
+                                            Remove
+                                          </Button>
+                                        )}
+                                      </div>
+                                      <div className={`grid ${standardApplianceGridTemplate} gap-3`}>
+                                        <div>
+                                          <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
+                                          <Input
+                                            placeholder="Make"
+                                            className="w-full"
+                                            value={extra.make || ""}
+                                            onChange={(e) => {
+                                              const updated = [...(formData.additional_appliances || [])];
+                                              updated[extra.globalIdx] = { ...updated[extra.globalIdx], make: e.target.value };
+                                              handleInputChange("additional_appliances", updated as any);
+                                            }}
+                                            readOnly={!isEditing}
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
+                                          <Input
+                                            placeholder="Model"
+                                            className="w-full"
+                                            value={extra.model || ""}
+                                            onChange={(e) => {
+                                              const updated = [...(formData.additional_appliances || [])];
+                                              updated[extra.globalIdx] = { ...updated[extra.globalIdx], model: e.target.value };
+                                              handleInputChange("additional_appliances", updated as any);
+                                            }}
+                                            readOnly={!isEditing}
+                                          />
+                                        </div>
+                                        {showOrderDate && (
+                                          <div>
+                                            <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
+                                            <input
+                                              type="date"
+                                              className={`w-full rounded-md border border-gray-300 p-2 ${!isEditing ? "cursor-not-allowed" : ""}`}
+                                              value={extra.order_date || ""}
+                                              onChange={(e) => {
+                                                const updated = [...(formData.additional_appliances || [])];
+                                                updated[extra.globalIdx] = { ...updated[extra.globalIdx], order_date: e.target.value };
+                                                handleInputChange("additional_appliances", updated as any);
+                                              }}
+                                              readOnly={!isEditing}
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             );
                           })}
+
 
                           {/* Integrated Units */}
                           <div className="space-y-3 border-t border-yellow-300 pt-3">

@@ -113,6 +113,7 @@ export default function KitchenChecklist() {
     integ_fridge_freezer_make: "",
     integ_fridge_freezer_model: "",
     integ_fridge_freezer_order_date: "",
+    additional_appliances: [],
   });
 
   useEffect(() => {
@@ -141,7 +142,7 @@ export default function KitchenChecklist() {
     }
   }, []);
 
-  type SingleField = keyof Omit<KitchenFormData, "worktop_features" | "appliances" | "additional_doors" | "additional_handles" | "additional_worktops">;
+  type SingleField = keyof Omit<KitchenFormData, "worktop_features" | "appliances" | "additional_doors" | "additional_handles" | "additional_worktops" | "additional_appliances">;
 
   const handleInputChange = (field: SingleField, value: string) => {
     setFormData((prev) => ({
@@ -170,6 +171,35 @@ export default function KitchenChecklist() {
       appliances[index] = { ...appliances[index], [field]: value };
       return { ...prev, appliances };
     });
+  };
+
+  const addAdditionalAppliance = (applianceName: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      additional_appliances: [
+        ...prev.additional_appliances,
+        { label: applianceName, make: "", model: "", order_date: "" },
+      ],
+    }));
+  };
+
+  const handleAdditionalApplianceChange = (
+    index: number,
+    field: "make" | "model" | "order_date",
+    value: string
+  ) => {
+    setFormData((prev) => {
+      const updated = [...prev.additional_appliances];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, additional_appliances: updated };
+    });
+  };
+
+  const removeAdditionalAppliance = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      additional_appliances: prev.additional_appliances.filter((_, i) => i !== index),
+    }));
   };
 
   const handleAdditionalDoorChange = (index: number, field: keyof AdditionalDoor, value: string) => {
@@ -426,6 +456,17 @@ export default function KitchenChecklist() {
 
     const finalAppliances = [...formData.appliances];
 
+    // Append additional per-appliance extras
+    formData.additional_appliances.forEach((extra) => {
+      if (extra.make || extra.model) {
+        finalAppliances.push({
+          make: `${extra.label} (additional) - ${extra.make || "No make"}`,
+          model: extra.model || "No model",
+          order_date: isClientOwned ? extra.order_date || "" : "",
+        });
+      }
+    });
+
     if (
       formData.integ_fridge_qty?.trim() ||
       formData.integ_fridge_make?.trim() ||
@@ -466,6 +507,7 @@ export default function KitchenChecklist() {
       integ_freezer_make: undefined,
       integ_freezer_model: undefined,
       integ_freezer_order_date: undefined,
+      additional_appliances: formData.additional_appliances,
     };
 
     setIsSubmitting(true);
@@ -1342,42 +1384,107 @@ export default function KitchenChecklist() {
                           : "Client Supplied Appliances Details"}
                       </label>
                       <div className="space-y-3">
-                        {standardAppliances.map((appliance, idx) => (
-                          <div key={appliance} className="rounded border border-yellow-300 bg-white p-3">
-                            <label className="mb-2 block text-sm font-bold text-gray-700">{appliance}</label>
-                            <div className={`grid ${standardApplianceGridTemplate} gap-3`}>
-                              <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
-                                <Input
-                                  placeholder={`${appliance} make`}
-                                  className="w-full"
-                                  value={formData.appliances[idx]?.make || ""}
-                                  onChange={(e) => handleApplianceChange(idx, "make", e.target.value)}
-                                />
+                        {standardAppliances.map((appliance, idx) => {
+                          const extras = formData.additional_appliances
+                            .map((a, i) => ({ ...a, globalIdx: i }))
+                            .filter((a) => a.label === appliance);
+
+                          return (
+                            <div key={appliance} className="rounded border border-yellow-300 bg-white p-3 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-bold text-gray-700">{appliance}</label>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-7 px-2 border-yellow-400 text-yellow-700 hover:bg-yellow-50"
+                                  onClick={() => addAdditionalAppliance(appliance)}
+                                >
+                                  + Add {appliance}
+                                </Button>
                               </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
-                                <Input
-                                  placeholder={`${appliance} model`}
-                                  className="w-full"
-                                  value={formData.appliances[idx]?.model || ""}
-                                  onChange={(e) => handleApplianceChange(idx, "model", e.target.value)}
-                                />
-                              </div>
-                              {showOrderDate && (
+                              <div className={`grid ${standardApplianceGridTemplate} gap-3`}>
                                 <div>
-                                  <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
-                                  <input
-                                    type="date"
-                                    className="w-full rounded-md border border-gray-300 p-2"
-                                    value={formData.appliances[idx]?.order_date || ""}
-                                    onChange={(e) => handleApplianceChange(idx, "order_date", e.target.value)}
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
+                                  <Input
+                                    placeholder={`${appliance} make`}
+                                    className="w-full"
+                                    value={formData.appliances[idx]?.make || ""}
+                                    onChange={(e) => handleApplianceChange(idx, "make", e.target.value)}
                                   />
                                 </div>
-                              )}
+                                <div>
+                                  <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
+                                  <Input
+                                    placeholder={`${appliance} model`}
+                                    className="w-full"
+                                    value={formData.appliances[idx]?.model || ""}
+                                    onChange={(e) => handleApplianceChange(idx, "model", e.target.value)}
+                                  />
+                                </div>
+                                {showOrderDate && (
+                                  <div>
+                                    <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
+                                    <input
+                                      type="date"
+                                      className="w-full rounded-md border border-gray-300 p-2"
+                                      value={formData.appliances[idx]?.order_date || ""}
+                                      onChange={(e) => handleApplianceChange(idx, "order_date", e.target.value)}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+
+                              {extras.map((extra, extraIdx) => (
+                                <div key={extraIdx} className="rounded border border-yellow-300 bg-white p-3 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-xs font-bold text-gray-600">{appliance} {extraIdx + 2}</label>
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => removeAdditionalAppliance(extra.globalIdx)}
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+                                  <div className={`grid ${standardApplianceGridTemplate} gap-3`}>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-bold text-gray-600">Make</label>
+                                      <Input
+                                        placeholder={`${appliance} make`}
+                                        className="w-full"
+                                        value={extra.make}
+                                        onChange={(e) => handleAdditionalApplianceChange(extra.globalIdx, "make", e.target.value)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-bold text-gray-600">Model</label>
+                                      <Input
+                                        placeholder={`${appliance} model`}
+                                        className="w-full"
+                                        value={extra.model}
+                                        onChange={(e) => handleAdditionalApplianceChange(extra.globalIdx, "model", e.target.value)}
+                                      />
+                                    </div>
+                                    {showOrderDate && (
+                                      <div>
+                                        <label className="mb-1 block text-xs font-bold text-gray-600">Order Date</label>
+                                        <input
+                                          type="date"
+                                          className="w-full rounded-md border border-gray-300 p-2"
+                                          value={extra.order_date}
+                                          onChange={(e) => handleAdditionalApplianceChange(extra.globalIdx, "order_date", e.target.value)}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
 
                         {/* Integrated Units */}
                         <div className="space-y-3 border-t border-yellow-300 pt-3">
