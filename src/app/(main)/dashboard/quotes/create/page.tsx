@@ -126,7 +126,6 @@ export default function CreateQuotePage() {
         const baseCode = itemCode.split('-')[0];
         const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
 
-
         const requestBody: any = { description: itemCode };
 
         if (!hasSuffix && !isApplianceCode) {
@@ -795,7 +794,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
 
         <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
           <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
-          <p className="font-semibold">Bank : Tide</p>
+          <p className="font-semibold">Bank : ClearBank</p>
           <p className="font-semibold">Sort Code: 04 06 05</p>
           <p className="font-semibold">Acc No: 31621197</p>
         </div>
@@ -1212,15 +1211,21 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                                         setItems(prevItems => prevItems.map(item => {
                                           if ((item.section || 'Furniture') !== section) return item;
                                           const itemDisc = item.discount_percent || 0;
-                                          // Update if: no discount, or discount matches previous section discount
-                                          if (itemDisc > 0 && itemDisc !== prevSectionPct) return item;
-                                          const qty = item.quantity || 1;
-                                          const amt = item.amount || 0;
-                                          return {
+                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevSectionPct) ? item : {
                                             ...item,
                                             discount_percent: pct,
-                                            discounted_total: calculateDiscountedTotal(qty, amt, pct),
+                                            discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
                                           };
+                                          const updatedSubItems = (item.subItems || []).map(sub => {
+                                            const subDisc = sub.discount_percent || 0;
+                                            if (subDisc > 0 && subDisc !== prevSectionPct) return sub;
+                                            return {
+                                              ...sub,
+                                              discount_percent: pct,
+                                              discounted_total: calculateDiscountedTotal(sub.quantity || 1, sub.amount || 0, pct),
+                                            };
+                                          });
+                                          return { ...updatedItem, subItems: updatedSubItems };
                                         }));
                                       }}
                                       className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"

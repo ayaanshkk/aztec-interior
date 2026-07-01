@@ -123,30 +123,48 @@ export default function EditInvoicePage() {
         door_style:       data.door_style       || "",
       });
 
-      const mapped: InvoiceItem[] = (data.items || []).map((i: any, idx: number) => ({
+      const allItems = data.items || [];
+      const topLevel = allItems.filter((i: any) => !i.is_sub_item);
+      const subItems = allItems.filter((i: any) => i.is_sub_item);
+
+      // Group sub-items by position — each sub-item follows its parent in order
+      // Since there's no parent_item_id, we assign sub-items to the preceding top-level item
+      let lastParentIdx = -1;
+      const subItemsByParent: Record<number, any[]> = {};
+      
+      allItems.forEach((i: any) => {
+        if (!i.is_sub_item) {
+          lastParentIdx++;
+          subItemsByParent[lastParentIdx] = [];
+        } else if (lastParentIdx >= 0) {
+          subItemsByParent[lastParentIdx].push(i);
+        }
+      });
+
+      const mapped: InvoiceItem[] = topLevel.map((i: any, idx: number) => ({
         id:               i.item_id || i.id || idx + 1,
         item:             i.item || i.item_name || "",
         description:      i.description || "",
         color:            i.color || i.colour || "",
         quantity:         i.quantity || 1,
-        amount:           i.amount || 0,
+        amount:           parseFloat((i.amount || 0).toFixed(2)),
         width:            i.width,
         height:           i.height,
         depth:            i.depth,
-        line_total:       (i.amount || 0) * (i.quantity || 1),
+        line_total:       parseFloat(((i.amount || 0) * (i.quantity || 1)).toFixed(2)),
         discount_percent: i.discount_percent || 0,
-        discounted_total: i.discounted_total || (i.amount || 0) * (i.quantity || 1),
+        discounted_total: parseFloat((i.discounted_total || (i.amount || 0) * (i.quantity || 1)).toFixed(2)),
         section:          i.section || "Furniture",
-        subItems:         (i.subItems || i.sub_items || []).map((s: any, si: number) => ({
+        subItems: (subItemsByParent[idx] || []).map((s: any, si: number) => ({
           id:               `sub-loaded-${idx}-${si}`,
           item:             s.item || s.item_name || "",
           description:      s.description || "",
           color:            s.color || s.colour || "",
           quantity:         s.quantity || 1,
-          amount:           s.amount || 0,
-          line_total:       (s.amount || 0) * (s.quantity || 1),
+          amount:           parseFloat((s.amount || 0).toFixed(2)),
+          line_total:       parseFloat(((s.amount || 0) * (s.quantity || 1)).toFixed(2)),
           discount_percent: s.discount_percent || 0,
-          discounted_total: s.discounted_total || (s.amount || 0) * (s.quantity || 1),
+          discounted_total: parseFloat((s.discounted_total || (s.amount || 0) * (s.quantity || 1)).toFixed(2)),
         })),
       }));
       setItems(mapped);
@@ -518,18 +536,18 @@ export default function EditInvoicePage() {
 					items: items
 						.filter(i => i.item || i.description || i.line_total > 0)
 						.flatMap(i => [
-							{
-								item:             i.item,
-								description:      i.description,
-								color:            i.color,
-								quantity:         i.quantity || 1,
-								amount:           i.line_total,
-								discount_percent: i.discount_percent || 0,
-								discounted_total: i.discounted_total || i.line_total,
-								width: i.width, height: i.height, depth: i.depth,
-								section: i.section || "Furniture",
-								is_sub_item: false,
-							},
+              {
+                item:             i.item,
+                description:      i.description,
+                color:            i.color,
+                quantity:         i.quantity || 1,
+                amount:           i.amount || 0,
+                discount_percent: i.discount_percent || 0,
+                discounted_total: i.discounted_total || i.line_total,
+                width: i.width, height: i.height, depth: i.depth,
+                section: i.section || "Furniture",
+                is_sub_item: false,
+              },
 							...(i.subItems || [])
 								.filter(s => (s.item && s.item.trim()) || (s.description && s.description.trim()) || s.line_total > 0)
 								.map(s => ({
@@ -537,9 +555,9 @@ export default function EditInvoicePage() {
 									description:      s.description || "",
 									color:            s.color || "",
 									quantity:         s.quantity || 1,
-									amount:           (s.amount || 0) * (s.quantity || 1),
-									discount_percent: s.discount_percent || 0,
-									discounted_total: s.discounted_total || (s.amount || 0) * (s.quantity || 1),
+                  amount:           s.amount || 0,
+                  discount_percent: s.discount_percent || 0,
+                  discounted_total: s.discounted_total || s.line_total,
 									width: s.width, height: s.height, depth: s.depth,
 									section: i.section || "Furniture",
 									is_sub_item: true,
@@ -615,7 +633,7 @@ export default function EditInvoicePage() {
         </div>
         <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
           <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
-          <p className="font-semibold">Bank : Tide</p>
+          <p className="font-semibold">Bank : ClearBank</p>
           <p className="font-semibold">Sort Code: 04 06 05</p>
           <p className="font-semibold">Acc No: 31621197</p>
         </div>
@@ -802,7 +820,7 @@ export default function EditInvoicePage() {
                             </td>
                           ))}
                           <td className="border border-black p-0">
-                            <Input type="number" step="0.01" min="0" value={item.amount} placeholder="0.00"
+                            <Input type="number" step="0.01" min="0" value={parseFloat((item.amount || 0).toFixed(2))} placeholder="0.00"
                               onChange={e => handleItemChange(item.id, "amount", e.target.value)}
                               className="border-none text-right focus-visible:ring-0 w-full text-xs" />
                           </td>
@@ -873,8 +891,15 @@ export default function EditInvoicePage() {
                                 onChange={e => handleSubItemChange(item.id, sub.id, "discount_percent", e.target.value)}
                                 className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" />
                             </td>
-                            <td className="border border-black px-2 py-1 text-right text-xs">
-                              {sub.discount_percent && sub.discount_percent > 0 ? fmt(sub.discounted_total || 0) : fmt(sub.line_total)}
+                            <td className="border border-black px-2 py-1 text-right">
+                              {sub.discount_percent && sub.discount_percent > 0 ? (
+                                <div>
+                                  <div className="text-xs text-gray-500 line-through">{fmt(sub.line_total)}</div>
+                                  <div className="font-semibold text-green-700 text-xs">{fmt(sub.discounted_total || 0)}</div>
+                                </div>
+                              ) : (
+                                <span className="font-semibold text-xs">{fmt(sub.line_total)}</span>
+                              )}
                             </td>
                             <td className="border border-black p-1 text-center">
                               <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(item.id, sub.id)}
@@ -928,15 +953,21 @@ export default function EditInvoicePage() {
                                         setItems(prevItems => prevItems.map(item => {
                                           if ((item.section || 'Furniture') !== section) return item;
                                           const itemDisc = item.discount_percent || 0;
-                                          if (itemDisc > 0 && itemDisc !== prevSectionPct) return item;
-                                          const qty = item.quantity || 1;
-                                          const amt = item.amount || 0;
-                                          const baseTotal = qty * amt;
-                                          return {
+                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevSectionPct) ? item : {
                                             ...item,
                                             discount_percent: pct,
-                                            discounted_total: pct > 0 ? baseTotal - baseTotal * (pct / 100) : baseTotal,
+                                            discounted_total: pct > 0 ? (item.quantity || 1) * (item.amount || 0) * (1 - pct / 100) : (item.quantity || 1) * (item.amount || 0),
                                           };
+                                          const updatedSubItems = (item.subItems || []).map(sub => {
+                                            const subDisc = sub.discount_percent || 0;
+                                            if (subDisc > 0 && subDisc !== prevSectionPct) return sub;
+                                            return {
+                                              ...sub,
+                                              discount_percent: pct,
+                                              discounted_total: pct > 0 ? (sub.quantity || 1) * (sub.amount || 0) * (1 - pct / 100) : (sub.quantity || 1) * (sub.amount || 0),
+                                            };
+                                          });
+                                          return { ...updatedItem, subItems: updatedSubItems };
                                         }));
                                       }}
                                   className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"

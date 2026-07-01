@@ -162,7 +162,7 @@ export default function CreatePaymentTermsPage() {
         <div className="mb-3 bg-yellow-200 p-2 text-sm">
           <p className="font-semibold">Please use your name and/or road name as reference:</p>
           <p>Acc name : Atelier Luxe Interiors LTD</p>
-          <p>Bank : Tide</p>
+          <p>Bank : ClearBank</p>
           <p>Sort Code: 04 06 05</p>
           <p>Acc No: 31621197</p>
         </div>

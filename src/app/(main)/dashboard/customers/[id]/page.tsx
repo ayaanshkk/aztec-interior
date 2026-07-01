@@ -1645,7 +1645,7 @@ export default function CustomerDetailsPage() {
       alert("You don't have permission to edit this customer.");
       return;
     }
-    router.push(`/dashboard/customers/${id}/edit`);
+    window.open(`/dashboard/customers/${id}/edit`);
   };
 
   const generateFormLink = (type: "bedroom" | "kitchen") => {
@@ -1777,7 +1777,7 @@ export default function CustomerDetailsPage() {
       type: "quotation",
       source: "customer",
     });
-    router.push(`/dashboard/quotes/create?${queryParams.toString()}`);
+    window.open(`/dashboard/quotes/create?${queryParams.toString()}`);
   };
 
   const buildCustomerQuery = () => {
@@ -1796,7 +1796,7 @@ export default function CustomerDetailsPage() {
       alert("Salesperson users cannot create remedial checklists. Please contact your Platform Admin.");
       return;
     }
-    router.push(`/dashboard/checklists/remedial?${buildCustomerQuery()}`);
+    window.open(`/dashboard/checklists/remedial?${buildCustomerQuery()}`);
   };
 
   const handleCreateReceipt = () => {
@@ -1817,7 +1817,7 @@ export default function CustomerDetailsPage() {
       paymentMethod: "BACS",
       paymentDescription: "Payment received for your Kitchen/Bedroom Cabinetry.",
     });
-    router.push(`/dashboard/checklists/receipt?${params.toString()}`);
+    router.push(`/dashboard/receipt?${params.toString()}`);
   };
 
   const handleCreateDepositReceipt = () => {
@@ -1838,7 +1838,7 @@ export default function CustomerDetailsPage() {
       paymentMethod: "BACS",
       paymentDescription: "Deposit payment received for your Kitchen/Bedroom Cabinetry.",
     });
-    router.push(`/dashboard/checklists/receipt?${params.toString()}`);
+    router.push(`/dashboard/receipt?${params.toString()}`);
   };
 
   const handleCreateFinalReceipt = () => {
@@ -1859,7 +1859,7 @@ export default function CustomerDetailsPage() {
       paymentMethod: "BACS",
       paymentDescription: "Final payment received for your Kitchen/Bedroom Cabinetry.",
     });
-    router.push(`/dashboard/checklists/receipt?${params.toString()}`);
+    router.push(`/dashboard/receipt?${params.toString()}`);
   };
 
   const handleCreateInvoice = () => {
@@ -1867,7 +1867,7 @@ export default function CustomerDetailsPage() {
       alert("You don't have permission to create invoices.");
       return;
     }
-    router.push(`/dashboard/checklists/invoice/?${buildCustomerQuery()}`)
+    window.open(`/dashboard/invoices/create?${buildCustomerQuery()}`);
   };
 
   const handleCreateProformaInvoice = () => {
@@ -1875,7 +1875,7 @@ export default function CustomerDetailsPage() {
       alert("You don't have permission to create invoices.");
       return;
     }
-    router.push(`/dashboard/checklists/invoices/create?type=proforma&${buildCustomerQuery()}`);
+    window.open(`/dashboard/invoices/create?type=proforma&${buildCustomerQuery()}`);
   };
 
   const handleCreatePaymentTerms = () => {
@@ -1883,7 +1883,7 @@ export default function CustomerDetailsPage() {
       alert("You don't have permission to create payment terms.");
       return;
     }
-    router.push(`/dashboard/checklists/payment-terms/?${buildCustomerQuery()}`)
+    window.open(`/dashboard/payment-terms/create?${buildCustomerQuery()}`);
   };
 
   const handleCreateKitchenChecklist = () => {
@@ -1915,24 +1915,24 @@ export default function CustomerDetailsPage() {
   };
 
   const handleViewJob = (jobId: string) => {
-    router.push(`/dashboard/jobs/${jobId}`);
+    window.open(`/dashboard/jobs/${jobId}`);
   };
 
   const handleViewFinancialDoc = (doc: FinancialDocument) => {
     switch (doc.type) {
       case "invoice":
-        router.push(`/dashboard/invoices/${doc.id}`);
+        window.open(`/dashboard/invoices/${doc.id}`);
         break;
       case "proforma":
-        router.push(`/dashboard/checklists/quotes/${doc.id}`);
+        window.open(`/dashboard/checklists/quotes/${doc.id}`);
         break;
       case "receipt":
       case "deposit":
       case "final":
-        router.push(`/dashboard/checklists/receipt?formSubmissionId=${doc.form_submission_id || doc.id}`);
+        window.open(`/dashboard/checklists/receipt?formSubmissionId=${doc.form_submission_id || doc.id}`);
         break;
       case "terms":
-        router.push(`/dashboard/payment-terms/${doc.id}`);
+        window.open(`/dashboard/payment-terms/${doc.id}`);
         break;
       default:
         alert("Viewing not yet implemented for this document type");
@@ -2169,7 +2169,7 @@ export default function CustomerDetailsPage() {
         paymentMethod: derivedData.payment_method || "BACS",
         paymentDescription: derivedData.payment_description || "Payment received for your Kitchen/Bedroom Cabinetry.",
       });
-      router.push(`/dashboard/checklists/receipt?formSubmissionId=${selectedForm?.id || ""}`);
+      window.open(`/dashboard/checklists/receipt?formSubmissionId=${selectedForm?.id || ""}`);
     };
 
     return (
@@ -2297,7 +2297,7 @@ export default function CustomerDetailsPage() {
 
       if (response.ok) {
         alert("Customer deleted successfully!");
-        router.push("/dashboard/customers");
+        window.open("/dashboard/customers");
       } else {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
         alert(`Failed to delete customer: ${errorData.error}`);
@@ -2790,7 +2790,7 @@ export default function CustomerDetailsPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.push("/dashboard/customers")}
+              onClick={() => window.open("/dashboard/customers")}
               className="h-10 w-10"
             >
               <ArrowLeft className="h-5 w-5" />
@@ -3562,42 +3562,49 @@ export default function CustomerDetailsPage() {
                       </Button>
  
                       {/* Delete — only for quotations, fixed width icon button */}
-                      {doc.type === 'quotation' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (doc.type === 'quotation') {
                             const quoteId = typeof doc.id === 'string' ? parseInt(doc.id) : doc.id;
                             if (!quoteId || isNaN(quoteId as number)) { alert('Error: Cannot delete - invalid ID'); return; }
                             setQuoteToDelete({ id: quoteId as number, reference: doc.reference || doc.title });
                             setDeleteDialogOpen(true);
-                          }}
-                          disabled={deletingQuoteId === doc.id}
-                          className="w-9 flex-shrink-0 px-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                        >
-                          {deletingQuoteId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                        </Button>
-                      ) : doc.type === 'invoice' ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          } else if (doc.type === 'invoice' || doc.type === 'proforma') {
                             const invId = typeof doc.id === 'string' ? parseInt(doc.id) : doc.id;
                             if (!invId || isNaN(invId as number)) { alert('Error: Cannot delete - invalid ID'); return; }
                             setInvoiceToDelete({ id: invId as number, title: doc.title });
                             setDeleteInvoiceDialogOpen(true);
-                          }}
-                          disabled={deletingInvoiceId === doc.id}
-                          className="w-9 flex-shrink-0 px-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                        >
-                          {deletingInvoiceId === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                        </Button>
-                      ) : (
-                        // Invisible spacer — keeps View+PDF the same width on non-quotation cards
-                        <div className="w-9 flex-shrink-0" />
-                      )}
+                          } else {
+                            if (window.confirm(`Are you sure you want to delete "${doc.title}"? This cannot be undone.`)) {
+                              const token = localStorage.getItem('token');
+                              const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+                              let url = '';
+                              if (doc.type === 'payment_terms') url = `${base}/api/form/payment-terms/${doc.id}`;
+                              else if (doc.type === 'receipt' || doc.type === 'deposit' || doc.type === 'final') url = `${base}/api/form/form-submissions/${doc.id}`;
+                              if (url) {
+                                fetch(url, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+                                  .then(res => {
+                                    if (res.ok) {
+                                      setFinancialDocuments(prev => prev.filter(d => !(d.id === doc.id && d.type === doc.type)));
+                                    } else {
+                                      alert('Failed to delete document');
+                                    }
+                                  })
+                                  .catch(() => alert('Network error'));
+                              }
+                            }
+                          }
+                        }}
+                        disabled={deletingQuoteId === doc.id || deletingInvoiceId === doc.id}
+                        className="w-9 flex-shrink-0 px-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                      >
+                        {(deletingQuoteId === doc.id || deletingInvoiceId === doc.id)
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <Trash2 className="h-4 w-4" />}
+                      </Button>
                     </div>
                     </div>
                   ))}

@@ -146,7 +146,7 @@ export default function ViewInvoicePage() {
         </div>
         <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
           <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
-          <p className="font-semibold">Bank : Tide</p>
+          <p className="font-semibold">Bank : ClearBank</p>
           <p className="font-semibold">Sort Code: 04 06 05</p>
           <p className="font-semibold">Acc No: 31621197</p>
         </div>
@@ -270,47 +270,28 @@ export default function ViewInvoicePage() {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-white">
-                          <th className="border border-black px-3 py-2 text-left font-bold text-sm">ITEM</th>
-                          <th className="border border-black px-3 py-2 text-left font-bold text-sm">DESCRIPTION</th>
-                          <th className="border border-black px-3 py-2 text-left font-bold text-sm">COLOUR</th>
-                          <th className="border border-black px-3 py-2 text-center font-bold text-sm">QTY</th>
-                          <th className="border border-black px-3 py-2 text-right font-bold text-sm">UNIT PRICE</th>
-                          <th className="border border-black px-3 py-2 text-right font-bold text-sm">AMOUNT</th>
-                          <th className="border border-black px-3 py-2 text-center font-bold text-sm">DISC %</th>
-                          <th className="border border-black px-3 py-2 text-right font-bold text-sm">FINAL</th>
+                          <th className="border border-black px-3 py-2 text-left font-bold">ITEM</th>
+                          <th className="border border-black px-3 py-2 text-left font-bold">DESCRIPTION</th>
+                          <th className="border border-black px-3 py-2 text-left font-bold">COLOUR</th>
+                          <th className="border border-black px-3 py-2 text-center font-bold">QTY</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {sectionItems.map((item, idx) => {
+                        {sectionItems.map((item, index) => {
                           const isSubItem = item.is_sub_item || false;
-                          const qty       = item.quantity || 1;
-                          const unitPrice = item.amount   || 0;
-                          const lineTotal = unitPrice * qty;
-                          const discPct   = item.discount_percent || 0;
-                          const finalAmt  = discPct > 0
-                            ? (item.discounted_total || item.discounted_amount || lineTotal - lineTotal * (discPct / 100))
-                            : lineTotal;
-
                           return (
-                            <tr key={idx} className={isSubItem ? "bg-gray-50" : "hover:bg-gray-50"}>
-                              <td className={`border border-black px-3 py-2 font-mono text-sm ${isSubItem ? "pl-6 text-gray-600" : ""}`}>
-                                {isSubItem ? `${item.item || item.item_name || "—"}` : (item.item || item.item_name || "—")}
+                            <tr key={index} className={isSubItem ? "bg-gray-50" : ""}>
+                              <td className={`border border-black px-3 py-2 ${isSubItem ? "pl-8 text-sm text-gray-600" : ""}`}>
+                                {item.item || item.item_name || "—"}
                               </td>
-                              <td className="border border-black px-3 py-2 text-sm">{item.description || "—"}</td>
-                              <td className="border border-black px-3 py-2 text-sm">{item.color || item.colour || "—"}</td>
-                              <td className="border border-black px-3 py-2 text-center text-sm">{qty}</td>
-                              <td className="border border-black px-3 py-2 text-right text-sm">{fmt(unitPrice)}</td>
-                              <td className="border border-black px-3 py-2 text-right font-semibold text-sm">{fmt(lineTotal)}</td>
-                              <td className="border border-black px-3 py-2 text-center text-sm">
-                                {discPct > 0 ? `${discPct}%` : "—"}
+                              <td className={`border border-black px-3 py-2 ${isSubItem ? "text-sm text-gray-600" : ""}`}>
+                                {item.description || "—"}
                               </td>
-                              <td className="border border-black px-3 py-2 text-right font-semibold text-sm">
-                                {discPct > 0 ? (
-                                  <div>
-                                    <div className="text-gray-400 line-through text-xs">{fmt(lineTotal)}</div>
-                                    <div className="text-green-700">{fmt(finalAmt)}</div>
-                                  </div>
-                                ) : fmt(finalAmt)}
+                              <td className={`border border-black px-3 py-2 ${isSubItem ? "text-sm text-gray-600" : ""}`}>
+                                {item.color || item.colour || "—"}
+                              </td>
+                              <td className={`border border-black px-3 py-2 text-center ${isSubItem ? "text-sm text-gray-600" : ""}`}>
+                                {item.quantity || 1}
                               </td>
                             </tr>
                           );
@@ -424,22 +405,6 @@ export default function ViewInvoicePage() {
             </div>
           ))}
         </div>
-
-        {/* Bottom action bar */}
-        <div className="flex justify-end gap-3 border-t pt-6 print:hidden">
-          <Button variant="outline" onClick={() => router.back()}>Back</Button>
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="mr-2 h-4 w-4" /> Print
-          </Button>
-          <Button variant="outline"
-            onClick={() => window.open(`${API_FORM}/invoices/${invoiceId}/pdf`, "_blank")}>
-            <Download className="mr-2 h-4 w-4" /> Download PDF
-          </Button>
-          <Button onClick={() => router.push(`/dashboard/invoices/${invoiceId}/edit`)}>
-            <Edit className="mr-2 h-4 w-4" /> Edit Invoice
-          </Button>
-        </div>
-
       </div>
     </div>
   );

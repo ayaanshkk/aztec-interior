@@ -752,7 +752,7 @@ export default function CreateInvoicePage() {
                 description:      i.description,
                 color:            i.color,
                 quantity:         i.quantity || 1,
-                amount:           i.line_total,
+                amount:           i.amount || 0,
                 discount_percent: i.discount_percent || 0,
                 discounted_total: i.discounted_total || i.line_total,
                 width: i.width, height: i.height, depth: i.depth,
@@ -766,9 +766,9 @@ export default function CreateInvoicePage() {
                   description:      s.description || "",
                   color:            s.color || "",
                   quantity:         s.quantity || 1,
-                  amount:           (s.amount || 0) * (s.quantity || 1),
+                  amount:           s.amount || 0,
                   discount_percent: s.discount_percent || 0,
-                  discounted_total: s.discounted_total || (s.amount || 0) * (s.quantity || 1),
+                  discounted_total: s.discounted_total || s.line_total,
                   width: s.width, height: s.height, depth: s.depth,
                   section: i.section || "Furniture",
                   is_sub_item: true,
@@ -867,7 +867,7 @@ export default function CreateInvoicePage() {
 
         <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
           <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
-          <p className="font-semibold">Bank : Tide</p>
+          <p className="font-semibold">Bank : ClearBank</p>
           <p className="font-semibold">Sort Code: 04 06 05</p>
           <p className="font-semibold">Acc No: 31621197</p>
         </div>
@@ -1184,10 +1184,15 @@ export default function CreateInvoicePage() {
                             <td className="border border-black p-0">
                               <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(item.id, sub.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
                             </td>
-                            <td className="border border-black px-2 py-1 text-right text-xs">
-                              {sub.discount_percent && sub.discount_percent > 0
-                                ? formatCurrency(sub.discounted_total || 0)
-                                : formatCurrency(sub.line_total)}
+                            <td className="border border-black px-2 py-1 text-right">
+                              {sub.discount_percent && sub.discount_percent > 0 ? (
+                                <div>
+                                  <div className="text-xs text-gray-500 line-through">{formatCurrency(sub.line_total)}</div>
+                                  <div className="font-semibold text-green-700 text-xs">{formatCurrency(sub.discounted_total || 0)}</div>
+                                </div>
+                              ) : (
+                                <span className="font-semibold text-xs">{formatCurrency(sub.line_total)}</span>
+                              )}
                             </td>
                             <td className="border border-black p-1 text-center">
                               <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(item.id, sub.id)} className="text-red-600 hover:bg-red-50 h-6 w-6">
@@ -1259,15 +1264,21 @@ export default function CreateInvoicePage() {
                                         setItems(prevItems => prevItems.map(item => {
                                           if ((item.section || 'Furniture') !== section) return item;
                                           const itemDisc = item.discount_percent || 0;
-                                          if (itemDisc > 0 && itemDisc !== prevSectionPct) return item;
-                                          const qty = item.quantity || 1;
-                                          const amt = item.amount || 0;
-                                          const baseTotal = qty * amt;
-                                          return {
+                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevSectionPct) ? item : {
                                             ...item,
                                             discount_percent: pct,
-                                            discounted_total: pct > 0 ? baseTotal - baseTotal * (pct / 100) : baseTotal,
+                                            discounted_total: pct > 0 ? (item.quantity || 1) * (item.amount || 0) * (1 - pct / 100) : (item.quantity || 1) * (item.amount || 0),
                                           };
+                                          const updatedSubItems = (item.subItems || []).map(sub => {
+                                            const subDisc = sub.discount_percent || 0;
+                                            if (subDisc > 0 && subDisc !== prevSectionPct) return sub;
+                                            return {
+                                              ...sub,
+                                              discount_percent: pct,
+                                              discounted_total: pct > 0 ? (sub.quantity || 1) * (sub.amount || 0) * (1 - pct / 100) : (sub.quantity || 1) * (sub.amount || 0),
+                                            };
+                                          });
+                                          return { ...updatedItem, subItems: updatedSubItems };
                                         }));
                                       }}
                                       className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"

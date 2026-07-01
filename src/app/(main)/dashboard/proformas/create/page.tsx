@@ -375,7 +375,7 @@ export default function CreateProformaPage() {
         </div>
         <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
           <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
-          <p className="font-semibold">Bank : Tide</p>
+          <p className="font-semibold">Bank : ClearBank</p>
           <p className="font-semibold">Sort Code: 04 06 05</p>
           <p className="font-semibold">Acc No: 31621197</p>
         </div>
