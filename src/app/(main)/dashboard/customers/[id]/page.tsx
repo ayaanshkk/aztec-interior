@@ -426,6 +426,10 @@ export default function CustomerDetailsPage() {
   const [showDeleteCustomerDialog, setShowDeleteCustomerDialog] = useState(false);
   const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
   const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
+  const [isDuplicatingDoc, setIsDuplicatingDoc] = useState<string | number | null>(null);
+  const [genericDocToDelete, setGenericDocToDelete] = useState<FinancialDocument | null>(null);
+  const [deleteGenericDocDialogOpen, setDeleteGenericDocDialogOpen] = useState(false);
+  const [isDeletingGenericDoc, setIsDeletingGenericDoc] = useState(false);
 
 
   useEffect(() => {
@@ -1322,6 +1326,160 @@ export default function CustomerDetailsPage() {
     }
   };
 
+  const handleDuplicateDoc = async (doc: FinancialDocument) => {
+    const docId = typeof doc.id === 'string' ? parseInt(doc.id) : doc.id as number;
+    setIsDuplicatingDoc(doc.id);
+    const token = localStorage.getItem('token');
+    const base = BACKEND_URL;
+
+    try {
+      if (doc.type === 'quotation') {
+        const res = await fetch(`${base}/quotations/${docId}`, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) throw new Error('Failed to fetch quote');
+        const original = await res.json();
+        const createRes = await fetch(`${base}/quotations`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: original.customer_id,
+            status: 'Draft',
+            notes: original.notes ? `Copy of: ${original.notes}` : 'Duplicated quote',
+            vat_percentage: original.vat_percentage,
+            global_discount_percent: original.global_discount_percent,
+            door_type: original.door_type,
+            room_type: original.room_type,
+            room_name: original.room_name,
+            carcass_colour: original.carcass_colour,
+            door_colour: original.door_colour,
+            panelwork_colour: original.panelwork_colour,
+            door_style: original.door_style,
+            customer_name: original.customer_name,
+            customer_address: original.customer_address,
+            customer_phone: original.customer_phone,
+            customer_email: original.customer_email,
+            section_discounts: original.section_discounts || {},
+            items: (original.items || []).map((item: any) => ({
+              item: item.item, description: item.description, colour: item.color,
+              quantity: item.quantity, amount: item.amount, width: item.width,
+              height: item.height, depth: item.depth, needs_manual_pricing: item.needs_manual_pricing,
+              price_list_item_id: item.price_list_item_id, discount_percent: item.discount_percent,
+              section: item.section, source: item.source,
+              subItems: (item.subItems || []).map((sub: any) => ({
+                item: sub.item, description: sub.description, colour: sub.color,
+                quantity: sub.quantity, amount: sub.amount, width: sub.width,
+                height: sub.height, depth: sub.depth, needs_manual_pricing: sub.needs_manual_pricing,
+                price_list_item_id: sub.price_list_item_id, discount_percent: sub.discount_percent,
+                section: sub.section, source: sub.source,
+              })),
+            })),
+          }),
+        });
+        if (!createRes.ok) throw new Error('Failed to create duplicate');
+        const newQuote = await createRes.json();
+        setFinancialDocuments(prev => [{
+          id: newQuote.quotation_id, type: 'quotation',
+          title: original.room_name || `Quotation ${newQuote.reference_number}`,
+          reference: newQuote.reference_number, total: original.total,
+          status: 'Draft', created_at: new Date().toISOString(),
+        }, ...prev]);
+        window.open(`/dashboard/quotes/${newQuote.quotation_id}/edit`, '_blank');
+
+      } else if (doc.type === 'invoice' || doc.type === 'proforma') {
+        const res = await fetch(`${base}/api/form/invoices/${docId}`, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) throw new Error('Failed to fetch invoice');
+        const original = await res.json();
+        const createRes = await fetch(`${base}/api/form/invoices`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...original, id: undefined, invoice_number: undefined, created_at: undefined }),
+        });
+        if (!createRes.ok) throw new Error('Failed to duplicate invoice');
+        const newInv = await createRes.json();
+        setFinancialDocuments(prev => [{
+          id: newInv.id || newInv.invoice_id, type: doc.type,
+          title: newInv.invoice_number || `Invoice copy`,
+          reference: newInv.invoice_number, total: original.total,
+          status: 'Draft', created_at: new Date().toISOString(),
+        }, ...prev]);
+        window.open(`/dashboard/invoices/${newInv.id || newInv.invoice_id}`, '_blank');
+
+      } else if (doc.type === 'payment_terms') {
+        const res = await fetch(`${base}/api/form/payment-terms/${docId}`, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) throw new Error('Failed to fetch payment terms');
+        const original = await res.json();
+        const createRes = await fetch(`${base}/api/form/payment-terms`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...original, pt_id: undefined, id: undefined, pt_number: undefined, created_at: undefined }),
+        });
+        if (!createRes.ok) throw new Error('Failed to duplicate payment terms');
+        const newPt = await createRes.json();
+        setFinancialDocuments(prev => [{
+          id: newPt.pt_id || newPt.id, type: 'payment_terms',
+          title: `Payment Terms ${newPt.pt_number || ''}`,
+          reference: newPt.pt_number,
+          total: original.total_amount_due || original.total_amount,
+          created_at: new Date().toISOString(),
+        }, ...prev]);
+        window.open(`/dashboard/payment-terms/${newPt.pt_id || newPt.id}`, '_blank');
+
+      } else if (['receipt', 'deposit', 'final'].includes(doc.type)) {
+        const res = await fetch(`${base}/api/form/form-submissions/${docId}`, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) throw new Error('Failed to fetch receipt');
+        const original = await res.json();
+        let fd = original.form_data;
+        if (typeof fd === 'string') fd = JSON.parse(fd);
+        const params = new URLSearchParams({
+          customerId: String(id), customerName: customer?.name || '',
+          customerAddress: customer?.address || '', customerPhone: customer?.phone || '',
+          type: doc.type,
+          paidAmount: fd.paidAmount || fd.paid_amount || '0.00',
+          totalPaidToDate: fd.totalPaidToDate || fd.total_paid_to_date || '0.00',
+          balanceToPay: fd.balanceToPay || fd.balance_to_pay || '0.00',
+          receiptDate: new Date().toISOString().split('T')[0],
+          paymentMethod: fd.paymentMethod || fd.payment_method || 'BACS',
+          paymentDescription: fd.paymentDescription || fd.payment_description || '',
+        });
+        window.open(`/dashboard/receipt?${params.toString()}`);
+      }
+    } catch (error) {
+      alert(`Failed to duplicate: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsDuplicatingDoc(null);
+    }
+  };
+
+  const handleDeleteGenericDoc = async () => {
+    if (!genericDocToDelete) return;
+    setIsDeletingGenericDoc(true);
+    const token = localStorage.getItem('token');
+    let url = '';
+    if (genericDocToDelete.type === 'payment_terms') url = `${BACKEND_URL}/api/form/payment-terms/${genericDocToDelete.id}`;
+    else if (['receipt', 'deposit', 'final'].includes(genericDocToDelete.type)) url = `${BACKEND_URL}/api/form/form-submissions/${genericDocToDelete.id}`;
+    try {
+      const res = await fetch(url, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        setFinancialDocuments(prev => prev.filter(d => !(d.id === genericDocToDelete.id && d.type === genericDocToDelete.type)));
+        setDeleteGenericDocDialogOpen(false);
+        setGenericDocToDelete(null);
+      } else {
+        alert('Failed to delete document');
+      }
+    } catch {
+      alert('Network error');
+    } finally {
+      setIsDeletingGenericDoc(false);
+    }
+  };
+
   const handleViewFinancialDocument = (doc: FinancialDocument) => {
     switch (doc.type) {
       case 'quotation':
@@ -1817,7 +1975,7 @@ export default function CustomerDetailsPage() {
       paymentMethod: "BACS",
       paymentDescription: "Payment received for your Kitchen/Bedroom Cabinetry.",
     });
-    router.push(`/dashboard/receipt?${params.toString()}`);
+    window.open(`/dashboard/receipt?${params.toString()}`);
   };
 
   const handleCreateDepositReceipt = () => {
@@ -1838,7 +1996,7 @@ export default function CustomerDetailsPage() {
       paymentMethod: "BACS",
       paymentDescription: "Deposit payment received for your Kitchen/Bedroom Cabinetry.",
     });
-    router.push(`/dashboard/receipt?${params.toString()}`);
+    window.open(`/dashboard/receipt?${params.toString()}`);
   };
 
   const handleCreateFinalReceipt = () => {
@@ -1859,7 +2017,7 @@ export default function CustomerDetailsPage() {
       paymentMethod: "BACS",
       paymentDescription: "Final payment received for your Kitchen/Bedroom Cabinetry.",
     });
-    router.push(`/dashboard/receipt?${params.toString()}`);
+    window.open(`/dashboard/receipt?${params.toString()}`);
   };
 
   const handleCreateInvoice = () => {
@@ -3531,7 +3689,6 @@ export default function CustomerDetailsPage() {
                       </div>
 
                     <div className="mt-auto pt-4 flex items-center gap-2">
-                      {/* View button — always present, takes remaining space */}
                       <Button
                         onClick={() => handleViewFinancialDocument(doc)}
                         variant="outline"
@@ -3541,8 +3698,7 @@ export default function CustomerDetailsPage() {
                         <Eye className="mr-2 h-4 w-4" />
                         View
                       </Button>
- 
-                      {/* PDF button — always present for all types */}
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -3560,8 +3716,20 @@ export default function CustomerDetailsPage() {
                         <Download className="mr-2 h-4 w-4" />
                         PDF
                       </Button>
- 
-                      {/* Delete — only for quotations, fixed width icon button */}
+
+                      {/* Duplicate button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleDuplicateDoc(doc); }}
+                        disabled={isDuplicatingDoc === doc.id}
+                        className="w-9 flex-shrink-0 px-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                        title="Duplicate"
+                      >
+                        {isDuplicatingDoc === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+
+                      {/* Delete button */}
                       <Button
                         variant="outline"
                         size="sm"
@@ -3578,28 +3746,13 @@ export default function CustomerDetailsPage() {
                             setInvoiceToDelete({ id: invId as number, title: doc.title });
                             setDeleteInvoiceDialogOpen(true);
                           } else {
-                            if (window.confirm(`Are you sure you want to delete "${doc.title}"? This cannot be undone.`)) {
-                              const token = localStorage.getItem('token');
-                              const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
-                              let url = '';
-                              if (doc.type === 'payment_terms') url = `${base}/api/form/payment-terms/${doc.id}`;
-                              else if (doc.type === 'receipt' || doc.type === 'deposit' || doc.type === 'final') url = `${base}/api/form/form-submissions/${doc.id}`;
-                              if (url) {
-                                fetch(url, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
-                                  .then(res => {
-                                    if (res.ok) {
-                                      setFinancialDocuments(prev => prev.filter(d => !(d.id === doc.id && d.type === doc.type)));
-                                    } else {
-                                      alert('Failed to delete document');
-                                    }
-                                  })
-                                  .catch(() => alert('Network error'));
-                              }
-                            }
+                            setGenericDocToDelete(doc);
+                            setDeleteGenericDocDialogOpen(true);
                           }
                         }}
                         disabled={deletingQuoteId === doc.id || deletingInvoiceId === doc.id}
                         className="w-9 flex-shrink-0 px-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        title="Delete"
                       >
                         {(deletingQuoteId === doc.id || deletingInvoiceId === doc.id)
                           ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -3689,6 +3842,33 @@ export default function CustomerDetailsPage() {
               {deletingInvoiceId !== null ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</>
               ) : 'Delete Invoice'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteGenericDocDialogOpen} onOpenChange={setDeleteGenericDocDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {genericDocToDelete?.type === 'payment_terms' ? 'Payment Terms' :
+                      genericDocToDelete?.type === 'deposit' ? 'Deposit Receipt' :
+                      genericDocToDelete?.type === 'final' ? 'Final Receipt' : 'Receipt'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{genericDocToDelete?.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingGenericDoc}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteGenericDoc}
+              disabled={isDeletingGenericDoc}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeletingGenericDoc ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</>
+              ) : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
