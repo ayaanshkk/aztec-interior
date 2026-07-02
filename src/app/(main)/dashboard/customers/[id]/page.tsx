@@ -556,8 +556,10 @@ export default function CustomerDetailsPage() {
 
       const allFinancialDocs: FinancialDocument[] = [];
 
+      console.log('📊 Raw quotations data sample:', quotationsData[0]);
+
       if (quotationsData && Array.isArray(quotationsData)) {
-        quotationsData.forEach((quote: Quotation) => {
+        quotationsData.forEach((quote: any) => {
           const quoteId = quote.id || quote.quotation_id || quote.reference_number;
           
           if (!quoteId) {
@@ -568,11 +570,11 @@ export default function CustomerDetailsPage() {
           allFinancialDocs.push({
             id: quoteId,
             type: 'quotation',
-            title: (quote as any).room_name
-              ? `${(quote as any).room_name}`
+            title: quote.room_name
+              ? `${quote.room_name}`
               : `Quotation ${quote.reference_number || quoteId}`,
             reference: quote.reference_number,
-            total: quote.total,
+            total: parseFloat(quote.total || 0),
             status: quote.status,
             created_at: quote.created_at,
             project_id: quote.project_id,
@@ -581,13 +583,13 @@ export default function CustomerDetailsPage() {
       }
 
       if (invoicesData && Array.isArray(invoicesData)) {
-        invoicesData.forEach((invoice: Invoice) => {
+        invoicesData.forEach((invoice: any) => {
           allFinancialDocs.push({
             id: invoice.id,
             type: invoice.invoice_number?.toLowerCase().includes('proforma') ? 'proforma' : 'invoice',
-            title: (invoice as any).room_name || invoice.invoice_number || `Invoice #${invoice.id}`,
+            title: invoice.room_name || invoice.invoice_number || `Invoice #${invoice.id}`,
             reference: invoice.invoice_number,
-            total: invoice.total,
+            total: parseFloat(invoice.total || 0),
             status: invoice.status,
             created_at: invoice.created_at,
             project_id: invoice.project_id,
@@ -614,16 +616,18 @@ export default function CustomerDetailsPage() {
                             : typeKey === 'final'   ? 'Final Receipt'
                             : 'Receipt';
  
-          const paidAmount  = parseFloat(fd.paidAmount  || fd.paid_amount  || 0);
-          const balance     = parseFloat(fd.balanceToPay || fd.balance_to_pay || 0);
-          const receiptDate = fd.receiptDate || fd.receipt_date || submission.submitted_at;
- 
+          const paidAmount      = parseFloat(fd.paidAmount      || fd.paid_amount      || 0);
+          const totalPaidToDate = parseFloat(fd.totalPaidToDate || fd.total_paid_to_date || paidAmount);
+          const balance         = parseFloat(fd.balanceToPay    || fd.balance_to_pay   || 0);
+          const receiptDate     = fd.receiptDate || fd.receipt_date || submission.submitted_at;
+
           allFinancialDocs.push({
             id:          submission.form_submission_id || submission.id,
             type:        typeKey,
             title:       `${typeLabel} - ${formatDate(receiptDate)}`,
             reference:   `#${submission.form_submission_id || submission.id}`,
             amount_paid: paidAmount,
+            total:       totalPaidToDate > 0 ? totalPaidToDate : paidAmount,
             balance:     balance,
             created_at:  submission.submitted_at || submission.created_at,
             project_id:  submission.project_id,
@@ -633,11 +637,10 @@ export default function CustomerDetailsPage() {
 
       if (paymentTermsData && Array.isArray(paymentTermsData)) {
         paymentTermsData.forEach((terms: any) => {
-          // Support both old PaymentTerms schema and new Payment_Terms_Master schema
           const ptId    = terms.pt_id    || terms.id;
           const ptNum   = terms.pt_number || terms.terms_title || `PT-${ptId}`;
-          const ptTotal = terms.total_amount_due || terms.total_amount || 0;
- 
+          const ptTotal = parseFloat(terms.total_amount_due || terms.total_amount || 0);
+
           allFinancialDocs.push({
             id:         ptId,
             type:       'payment_terms',

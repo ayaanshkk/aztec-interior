@@ -79,20 +79,16 @@ export default function ViewInvoicePage() {
 
   const sectionDiscountsData = invoice?.section_discounts || {};
 
-  const subtotalAfterSectionDiscounts = validItems.reduce((sum, item) => {
-    const section = item.section || 'Furniture';
+  const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
+    const sectionItems = validItems.filter(i => (i.section || 'Furniture') === section);
     const sectionDiscountPct = sectionDiscountsData[section] || 0;
-    const lineTotal = (item.amount || 0) * (item.quantity || 1);
-    const itemTotal = (item.discount_percent && item.discount_percent > 0)
-      ? (item.discounted_total || item.discounted_amount || lineTotal)
-      : lineTotal;
-    const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) => {
-      const subLine = (sub.amount || 0) * (sub.quantity || 1);
-      return s + ((sub.discount_percent && sub.discount_percent > 0)
-        ? (sub.discounted_total || sub.discounted_amount || subLine) : subLine);
+    const sectionRaw = sectionItems.reduce((sum, item) => {
+      const itemTotal = (item.amount || 0) * (item.quantity || 1);
+      const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
+        s + (sub.amount || 0) * (sub.quantity || 1), 0);
+      return sum + itemTotal + subTotal;
     }, 0);
-    const itemPlusSubTotal = itemTotal + subTotal;
-    return sum + itemPlusSubTotal * (1 - sectionDiscountPct / 100);
+    return total + sectionRaw * (1 - sectionDiscountPct / 100);
   }, 0);
 
   const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);

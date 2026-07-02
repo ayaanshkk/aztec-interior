@@ -748,22 +748,18 @@ export default function EditQuotePage() {
   }
 
   // ✅ ADD CALCULATIONS HERE - BEFORE THE RETURN
-  const subtotalAfterSectionDiscounts = items.reduce((sum, item) => {
-    const section = item.section || 'Furniture';
+  const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
+    const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
     const sectionDiscountPct = sectionDiscounts[section] || 0;
 
-    const itemTotal = (item.discount_percent && item.discount_percent > 0)
-      ? (item.discounted_total || 0)
-      : item.line_total;
-    const subTotal = (item.subItems || []).reduce((subSum, sub) => {
-      const subItemTotal = (sub.discount_percent && sub.discount_percent > 0)
-        ? (sub.discounted_total || 0)
-        : sub.line_total;
-      return subSum + subItemTotal;
+    const sectionRaw = sectionItems.reduce((sum, item) => {
+      const itemTotal = (item.amount || 0) * (item.quantity || 1);
+      const subTotal = (item.subItems || []).reduce((s, sub) =>
+        s + (sub.amount || 0) * (sub.quantity || 1), 0);
+      return sum + itemTotal + subTotal;
     }, 0);
 
-    const itemPlusSubTotal = itemTotal + subTotal;
-    return sum + itemPlusSubTotal * (1 - sectionDiscountPct / 100);
+    return total + sectionRaw * (1 - sectionDiscountPct / 100);
   }, 0);
 
   const handleAddSubItem = (parentIndex: number) => {
