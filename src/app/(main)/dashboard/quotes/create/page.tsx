@@ -1264,7 +1264,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                                 </div>
                               </td>
                               <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
-                                {sectionDiscountPct > 0 ? `-${formatCurrency(sectionDiscountAmt)}` : '—'}
+                                {hasItemDiscount ? `-${formatCurrency(itemDiscountTotal)}` : '—'}
                               </td>
                             </tr>
                             <tr>
