@@ -151,14 +151,17 @@ export default function ViewQuotePage() {
 
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    const sectionDiscountPct = sectionDiscountsData[section] || 0;
-    const sectionRaw = sectionItems.reduce((sum, item) => {
-      const itemRaw = (item.amount || 0) * (item.quantity || 1);
-      const subRaw = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
-        s + (sub.amount || 0) * (sub.quantity || 1), 0);
-      return sum + itemRaw + subRaw;
+    const sectionTotal = sectionItems.reduce((sum, item) => {
+      const itemTotal = (item.discount_percent && item.discount_percent > 0)
+        ? (item.discounted_total ?? item.discounted_amount ?? (item.amount || 0) * (item.quantity || 1))
+        : (item.amount || 0) * (item.quantity || 1);
+      const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
+        s + ((sub.discount_percent && sub.discount_percent > 0)
+          ? (sub.discounted_total ?? sub.discounted_amount ?? (sub.amount || 0) * (sub.quantity || 1))
+          : (sub.amount || 0) * (sub.quantity || 1)), 0);
+      return sum + itemTotal + subTotal;
     }, 0);
-    return total + sectionRaw * (1 - sectionDiscountPct / 100);
+    return total + sectionTotal;
   }, 0);
 
   const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
@@ -326,18 +329,28 @@ export default function ViewQuotePage() {
               if (sectionItems.length === 0) return null;
 
               // ✅ Section totals
-              const sectionSubtotal = sectionItems.reduce((sum, item) => {
+              const sectionRaw = sectionItems.reduce((sum, item) => {
                 const itemRaw = (item.amount || 0) * (item.quantity || 1);
                 const subRaw = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
                   s + (sub.amount || 0) * (sub.quantity || 1), 0);
                 return sum + itemRaw + subRaw;
               }, 0);
 
-              const sectionAfterItemDiscounts = sectionSubtotal; // no per-item discounts
-              const itemDiscountTotal = 0;
-              const hasItemDiscount = false;
-              const sectionDiscount = 0;
-              const hasDiscount = false;
+              // ✅ After item-level discounts from DB
+              const sectionAfterItemDiscounts = sectionItems.reduce((sum, item) => {
+                const itemTotal = (item.discount_percent && item.discount_percent > 0)
+                  ? (item.discounted_total ?? item.discounted_amount ?? (item.amount || 0) * (item.quantity || 1))
+                  : (item.amount || 0) * (item.quantity || 1);
+                const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
+                  s + ((sub.discount_percent && sub.discount_percent > 0)
+                    ? (sub.discounted_total ?? sub.discounted_amount ?? (sub.amount || 0) * (sub.quantity || 1))
+                    : (sub.amount || 0) * (sub.quantity || 1)), 0);
+                return sum + itemTotal + subTotal;
+              }, 0);
+
+              const sectionSubtotal = sectionRaw;
+              const itemDiscountTotal = sectionRaw - sectionAfterItemDiscounts;
+              const hasItemDiscount = itemDiscountTotal > 0;
 
               return (
                 <div key={section} className="mb-6">
@@ -380,9 +393,7 @@ export default function ViewQuotePage() {
                     <table className="border-collapse" style={{ width: '35%' }}>
                       <tbody>
                         {(() => {
-                          const secDiscPct = sectionDiscountsData[section] || 0;
-                          const secDiscAmt = sectionSubtotal * (secDiscPct / 100);
-                          const secTotal = sectionSubtotal - secDiscAmt;
+                          const secTotal = sectionAfterItemDiscounts;
                           return (
                             <>
                               <tr>
@@ -390,16 +401,16 @@ export default function ViewQuotePage() {
                                   {section} Subtotal
                                 </td>
                                 <td className="border border-gray-300 px-3 py-1 text-right text-sm">
-                                  {formatCurrency(sectionSubtotal)}
+                                  {formatCurrency(sectionRaw)}
                                 </td>
                               </tr>
-                              {secDiscPct > 0 && (
+                              {hasItemDiscount && (
                                 <tr>
                                   <td className="border border-gray-300 px-3 py-1 text-sm text-red-600">
                                     Section Discount
                                   </td>
                                   <td className="border border-gray-300 px-3 py-1 text-right text-sm text-red-600">
-                                    -{formatCurrency(secDiscAmt)}
+                                    -{formatCurrency(itemDiscountTotal)}
                                   </td>
                                 </tr>
                               )}

@@ -81,14 +81,17 @@ export default function ViewInvoicePage() {
 
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = validItems.filter(i => (i.section || 'Furniture') === section);
-    const sectionDiscountPct = sectionDiscountsData[section] || 0;
-    const sectionRaw = sectionItems.reduce((sum, item) => {
-      const itemRaw = (item.amount || 0) * (item.quantity || 1);
-      const subRaw = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
-        s + (sub.amount || 0) * (sub.quantity || 1), 0);
-      return sum + itemRaw + subRaw;
+    const sectionTotal = sectionItems.reduce((sum, item) => {
+      const itemTotal = (item.discount_percent && item.discount_percent > 0)
+        ? (item.discounted_total ?? item.discounted_amount ?? (item.amount || 0) * (item.quantity || 1))
+        : (item.amount || 0) * (item.quantity || 1);
+      const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
+        s + ((sub.discount_percent && sub.discount_percent > 0)
+          ? (sub.discounted_total ?? sub.discounted_amount ?? (sub.amount || 0) * (sub.quantity || 1))
+          : (sub.amount || 0) * (sub.quantity || 1)), 0);
+      return sum + itemTotal + subTotal;
     }, 0);
-    return total + sectionRaw * (1 - sectionDiscountPct / 100);
+    return total + sectionTotal;
   }, 0);
 
   const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
@@ -238,16 +241,29 @@ export default function ViewInvoicePage() {
               if (sectionItems.length === 0) return null;
 
               // Section totals
-              const sectionSubtotal = sectionItems.reduce((sum, item) => {
+              const sectionRaw = sectionItems.reduce((sum, item) => {
                 const itemRaw = (item.amount || 0) * (item.quantity || 1);
                 const subRaw = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
                   s + (sub.amount || 0) * (sub.quantity || 1), 0);
                 return sum + itemRaw + subRaw;
               }, 0);
 
+              // ✅ After item-level discounts from DB
+              const sectionAfterItemDiscounts = sectionItems.reduce((sum, item) => {
+                const itemTotal = (item.discount_percent && item.discount_percent > 0)
+                  ? (item.discounted_total ?? item.discounted_amount ?? (item.amount || 0) * (item.quantity || 1))
+                  : (item.amount || 0) * (item.quantity || 1);
+                const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
+                  s + ((sub.discount_percent && sub.discount_percent > 0)
+                    ? (sub.discounted_total ?? sub.discounted_amount ?? (sub.amount || 0) * (sub.quantity || 1))
+                    : (sub.amount || 0) * (sub.quantity || 1)), 0);
+                return sum + itemTotal + subTotal;
+              }, 0);
+
               const secDiscountPct = sectionDiscountsData[section] || 0;
-              const secDiscountAmt = sectionSubtotal * (secDiscountPct / 100);
-              const sectionTotal   = sectionSubtotal - secDiscountAmt;
+              const itemDiscountTotal = sectionRaw - sectionAfterItemDiscounts;
+              const hasItemDiscount = itemDiscountTotal > 0;
+              const sectionTotal = sectionAfterItemDiscounts;
 
               return (
                 <div key={section} className="mb-6">
@@ -290,13 +306,21 @@ export default function ViewInvoicePage() {
                   <div className="flex justify-end mt-2 mb-2">
                     <table className="border-collapse" style={{ width: "35%" }}>
                       <tbody>
-                        {secDiscountPct > 0 && (
+                        <tr>
+                          <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-sm">
+                            {section} Subtotal
+                          </td>
+                          <td className="border border-gray-300 px-3 py-1 text-right text-sm">
+                            {fmt(sectionRaw)}
+                          </td>
+                        </tr>
+                        {hasItemDiscount && (
                           <tr>
-                            <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-sm text-red-600">
+                            <td className="border border-gray-300 px-3 py-1 text-sm text-red-600">
                               Section Discount
                             </td>
                             <td className="border border-gray-300 px-3 py-1 text-right text-sm text-red-600">
-                              -{fmt(secDiscountAmt)}
+                              -{fmt(itemDiscountTotal)}
                             </td>
                           </tr>
                         )}

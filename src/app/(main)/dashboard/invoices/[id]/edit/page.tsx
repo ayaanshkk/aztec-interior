@@ -492,14 +492,17 @@ export default function EditInvoicePage() {
   // ── Computed totals ───────────────────────────────────────────────────────
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    const sectionDiscountPct = sectionDiscounts[section] || 0;
-    const sectionRaw = sectionItems.reduce((sum, item) => {
-      const itemRaw = (item.amount || 0) * (item.quantity || 1);
-      const subRaw = (item.subItems || []).reduce((s, sub) =>
-        s + (sub.amount || 0) * (sub.quantity || 1), 0);
-      return sum + itemRaw + subRaw;
+    const sectionTotal = sectionItems.reduce((sum, item) => {
+      const itemTotal = (item.discount_percent && item.discount_percent > 0)
+        ? (item.discounted_total ?? (item.amount || 0) * (item.quantity || 1))
+        : (item.amount || 0) * (item.quantity || 1);
+      const subTotal = (item.subItems || []).reduce((s, sub) =>
+        s + ((sub.discount_percent && sub.discount_percent > 0)
+          ? (sub.discounted_total ?? (sub.amount || 0) * (sub.quantity || 1))
+          : (sub.amount || 0) * (sub.quantity || 1)), 0);
+      return sum + itemTotal + subTotal;
     }, 0);
-    return total + sectionRaw * (1 - sectionDiscountPct / 100);
+    return total + sectionTotal;
   }, 0);
 
   const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
@@ -743,19 +746,30 @@ export default function EditInvoicePage() {
             const sectionItems = items.filter(i => (i.section || "Furniture") === section);
             if (sectionItems.length === 0) return null;
 
-            const sectionSubtotal = sectionItems.reduce((sum, item) => {
+            const sectionRaw = sectionItems.reduce((sum, item) => {
               const itemRaw = (item.amount || 0) * (item.quantity || 1);
               const subRaw = (item.subItems || []).reduce((s, sub) =>
                 s + (sub.amount || 0) * (sub.quantity || 1), 0);
               return sum + itemRaw + subRaw;
             }, 0);
 
-            const sectionAfterItemDiscounts = sectionSubtotal; // no per-item discounts
-            const itemDiscountTotal = 0;
-            const hasItemDiscount = false;
+            const sectionAfterItemDiscounts = sectionItems.reduce((sum, item) => {
+              const itemTotal = (item.discount_percent && item.discount_percent > 0)
+                ? (item.discounted_total ?? (item.amount || 0) * (item.quantity || 1))
+                : (item.amount || 0) * (item.quantity || 1);
+              const subTotal = (item.subItems || []).reduce((s, sub) =>
+                s + ((sub.discount_percent && sub.discount_percent > 0)
+                  ? (sub.discounted_total ?? (sub.amount || 0) * (sub.quantity || 1))
+                  : (sub.amount || 0) * (sub.quantity || 1)), 0);
+              return sum + itemTotal + subTotal;
+            }, 0);
+
+            const sectionSubtotal = sectionRaw;
+            const itemDiscountTotal = sectionRaw - sectionAfterItemDiscounts;
+            const hasItemDiscount = itemDiscountTotal > 0;
             const sectionDiscountPct = sectionDiscounts[section] || 0;
-            const sectionDiscountAmt = sectionSubtotal * (sectionDiscountPct / 100);
-            const sectionTotal = sectionSubtotal - sectionDiscountAmt;
+            const sectionDiscountAmt = sectionRaw * (sectionDiscountPct / 100);
+            const sectionTotal = sectionAfterItemDiscounts;
 
             return (
               <div key={section} className="mb-6">
@@ -928,11 +942,13 @@ export default function EditInvoicePage() {
                     <tbody>
                       <tr>
                         <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs">{section} Subtotal</td>
-                        <td className="border border-gray-300 px-3 py-1 text-right text-xs">{fmt(sectionSubtotal)}</td>
+                        <td className="border border-gray-300 px-3 py-1 text-right text-xs">{fmt(sectionRaw)}</td>
                       </tr>
                       {hasItemDiscount && (
                         <tr>
-                          <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs text-red-600">Item Discounts</td>
+                          <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs text-red-600">
+                            Section Discount ({parseFloat(sectionDiscountPct.toFixed(2))}%)
+                          </td>
                           <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">-{fmt(itemDiscountTotal)}</td>
                         </tr>
                       )}
@@ -945,9 +961,28 @@ export default function EditInvoicePage() {
                                 <Input type="number" value={sectionDiscountPct || ""}
                                       onChange={(e) => {
                                         const pct = parseFloat(e.target.value) || 0;
+                                        const prevPct = sectionDiscounts[section] || 0;
                                         setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
                                         setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
-                                        // ✅ Do NOT write discount_percent into items
+                                        setItems(prevItems => prevItems.map(item => {
+                                          if ((item.section || 'Furniture') !== section) return item;
+                                          const itemDisc = item.discount_percent || 0;
+                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevPct) ? item : {
+                                            ...item,
+                                            discount_percent: pct,
+                                            discounted_total: calcDiscounted(item.quantity || 1, item.amount || 0, pct),
+                                          };
+                                          const updatedSubs = (item.subItems || []).map(sub => {
+                                            const subDisc = sub.discount_percent || 0;
+                                            if (subDisc > 0 && subDisc !== prevPct) return sub;
+                                            return {
+                                              ...sub,
+                                              discount_percent: pct,
+                                              discounted_total: calcDiscounted(sub.quantity || 1, sub.amount || 0, pct),
+                                            };
+                                          });
+                                          return { ...updatedItem, subItems: updatedSubs };
+                                        }));
                                       }}
                                   className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"
                                   min="0" max="100" step="0.1" placeholder="0" />
@@ -957,14 +992,28 @@ export default function EditInvoicePage() {
                               <div className="flex items-center gap-1">
                                 <span className="text-xs text-gray-500">£</span>
                                 <Input type="number"
-                                  value={sectionDiscountAmounts[section] ?? (sectionDiscountAmt > 0 ? sectionDiscountAmt.toFixed(2) : "")}
+                                  value={
+                                    sectionDiscountAmounts[section] !== undefined && sectionDiscountAmounts[section] !== ''
+                                      ? sectionDiscountAmounts[section]
+                                      : itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : ''
+                                  }
                                   onChange={e => setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }))}
                                   onBlur={e => {
                                     const amt = parseFloat(e.target.value) || 0;
-                                    const pct = sectionSubtotal > 0 ? (amt / sectionSubtotal) * 100 : 0;
+                                    const pct = sectionRaw > 0 ? (amt / sectionRaw) * 100 : 0;
+                                    const prevPct = sectionDiscounts[section] || 0;
                                     setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
                                     setSectionDiscountAmounts(prev => ({ ...prev, [section]: "" }));
-                                    // ✅ Do NOT write into items
+                                    setItems(prevItems => prevItems.map(item => {
+                                      if ((item.section || 'Furniture') !== section) return item;
+                                      const itemDisc = item.discount_percent || 0;
+                                      if (itemDisc > 0 && itemDisc !== prevPct) return item;
+                                      return {
+                                        ...item,
+                                        discount_percent: pct,
+                                        discounted_total: calcDiscounted(item.quantity || 1, item.amount || 0, pct),
+                                      };
+                                    }));
                                   }}
                                   className="border border-gray-300 rounded px-1 py-0.5 w-20 text-right text-xs"
                                   min="0" step="0.01" placeholder="0.00" />
