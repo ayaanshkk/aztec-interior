@@ -494,9 +494,14 @@ export default function CreateQuotePage() {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
     const sectionDiscountPct = sectionDiscounts[section] || 0;
     const sectionRaw = sectionItems.reduce((sum, item) => {
-      const itemTotal = (item.amount || 0) * (item.quantity || 1);
+      // ✅ Use discounted_total if item has its own discount
+      const itemTotal = (item.discount_percent && item.discount_percent > 0)
+        ? (item.discounted_total || item.line_total || 0)
+        : (item.line_total || 0);
       const subTotal = (item.subItems || []).reduce((s, sub) =>
-        s + (sub.amount || 0) * (sub.quantity || 1), 0);
+        s + ((sub.discount_percent && sub.discount_percent > 0)
+          ? (sub.discounted_total || sub.line_total || 0)
+          : (sub.line_total || 0)), 0);
       return sum + itemTotal + subTotal;
     }, 0);
     return total + sectionRaw * (1 - sectionDiscountPct / 100);
@@ -729,9 +734,14 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
     const sectionDiscountPct = sectionDiscounts[section] || 0;
     const sectionRaw = sectionItems.reduce((sum, item) => {
-      const itemTotal = (item.amount || 0) * (item.quantity || 1);
+      // ✅ Use discounted_total if item has its own discount
+      const itemTotal = (item.discount_percent && item.discount_percent > 0)
+        ? (item.discounted_total || item.line_total || 0)
+        : (item.line_total || 0);
       const subTotal = (item.subItems || []).reduce((s, sub) =>
-        s + (sub.amount || 0) * (sub.quantity || 1), 0);
+        s + ((sub.discount_percent && sub.discount_percent > 0)
+          ? (sub.discounted_total || sub.line_total || 0)
+          : (sub.line_total || 0)), 0);
       return sum + itemTotal + subTotal;
     }, 0);
     return total + sectionRaw * (1 - sectionDiscountPct / 100);
@@ -960,8 +970,14 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
 
             // ✅ Section totals
             const sectionSubtotal = sectionItems.reduce((sum, item) => {
-              const itemTotal = item.line_total || 0;
-              const subTotal = (item.subItems || []).reduce((s, sub) => s + (sub.line_total || 0), 0);
+              // ✅ Use discounted_total if item has its own discount
+              const itemTotal = (item.discount_percent && item.discount_percent > 0)
+                ? (item.discounted_total || item.line_total || 0)
+                : (item.line_total || 0);
+              const subTotal = (item.subItems || []).reduce((s, sub) =>
+                s + ((sub.discount_percent && sub.discount_percent > 0)
+                  ? (sub.discounted_total || sub.line_total || 0)
+                  : (sub.line_total || 0)), 0);
               return sum + itemTotal + subTotal;
             }, 0);
 

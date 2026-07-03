@@ -753,9 +753,14 @@ export default function EditQuotePage() {
     const sectionDiscountPct = sectionDiscounts[section] || 0;
 
     const sectionRaw = sectionItems.reduce((sum, item) => {
-      const itemTotal = (item.amount || 0) * (item.quantity || 1);
+      // ✅ Use discounted_total if item has its own discount
+      const itemTotal = (item.discount_percent && item.discount_percent > 0)
+        ? (item.discounted_total || (item.amount || 0) * (item.quantity || 1))
+        : (item.amount || 0) * (item.quantity || 1);
       const subTotal = (item.subItems || []).reduce((s, sub) =>
-        s + (sub.amount || 0) * (sub.quantity || 1), 0);
+        s + ((sub.discount_percent && sub.discount_percent > 0)
+          ? (sub.discounted_total || (sub.amount || 0) * (sub.quantity || 1))
+          : (sub.amount || 0) * (sub.quantity || 1)), 0);
       return sum + itemTotal + subTotal;
     }, 0);
 
@@ -1135,11 +1140,17 @@ export default function EditQuotePage() {
 
             // ✅ Section totals
             const sectionSubtotal = indexedItems.reduce((sum, { item }) => {
-              const itemTotal = (item.amount || 0) * (item.quantity || 1);
-              const subTotal = (item.subItems || []).reduce((s, sub) => s + (sub.amount || 0) * (sub.quantity || 1), 0);
+              // ✅ Use discounted_total if item has its own discount
+              const itemTotal = (item.discount_percent && item.discount_percent > 0)
+                ? (item.discounted_total || (item.amount || 0) * (item.quantity || 1))
+                : (item.amount || 0) * (item.quantity || 1);
+              const subTotal = (item.subItems || []).reduce((s, sub) =>
+                s + ((sub.discount_percent && sub.discount_percent > 0)
+                  ? (sub.discounted_total || (sub.amount || 0) * (sub.quantity || 1))
+                  : (sub.amount || 0) * (sub.quantity || 1)), 0);
               return sum + itemTotal + subTotal;
             }, 0);
-
+            
             const sectionDiscounted = indexedItems.reduce((sum, { item }) => {
               const itemTotal = (item.discount_percent && item.discount_percent > 0)
                 ? (item.discounted_total || (item.amount || 0) * (item.quantity || 1))

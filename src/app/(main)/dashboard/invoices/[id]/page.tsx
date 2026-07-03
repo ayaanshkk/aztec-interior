@@ -83,9 +83,17 @@ export default function ViewInvoicePage() {
     const sectionItems = validItems.filter(i => (i.section || 'Furniture') === section);
     const sectionDiscountPct = sectionDiscountsData[section] || 0;
     const sectionRaw = sectionItems.reduce((sum, item) => {
-      const itemTotal = (item.amount || 0) * (item.quantity || 1);
-      const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
-        s + (sub.amount || 0) * (sub.quantity || 1), 0);
+      // ✅ Use discounted_total/discounted_amount if item has its own discount
+      const lineTotal = (item.amount || 0) * (item.quantity || 1);
+      const itemTotal = (item.discount_percent && item.discount_percent > 0)
+        ? (item.discounted_total || item.discounted_amount || lineTotal)
+        : lineTotal;
+      const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) => {
+        const subLine = (sub.amount || 0) * (sub.quantity || 1);
+        return s + ((sub.discount_percent && sub.discount_percent > 0)
+          ? (sub.discounted_total || sub.discounted_amount || subLine)
+          : subLine);
+      }, 0);
       return sum + itemTotal + subTotal;
     }, 0);
     return total + sectionRaw * (1 - sectionDiscountPct / 100);
@@ -239,10 +247,18 @@ export default function ViewInvoicePage() {
 
               // Section totals
               const sectionSubtotal = sectionItems.reduce((sum, item) => {
+                // ✅ Use discounted_total/discounted_amount if item has its own discount
                 const lineTotal = (item.amount || 0) * (item.quantity || 1);
-                const subTotal  = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
-                  s + (sub.amount || 0) * (sub.quantity || 1), 0);
-                return sum + lineTotal + subTotal;
+                const itemTotal = (item.discount_percent && item.discount_percent > 0)
+                  ? (item.discounted_total || item.discounted_amount || lineTotal)
+                  : lineTotal;
+                const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) => {
+                  const subLine = (sub.amount || 0) * (sub.quantity || 1);
+                  return s + ((sub.discount_percent && sub.discount_percent > 0)
+                    ? (sub.discounted_total || sub.discounted_amount || subLine)
+                    : subLine);
+                }, 0);
+                return sum + itemTotal + subTotal;
               }, 0);
 
               const sectionDiscounted = sectionItems.reduce((sum, item) => {
