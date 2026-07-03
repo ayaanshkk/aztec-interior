@@ -1235,7 +1235,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                                       <span className="text-xs text-gray-500">£</span>
                                       <Input
                                         type="number"
-                                        value={sectionDiscountAmounts[section] ?? (sectionDiscountAmt > 0 ? sectionDiscountAmt.toFixed(2) : '')}
+                                        value={sectionDiscountAmounts[section] ?? (itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : '')}
                                         onChange={(e) => {
                                           setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }));
                                         }}
