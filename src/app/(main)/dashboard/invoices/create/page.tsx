@@ -700,15 +700,10 @@ export default function CreateInvoicePage() {
       const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
       const sectionDiscountPct = sectionDiscounts[section] || 0;
       const sectionRaw = sectionItems.reduce((sum, item) => {
-        // ✅ Use discounted_total if item has its own discount
-        const itemTotal = (item.discount_percent && item.discount_percent > 0)
-          ? (item.discounted_total || item.line_total || 0)
-          : (item.line_total || 0);
-        const subTotal = (item.subItems || []).reduce((s, sub) =>
-          s + ((sub.discount_percent && sub.discount_percent > 0)
-            ? (sub.discounted_total || sub.line_total || 0)
-            : (sub.line_total || 0)), 0);
-        return sum + itemTotal + subTotal;
+        const itemRaw = (item.amount || 0) * (item.quantity || 1);
+        const subRaw = (item.subItems || []).reduce((s, sub) =>
+          s + (sub.amount || 0) * (sub.quantity || 1), 0);
+        return sum + itemRaw + subRaw;
       }, 0);
       return total + sectionRaw * (1 - sectionDiscountPct / 100);
     }, 0);
@@ -808,15 +803,10 @@ export default function CreateInvoicePage() {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
     const sectionDiscountPct = sectionDiscounts[section] || 0;
     const sectionRaw = sectionItems.reduce((sum, item) => {
-      // ✅ Use discounted_total if item has its own discount
-      const itemTotal = (item.discount_percent && item.discount_percent > 0)
-        ? (item.discounted_total || item.line_total || 0)
-        : (item.line_total || 0);
-      const subTotal = (item.subItems || []).reduce((s, sub) =>
-        s + ((sub.discount_percent && sub.discount_percent > 0)
-          ? (sub.discounted_total || sub.line_total || 0)
-          : (sub.line_total || 0)), 0);
-      return sum + itemTotal + subTotal;
+      const itemRaw = (item.amount || 0) * (item.quantity || 1);
+      const subRaw = (item.subItems || []).reduce((s, sub) =>
+        s + (sub.amount || 0) * (sub.quantity || 1), 0);
+      return sum + itemRaw + subRaw;
     }, 0);
     return total + sectionRaw * (1 - sectionDiscountPct / 100);
   }, 0);
@@ -1033,30 +1023,16 @@ export default function CreateInvoicePage() {
             if (sectionItems.length === 0) return null;
 
             const sectionSubtotal = sectionItems.reduce((sum, item) => {
-              // ✅ Use discounted_total if item has its own discount
-              const itemTotal = (item.discount_percent && item.discount_percent > 0)
-                ? (item.discounted_total || item.line_total || 0)
-                : (item.line_total || 0);
-              const subTotal = (item.subItems || []).reduce((s, sub) =>
-                s + ((sub.discount_percent && sub.discount_percent > 0)
-                  ? (sub.discounted_total || sub.line_total || 0)
-                  : (sub.line_total || 0)), 0);
-              return sum + itemTotal + subTotal;
+              const itemRaw = (item.amount || 0) * (item.quantity || 1);
+              const subRaw = (item.subItems || []).reduce((s, sub) =>
+                s + (sub.amount || 0) * (sub.quantity || 1), 0);
+              return sum + itemRaw + subRaw;
             }, 0);
 
-            const sectionDiscounted = sectionItems.reduce((sum, item) => {
-              const itemTotal = (item.discount_percent && item.discount_percent > 0)
-                ? (item.discounted_total || item.line_total || 0)
-                : (item.line_total || 0);
-              const subTotal = (item.subItems || []).reduce((s, sub) => {
-                return s + ((sub.discount_percent && sub.discount_percent > 0)
-                  ? (sub.discounted_total || sub.line_total || 0)
-                  : (sub.line_total || 0));
-              }, 0);
-              return sum + itemTotal + subTotal;
-            }, 0);
-
-            const sectionDiscount = sectionSubtotal - sectionDiscounted;
+            const sectionAfterItemDiscounts = sectionSubtotal; // no per-item discounts
+            const itemDiscountTotal = 0;
+            const hasItemDiscount = false;
+            const sectionDiscount = 0;
 
             return (
               <div key={section} className="mb-6">
@@ -1230,7 +1206,7 @@ export default function CreateInvoicePage() {
                   const sectionDiscountPct = sectionDiscounts[section] || 0;
                   const sectionDiscountAmt = sectionSubtotal * (sectionDiscountPct / 100);
                   const sectionTotal = sectionSubtotal - sectionDiscountAmt;
-                  const hasItemDiscount = sectionDiscount > 0;
+                  const hasItemDiscount = itemDiscountTotal > 0;
 
                   return (
                     <div className="flex justify-end mt-2 mb-4">
@@ -1265,28 +1241,9 @@ export default function CreateInvoicePage() {
                                       value={sectionDiscountPct || ''}
                                       onChange={(e) => {
                                         const pct = parseFloat(e.target.value) || 0;
-                                        const prevSectionPct = sectionDiscounts[section] || 0;
                                         setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
                                         setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
-                                        setItems(prevItems => prevItems.map(item => {
-                                          if ((item.section || 'Furniture') !== section) return item;
-                                          const itemDisc = item.discount_percent || 0;
-                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevSectionPct) ? item : {
-                                            ...item,
-                                            discount_percent: pct,
-                                            discounted_total: pct > 0 ? (item.quantity || 1) * (item.amount || 0) * (1 - pct / 100) : (item.quantity || 1) * (item.amount || 0),
-                                          };
-                                          const updatedSubItems = (item.subItems || []).map(sub => {
-                                            const subDisc = sub.discount_percent || 0;
-                                            if (subDisc > 0 && subDisc !== prevSectionPct) return sub;
-                                            return {
-                                              ...sub,
-                                              discount_percent: pct,
-                                              discounted_total: pct > 0 ? (sub.quantity || 1) * (sub.amount || 0) * (1 - pct / 100) : (sub.quantity || 1) * (sub.amount || 0),
-                                            };
-                                          });
-                                          return { ...updatedItem, subItems: updatedSubItems };
-                                        }));
+                                        // ✅ Do NOT write discount_percent into items
                                       }}
                                       className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"
                                       min="0" max="100" step="0.1" placeholder="0"
@@ -1305,22 +1262,9 @@ export default function CreateInvoicePage() {
                                       onBlur={(e) => {
                                         const amtVal = parseFloat(e.target.value) || 0;
                                         const pct = sectionSubtotal > 0 ? (amtVal / sectionSubtotal) * 100 : 0;
-                                        const prevSectionPct = sectionDiscounts[section] || 0;
                                         setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
                                         setSectionDiscountAmounts(prev => ({ ...prev, [section]: amtVal > 0 ? amtVal.toFixed(2) : '' }));
-                                        setItems(prevItems => prevItems.map(item => {
-                                          if ((item.section || 'Furniture') !== section) return item;
-                                          const itemDisc = item.discount_percent || 0;
-                                          if (itemDisc > 0 && itemDisc !== prevSectionPct) return item;
-                                          const qty = item.quantity || 1;
-                                          const amt = item.amount || 0;
-                                          const baseTotal = qty * amt;
-                                          return {
-                                            ...item,
-                                            discount_percent: pct,
-                                            discounted_total: pct > 0 ? baseTotal - baseTotal * (pct / 100) : baseTotal,
-                                          };
-                                        }));
+                                        // ✅ Do NOT write into items
                                       }}
                                       className="border border-gray-300 rounded px-1 py-0.5 w-20 text-right text-xs"
                                       min="0" step="0.01" placeholder="0.00"

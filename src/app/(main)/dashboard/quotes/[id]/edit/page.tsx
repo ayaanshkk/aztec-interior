@@ -751,19 +751,12 @@ export default function EditQuotePage() {
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
     const sectionDiscountPct = sectionDiscounts[section] || 0;
-
     const sectionRaw = sectionItems.reduce((sum, item) => {
-      // ✅ Use discounted_total if item has its own discount
-      const itemTotal = (item.discount_percent && item.discount_percent > 0)
-        ? (item.discounted_total || (item.amount || 0) * (item.quantity || 1))
-        : (item.amount || 0) * (item.quantity || 1);
-      const subTotal = (item.subItems || []).reduce((s, sub) =>
-        s + ((sub.discount_percent && sub.discount_percent > 0)
-          ? (sub.discounted_total || (sub.amount || 0) * (sub.quantity || 1))
-          : (sub.amount || 0) * (sub.quantity || 1)), 0);
-      return sum + itemTotal + subTotal;
+      const itemRaw = (item.amount || 0) * (item.quantity || 1);
+      const subRaw = (item.subItems || []).reduce((s, sub) =>
+        s + (sub.amount || 0) * (sub.quantity || 1), 0);
+      return sum + itemRaw + subRaw;
     }, 0);
-
     return total + sectionRaw * (1 - sectionDiscountPct / 100);
   }, 0);
 
@@ -1140,31 +1133,15 @@ export default function EditQuotePage() {
 
             // ✅ Section totals
             const sectionSubtotal = indexedItems.reduce((sum, { item }) => {
-              // ✅ Use discounted_total if item has its own discount
-              const itemTotal = (item.discount_percent && item.discount_percent > 0)
-                ? (item.discounted_total || (item.amount || 0) * (item.quantity || 1))
-                : (item.amount || 0) * (item.quantity || 1);
-              const subTotal = (item.subItems || []).reduce((s, sub) =>
-                s + ((sub.discount_percent && sub.discount_percent > 0)
-                  ? (sub.discounted_total || (sub.amount || 0) * (sub.quantity || 1))
-                  : (sub.amount || 0) * (sub.quantity || 1)), 0);
-              return sum + itemTotal + subTotal;
-            }, 0);
-            
-            const sectionDiscounted = indexedItems.reduce((sum, { item }) => {
-              const itemTotal = (item.discount_percent && item.discount_percent > 0)
-                ? (item.discounted_total || (item.amount || 0) * (item.quantity || 1))
-                : (item.amount || 0) * (item.quantity || 1);
-              const subTotal = (item.subItems || []).reduce((s, sub) => {
-                return s + ((sub.discount_percent && sub.discount_percent > 0)
-                  ? (sub.discounted_total || (sub.amount || 0) * (sub.quantity || 1))
-                  : (sub.amount || 0) * (sub.quantity || 1));
-              }, 0);
-              return sum + itemTotal + subTotal;
+              const itemRaw = (item.amount || 0) * (item.quantity || 1);
+              const subRaw = (item.subItems || []).reduce((s, sub) =>
+                s + (sub.amount || 0) * (sub.quantity || 1), 0);
+              return sum + itemRaw + subRaw;
             }, 0);
 
-            const sectionDiscount = sectionSubtotal - sectionDiscounted;
-            const hasDiscount = sectionDiscount > 0;
+            const sectionAfterItemDiscounts = sectionSubtotal; // no per-item discounts
+            const itemDiscountTotal = 0;
+            const hasItemDiscount = false;
 
             return (
               <div key={section} className="mb-6">
@@ -1327,7 +1304,6 @@ export default function EditQuotePage() {
                   const sectionDiscountPct = sectionDiscounts[section] || 0;
                   const sectionDiscountAmt = sectionSubtotal * (sectionDiscountPct / 100);
                   const sectionTotal = sectionSubtotal - sectionDiscountAmt;
-                  const hasItemDiscount = sectionDiscount > 0;
 
                   return (
                     <div className="flex justify-end mt-2 mb-2">
@@ -1347,7 +1323,7 @@ export default function EditQuotePage() {
                                 Item Discounts
                               </td>
                               <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
-                                -{formatCurrency(sectionDiscount)}
+                                -{formatCurrency(itemDiscountTotal)}
                               </td>
                             </tr>
                           )}
@@ -1362,29 +1338,9 @@ export default function EditQuotePage() {
                                       value={sectionDiscountPct ? parseFloat(sectionDiscountPct.toFixed(2)) : ''}
                                       onChange={(e) => {
                                         const pct = parseFloat(e.target.value) || 0;
-                                        const prevSectionPct = sectionDiscounts[section] || 0;
                                         setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
                                         setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
-                                        setItems(prevItems => prevItems.map(item => {
-                                          if ((item.section || 'Furniture') !== section) return item;
-                                          const itemDisc = item.discount_percent || 0;
-                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevSectionPct) ? item : {
-                                            ...item,
-                                            discount_percent: pct,
-                                            discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
-                                          };
-                                          // Also update sub-items
-                                          const updatedSubItems = (item.subItems || []).map(sub => {
-                                            const subDisc = sub.discount_percent || 0;
-                                            if (subDisc > 0 && subDisc !== prevSectionPct) return sub;
-                                            return {
-                                              ...sub,
-                                              discount_percent: pct,
-                                              discounted_total: calculateDiscountedTotal(sub.quantity || 1, sub.amount || 0, pct),
-                                            };
-                                          });
-                                          return { ...updatedItem, subItems: updatedSubItems };
-                                        }));
+                                        // ✅ Do NOT write discount_percent into items
                                       }}
                                       className="border border-gray-300 rounded px-1 py-0.5 w-20 text-right text-xs"
                                       min="0"
@@ -1410,28 +1366,9 @@ export default function EditQuotePage() {
                                       onBlur={(e) => {
                                         const amtVal = parseFloat(e.target.value) || 0;
                                         const pct = sectionSubtotal > 0 ? (amtVal / sectionSubtotal) * 100 : 0;
-                                        const prevSectionPct = sectionDiscounts[section] || 0;
                                         setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
                                         setSectionDiscountAmounts(prev => ({ ...prev, [section]: amtVal > 0 ? amtVal.toFixed(2) : '' }));
-                                        setItems(prevItems => prevItems.map(item => {
-                                          if ((item.section || 'Furniture') !== section) return item;
-                                          const itemDisc = item.discount_percent || 0;
-                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevSectionPct) ? item : {
-                                            ...item,
-                                            discount_percent: pct,
-                                            discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
-                                          };
-                                          const updatedSubItems = (item.subItems || []).map(sub => {
-                                            const subDisc = sub.discount_percent || 0;
-                                            if (subDisc > 0 && subDisc !== prevSectionPct) return sub;
-                                            return {
-                                              ...sub,
-                                              discount_percent: pct,
-                                              discounted_total: calculateDiscountedTotal(sub.quantity || 1, sub.amount || 0, pct),
-                                            };
-                                          });
-                                          return { ...updatedItem, subItems: updatedSubItems };
-                                        }));
+                                        // ✅ Do NOT write into items
                                       }}
                                       className="border border-gray-300 rounded px-1 py-0.5 w-24 text-right text-xs"
                                       min="0"

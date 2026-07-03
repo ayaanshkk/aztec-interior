@@ -494,10 +494,10 @@ export default function EditInvoicePage() {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
     const sectionDiscountPct = sectionDiscounts[section] || 0;
     const sectionRaw = sectionItems.reduce((sum, item) => {
-      const itemTotal = (item.amount || 0) * (item.quantity || 1);
-      const subTotal = (item.subItems || []).reduce((s, sub) =>
+      const itemRaw = (item.amount || 0) * (item.quantity || 1);
+      const subRaw = (item.subItems || []).reduce((s, sub) =>
         s + (sub.amount || 0) * (sub.quantity || 1), 0);
-      return sum + itemTotal + subTotal;
+      return sum + itemRaw + subRaw;
     }, 0);
     return total + sectionRaw * (1 - sectionDiscountPct / 100);
   }, 0);
@@ -744,17 +744,18 @@ export default function EditInvoicePage() {
             if (sectionItems.length === 0) return null;
 
             const sectionSubtotal = sectionItems.reduce((sum, item) => {
-              return sum + (item.line_total || 0) + (item.subItems || []).reduce((s, sub) => s + (sub.line_total || 0), 0);
+              const itemRaw = (item.amount || 0) * (item.quantity || 1);
+              const subRaw = (item.subItems || []).reduce((s, sub) =>
+                s + (sub.amount || 0) * (sub.quantity || 1), 0);
+              return sum + itemRaw + subRaw;
             }, 0);
-            const sectionDiscounted = sectionItems.reduce((sum, item) => {
-              const it = (item.discount_percent && item.discount_percent > 0) ? (item.discounted_total || item.line_total || 0) : (item.line_total || 0);
-              const st = (item.subItems || []).reduce((s, sub) => s + ((sub.discount_percent && sub.discount_percent > 0) ? (sub.discounted_total || sub.line_total || 0) : (sub.line_total || 0)), 0);
-              return sum + it + st;
-            }, 0);
-            const sectionItemDiscount = sectionSubtotal - sectionDiscounted;
-            const sectionDiscountPct  = sectionDiscounts[section] || 0;
-            const sectionDiscountAmt  = sectionSubtotal * (sectionDiscountPct / 100);
-            const sectionTotal        = sectionSubtotal - sectionDiscountAmt;
+
+            const sectionAfterItemDiscounts = sectionSubtotal; // no per-item discounts
+            const itemDiscountTotal = 0;
+            const hasItemDiscount = false;
+            const sectionDiscountPct = sectionDiscounts[section] || 0;
+            const sectionDiscountAmt = sectionSubtotal * (sectionDiscountPct / 100);
+            const sectionTotal = sectionSubtotal - sectionDiscountAmt;
 
             return (
               <div key={section} className="mb-6">
@@ -929,10 +930,10 @@ export default function EditInvoicePage() {
                         <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs">{section} Subtotal</td>
                         <td className="border border-gray-300 px-3 py-1 text-right text-xs">{fmt(sectionSubtotal)}</td>
                       </tr>
-                      {sectionItemDiscount > 0 && (
+                      {hasItemDiscount && (
                         <tr>
                           <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs text-red-600">Item Discounts</td>
-                          <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">-{fmt(sectionItemDiscount)}</td>
+                          <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">-{fmt(itemDiscountTotal)}</td>
                         </tr>
                       )}
                       <tr>
@@ -944,28 +945,9 @@ export default function EditInvoicePage() {
                                 <Input type="number" value={sectionDiscountPct || ""}
                                       onChange={(e) => {
                                         const pct = parseFloat(e.target.value) || 0;
-                                        const prevSectionPct = sectionDiscounts[section] || 0;
                                         setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
                                         setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
-                                        setItems(prevItems => prevItems.map(item => {
-                                          if ((item.section || 'Furniture') !== section) return item;
-                                          const itemDisc = item.discount_percent || 0;
-                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevSectionPct) ? item : {
-                                            ...item,
-                                            discount_percent: pct,
-                                            discounted_total: pct > 0 ? (item.quantity || 1) * (item.amount || 0) * (1 - pct / 100) : (item.quantity || 1) * (item.amount || 0),
-                                          };
-                                          const updatedSubItems = (item.subItems || []).map(sub => {
-                                            const subDisc = sub.discount_percent || 0;
-                                            if (subDisc > 0 && subDisc !== prevSectionPct) return sub;
-                                            return {
-                                              ...sub,
-                                              discount_percent: pct,
-                                              discounted_total: pct > 0 ? (sub.quantity || 1) * (sub.amount || 0) * (1 - pct / 100) : (sub.quantity || 1) * (sub.amount || 0),
-                                            };
-                                          });
-                                          return { ...updatedItem, subItems: updatedSubItems };
-                                        }));
+                                        // ✅ Do NOT write discount_percent into items
                                       }}
                                   className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"
                                   min="0" max="100" step="0.1" placeholder="0" />
@@ -982,6 +964,7 @@ export default function EditInvoicePage() {
                                     const pct = sectionSubtotal > 0 ? (amt / sectionSubtotal) * 100 : 0;
                                     setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
                                     setSectionDiscountAmounts(prev => ({ ...prev, [section]: "" }));
+                                    // ✅ Do NOT write into items
                                   }}
                                   className="border border-gray-300 rounded px-1 py-0.5 w-20 text-right text-xs"
                                   min="0" step="0.01" placeholder="0.00" />

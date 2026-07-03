@@ -152,22 +152,12 @@ export default function ViewQuotePage() {
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
     const sectionDiscountPct = sectionDiscountsData[section] || 0;
-
     const sectionRaw = sectionItems.reduce((sum, item) => {
-      // ✅ Use discounted_total/discounted_amount if item has its own discount
-      const lineTotal = (item.amount || 0) * (item.quantity || 1);
-      const itemTotal = (item.discount_percent && item.discount_percent > 0)
-        ? (item.discounted_total || item.discounted_amount || lineTotal)
-        : lineTotal;
-      const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) => {
-        const subLine = (sub.amount || 0) * (sub.quantity || 1);
-        return s + ((sub.discount_percent && sub.discount_percent > 0)
-          ? (sub.discounted_total || sub.discounted_amount || subLine)
-          : subLine);
-      }, 0);
-      return sum + itemTotal + subTotal;
+      const itemRaw = (item.amount || 0) * (item.quantity || 1);
+      const subRaw = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
+        s + (sub.amount || 0) * (sub.quantity || 1), 0);
+      return sum + itemRaw + subRaw;
     }, 0);
-
     return total + sectionRaw * (1 - sectionDiscountPct / 100);
   }, 0);
 
@@ -337,36 +327,17 @@ export default function ViewQuotePage() {
 
               // ✅ Section totals
               const sectionSubtotal = sectionItems.reduce((sum, item) => {
-                // ✅ Use discounted_total/discounted_amount if item has its own discount
-                const lineTotal = (item.amount || 0) * (item.quantity || 1);
-                const itemTotal = (item.discount_percent && item.discount_percent > 0)
-                  ? (item.discounted_total || item.discounted_amount || lineTotal)
-                  : lineTotal;
-                const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) => {
-                  const subLine = (sub.amount || 0) * (sub.quantity || 1);
-                  return s + ((sub.discount_percent && sub.discount_percent > 0)
-                    ? (sub.discounted_total || sub.discounted_amount || subLine)
-                    : subLine);
-                }, 0);
-                return sum + itemTotal + subTotal;
+                const itemRaw = (item.amount || 0) * (item.quantity || 1);
+                const subRaw = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
+                  s + (sub.amount || 0) * (sub.quantity || 1), 0);
+                return sum + itemRaw + subRaw;
               }, 0);
 
-              const sectionDiscounted = sectionItems.reduce((sum, item) => {
-                const lineTotal = (item.amount || 0) * (item.quantity || 1);
-                const itemTotal = (item.discount_percent && item.discount_percent > 0)
-                  ? (item.discounted_total || item.discounted_amount || lineTotal)
-                  : lineTotal;
-                const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) => {
-                  const subLine = (sub.amount || 0) * (sub.quantity || 1);
-                  return s + ((sub.discount_percent && sub.discount_percent > 0)
-                    ? (sub.discounted_total || sub.discounted_amount || subLine)
-                    : subLine);
-                }, 0);
-                return sum + itemTotal + subTotal;
-              }, 0);
-
-              const sectionDiscount = sectionSubtotal - sectionDiscounted;
-              const hasDiscount = sectionDiscount > 0;
+              const sectionAfterItemDiscounts = sectionSubtotal; // no per-item discounts
+              const itemDiscountTotal = 0;
+              const hasItemDiscount = false;
+              const sectionDiscount = 0;
+              const hasDiscount = false;
 
               return (
                 <div key={section} className="mb-6">
@@ -408,31 +379,37 @@ export default function ViewQuotePage() {
                   <div className="flex justify-end mt-2">
                     <table className="border-collapse" style={{ width: '35%' }}>
                       <tbody>
-                        <tr>
-                          <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-sm">{section} Subtotal</td>
-                          <td className="border border-gray-300 px-3 py-1 text-right text-sm">{formatCurrency(sectionSubtotal)}</td>
-                        </tr>
-                        {hasDiscount && (
-                          <tr>
-                            <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-sm text-red-600">Discount</td>
-                            <td className="border border-gray-300 px-3 py-1 text-right text-sm text-red-600">-{formatCurrency(sectionDiscount)}</td>
-                          </tr>
-                        )}
                         {(() => {
                           const secDiscPct = sectionDiscountsData[section] || 0;
-                          const secDiscAmt = sectionDiscounted * (secDiscPct / 100);
-                          const secTotal = sectionDiscounted - secDiscAmt;
+                          const secDiscAmt = sectionSubtotal * (secDiscPct / 100);
+                          const secTotal = sectionSubtotal - secDiscAmt;
                           return (
                             <>
+                              <tr>
+                                <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-sm">
+                                  {section} Subtotal
+                                </td>
+                                <td className="border border-gray-300 px-3 py-1 text-right text-sm">
+                                  {formatCurrency(sectionSubtotal)}
+                                </td>
+                              </tr>
                               {secDiscPct > 0 && (
                                 <tr>
-                                  <td className="border border-gray-300 px-3 py-1 text-sm text-red-600">Section Discount</td>
-                                  <td className="border border-gray-300 px-3 py-1 text-right text-sm text-red-600">-{formatCurrency(secDiscAmt)}</td>
+                                  <td className="border border-gray-300 px-3 py-1 text-sm text-red-600">
+                                    Section Discount
+                                  </td>
+                                  <td className="border border-gray-300 px-3 py-1 text-right text-sm text-red-600">
+                                    -{formatCurrency(secDiscAmt)}
+                                  </td>
                                 </tr>
                               )}
                               <tr>
-                                <td className="border border-gray-300 px-3 py-1 font-bold bg-gray-100 text-sm">{section} Total</td>
-                                <td className="border border-gray-300 px-3 py-1 text-right font-bold text-sm">{formatCurrency(secTotal)}</td>
+                                <td className="border border-gray-300 px-3 py-1 font-bold bg-gray-100 text-sm">
+                                  {section} Total
+                                </td>
+                                <td className="border border-gray-300 px-3 py-1 text-right font-bold text-sm">
+                                  {formatCurrency(secTotal)}
+                                </td>
                               </tr>
                             </>
                           );
