@@ -79,6 +79,9 @@ export default function CreateInvoicePage() {
   const [roomName, setRoomName] = useState('');
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
+  const doorRoomSetByLoad = useRef(false);
+  const itemsLoadedFromQuote = useRef(false);
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
@@ -100,6 +103,15 @@ export default function CreateInvoicePage() {
       if (raw) {
         try {
           const q = JSON.parse(raw);
+          console.table(q.items?.slice(0, 5).map((i: any) => ({
+            item: i.item,
+            amount: i.amount,
+            unit_price: i.unit_price,
+            qty: i.quantity,
+            disc_pct: i.discount_percent,
+            discounted_total: i.discounted_total,
+            line_total: i.line_total,
+          })));
           localStorage.removeItem("invoiceFromQuote"); // consume immediately
 
           if (customerIdParam) setCustomerId(customerIdParam);
@@ -113,9 +125,15 @@ export default function CreateInvoicePage() {
             email:   q.customer_email   || "",
           }));
 
-          if (q.room_name)        setRoomName(q.room_name);
-          if (q.door_type)        setDoorType(q.door_type);
-          if (q.room_type)        setRoomType(q.room_type);
+          if (q.door_type) {
+            doorRoomSetByLoad.current = true;
+            setDoorType(q.door_type);
+          }
+          if (q.room_type) {
+            doorRoomSetByLoad.current = true;
+            setRoomType(q.room_type);
+          }
+          setRoomName(q.room_name || "");
           if (q.carcass_colour)   setCarcassColour(q.carcass_colour);
           if (q.door_colour)      setDoorColour(q.door_colour);
           if (q.panelwork_colour) setPanelworkColour(q.panelwork_colour);
@@ -164,6 +182,7 @@ export default function CreateInvoicePage() {
               };
             });
             setItems(mapped);
+            itemsLoadedFromQuote.current = true;
           }
         } catch (e) {
           console.error("Failed to load quote data:", e);
@@ -191,10 +210,16 @@ export default function CreateInvoicePage() {
 
   // Update all prices when door/room type changes
   useEffect(() => {
+    if (doorRoomSetByLoad.current) {
+      doorRoomSetByLoad.current = false;
+      return;
+    }
+    if (itemsLoadedFromQuote.current) {
+      return;
+    }
     const updateAllPrices = async () => {
       const token = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
-
       const currentItems = itemsRef.current;
       const hasItemsWithCodes = currentItems.some(item => item.item && item.item.trim().length > 0);
       if (!hasItemsWithCodes) return;
@@ -243,11 +268,19 @@ export default function CreateInvoicePage() {
         prevItems.map((item) => {
           const result = results.find((r) => r && r.id === item.id);
           if (result) {
+            const newAmount = result.price;
+            const qty = item.quantity || 1;
+            const lineTotal = newAmount * qty;
+            const discPct = item.discount_percent || 0;
+            const discountedTotal = discPct > 0
+              ? lineTotal - lineTotal * (discPct / 100)
+              : lineTotal;
             return {
               ...item,
-              amount: result.price,
-              description: result.description,
-              line_total: result.price * (item.quantity || 1),
+              amount: newAmount,
+              description: result.description || item.description,
+              line_total: lineTotal,
+              discounted_total: discountedTotal,
             };
           }
           return item;
@@ -698,29 +731,31 @@ export default function CreateInvoicePage() {
 
     const subtotalBeforeDiscount = SECTIONS.reduce((total, section) => {
       const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-      const sectionTotal = sectionItems.reduce((sum, item) => {
-        const itemTotal = (item.discount_percent && item.discount_percent > 0)
-          ? (item.discounted_total ?? (item.amount || 0) * (item.quantity || 1))
-          : (item.amount || 0) * (item.quantity || 1);
-        const subTotal = (item.subItems || []).reduce((s, sub) =>
-          s + ((sub.discount_percent && sub.discount_percent > 0)
-            ? (sub.discounted_total ?? (sub.amount || 0) * (sub.quantity || 1))
-            : (sub.amount || 0) * (sub.quantity || 1)), 0);
+      return total + sectionItems.reduce((sum, item) => {
+        const qty = item.quantity || 1;
+        const amt = item.amount || 0;
+        const pct = item.discount_percent || 0;
+        const itemTotal = pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty;
+        const subTotal = (item.subItems || []).reduce((s, sub) => {
+          const sQty = sub.quantity || 1;
+          const sAmt = sub.amount || 0;
+          const sPct = sub.discount_percent || 0;
+          return s + (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty);
+        }, 0);
         return sum + itemTotal + subTotal;
       }, 0);
-      return total + sectionTotal;
     }, 0);
 
-    const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
-    const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
+    const globalDiscountAmount = Math.round(subtotalBeforeDiscount * (globalDiscountPercent / 100) * 100) / 100;
+    const subtotal = Math.round((subtotalBeforeDiscount - globalDiscountAmount) * 100) / 100;
 
     if (subtotal <= 0) { alert("Please add at least one item with a valid price"); return; }
 
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
-      const vat = subtotal * (vatPercentage / 100);
-      const total = subtotal + vat;
+      const vat = Math.round(subtotal * (vatPercentage / 100) * 100) / 100;
+      const total = Math.round((subtotal + vat) * 100) / 100;
 
       const response = await fetch(`${API_FORM}/invoices`, {
         method: "POST",
@@ -805,22 +840,25 @@ export default function CreateInvoicePage() {
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
     const sectionTotal = sectionItems.reduce((sum, item) => {
-      const itemTotal = (item.discount_percent && item.discount_percent > 0)
-        ? (item.discounted_total ?? (item.amount || 0) * (item.quantity || 1))
-        : (item.amount || 0) * (item.quantity || 1);
-      const subTotal = (item.subItems || []).reduce((s, sub) =>
-        s + ((sub.discount_percent && sub.discount_percent > 0)
-          ? (sub.discounted_total ?? (sub.amount || 0) * (sub.quantity || 1))
-          : (sub.amount || 0) * (sub.quantity || 1)), 0);
+      const qty = item.quantity || 1;
+      const amt = item.amount || 0;
+      const pct = item.discount_percent || 0;
+      const itemTotal = pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty;
+      const subTotal = (item.subItems || []).reduce((s, sub) => {
+        const sQty = sub.quantity || 1;
+        const sAmt = sub.amount || 0;
+        const sPct = sub.discount_percent || 0;
+        return s + (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty);
+      }, 0);
       return sum + itemTotal + subTotal;
     }, 0);
     return total + sectionTotal;
   }, 0);
 
-  const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
-  const subtotal = subtotalAfterSectionDiscounts - globalDiscountAmount;
-  const vat = subtotal * (vatPercentage / 100);
-  const total = subtotal + vat;
+  const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
+  const subtotal = Math.round((subtotalAfterSectionDiscounts - globalDiscountAmount) * 100) / 100;
+  const vat = Math.round(subtotal * (vatPercentage / 100) * 100) / 100;
+  const total = Math.round((subtotal + vat) * 100) / 100;
 
   return (
     <div className="min-h-screen bg-white">
@@ -903,7 +941,7 @@ export default function CreateInvoicePage() {
               <option value="Basic Slab">Slab</option>
               <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
               <option value="Timber">Timber</option>
-              <option value="Vinyl">Vinyl</option>
+              <option value="Vinyl Doors">Vinyl</option>
               <option value="Black Glass">Black Glass</option>
             </select>
           </div>

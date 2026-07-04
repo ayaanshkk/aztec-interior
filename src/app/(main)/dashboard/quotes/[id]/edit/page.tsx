@@ -40,7 +40,10 @@ export default function EditQuotePage() {
   const [quotation, setQuotation] = useState<any>(null);
   const [items, setItems] = useState<QuoteItem[]>([]);
   const itemsRef = useRef<QuoteItem[]>([]);
+  const originalItemsRef = useRef<QuoteItem[]>([]);
+  const originalDoorType = useRef<string>('');
   useEffect(() => { itemsRef.current = items; }, [items]);
+  const doorRoomSetByLoad = useRef(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [autoFilling, setAutoFilling] = useState<number | null>(null);
@@ -94,29 +97,56 @@ export default function EditQuotePage() {
   useEffect(() => {
     const urlDoorType = searchParams.get("doorType");
     const urlRoomType = searchParams.get("roomType");
-    
     if (urlDoorType) {
+      doorRoomSetByLoad.current = true;
       setDoorType(urlDoorType);
-      console.log('🚪 Door type from URL:', urlDoorType);
+      originalDoorType.current = urlDoorType;
     }
     if (urlRoomType) {
+      doorRoomSetByLoad.current = true;
       setRoomType(urlRoomType);
-      console.log('🏠 Room type from URL:', urlRoomType);
     }
   }, [searchParams]);
- 
+
   useEffect(() => {
     fetchQuotation();
   }, [quoteId]);
 
   // ✅ NEW: Update all prices when door type or room type changes
   useEffect(() => {
+    if (doorRoomSetByLoad.current) {
+      doorRoomSetByLoad.current = false;
+      return;
+    }
+
     const updateAllPrices = async () => {
       if (items.length === 0 || loading) return;
 
+      // ✅ If user returned to original door type, restore saved prices instead of re-fetching
+      if (doorType === originalDoorType.current && originalItemsRef.current.length > 0) {
+        setItems(prevItems =>
+          prevItems.map((item, index) => {
+            const original = originalItemsRef.current[index];
+            if (!original) return item;
+            return {
+              ...item,
+              amount: original.amount,
+              description: original.description,
+              width: original.width,
+              height: original.height,
+              depth: original.depth,
+              line_total: (item.quantity || 1) * original.amount,
+              discounted_total: item.discount_percent && item.discount_percent > 0
+                ? calculateDiscountedTotal(item.quantity || 1, original.amount, item.discount_percent)
+                : (item.quantity || 1) * original.amount,
+            };
+          })
+        );
+        return;
+      }
+
       const token = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
-
       const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW', 'FITTING'];
 
       const updatePromises = items.map(async (item, index) => {
@@ -129,7 +159,6 @@ export default function EditQuotePage() {
         const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
 
         const requestBody: any = { description: itemCode };
-
         if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
@@ -147,22 +176,13 @@ export default function EditQuotePage() {
             },
             body: JSON.stringify(requestBody),
           });
-
           const data = await response.json();
-
           if (data.found) {
             let autoDescription = data.description || data.item_name || '';
             if (isApplianceCode && data.brand && data.series_level) {
               autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
             }
-            return {
-              index,
-              price: data.price,
-              description: autoDescription,
-              width: data.width,
-              height: data.height,
-              depth: data.depth,
-            };
+            return { index, price: data.price, description: autoDescription, width: data.width, height: data.height, depth: data.depth };
           }
           return null;
         } catch (error) {
@@ -177,17 +197,19 @@ export default function EditQuotePage() {
         prevItems.map((item, index) => {
           const result = results.find((r) => r && r.index === index);
           if (result) {
+            const newAmount = result.price;
+            const qty = item.quantity || 1;
+            const lineTotal = newAmount * qty;
+            const discPct = item.discount_percent || 0;
             return {
               ...item,
-              amount: result.price,
+              amount: newAmount,
               description: result.description || item.description,
               width: result.width,
               height: result.height,
               depth: result.depth,
-              line_total: result.price * (item.quantity || 1),
-              discounted_total: item.discount_percent
-                ? calculateDiscountedTotal(item.quantity || 1, result.price, item.discount_percent)
-                : result.price * (item.quantity || 1),
+              line_total: lineTotal,
+              discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
             };
           }
           return item;
@@ -199,7 +221,7 @@ export default function EditQuotePage() {
     if (hasItemsWithCodes && !loading) {
       updateAllPrices();
     }
-  }, [doorType, roomType]);// Re-run whenever doorType or roomType changes
+  }, [doorType, roomType]);
  
   const fetchQuotation = async () => {
     try {
@@ -253,6 +275,7 @@ export default function EditQuotePage() {
           })),
         }));
         setItems(itemsWithTotals);
+        originalItemsRef.current = itemsWithTotals;
 
         if (data.global_discount_percent) {
           setGlobalDiscountPercent(data.global_discount_percent);
@@ -266,8 +289,15 @@ export default function EditQuotePage() {
         }
         const urlDoorType = searchParams.get("doorType");
         const urlRoomType = searchParams.get("roomType");
-        if (!urlDoorType && data.door_type) setDoorType(data.door_type);
-        if (!urlRoomType && data.room_type) setRoomType(data.room_type);
+        if (!urlDoorType && data.door_type) {
+          doorRoomSetByLoad.current = true;
+          setDoorType(data.door_type);
+          originalDoorType.current = data.door_type;  // ← ADD THIS
+        }
+        if (!urlRoomType && data.room_type) {
+          doorRoomSetByLoad.current = true; // ← ADD
+          setRoomType(data.room_type);
+        }
         setCarcassColour(data.carcass_colour || '');
         setDoorColour(data.door_colour || '');
         setPanelworkColour(data.panelwork_colour || '');
@@ -648,8 +678,8 @@ export default function EditQuotePage() {
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
-      const vat = subtotal * (vatPercentage / 100);
-      const total = subtotal + vat;
+      const vat = Math.round(subtotal * (vatPercentage / 100) * 100) / 100;
+      const total = Math.round((subtotal + vat) * 100) / 100;
 
       const response = await fetch(`${BACKEND_URL}/quotations/${quoteId}`, {
         method: "PUT",
@@ -750,18 +780,21 @@ export default function EditQuotePage() {
   // ✅ ADD CALCULATIONS HERE - BEFORE THE RETURN
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    const sectionTotal = sectionItems.reduce((sum, item) => {
-      const itemTotal = (item.discount_percent && item.discount_percent > 0)
-        ? (item.discounted_total ?? (item.amount || 0) * (item.quantity || 1))
-        : (item.amount || 0) * (item.quantity || 1);
-      const subTotal = (item.subItems || []).reduce((s, sub) =>
-        s + ((sub.discount_percent && sub.discount_percent > 0)
-          ? (sub.discounted_total ?? (sub.amount || 0) * (sub.quantity || 1))
-          : (sub.amount || 0) * (sub.quantity || 1)), 0);
+    return total + sectionItems.reduce((sum, item) => {
+      const qty = item.quantity || 1;
+      const amt = item.amount || 0;
+      const pct = item.discount_percent || 0;
+      const itemTotal = pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty;
+      const subTotal = (item.subItems || []).reduce((s, sub) => {
+        const sQty = sub.quantity || 1;
+        const sAmt = sub.amount || 0;
+        const sPct = sub.discount_percent || 0;
+        return s + (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty);
+      }, 0);
       return sum + itemTotal + subTotal;
     }, 0);
-    return total + sectionTotal;
   }, 0);
+
 
   const handleAddSubItem = (parentIndex: number) => {
     setItems(prevItems => prevItems.map((item, idx) => {
@@ -883,10 +916,10 @@ export default function EditQuotePage() {
     }
   };
 
-  const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
-  const subtotal = subtotalAfterSectionDiscounts - globalDiscountAmount;
-  const vat = subtotal * (vatPercentage / 100);
-  const total = subtotal + vat;
+  const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
+  const subtotal = Math.round((subtotalAfterSectionDiscounts - globalDiscountAmount) * 100) / 100;
+  const vat = Math.round(subtotal * (vatPercentage / 100) * 100) / 100;
+  const total = Math.round((subtotal + vat) * 100) / 100;
  
   return (
     <div className="min-h-screen bg-white">

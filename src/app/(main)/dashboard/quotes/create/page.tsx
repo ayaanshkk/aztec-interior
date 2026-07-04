@@ -76,7 +76,7 @@ export default function CreateQuotePage() {
   const [roomName, setRoomName] = useState('');
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
-  
+  const itemsLoadedFromQuote = useRef(false);  
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
@@ -162,11 +162,16 @@ export default function CreateQuotePage() {
         prevItems.map((item) => {
           const result = results.find((r) => r && r.id === item.id);
           if (result) {
+            const newAmount = result.price;
+            const qty = item.quantity || 1;
+            const lineTotal = newAmount * qty;
+            const discPct = item.discount_percent || 0;
             return {
               ...item,
-              amount: result.price,
-              description: result.description,
-              line_total: result.price * (item.quantity || 1),
+              amount: newAmount,
+              description: result.description || item.description,
+              line_total: lineTotal,
+              discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
             };
           }
           return item;
@@ -730,17 +735,19 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
 
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    const sectionTotal = sectionItems.reduce((sum, item) => {
-      const itemTotal = (item.discount_percent && item.discount_percent > 0)
-        ? (item.discounted_total ?? (item.amount || 0) * (item.quantity || 1))
-        : (item.amount || 0) * (item.quantity || 1);
-      const subTotal = (item.subItems || []).reduce((s, sub) =>
-        s + ((sub.discount_percent && sub.discount_percent > 0)
-          ? (sub.discounted_total ?? (sub.amount || 0) * (sub.quantity || 1))
-          : (sub.amount || 0) * (sub.quantity || 1)), 0);
+    return total + sectionItems.reduce((sum, item) => {
+      const qty = item.quantity || 1;
+      const amt = item.amount || 0;
+      const pct = item.discount_percent || 0;
+      const itemTotal = pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty;
+      const subTotal = (item.subItems || []).reduce((s, sub) => {
+        const sQty = sub.quantity || 1;
+        const sAmt = sub.amount || 0;
+        const sPct = sub.discount_percent || 0;
+        return s + (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty);
+      }, 0);
       return sum + itemTotal + subTotal;
     }, 0);
-    return total + sectionTotal;
   }, 0);
 
   const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);

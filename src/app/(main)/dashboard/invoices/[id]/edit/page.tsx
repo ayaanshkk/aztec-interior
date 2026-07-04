@@ -76,6 +76,7 @@ export default function EditInvoicePage() {
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [doorType,               setDoorType]               = useState("Carcass Only");
   const [roomType,               setRoomType]               = useState("Kitchen");
+  const doorRoomSetByLoad = useRef(false);
 
   const itemsRef         = useRef(items);
   const recalcInProgress = useRef(false);
@@ -105,6 +106,7 @@ export default function EditInvoicePage() {
       setVatPercentage(data.vat_rate || 20);
       setDeposit(data.deposit_paid || 0);
       if (data.section_discounts) setSectionDiscounts(data.section_discounts);
+      doorRoomSetByLoad.current = true; 
       if (data.door_type) setDoorType(data.door_type);
       if (data.room_type) setRoomType(data.room_type);
 
@@ -179,6 +181,12 @@ export default function EditInvoicePage() {
 
   // ── Re-price when door/room type changes ──────────────────────────────────
   useEffect(() => {
+    if (doorRoomSetByLoad.current) {
+      const timer = setTimeout(() => {
+        doorRoomSetByLoad.current = false;
+      }, 100);
+      return () => clearTimeout(timer);
+    }
     const current = itemsRef.current;
     if (current.length === 0 || !current.some(i => i.item && i.item.trim().length > 0)) return;
 
@@ -210,7 +218,17 @@ export default function EditInvoicePage() {
       setItems(prev => prev.map(item => {
         const hit = updates.find(u => u && u.id === item.id);
         if (!hit) return item;
-        return { ...item, amount: hit.price, description: hit.description || item.description, line_total: hit.price * (item.quantity || 1) };
+        const newAmount = hit.price;
+        const qty = item.quantity || 1;
+        const lineTotal = newAmount * qty;
+        const discPct = item.discount_percent || 0;
+        return {
+          ...item,
+          amount: newAmount,
+          description: hit.description || item.description,
+          line_total: lineTotal,
+          discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
+        };
       }));
     };
     updateAllPrices();
@@ -492,23 +510,25 @@ export default function EditInvoicePage() {
   // ── Computed totals ───────────────────────────────────────────────────────
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    const sectionTotal = sectionItems.reduce((sum, item) => {
-      const itemTotal = (item.discount_percent && item.discount_percent > 0)
-        ? (item.discounted_total ?? (item.amount || 0) * (item.quantity || 1))
-        : (item.amount || 0) * (item.quantity || 1);
-      const subTotal = (item.subItems || []).reduce((s, sub) =>
-        s + ((sub.discount_percent && sub.discount_percent > 0)
-          ? (sub.discounted_total ?? (sub.amount || 0) * (sub.quantity || 1))
-          : (sub.amount || 0) * (sub.quantity || 1)), 0);
+    return total + sectionItems.reduce((sum, item) => {
+      const qty = item.quantity || 1;
+      const amt = item.amount || 0;
+      const pct = item.discount_percent || 0;
+      const itemTotal = pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty;
+      const subTotal = (item.subItems || []).reduce((s, sub) => {
+        const sQty = sub.quantity || 1;
+        const sAmt = sub.amount || 0;
+        const sPct = sub.discount_percent || 0;
+        return s + (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty);
+      }, 0);
       return sum + itemTotal + subTotal;
     }, 0);
-    return total + sectionTotal;
   }, 0);
 
-  const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
-  const subtotal = subtotalAfterSectionDiscounts - globalDiscountAmount;
-  const vat = subtotal * (vatPercentage / 100);
-  const total = subtotal + vat;
+  const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
+  const subtotal = Math.round((subtotalAfterSectionDiscounts - globalDiscountAmount) * 100) / 100;
+  const vat = Math.round(subtotal * (vatPercentage / 100) * 100) / 100;
+  const total = Math.round((subtotal + vat) * 100) / 100;
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -660,7 +680,7 @@ export default function EditInvoicePage() {
               <option value="Basic Slab">Slab</option>
               <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
               <option value="Timber">Timber</option>
-              <option value="Vinyl">Vinyl</option>
+              <option value="Vinyl Doors">Vinyl</option>
               <option value="Black Glass">Black Glass</option>
             </select>
           </div>

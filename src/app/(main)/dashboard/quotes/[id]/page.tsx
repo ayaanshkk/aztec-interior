@@ -87,13 +87,28 @@ export default function ViewQuotePage() {
   const handleGenerateInvoice = () => {
     if (!quotation) return;
 
+    const doorTypeMap: Record<string, string> = {
+      'Vinyl Doors': 'Vinyl Doors',   // keep as-is if you standardise dropdowns
+      'Basic Slab': 'Basic Slab',
+      'Acrylic Gloss/Matt': 'Acrylic Gloss/Matt',
+      'Timber': 'Timber',
+      'Black Glass': 'Black Glass',
+      'Carcass Only': 'Carcass Only',
+      // legacy aliases
+      'Vinyl': 'Vinyl Doors',
+      'Slab': 'Basic Slab',
+      'Lacquered Slab': 'Acrylic Gloss/Matt',
+    };
+
+    const mappedDoorType = doorTypeMap[quotation.door_type] || quotation.door_type || 'Carcass Only';
+
     localStorage.setItem("invoiceFromQuote", JSON.stringify({
       customer_name:    quotation.customer_name    || "",
       customer_address: quotation.customer_address || quotation.address || "",
       customer_phone:   quotation.customer_phone   || quotation.phone   || "",
       customer_email:   quotation.customer_email   || quotation.email   || "",
       room_name:        quotation.room_name        || "",
-      door_type:        quotation.door_type        || "Carcass Only",
+      door_type: mappedDoorType,
       room_type:        quotation.room_type        || "Kitchen",
       carcass_colour:   quotation.carcass_colour   || "",
       door_colour:      quotation.door_colour      || "",
@@ -107,7 +122,7 @@ export default function ViewQuotePage() {
         description:      item.description || "",
         color:            item.colour      || item.color     || "",
         quantity:         item.quantity    || 1,
-        amount:           item.unit_price  || item.amount    || 0,
+        amount: item.amount || 0,
         width:            item.width,
         height:           item.height,
         depth:            item.depth,
@@ -118,7 +133,7 @@ export default function ViewQuotePage() {
           description:      sub.description || "",
           color:            sub.colour      || sub.color     || "",
           quantity:         sub.quantity    || 1,
-          amount:           sub.unit_price  || sub.amount    || 0,
+          amount: sub.amount || 0,
           discount_percent: sub.discount_percent || 0,
         })),
       })),
