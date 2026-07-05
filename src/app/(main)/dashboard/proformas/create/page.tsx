@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import Image from 'next/image';
 
 const API_FORM = `${BACKEND_URL}/api/form`;
 
-interface InvoiceItem {
+interface ProformaItem {
   id: string;
   item: string;
   description: string;
@@ -24,48 +24,64 @@ interface InvoiceItem {
   line_total: number;
   discount_percent?: number;
   discounted_total?: number;
+  autoFitting?: boolean;
+  subItems?: ProformaItem[];
+  section?: string;
 }
 
+const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings'] as const;
+
 export default function CreateProformaPage() {
-  const router       = useRouter();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const { user }     = useAuth();
+  const { user } = useAuth();
 
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     invoice_date: new Date().toISOString().split("T")[0],
     due_date:     new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-    name:    "",
+    name: "",
     address: "",
-    phone:   "",
-    email:   "",
+    phone: "",
+    email: "",
   });
 
-  const [items, setItems] = useState<InvoiceItem[]>([{
+  const [items, setItems] = useState<ProformaItem[]>([{
     id: "1", item: "", description: "", color: "",
-    quantity: 1, amount: 0, line_total: 0, discount_percent: 0, discounted_total: 0,
+    quantity: 1, amount: 0, line_total: 0,
+    discount_percent: 0, discounted_total: 0, section: 'Furniture',
   }]);
 
-  const [saving,                setSaving]                = useState(false);
-  const [autoFilling,           setAutoFilling]           = useState<string | null>(null);
-  const [vatPercentage,         setVatPercentage]         = useState(20);
-  const [globalDiscountPercent, setGlobalDiscountPercent] = useState(0);
+  const itemsRef = useRef(items);
+  useEffect(() => { itemsRef.current = items; }, [items]);
 
-  // ── Door / room type — same as quotation page ─────────────────────────────
-  const [doorType, setDoorType] = useState("Carcass Only");
-  const [roomType, setRoomType] = useState("Kitchen");
+  const [saving, setSaving] = useState(false);
+  const [autoFilling, setAutoFilling] = useState<string | null>(null);
+  const [globalDiscountPercent, setGlobalDiscountPercent] = useState<number>(0);
+  const [doorType, setDoorType] = useState<string>('Carcass Only');
+  const [roomType, setRoomType] = useState<string>('Kitchen');
+  const [vatPercentage, setVatPercentage] = useState<number>(20);
+  const [carcassColour, setCarcassColour] = useState('');
+  const [doorColour, setDoorColour] = useState('');
+  const [panelworkColour, setPanelworkColour] = useState('');
+  const [doorStyle, setDoorStyle] = useState<string>('');
+  const [roomName, setRoomName] = useState('');
+  const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
+  const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
+  const doorRoomSetByLoad = useRef(0);
 
-  const fmt = (v: number) =>
-    new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(v);
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
 
-  const calcDiscounted = (qty: number, amount: number, pct: number) => {
-    const base = qty * amount;
-    return pct > 0 ? base - base * (pct / 100) : base;
+  const calculateDiscountedTotal = (quantity: number, amount: number, discountPercent: number) => {
+    const baseTotal = quantity * amount;
+    if (!discountPercent || discountPercent === 0) return baseTotal;
+    return baseTotal - baseTotal * (discountPercent / 100);
   };
 
   // ── Populate customer from URL params ─────────────────────────────────────
   useEffect(() => {
-    const cid = searchParams.get("customerId");
+    const cid  = searchParams.get("customerId");
     const name = searchParams.get("customerName");
     if (cid) setCustomerId(cid);
     if (name) {
@@ -79,208 +95,434 @@ export default function CreateProformaPage() {
     }
   }, [searchParams]);
 
-  // ── Re-price all coded items when door/room type changes ──────────────────
+  // ── Re-price when door/room type changes ──────────────────────────────────
   useEffect(() => {
+    if (doorRoomSetByLoad.current > 0) {
+      doorRoomSetByLoad.current -= 1;
+      return;
+    }
+
     const updateAllPrices = async () => {
+      const currentItems = itemsRef.current;
+      if (!currentItems.some(i => i.item && i.item.trim().length > 0)) return;
+
       const token    = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
 
-      const updates = await Promise.all(
-        items.map(async item => {
-          if (!item.item || item.item.trim().length === 0) return null;
+      const updatePromises = currentItems.map(async (item) => {
+        if (!item.item || item.item.trim().length === 0) return null;
+        const itemCode = item.item.trim();
+        const hasSuffix = itemCode.includes('-');
+        const baseCode = itemCode.split('-')[0];
+        const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+        const requestBody: any = { description: itemCode };
+        if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; }
+        else if (!isApplianceCode)          { requestBody.room_type = roomType; }
+        try {
+          const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+            body: JSON.stringify(requestBody),
+          });
+          const data = await response.json();
+          if (data.found) return { id: item.id, price: data.price, description: data.description || data.item_name };
+          return null;
+        } catch { return null; }
+      });
 
-          const code      = item.item.trim().toUpperCase();
-          const hasSuffix = code.includes("-");
-          const isAppliance = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(code.split("-")[0]);
-
-          const body: any = { description: code };
-          if (!hasSuffix && !isAppliance) { body.door_type = doorType; body.room_type = roomType; }
-          else if (!isAppliance)          { body.room_type = roomType; }
-
+      const subItemPromises = currentItems.flatMap((item) =>
+        (item.subItems || []).map(async (sub: any) => {
+          if (!sub.item || sub.item.trim().length === 0) return null;
+          const code = sub.item.trim();
+          const hasSuffix = code.includes('-');
+          const baseCode = code.split('-')[0];
+          const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+          const requestBody: any = { description: code };
+          if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; }
+          else if (!isApplianceCode)          { requestBody.room_type = roomType; }
           try {
-            const res  = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+            const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-                "X-Tenant-ID": tenantId,
-              },
-              body: JSON.stringify(body),
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+              body: JSON.stringify(requestBody),
             });
-            const data = await res.json();
-            if (data.found) return { id: item.id, price: data.price, description: data.description || data.item_name };
+            const data = await response.json();
+            if (data.found) return { subId: sub.id, price: data.price, description: data.description || data.item_name };
           } catch { /* silent */ }
           return null;
         })
       );
 
-      setItems(prev =>
-        prev.map(item => {
-          const hit = updates.find(u => u && u.id === item.id);
-          if (!hit) return item;
+      const [results, subItemResults] = await Promise.all([
+        Promise.all(updatePromises),
+        Promise.all(subItemPromises),
+      ]);
+
+      setItems(prev => prev.map(item => {
+        const result = results.find(r => r && r.id === item.id);
+        const updatedItem = result ? (() => {
+          const newAmount = result.price;
+          const qty = item.quantity || 1;
+          const lineTotal = newAmount * qty;
+          const discPct = item.discount_percent || 0;
           return {
             ...item,
-            amount:      hit.price,
-            description: hit.description,
-            line_total:  hit.price * (item.quantity || 1),
+            amount: newAmount,
+            description: result.description || item.description,
+            line_total: lineTotal,
+            discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
           };
-        })
-      );
+        })() : item;
+
+        const updatedSubs = (updatedItem.subItems || []).map((sub: any) => {
+          const subResult = subItemResults.find(r => r && r.subId === sub.id);
+          if (!subResult) return sub;
+          const newAmt = subResult.price;
+          const sQty = sub.quantity || 1;
+          const sLine = newAmt * sQty;
+          const sPct = sub.discount_percent || 0;
+          return {
+            ...sub,
+            amount: newAmt,
+            description: subResult.description || sub.description,
+            line_total: sLine,
+            discounted_total: sPct > 0 ? sLine - sLine * (sPct / 100) : sLine,
+          };
+        });
+
+        return { ...updatedItem, subItems: updatedSubs };
+      }));
     };
 
-    if (items.some(i => i.item && i.item.trim().length > 0)) {
-      updateAllPrices();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    updateAllPrices();
   }, [doorType, roomType]);
 
-  // ── Item code auto-fill (price lookup on code entry) ─────────────────────
-  const handleItemChange = async (id: string, field: keyof InvoiceItem, value: any) => {
-    // Update item state first (recalculate totals)
-    setItems(prev => prev.map(item => {
-      if (item.id !== id) return item;
-      const updated = { ...item, [field]: value };
-      if (["quantity", "amount", "discount_percent"].includes(field as string)) {
-        const qty = field === "quantity"         ? parseFloat(value) || 1 : updated.quantity       || 1;
-        const amt = field === "amount"           ? parseFloat(value) || 0 : updated.amount         || 0;
-        const pct = field === "discount_percent" ? parseFloat(value) || 0 : updated.discount_percent || 0;
-        updated.line_total       = qty * amt;
-        updated.discounted_total = calcDiscounted(qty, amt, pct);
-      }
-      return updated;
-    }));
+  // ── FITTING CODES ─────────────────────────────────────────────────────────
+  const FITTING_CODES_LIST = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW'];
+  const recalcInProgress = useRef(false);
 
-    // Auto-fill price when ITEM code field changes
-    if (field === "item" && value && value.length >= 2) {
-      const code = value.trim().toUpperCase();
-
-      // Skip if it looks like a full description (spaces or very long)
-      if (code.includes(" ") || code.length > 20) return;
-
-      const hasSuffix   = code.includes("-");
-      const isAppliance = /^[A-Z]{2,}[0-9]{2,}[A-Z0-9]{2,}$/i.test(code.split("-")[0]);
-
-      setAutoFilling(id);
+  useEffect(() => {
+    const recalcFittings = async () => {
+      if (recalcInProgress.current) return;
+      const currentItems = itemsRef.current;
+      const fittingRows = currentItems.filter(i => i.autoFitting && FITTING_CODES_LIST.includes((i.item || '').trim().toUpperCase()));
+      if (fittingRows.length === 0) return;
+      recalcInProgress.current = true;
+      const token    = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+      const nonFittingSnapshot = currentItems
+        .filter(i => !FITTING_CODES_LIST.includes((i.item || '').trim().toUpperCase()))
+        .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
       try {
-        const token    = localStorage.getItem("token");
-        const tenantId = localStorage.getItem("tenantId") || "7";
-
-        const body: any = { description: code };
-        if (!hasSuffix && !isAppliance) { body.door_type = doorType; body.room_type = roomType; }
-        else if (!isAppliance)          { body.room_type = roomType; }
-
-        const res  = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization:  `Bearer ${token}`,
-            "X-Tenant-ID":  tenantId,
-          },
-          body: JSON.stringify(body),
+        const results = await Promise.all(
+          fittingRows.map(async (row) => {
+            const code = (row.item || '').trim().toUpperCase();
+            try {
+              const res = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+                body: JSON.stringify({ description: code, current_items: nonFittingSnapshot }),
+              });
+              const data = await res.json();
+              return { id: row.id, code, found: data.found, quantity: data.quantity || 0, price: data.price || 0 };
+            } catch { return { id: row.id, code, found: false, quantity: 0, price: 0 }; }
+          })
+        );
+        setItems(prevItems => {
+          let changed = false;
+          const updated = prevItems.map(item => {
+            const result = results.find(r => r.id === item.id);
+            if (!result) return item;
+            if (!result.found || result.quantity === 0) { changed = true; return null; }
+            if (item.quantity !== result.quantity || item.amount !== result.price) {
+              changed = true;
+              return {
+                ...item, quantity: result.quantity, amount: result.price,
+                line_total: result.price * result.quantity,
+                discounted_total: item.discount_percent
+                  ? calculateDiscountedTotal(result.quantity, result.price, item.discount_percent)
+                  : result.price * result.quantity,
+              };
+            }
+            return item;
+          }).filter((item): item is ProformaItem => item !== null);
+          return changed ? updated : prevItems;
         });
-        const data = await res.json();
+      } catch (e) { console.error('Fitting recalc failed:', e); }
+      finally { recalcInProgress.current = false; }
+    };
+    const timer = setTimeout(recalcFittings, 800);
+    return () => clearTimeout(timer);
+  }, [items]);
 
-        if (data.found) {
-          let desc = data.description || data.item_name || "";
-          if (isAppliance && data.brand && data.series_level) {
-            desc = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ""}`;
-          }
-
-          setItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            return {
-              ...item,
-              item:        code,
-              description: desc,
-              amount:      data.price || 0,
-              width:       data.width,
-              height:      data.height,
-              depth:       data.depth,
-              line_total:  (data.price || 0) * (item.quantity || 1),
-            };
-          }));
+  // ── Item change + auto-fill ───────────────────────────────────────────────
+  const handleItemChange = async (id: string, field: keyof ProformaItem, value: any) => {
+    const updatedItems = items.map((item) => {
+      if (item.id === id) {
+        const updatedItem = { ...item, [field]: value };
+        if (['quantity', 'amount', 'discount_percent'].includes(field)) {
+          const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItem.quantity || 1;
+          const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItem.amount || 0;
+          const discountPercent = field === 'discount_percent' ? parseFloat(value) || 0 : updatedItem.discount_percent || 0;
+          updatedItem.line_total = qty * amount;
+          updatedItem.discounted_total = calculateDiscountedTotal(qty, amount, discountPercent);
         }
-      } catch (e) {
-        console.error("Auto-price lookup failed:", e);
-      } finally {
-        setAutoFilling(null);
+        return updatedItem;
       }
+      return item;
+    });
+    setItems(updatedItems);
+
+    if (field !== 'item' || !value || value.length < 1) return;
+    const trimmedValue = value.trim().toUpperCase();
+
+    // FITTING EXPANSION
+    if (trimmedValue === 'FITTING') {
+      setAutoFilling(id);
+      const token    = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+      const currentItemsSnapshot = itemsRef.current.filter(i => i.id !== id).map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
+      try {
+        const fittingResults = await Promise.all(
+          FITTING_CODES_LIST.map(async (code) => {
+            try {
+              const res = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+                body: JSON.stringify({ description: code, current_items: currentItemsSnapshot }),
+              });
+              const data = await res.json();
+              if (data.found && data.quantity > 0) return { code, price: data.price, quantity: data.quantity, name: data.item_name };
+              return null;
+            } catch { return null; }
+          })
+        );
+        const validFittings = fittingResults.filter(Boolean) as { code: string; price: number; quantity: number; name: string }[];
+        if (validFittings.length === 0) { alert('No fitting items detected. Add kitchen/bedroom units first.'); setAutoFilling(null); return; }
+        setItems(prevItems => {
+          const withoutPlaceholder = prevItems.filter(i => i.id !== id);
+          return [...withoutPlaceholder, ...validFittings.map(f => ({
+            id: `fitting-${f.code}-${Date.now()}-${Math.random()}`,
+            item: f.code, description: f.name, color: '',
+            quantity: f.quantity, amount: f.price, line_total: f.price * f.quantity,
+            discount_percent: 0, discounted_total: f.price * f.quantity,
+            autoFitting: true, section: 'Fittings',
+          }))];
+        });
+      } catch (error) { console.error('Fitting expansion failed:', error); }
+      finally { setAutoFilling(null); }
+      return;
     }
-  };
 
-  // ── Description auto-fill (lookup by full description text) ──────────────
-  const handleDescriptionChange = async (id: string, value: string) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, description: value } : i));
-    if (!value || value.length < 5) return;
-
+    if (trimmedValue.length > 100) return;
     setAutoFilling(id);
     try {
       const token    = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
-
-      const res  = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+      const hasSuffix = trimmedValue.includes('-');
+      const baseCode = trimmedValue.split('-')[0];
+      const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+      const currentItemsSnapshot = itemsRef.current.filter(i => i.id !== id).map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
+      const MANUAL_FITTING_CODES = ['APPL', 'SINKTAP', 'KUNIT', 'BUNIT', 'ROBE', 'WTJT', 'FITDR', 'PANW'];
+      const isFittingCode = MANUAL_FITTING_CODES.includes(trimmedValue.toUpperCase());
+      const requestBody: any = {
+        description: trimmedValue,
+        current_items: isFittingCode ? [] : currentItemsSnapshot,
+      };
+      if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; }
+      else if (!isApplianceCode)          { requestBody.room_type = roomType; }
+      const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization:  `Bearer ${token}`,
-          "X-Tenant-ID":  tenantId,
-        },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+        body: JSON.stringify(requestBody),
+      });
+      const data = await response.json();
+      if (data.found) {
+        let autoDescription = data.description || data.item_name || '';
+        if (data.is_fitting) autoDescription = data.item_name || '';
+        else if (isApplianceCode && data.brand && data.series_level) {
+          autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
+        }
+        const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
+        setItems(prevItems => prevItems.map(item => {
+          if (item.id === id) {
+            const qty = fittingQty !== null ? fittingQty : (item.quantity || 1);
+            return { ...item, item: trimmedValue, description: autoDescription, amount: data.price || 0, quantity: qty, width: data.width, height: data.height, depth: data.depth, line_total: (data.price || 0) * qty };
+          }
+          return item;
+        }));
+      }
+    } catch (error) { console.error("Auto-price lookup failed:", error); }
+    finally { setAutoFilling(null); }
+  };
+
+  // ── Description auto-fill ─────────────────────────────────────────────────
+  const handleDescriptionChange = async (id: string, value: string) => {
+    setItems(prev => prev.map(item => item.id === id ? { ...item, description: value } : item));
+    if (!value || value.length < 5) return;
+    setAutoFilling(id);
+    try {
+      const token    = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+      const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
         body: JSON.stringify({ description: value, door_type: doorType, room_type: roomType }),
       });
-      const data = await res.json();
-
+      const data = await response.json();
       if (data.found) {
         setItems(prev => prev.map(item => {
-          if (item.id !== id) return item;
+          if (item.id === id) {
+            return { ...item, item: data.item_code || item.item, amount: data.price || 0, width: data.width, height: data.height, depth: data.depth, line_total: (data.price || 0) * (item.quantity || 1) };
+          }
+          return item;
+        }));
+      }
+    } catch (error) { console.error("Description auto-fill failed:", error); }
+    finally { setAutoFilling(null); }
+  };
+
+  // ── Sub-item handlers ─────────────────────────────────────────────────────
+  const handleAddSubItem = (parentId: string) => {
+    setItems(prevItems => prevItems.map(item => {
+      if (item.id === parentId) {
+        const newSub: ProformaItem = {
+          id: `sub-${Date.now()}-${Math.random()}`, item: "", description: "", color: "",
+          quantity: 1, amount: 0, line_total: 0, discount_percent: 0, discounted_total: 0,
+        };
+        return { ...item, subItems: [...(item.subItems || []), newSub] };
+      }
+      return item;
+    }));
+  };
+
+  const handleSubItemChange = (parentId: string, subId: string, field: keyof ProformaItem, value: any) => {
+    setItems(prevItems => prevItems.map(item => {
+      if (item.id !== parentId || !item.subItems) return item;
+      return {
+        ...item,
+        subItems: item.subItems.map(sub => {
+          if (sub.id !== subId) return sub;
+          const updatedSub = { ...sub, [field]: value };
+          if (['quantity', 'amount', 'discount_percent'].includes(field)) {
+            const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedSub.quantity || 1;
+            const amount = field === 'amount' ? parseFloat(value) || 0 : updatedSub.amount || 0;
+            const discountPercent = field === 'discount_percent' ? parseFloat(value) || 0 : updatedSub.discount_percent || 0;
+            updatedSub.line_total = qty * amount;
+            updatedSub.discounted_total = calculateDiscountedTotal(qty, amount, discountPercent);
+          }
+          return updatedSub;
+        }),
+      };
+    }));
+  };
+
+  const handleRemoveSubItem = (parentId: string, subId: string) => {
+    if (!confirm("Remove this sub-item?")) return;
+    setItems(prevItems => prevItems.map(item => {
+      if (item.id !== parentId || !item.subItems) return item;
+      return { ...item, subItems: item.subItems.filter(sub => sub.id !== subId) };
+    }));
+  };
+
+  const handleSubItemAutoFill = async (parentId: string, subId: string, value: string) => {
+    setItems(prevItems => prevItems.map(item => {
+      if (item.id !== parentId || !item.subItems) return item;
+      return { ...item, subItems: item.subItems.map(sub => sub.id === subId ? { ...sub, item: value } : sub) };
+    }));
+    if (!value || value.trim().length < 1) return;
+    const trimmedValue = value.trim().toUpperCase();
+    if (trimmedValue.length > 100) return;
+    try {
+      const token    = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+      const hasSuffix = trimmedValue.includes('-');
+      const baseCode = trimmedValue.split('-')[0];
+      const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+      const requestBody: any = { description: trimmedValue, current_items: [] };
+      if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; }
+      else if (!isApplianceCode)          { requestBody.room_type = roomType; }
+      const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+        body: JSON.stringify(requestBody),
+      });
+      const data = await response.json();
+      if (data.found) {
+        let autoDescription = data.description || data.item_name || '';
+        if (data.is_fitting) autoDescription = data.item_name || '';
+        else if (isApplianceCode && data.brand && data.series_level) {
+          autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
+        }
+        const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
+        setItems(prevItems => prevItems.map(item => {
+          if (item.id !== parentId || !item.subItems) return item;
           return {
             ...item,
-            item:       data.item_code || item.item,
-            amount:     data.price || 0,
-            width:      data.width,
-            height:     data.height,
-            depth:      data.depth,
-            line_total: (data.price || 0) * (item.quantity || 1),
+            subItems: item.subItems.map(sub => {
+              if (sub.id !== subId) return sub;
+              const qty = fittingQty !== null ? fittingQty : (sub.quantity || 1);
+              const price = data.price || 0;
+              return {
+                ...sub, item: data.item_code || trimmedValue, description: autoDescription,
+                amount: price, quantity: qty, width: data.width, height: data.height, depth: data.depth,
+                line_total: price * qty,
+                discounted_total: sub.discount_percent ? calculateDiscountedTotal(qty, price, sub.discount_percent) : price * qty,
+              };
+            }),
           };
         }));
       }
-    } catch (e) {
-      console.error("Description auto-fill failed:", e);
-    } finally {
-      setAutoFilling(null);
-    }
+    } catch (error) { console.error("Sub-item auto-price lookup failed:", error); }
   };
 
-  const handleAddItem = () => setItems(prev => [
-    ...prev,
-    { id: Date.now().toString(), item: "", description: "", color: "",
-      quantity: 1, amount: 0, line_total: 0, discount_percent: 0, discounted_total: 0 },
-  ]);
+  const handleAddItem = (section: string) => {
+    setItems([...items, {
+      id: Date.now().toString(), item: "", description: "", color: "",
+      quantity: 1, amount: 0, line_total: 0, section,
+    }]);
+  };
 
   const handleRemoveItem = (id: string) => {
-    if (confirm("Remove this item?")) setItems(prev => prev.filter(i => i.id !== id));
+    if (confirm("Remove this item?")) setItems(items.filter(item => item.id !== id));
   };
+
+  // ── Computed totals ───────────────────────────────────────────────────────
+  const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
+    const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
+    return total + sectionItems.reduce((sum, item) => {
+      const qty = item.quantity || 1;
+      const amt = item.amount || 0;
+      const pct = item.discount_percent || 0;
+      const itemTotal = pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty;
+      const subTotal = (item.subItems || []).reduce((s, sub) => {
+        const sQty = sub.quantity || 1;
+        const sAmt = sub.amount || 0;
+        const sPct = sub.discount_percent || 0;
+        return s + (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty);
+      }, 0);
+      return sum + itemTotal + subTotal;
+    }, 0);
+  }, 0);
+
+  const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
+  const subtotal = Math.round((subtotalAfterSectionDiscounts - globalDiscountAmount) * 100) / 100;
+  const vat      = Math.round(subtotal * (vatPercentage / 100) * 100) / 100;
+  const total    = Math.round((subtotal + vat) * 100) / 100;
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (saving) return;
     if (!formData.name?.trim())    { alert("Customer name is required");    return; }
     if (!formData.address?.trim()) { alert("Customer address is required"); return; }
-
-    const subtotalBD = items.reduce((sum, i) =>
-      sum + ((i.discount_percent && i.discount_percent > 0) ? (i.discounted_total || 0) : i.line_total), 0);
-    const discAmt  = subtotalBD * (globalDiscountPercent / 100);
-    const subtotal = subtotalBD - discAmt;
-
-    if (subtotal <= 0) { alert("Please add at least one item with a valid price"); return; }
+    if (!roomName.trim())          { alert("Room name is required");        return; }
+    if (subtotal <= 0)             { alert("Please add at least one item with a valid price"); return; }
 
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
-      const vat   = subtotal * (vatPercentage / 100);
-      const total = subtotal + vat;
-
       const res = await fetch(`${API_FORM}/proformas`, {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           client_id:        customerId,
@@ -290,22 +532,40 @@ export default function CreateProformaPage() {
           customer_email:   formData.email,
           invoice_date:     formData.invoice_date,
           due_date:         formData.due_date,
+          door_type:        doorType,
+          room_type:        roomType,
+          room_name:        roomName,
+          carcass_colour:   carcassColour,
+          door_colour:      doorColour,
+          panelwork_colour: panelworkColour,
+          door_style:       doorStyle,
+          section_discounts: sectionDiscounts,
           items: items
             .filter(i => i.item || i.description || i.line_total > 0)
-            .map(i => ({
-              item:             i.item,
-              description:      i.description,
-              color:            i.color,
-              quantity:         i.quantity || 1,
-              amount:           i.line_total,
-              discount_percent: i.discount_percent || 0,
-              discounted_total: i.discounted_total || i.line_total,
-              width: i.width, height: i.height, depth: i.depth,
-            })),
-          subtotal,
+            .flatMap(i => [
+              {
+                item: i.item, description: i.description, color: i.color,
+                quantity: i.quantity || 1, amount: i.amount || 0,
+                discount_percent: i.discount_percent || 0,
+                discounted_total: i.discounted_total || i.line_total,
+                width: i.width, height: i.height, depth: i.depth,
+                section: i.section || "Furniture", is_sub_item: false,
+              },
+              ...(i.subItems || [])
+                .filter(s => (s.item && s.item.trim()) || (s.description && s.description.trim()) || s.line_total > 0)
+                .map(s => ({
+                  item: s.item || "", description: s.description || "", color: s.color || "",
+                  quantity: s.quantity || 1, amount: s.amount || 0,
+                  discount_percent: s.discount_percent || 0,
+                  discounted_total: s.discounted_total || s.line_total,
+                  width: s.width, height: s.height, depth: s.depth,
+                  section: i.section || "Furniture", is_sub_item: true,
+                })),
+            ]),
+          subtotal, vat, total,
           vat_percentage:          vatPercentage,
           global_discount_percent: globalDiscountPercent,
-          global_discount_amount:  discAmt,
+          global_discount_amount:  globalDiscountAmount,
         }),
       });
 
@@ -313,27 +573,19 @@ export default function CreateProformaPage() {
         const data  = await res.json();
         const invId = data.invoice_id || data.id;
         alert(`✅ Proforma #${invId} created successfully!`);
-        window.open(`/dashboard/proformas/${invId}`, "_blank");
+        window.open(`/dashboard/proformas/${invId}`, '_blank');
         router.push(customerId ? `/dashboard/customers/${customerId}` : "/dashboard/proformas");
       } else {
-        const err = await res.json();
-        alert(`❌ Failed to save: ${err.error || "Unknown error"}`);
+        const error = await res.json();
+        alert(`❌ Failed to save: ${error.error || 'Unknown error'}`);
       }
-    } catch (e) {
-      console.error(e);
-      alert("❌ Error saving invoice");
+    } catch (error) {
+      console.error("Error saving proforma:", error);
+      alert("❌ Error saving proforma");
     } finally {
       setSaving(false);
     }
   };
-
-  // ── Computed totals ───────────────────────────────────────────────────────
-  const subtotalBD = items.reduce((sum, i) =>
-    sum + ((i.discount_percent && i.discount_percent > 0) ? (i.discounted_total || 0) : i.line_total), 0);
-  const discAmt  = subtotalBD * (globalDiscountPercent / 100);
-  const subtotal = subtotalBD - discAmt;
-  const vat      = subtotal * (vatPercentage / 100);
-  const total    = subtotal + vat;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -347,7 +599,7 @@ export default function CreateProformaPage() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold">Create New Proforma Invoice</h1>
-              <p className="text-sm text-gray-600">Fill in the details below to create an invoice</p>
+              <p className="text-sm text-gray-600">Fill in the details below</p>
             </div>
           </div>
           <Button onClick={handleSave} disabled={saving}>
@@ -357,21 +609,14 @@ export default function CreateProformaPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-8 py-8">
-        {/* Company header */}
+      <div className="px-4 py-8">
+        {/* Company Header */}
         <div className="mb-8 flex items-center justify-center gap-3">
-          <Image
-            src="/images/logo3.png"
-            alt="Logo"
-            width={80}
-            height={80}
-            className="object-contain"
-          />
+          <Image src="/images/logo3.png" alt="Logo" width={80} height={80} className="object-contain" />
           <div className="text-4xl font-bold tracking-wider text-gray-800">ATELIER LUXE INTERIORS</div>
         </div>
         <div className="mb-6 space-y-1 bg-green-200 p-3 text-sm">
           <p className="font-semibold">Registered to England No 5246881</p>
-          {/* <p className="font-semibold">VAT Reg No.686 8010 72</p> */}
         </div>
         <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
           <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
@@ -384,12 +629,10 @@ export default function CreateProformaPage() {
         </div>
         <h1 className="mb-6 text-center text-2xl font-bold">PROFORMA INVOICE</h1>
 
-        {/* ── Door / Room type dropdowns — identical to quotation page ── */}
+        {/* Door / Room type */}
         <div className="mb-6 grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Room Type <span className="text-red-600">*</span>
-            </label>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">Room Type <span className="text-red-600">*</span></label>
             <select value={roomType} onChange={e => setRoomType(e.target.value)}
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="Kitchen">Kitchen</option>
@@ -397,255 +640,437 @@ export default function CreateProformaPage() {
             </select>
           </div>
           <div>
-            <label className="mb-2 block text-sm font-semibold text-gray-700">
-              Door Type <span className="text-red-600">*</span>
-            </label>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">Door Type <span className="text-red-600">*</span></label>
             <select value={doorType} onChange={e => setDoorType(e.target.value)}
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="Carcass Only">Carcass Only (No Doors/Drawers)</option>
               <option value="Basic Slab">Slab</option>
               <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
-              <option value="Vinyl Doors">Vinyl Doors</option>
+              <option value="Timber">Timber</option>
+              <option value="Vinyl Doors">Vinyl</option>
               <option value="Black Glass">Black Glass</option>
             </select>
           </div>
         </div>
 
-        {/* ── Info banner with suffix instructions ── */}
-        <div className="mb-6 rounded-md border border-blue-200 bg-blue-50 p-4">
-          <p className="mb-2 text-sm font-medium text-blue-900">
-            💡 Selected: <span className="font-bold">{roomType}</span> with{" "}
-            <span className="font-bold">{doorType}</span> doors
+        <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-4">
+          <p className="font-medium text-sm text-blue-900 mb-2">
+            💡 Selected: <span className="font-bold">{roomType}</span> with <span className="font-bold">{doorType}</span> doors
           </p>
-          <p className="text-xs text-blue-700 mb-2">
-            Prices are automatically looked up when you enter item codes.
-          </p>
-          <div className="mt-3 border-t border-blue-200 pt-3">
-            <p className="mb-1 text-xs font-semibold text-blue-900">🎯 Component-Only Pricing (Advanced):</p>
-            <ul className="ml-4 space-y-0.5 text-xs text-blue-700">
-              <li>• <code className="rounded bg-blue-100 px-1">50B</code> = Carcass + {doorType} (complete unit)</li>
-              <li>• <code className="rounded bg-blue-100 px-1">50B-BS</code> = Basic Slab door component only</li>
-              <li>• <code className="rounded bg-blue-100 px-1">50B-AG</code> = Acrylic door component only</li>
-              <li>• <code className="rounded bg-blue-100 px-1">50B-VD</code> = Vinyl door component only</li>
-              <li>• <code className="rounded bg-blue-100 px-1">50B-BG</code> = Black Glass door component only</li>
+          <p className="text-xs text-blue-700 mb-2">Prices will be automatically looked up based on these selections when you enter item codes.</p>
+          <div className="mt-3 pt-3 border-t border-blue-200">
+            <p className="text-xs font-semibold text-blue-900 mb-1">🎯 Component-Only Pricing (Advanced):</p>
+            <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
+              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = {doorType === 'Carcass Only' ? 'Carcass only' : `Carcass + ${doorType} total (auto)`}</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-S</code> = Slab door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-LS</code> = Lacquered Slab door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-T</code> = Timber door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">FITTING</code> = Auto-detect all fittings from items</li>
             </ul>
           </div>
         </div>
 
-        {/* Customer info */}
+        {/* Customer Information */}
         <div className="mb-6">
           <table className="w-full border-collapse">
             <tbody>
-              {[
-                { label: "PROFORMA DATE:", field: "invoice_date", type: "date" },
-                { label: "DUE DATE:",     field: "due_date",     type: "date" },
-                { label: "NAME:",         field: "name",         type: "text" },
-                { label: "ADDRESS:",      field: "address",      type: "textarea" },
-                { label: "TEL:",          field: "phone",        type: "text" },
-              ].map(({ label, field, type }) => (
-                <tr key={field}>
-                  <td className="border border-black bg-gray-50 px-3 py-2 font-semibold" style={{ width: "20%" }}>
-                    {label}
-                  </td>
-                  <td className="border border-black p-0">
-                    {type === "textarea" ? (
-                      <textarea
-                        value={(formData as any)[field]}
-                        onChange={e => setFormData(prev => ({ ...prev, [field]: e.target.value }))}
-                        placeholder="Customer address"
-                        className="w-full resize-none px-3 py-2 text-sm focus:outline-none"
-                        rows={2}
-                      />
-                    ) : (
-                      <Input type={type} value={(formData as any)[field]}
-                        onChange={e => setFormData(prev => ({ ...prev, [field]: e.target.value }))}
-                        className="border-none focus-visible:ring-0" />
-                    )}
-                  </td>
-                </tr>
-              ))}
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50" style={{ width: '20%' }}>PROFORMA DATE:</td>
+                <td className="border border-black p-0">
+                  <Input type="date" value={formData.invoice_date} onChange={e => setFormData(prev => ({ ...prev, invoice_date: e.target.value }))} className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">VALID UNTIL:</td>
+                <td className="border border-black p-0">
+                  <Input type="date" value={formData.due_date} onChange={e => setFormData(prev => ({ ...prev, due_date: e.target.value }))} className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">NAME:</td>
+                <td className="border border-black p-0">
+                  <Input value={formData.name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="Customer name" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" required />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ADDRESS:</td>
+                <td className="border border-black p-0">
+                  <textarea value={formData.address} onChange={e => setFormData(prev => ({ ...prev, address: e.target.value }))} placeholder="Customer address" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2 resize-none" rows={2} required />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">TEL:</td>
+                <td className="border border-black p-0">
+                  <Input value={formData.phone} onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))} placeholder="Phone number" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">EMAIL:</td>
+                <td className="border border-black p-0">
+                  <Input type="email" value={formData.email} onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="Email address" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ROOM NAME: <span className="text-red-600">*</span></td>
+                <td className="border border-black p-0">
+                  <Input value={roomName} onChange={e => setRoomName(e.target.value)} placeholder="e.g. Kitchen, Master Bedroom" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" required />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">CARCASS COLOUR:</td>
+                <td className="border border-black p-0">
+                  <Input value={carcassColour} onChange={e => setCarcassColour(e.target.value)} placeholder="Carcass colour" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR COLOUR:</td>
+                <td className="border border-black p-0">
+                  <Input value={doorColour} onChange={e => setDoorColour(e.target.value)} placeholder="Door colour" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">PANELWORK COLOUR:</td>
+                <td className="border border-black p-0">
+                  <Input value={panelworkColour} onChange={e => setPanelworkColour(e.target.value)} placeholder="Panelwork colour" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR STYLE:</td>
+                <td className="border border-black p-0">
+                  <Input value={doorStyle} onChange={e => setDoorStyle(e.target.value)} placeholder="Door style" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
 
-        {/* Items table */}
+        {/* Items by Section */}
         <div className="mb-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-lg font-bold">Proforma Items</h3>
-            <Button onClick={handleAddItem} size="sm" variant="outline">
-              <Plus className="mr-2 h-4 w-4" /> Add Item
-            </Button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-white text-xs font-bold">
-                  {["ITEM", "DESCRIPTION", "COLOUR", "QTY", "W", "H", "D", "PRICE", "AMOUNT", "DISC %", "FINAL", ""].map(h => (
-                    <th key={h} className="border border-black px-2 py-2 text-left">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {items.map(item => (
-                  <tr key={item.id}>
-                    {/* ITEM CODE — triggers auto-fill */}
-                    <td className="border border-black p-1">
-                      <Input
-                        value={item.item}
-                        onChange={(e) => {
-                          setItems(prevItems => prevItems.map(i => i.id === item.id ? { ...i, item: e.target.value } : i));
-                        }}
-                        onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
-                        placeholder="50B"
-                        className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
-                      />
-                    </td>
+          {SECTIONS.map(section => {
+            const sectionItems = items.filter(item => (item.section || 'Furniture') === section);
+            if (sectionItems.length === 0) return null;
 
-                    {/* DESCRIPTION — secondary auto-fill */}
-                    <td className="border border-black p-1">
-                      <textarea
-                        value={item.description}
-                        onChange={e => handleDescriptionChange(item.id, e.target.value)}
-                        placeholder="Description"
-                        rows={2}
-                        style={{ minHeight: "35px", lineHeight: "1.3" }}
-                        onInput={e => {
-                          const t = e.target as HTMLTextAreaElement;
-                          t.style.height = "auto";
-                          t.style.height = `${t.scrollHeight}px`;
-                        }}
-                        className={`w-full resize-none text-xs focus:outline-none ${
-                          autoFilling === item.id ? "animate-pulse bg-blue-50" : ""
-                        }`}
-                      />
-                    </td>
+            const sectionRaw = sectionItems.reduce((sum, item) => {
+              const itemRaw = (item.amount || 0) * (item.quantity || 1);
+              const subRaw = (item.subItems || []).reduce((s, sub) => s + (sub.amount || 0) * (sub.quantity || 1), 0);
+              return sum + itemRaw + subRaw;
+            }, 0);
 
-                    {/* COLOUR */}
-                    <td className="border border-black p-1">
-                      <Input value={item.color}
-                        onChange={e => handleItemChange(item.id, "color", e.target.value)}
-                        placeholder="Colour" className="border-none focus-visible:ring-0 text-xs" />
-                    </td>
+            const sectionAfterItemDiscounts = sectionItems.reduce((sum, item) => {
+              const itemTotal = (item.discount_percent && item.discount_percent > 0)
+                ? (item.discounted_total ?? (item.amount || 0) * (item.quantity || 1))
+                : (item.amount || 0) * (item.quantity || 1);
+              const subTotal = (item.subItems || []).reduce((s, sub) =>
+                s + ((sub.discount_percent && sub.discount_percent > 0)
+                  ? (sub.discounted_total ?? (sub.amount || 0) * (sub.quantity || 1))
+                  : (sub.amount || 0) * (sub.quantity || 1)), 0);
+              return sum + itemTotal + subTotal;
+            }, 0);
 
-                    {/* QTY */}
-                    <td className="border border-black p-1">
-                      <Input type="number" min="1" value={item.quantity}
-                        onChange={e => handleItemChange(item.id, "quantity", e.target.value)}
-                        className="border-none text-center focus-visible:ring-0 w-[45px] text-xs" />
-                    </td>
+            const itemDiscountTotal = sectionRaw - sectionAfterItemDiscounts;
+            const hasItemDiscount = itemDiscountTotal > 0;
 
-                    {/* W / H / D */}
-                    {(["width", "height", "depth"] as const).map(dim => (
-                      <td key={dim} className="border border-black p-1">
-                        <Input type="number" value={item[dim] || ""}
-                          onChange={e => handleItemChange(item.id, dim, e.target.value)}
-                          placeholder="—" className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" />
-                      </td>
+            return (
+              <div key={section} className="mb-6">
+                <div className="mb-3"><h3 className="text-lg font-bold">{section}</h3></div>
+
+                <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                  <thead>
+                    <tr className="bg-white">
+                      <th className="border border-black px-1 py-2 text-left font-bold text-xs"   style={{ width: '8%' }}>ITEM</th>
+                      <th className="border border-black px-1 py-2 text-left font-bold text-xs"   style={{ width: '20%' }}>DESCRIPTION</th>
+                      <th className="border border-black px-1 py-2 text-left font-bold text-xs"   style={{ width: '10%' }}>COLOUR</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>QTY</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>W</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>H</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>D</th>
+                      <th className="border border-black px-1 py-2 text-right font-bold text-xs"  style={{ width: '8%' }}>PRICE</th>
+                      <th className="border border-black px-1 py-2 text-right font-bold text-xs"  style={{ width: '9%' }}>AMOUNT</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '6%' }}>DISC %</th>
+                      <th className="border border-black px-1 py-2 text-right font-bold text-xs"  style={{ width: '9%' }}>FINAL</th>
+                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sectionItems.map(item => (
+                      <React.Fragment key={item.id}>
+                        <tr>
+                          <td className="border border-black p-0">
+                            <Input
+                              value={item.item}
+                              onChange={e => setItems(prev => prev.map(i => i.id === item.id ? { ...i, item: e.target.value } : i))}
+                              onBlur={e => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
+                              placeholder="50B"
+                              className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
+                            />
+                          </td>
+                          <td className="border border-black p-0">
+                            <textarea
+                              value={item.description}
+                              onChange={e => handleDescriptionChange(item.id, e.target.value)}
+                              placeholder="Description" rows={2}
+                              style={{ minHeight: '35px', lineHeight: '1.3' }}
+                              onInput={e => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = `${t.scrollHeight}px`; }}
+                              className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
+                            />
+                          </td>
+                          <td className="border border-black p-0">
+                            <Input value={item.color} onChange={e => handleItemChange(item.id, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 min-w-[70px] text-xs" />
+                          </td>
+                          <td className="border border-black p-0">
+                            <Input type="number" value={item.quantity} onChange={e => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="1" />
+                          </td>
+                          <td className="border border-black p-0">
+                            <Input type="number" value={item.width || ''} onChange={e => handleItemChange(item.id, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                          </td>
+                          <td className="border border-black p-0">
+                            <Input type="number" value={item.height || ''} onChange={e => handleItemChange(item.id, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                          </td>
+                          <td className="border border-black p-0">
+                            <Input type="number" value={item.depth || ''} onChange={e => handleItemChange(item.id, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                          </td>
+                          <td className="border border-black p-0">
+                            <Input type="number" step="0.01" value={item.amount} onChange={e => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
+                          </td>
+                          <td className="border border-black px-2 py-1 text-right font-semibold text-xs">{formatCurrency(item.line_total)}</td>
+                          <td className="border border-black p-0">
+                            <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={e => handleItemChange(item.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" max="100" placeholder="0" />
+                          </td>
+                          <td className="border border-black px-2 py-1 text-right">
+                            {item.discount_percent && item.discount_percent > 0 ? (
+                              <div>
+                                <div className="text-xs text-gray-500 line-through">{formatCurrency(item.line_total)}</div>
+                                <div className="font-semibold text-green-700 text-xs">{formatCurrency(item.discounted_total || 0)}</div>
+                              </div>
+                            ) : <span className="font-semibold text-xs">{formatCurrency(item.line_total)}</span>}
+                          </td>
+                          <td className="border border-black p-1 text-center">
+                            <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </td>
+                        </tr>
+
+                        {/* SUB-ITEMS */}
+                        {(item.subItems || []).map(sub => (
+                          <tr key={sub.id} className="bg-gray-50">
+                            <td className="border border-black p-0 pl-4">
+                              <Input
+                                value={sub.item}
+                                onChange={e => setItems(prev => prev.map(it => {
+                                  if (it.id !== item.id || !it.subItems) return it;
+                                  return { ...it, subItems: it.subItems.map(s => s.id === sub.id ? { ...s, item: e.target.value } : s) };
+                                }))}
+                                onBlur={e => handleSubItemAutoFill(item.id, sub.id, e.target.value)}
+                                placeholder="sub-code"
+                                className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
+                              />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input value={sub.description} onChange={e => handleSubItemChange(item.id, sub.id, "description", e.target.value)} placeholder="Sub-item description" className="border-none focus-visible:ring-0 w-full text-xs px-1" />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input value={sub.color} onChange={e => handleSubItemChange(item.id, sub.id, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 w-full text-xs px-1" />
+                            </td>
+                            <td className="border border-black p-0">
+                              <Input type="number" value={sub.quantity} onChange={e => handleSubItemChange(item.id, sub.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="1" />
+                            </td>
+                            <td className="border border-black p-0" /><td className="border border-black p-0" /><td className="border border-black p-0" />
+                            <td className="border border-black p-0">
+                              <Input type="number" step="0.01" value={sub.amount} onChange={e => handleSubItemChange(item.id, sub.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs px-1" min="0" placeholder="0.00" />
+                            </td>
+                            <td className="border border-black px-2 py-1 text-right text-xs">{formatCurrency(sub.line_total)}</td>
+                            <td className="border border-black p-0">
+                              <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={e => handleSubItemChange(item.id, sub.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
+                            </td>
+                            <td className="border border-black px-2 py-1 text-right">
+                              {sub.discount_percent && sub.discount_percent > 0 ? (
+                                <div>
+                                  <div className="text-xs text-gray-500 line-through">{formatCurrency(sub.line_total)}</div>
+                                  <div className="font-semibold text-green-700 text-xs">{formatCurrency(sub.discounted_total || 0)}</div>
+                                </div>
+                              ) : <span className="font-semibold text-xs">{formatCurrency(sub.line_total)}</span>}
+                            </td>
+                            <td className="border border-black p-1 text-center">
+                              <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(item.id, sub.id)} className="text-red-600 hover:bg-red-50 h-6 w-6">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+
+                        {/* ADD SUB-ITEM */}
+                        <tr>
+                          <td colSpan={12} className="border border-black px-2 py-1 bg-gray-50">
+                            <button onClick={() => handleAddSubItem(item.id)} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                              <Plus className="h-3 w-3" /> Add sub-item
+                            </button>
+                          </td>
+                        </tr>
+                      </React.Fragment>
                     ))}
+                  </tbody>
+                </table>
 
-                    {/* PRICE */}
-                    <td className="border border-black p-1">
-                      <Input type="number" step="0.01" min="0" value={item.amount}
-                        onChange={e => handleItemChange(item.id, "amount", e.target.value)}
-                        className="border-none text-right focus-visible:ring-0 w-[70px] text-xs" />
-                    </td>
+                {/* Section Totals */}
+                {(() => {
+                  const sectionDiscountPct = sectionDiscounts[section] || 0;
+                  const sectionTotal = sectionAfterItemDiscounts;
+                  return (
+                    <div className="flex justify-end mt-2 mb-4">
+                      <table className="border-collapse text-sm" style={{ width: '40%' }}>
+                        <tbody>
+                          <tr>
+                            <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs">{section} Subtotal</td>
+                            <td className="border border-gray-300 px-3 py-1 text-right text-xs">{formatCurrency(sectionRaw)}</td>
+                          </tr>
+                          {hasItemDiscount && (
+                            <tr>
+                              <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs text-red-600">Section Discount ({parseFloat(sectionDiscountPct.toFixed(2))}%)</td>
+                              <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">-{formatCurrency(itemDiscountTotal)}</td>
+                            </tr>
+                          )}
+                          <tr>
+                            <td className="border border-gray-300 px-3 py-1 bg-gray-50 text-xs">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium">Section Discount</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      value={sectionDiscountPct || ''}
+                                      onChange={e => {
+                                        const pct = parseFloat(e.target.value) || 0;
+                                        const prevPct = sectionDiscounts[section] || 0;
+                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
+                                        setItems(prevItems => prevItems.map(item => {
+                                          if ((item.section || 'Furniture') !== section) return item;
+                                          const itemDisc = item.discount_percent || 0;
+                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevPct) ? item : {
+                                            ...item,
+                                            discount_percent: pct,
+                                            discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
+                                          };
+                                          const updatedSubs = (item.subItems || []).map(sub => {
+                                            const subDisc = sub.discount_percent || 0;
+                                            if (subDisc > 0 && subDisc !== prevPct) return sub;
+                                            return { ...sub, discount_percent: pct, discounted_total: calculateDiscountedTotal(sub.quantity || 1, sub.amount || 0, pct) };
+                                          });
+                                          return { ...updatedItem, subItems: updatedSubs };
+                                        }));
+                                      }}
+                                      className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"
+                                      min="0" max="100" step="0.1" placeholder="0"
+                                    />
+                                    <span className="text-xs text-gray-500">%</span>
+                                  </div>
+                                  <span className="text-xs text-gray-400">or</span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-gray-500">£</span>
+                                    <Input
+                                      type="number"
+                                      value={sectionDiscountAmounts[section] !== undefined && sectionDiscountAmounts[section] !== '' ? sectionDiscountAmounts[section] : itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : ''}
+                                      onChange={e => setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }))}
+                                      onBlur={e => {
+                                        const amtVal = parseFloat(e.target.value) || 0;
+                                        const pct = sectionRaw > 0 ? (amtVal / sectionRaw) * 100 : 0;
+                                        const prevPct = sectionDiscounts[section] || 0;
+                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: amtVal > 0 ? amtVal.toFixed(2) : '' }));
+                                        setItems(prevItems => prevItems.map(item => {
+                                          if ((item.section || 'Furniture') !== section) return item;
+                                          const itemDisc = item.discount_percent || 0;
+                                          if (itemDisc > 0 && itemDisc !== prevPct) return item;
+                                          return { ...item, discount_percent: pct, discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct) };
+                                        }));
+                                      }}
+                                      className="border border-gray-300 rounded px-1 py-0.5 w-20 text-right text-xs"
+                                      min="0" step="0.01" placeholder="0.00"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
+                              {hasItemDiscount ? `-${formatCurrency(itemDiscountTotal)}` : '—'}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="border border-gray-300 px-3 py-1 font-bold bg-gray-100 text-xs">{section} Total</td>
+                            <td className="border border-gray-300 px-3 py-1 text-right font-bold text-xs">{formatCurrency(sectionTotal)}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
 
-                    {/* AMOUNT */}
-                    <td className="border border-black px-2 py-1 text-right text-xs font-semibold">
-                      {fmt(item.line_total)}
-                    </td>
+                <div className="mt-3">
+                  <Button onClick={() => handleAddItem(section)} size="sm" variant="outline">
+                    <Plus className="mr-2 h-4 w-4" /> Add Item
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
 
-                    {/* DISC % */}
-                    <td className="border border-black p-1">
-                      <Input type="number" step="0.1" min="0" max="100"
-                        value={item.discount_percent || ""}
-                        onChange={e => handleItemChange(item.id, "discount_percent", e.target.value)}
-                        placeholder="0" className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" />
-                    </td>
-
-                    {/* FINAL */}
-                    <td className="border border-black px-2 py-1 text-right text-xs">
-                      {item.discount_percent && item.discount_percent > 0 ? (
-                        <div>
-                          <div className="text-xs text-gray-400 line-through">{fmt(item.line_total)}</div>
-                          <div className="text-xs font-semibold text-green-700">{fmt(item.discounted_total || 0)}</div>
-                        </div>
-                      ) : (
-                        <span className="font-semibold">{fmt(item.line_total)}</span>
-                      )}
-                    </td>
-
-                    {/* DELETE */}
-                    <td className="border border-black p-1 text-center">
-                      <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)}
-                        className="h-7 w-7 text-red-600 hover:bg-red-50">
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-
-                {items.length === 0 && (
-                  <tr>
-                    <td colSpan={12} className="border border-black px-3 py-8 text-center text-gray-500">
-                      No items yet. Click "Add Item" to get started.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          {/* Add to empty sections */}
+          <div className="flex flex-wrap gap-2">
+            {SECTIONS.filter(s => !items.some(item => (item.section || 'Furniture') === s)).map(section => (
+              <Button key={section} onClick={() => handleAddItem(section)} size="sm" variant="outline">
+                <Plus className="mr-2 h-4 w-4" /> Add Item to {section}
+              </Button>
+            ))}
           </div>
         </div>
 
         {/* Totals */}
         <div className="mb-6 flex justify-end">
-          <table className="border-collapse" style={{ width: "40%" }}>
+          <table className="border-collapse" style={{ width: '40%' }}>
             <tbody>
               <tr>
-                <td className="border border-black bg-gray-50 px-3 py-2 font-semibold">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{fmt(subtotalBD)}</td>
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalAfterSectionDiscounts)}</td>
               </tr>
               <tr>
-                <td className="border border-black bg-gray-50 px-3 py-2 font-semibold">
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
                   <div className="flex items-center justify-between gap-2">
                     <span>DISCOUNT</span>
                     <div className="flex items-center gap-1">
-                      <Input type="number" min="0" max="100" step="0.1"
-                        value={globalDiscountPercent}
-                        onChange={e => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)}
-                        className="w-16 rounded border border-gray-300 px-2 py-1 text-right text-sm" />
+                      <Input type="number" value={globalDiscountPercent} onChange={e => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)} className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm" min="0" max="100" step="0.1" />
                       <span className="text-sm">%</span>
                     </div>
                   </div>
                 </td>
                 <td className="border border-black px-3 py-2 text-right text-red-600">
-                  {globalDiscountPercent > 0 ? `-${fmt(discAmt)}` : "—"}
+                  {globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}
                 </td>
               </tr>
               {globalDiscountPercent > 0 && (
                 <tr>
-                  <td className="border border-black bg-blue-50 px-3 py-2 font-semibold">SUBTOTAL AFTER DISCOUNT</td>
-                  <td className="border border-black px-3 py-2 text-right font-semibold">{fmt(subtotal)}</td>
+                  <td className="border border-black px-3 py-2 font-semibold bg-blue-50">SUBTOTAL AFTER DISCOUNT</td>
+                  <td className="border border-black px-3 py-2 text-right font-semibold">{formatCurrency(subtotal)}</td>
                 </tr>
               )}
               <tr>
-                <td className="border border-black bg-gray-50 px-3 py-2 font-semibold">
+                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
                   <div className="flex items-center justify-between gap-2">
                     <span>VAT</span>
                     <div className="flex items-center gap-1">
-                      <Input type="number" min="0" max="100" step="0.1"
-                        value={vatPercentage}
-                        onChange={e => setVatPercentage(parseFloat(e.target.value) || 0)}
-                        className="w-16 rounded border border-gray-300 px-2 py-1 text-right text-sm" />
+                      <Input type="number" value={vatPercentage} onChange={e => setVatPercentage(parseFloat(e.target.value) || 0)} className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm" min="0" max="100" step="0.1" />
                       <span className="text-sm">%</span>
                     </div>
                   </div>
                 </td>
-                <td className="border border-black px-3 py-2 text-right">{fmt(vat)}</td>
+                <td className="border border-black px-3 py-2 text-right">{formatCurrency(vat)}</td>
               </tr>
               <tr>
-                <td className="border border-black bg-gray-50 px-3 py-2 font-bold">TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right font-bold">{fmt(total)}</td>
+                <td className="border border-black px-3 py-2 font-bold bg-gray-50">TOTAL</td>
+                <td className="border border-black px-3 py-2 text-right font-bold">{formatCurrency(total)}</td>
               </tr>
             </tbody>
           </table>
@@ -653,11 +1078,11 @@ export default function CreateProformaPage() {
 
         {/* Payment terms */}
         <div className="mb-6 space-y-2 text-sm">
-          <p className="font-semibold">Only Bacs or Cash will be accepted on Delivery and Completion</p>
-          <p className="font-semibold">NOTE: Payment is due within 30 days of the invoice date.</p>
+          <p className="font-semibold">This is a Proforma Invoice - not a VAT invoice.</p>
+          <p className="font-semibold">Payment is required before goods are dispatched or work commences.</p>
         </div>
         <div className="mb-8 text-sm font-semibold text-red-600">
-          <p>Please contact us if you have any queries regarding this invoice.</p>
+          <p>Please sign here to confirm.</p>
         </div>
 
         {/* Signature */}
@@ -665,7 +1090,7 @@ export default function CreateProformaPage() {
           {["Customer Signature:", "Customer Name:", "Date:"].map(label => (
             <div key={label} className="flex items-center">
               <span className="mr-2">{label}</span>
-              <span className="flex-1 border-b border-dotted border-black" />
+              <span className="border-b border-dotted border-black flex-1" />
             </div>
           ))}
         </div>
