@@ -191,28 +191,72 @@ export default function EditQuotePage() {
         }
       });
 
-      const results = await Promise.all(updatePromises);
+      const subItemPromises = items.flatMap((item) =>
+        (item.subItems || []).map(async (sub: any) => {
+          if (!sub.item || sub.item.trim().length === 0) return null;
+          const code = sub.item.trim();
+          const hasSuffix = code.includes('-');
+          const baseCode = code.split('-')[0];
+          const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+          const requestBody: any = { description: code };
+          if (!hasSuffix && !isApplianceCode) {
+            requestBody.door_type = doorType;
+            requestBody.room_type = roomType;
+          } else if (!isApplianceCode) {
+            requestBody.room_type = roomType;
+          }
+          try {
+            const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+              body: JSON.stringify(requestBody),
+            });
+            const data = await response.json();
+            if (data.found) return { subId: sub.id, price: data.price, description: data.description || data.item_name };
+          } catch { /* silent */ }
+          return null;
+        })
+      );
+
+      const [results, subItemResults] = await Promise.all([
+        Promise.all(updatePromises),
+        Promise.all(subItemPromises),
+      ]);
 
       setItems((prevItems) =>
         prevItems.map((item, index) => {
           const result = results.find((r) => r && r.index === index);
-          if (result) {
-            const newAmount = result.price;
-            const qty = item.quantity || 1;
-            const lineTotal = newAmount * qty;
-            const discPct = item.discount_percent || 0;
+          const updatedItem = result ? {
+            ...item,
+            amount: result.price,
+            description: result.description || item.description,
+            width: result.width,
+            height: result.height,
+            depth: result.depth,
+            line_total: result.price * (item.quantity || 1),
+            discounted_total: (item.discount_percent || 0) > 0
+              ? result.price * (item.quantity || 1) * (1 - (item.discount_percent || 0) / 100)
+              : result.price * (item.quantity || 1),
+          } : item;
+
+          // ✅ Update sub-items too
+          const updatedSubs = (updatedItem.subItems || []).map((sub: any) => {
+            const subResult = subItemResults.find((r) => r && r.subId === sub.id);
+            if (!subResult) return sub;
+            const newAmt = subResult.price;
+            const sQty = sub.quantity || 1;
+            const sLine = newAmt * sQty;
+            const sPct = sub.discount_percent || 0;
             return {
-              ...item,
-              amount: newAmount,
-              description: result.description || item.description,
-              width: result.width,
-              height: result.height,
-              depth: result.depth,
-              line_total: lineTotal,
-              discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
+              ...sub,
+              amount: newAmt,
+              description: subResult.description || sub.description,
+              line_total: sLine,
+              discounted_total: sPct > 0 ? sLine - sLine * (sPct / 100) : sLine,
             };
-          }
-          return item;
+          });
+
+          return { ...updatedItem, subItems: updatedSubs };
         })
       );
     };

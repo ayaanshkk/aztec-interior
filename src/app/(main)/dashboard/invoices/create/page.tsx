@@ -79,9 +79,9 @@ export default function CreateInvoicePage() {
   const [roomName, setRoomName] = useState('');
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
-  const doorRoomSetByLoad = useRef(false);
-  const itemsLoadedFromQuote = useRef(false);
-
+  const doorRoomSetByLoad = useRef(0);
+  const originalItemsRef = useRef<InvoiceItem[]>([]);
+  const originalDoorType = useRef<string>('');
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
@@ -125,14 +125,12 @@ export default function CreateInvoicePage() {
             email:   q.customer_email   || "",
           }));
 
-          if (q.door_type) {
-            doorRoomSetByLoad.current = true;
-            setDoorType(q.door_type);
-          }
-          if (q.room_type) {
-            doorRoomSetByLoad.current = true;
-            setRoomType(q.room_type);
-          }
+          doorRoomSetByLoad.current = 2; // suppress both upcoming effect fires
+          if (q.door_type) setDoorType(q.door_type);
+          if (q.room_type) setRoomType(q.room_type);
+          originalItemsRef.current = mapped;
+          originalDoorType.current = q.door_type || 'Carcass Only';
+
           setRoomName(q.room_name || "");
           if (q.carcass_colour)   setCarcassColour(q.carcass_colour);
           if (q.door_colour)      setDoorColour(q.door_colour);
@@ -182,7 +180,8 @@ export default function CreateInvoicePage() {
               };
             });
             setItems(mapped);
-            itemsLoadedFromQuote.current = true;
+            originalItemsRef.current = mapped;
+            originalDoorType.current = q.door_type || 'Carcass Only';
           }
         } catch (e) {
           console.error("Failed to load quote data:", e);
@@ -210,82 +209,76 @@ export default function CreateInvoicePage() {
 
   // Update all prices when door/room type changes
   useEffect(() => {
-    if (doorRoomSetByLoad.current) {
-      doorRoomSetByLoad.current = false;
+    if (doorRoomSetByLoad.current > 0) {
+      doorRoomSetByLoad.current -= 1;
       return;
     }
-    if (itemsLoadedFromQuote.current) {
-      return;
-    }
+
     const updateAllPrices = async () => {
+      const currentItems = itemsRef.current;
+      if (!currentItems.some(i => i.item && i.item.trim().length > 0)) return;
+
+      // Restore originals if switched back to original door type
+      if (doorType === originalDoorType.current && originalItemsRef.current.length > 0) {
+        setItems(prev => prev.map((item, idx) => {
+          const orig = originalItemsRef.current[idx];
+          if (!orig) return item;
+          const qty = item.quantity || 1;
+          return {
+            ...item,
+            amount: orig.amount,
+            line_total: orig.amount * qty,
+            discounted_total: item.discount_percent && item.discount_percent > 0
+              ? orig.amount * qty * (1 - item.discount_percent / 100)
+              : orig.amount * qty,
+          };
+        }));
+        return;
+      }
+
       const token = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
-      const currentItems = itemsRef.current;
-      const hasItemsWithCodes = currentItems.some(item => item.item && item.item.trim().length > 0);
-      if (!hasItemsWithCodes) return;
-
       const updatePromises = currentItems.map(async (item) => {
         if (!item.item || item.item.trim().length === 0) return null;
-
         const itemCode = item.item.trim();
         const hasSuffix = itemCode.includes('-');
         const baseCode = itemCode.split('-')[0];
         const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
-
         const requestBody: any = { description: itemCode };
-
         if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
         } else if (!isApplianceCode) {
           requestBody.room_type = roomType;
         }
-
         try {
           const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`,
-              "X-Tenant-ID": tenantId,
-            },
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
             body: JSON.stringify(requestBody),
           });
-
           const data = await response.json();
-          if (data.found) {
-            return { id: item.id, price: data.price, description: data.description || data.item_name };
-          }
+          if (data.found) return { id: item.id, price: data.price, description: data.description || data.item_name };
           return null;
-        } catch {
-          return null;
-        }
+        } catch { return null; }
       });
 
       const results = await Promise.all(updatePromises);
-
-      setItems((prevItems) =>
-        prevItems.map((item) => {
-          const result = results.find((r) => r && r.id === item.id);
-          if (result) {
-            const newAmount = result.price;
-            const qty = item.quantity || 1;
-            const lineTotal = newAmount * qty;
-            const discPct = item.discount_percent || 0;
-            const discountedTotal = discPct > 0
-              ? lineTotal - lineTotal * (discPct / 100)
-              : lineTotal;
-            return {
-              ...item,
-              amount: newAmount,
-              description: result.description || item.description,
-              line_total: lineTotal,
-              discounted_total: discountedTotal,
-            };
-          }
-          return item;
-        })
-      );
+      setItems(prev => prev.map(item => {
+        const result = results.find(r => r && r.id === item.id);
+        if (!result) return item;
+        const newAmount = result.price;
+        const qty = item.quantity || 1;
+        const lineTotal = newAmount * qty;
+        const discPct = item.discount_percent || 0;
+        return {
+          ...item,
+          amount: newAmount,
+          description: result.description || item.description,
+          line_total: lineTotal,
+          discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
+        };
+      }));
     };
 
     updateAllPrices();

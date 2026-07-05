@@ -76,8 +76,9 @@ export default function EditInvoicePage() {
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [doorType,               setDoorType]               = useState("Carcass Only");
   const [roomType,               setRoomType]               = useState("Kitchen");
-  const doorRoomSetByLoad = useRef(false);
-
+  const doorRoomSetByLoad = useRef(0);
+  const originalItemsRef = useRef<InvoiceItem[]>([]);
+  const originalDoorType = useRef<string>('');
   const itemsRef         = useRef(items);
   const recalcInProgress = useRef(false);
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -106,7 +107,7 @@ export default function EditInvoicePage() {
       setVatPercentage(data.vat_rate || 20);
       setDeposit(data.deposit_paid || 0);
       if (data.section_discounts) setSectionDiscounts(data.section_discounts);
-      doorRoomSetByLoad.current = true; 
+      doorRoomSetByLoad.current = 2; // suppress both fires
       if (data.door_type) setDoorType(data.door_type);
       if (data.room_type) setRoomType(data.room_type);
 
@@ -170,6 +171,8 @@ export default function EditInvoicePage() {
         })),
       }));
       setItems(mapped);
+      originalItemsRef.current = mapped;
+      originalDoorType.current = data.door_type || 'Carcass Only';
       setNextId((mapped.length || 0) + 9000);
     } catch (e) {
       console.error(e);
@@ -181,58 +184,124 @@ export default function EditInvoicePage() {
 
   // ── Re-price when door/room type changes ──────────────────────────────────
   useEffect(() => {
-    if (doorRoomSetByLoad.current) {
-      const timer = setTimeout(() => {
-        doorRoomSetByLoad.current = false;
-      }, 100);
-      return () => clearTimeout(timer);
+    if (doorRoomSetByLoad.current > 0) {
+      doorRoomSetByLoad.current -= 1;
+      return;
     }
+
     const current = itemsRef.current;
     if (current.length === 0 || !current.some(i => i.item && i.item.trim().length > 0)) return;
+
+    // Restore originals if switched back
+    if (doorType === originalDoorType.current && originalItemsRef.current.length > 0) {
+      setItems(prev => prev.map((item, idx) => {
+        const orig = originalItemsRef.current[idx];
+        if (!orig) return item;
+        const qty = item.quantity || 1;
+        return {
+          ...item,
+          amount: orig.amount,
+          line_total: orig.amount * qty,
+          discounted_total: item.discount_percent && item.discount_percent > 0
+            ? orig.amount * qty * (1 - item.discount_percent / 100)
+            : orig.amount * qty,
+        };
+      }));
+      return;
+    }
 
     const updateAllPrices = async () => {
       const token    = localStorage.getItem("token");
       const tenantId = localStorage.getItem("tenantId") || "7";
-      const updates  = await Promise.all(
-        current.map(async item => {
-          if (!item.item || item.item.trim().length === 0) return null;
-          const code        = item.item.trim();
-          const hasSuffix   = code.includes("-");
-          const baseCode    = code.split("-")[0];
+
+      const updatePromises = current.map(async item => {
+        if (!item.item || item.item.trim().length === 0) return null;
+        const code        = item.item.trim();
+        const hasSuffix   = code.includes("-");
+        const baseCode    = code.split("-")[0];
+        const isAppliance = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+        const body: any   = { description: code };
+        if (!hasSuffix && !isAppliance) { body.door_type = doorType; body.room_type = roomType; }
+        else if (!isAppliance)          { body.room_type = roomType; }
+        try {
+          const res  = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, "X-Tenant-ID": tenantId },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+          if (data.found) return { id: item.id, price: data.price, description: data.description || data.item_name };
+        } catch { /* silent */ }
+        return null;
+      });
+
+      // ✅ Sub-item lookups
+      const subItemPromises = current.flatMap((item) =>
+        (item.subItems || []).map(async (sub: any) => {
+          if (!sub.item || sub.item.trim().length === 0) return null;
+          const code = sub.item.trim();
+          const hasSuffix = code.includes('-');
+          const baseCode = code.split('-')[0];
           const isAppliance = /^[A-Z]{2,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
-          const body: any   = { description: code };
+          const body: any = { description: code };
           if (!hasSuffix && !isAppliance) { body.door_type = doorType; body.room_type = roomType; }
           else if (!isAppliance)          { body.room_type = roomType; }
           try {
-            const res  = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+            const res = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, "X-Tenant-ID": tenantId },
               body: JSON.stringify(body),
             });
             const data = await res.json();
-            if (data.found) return { id: item.id, price: data.price, description: data.description || data.item_name };
+            if (data.found) return { subId: sub.id, price: data.price, description: data.description || data.item_name };
           } catch { /* silent */ }
           return null;
         })
       );
+
+      const [updates, subItemResults] = await Promise.all([
+        Promise.all(updatePromises),
+        Promise.all(subItemPromises),
+      ]);
+
       setItems(prev => prev.map(item => {
         const hit = updates.find(u => u && u.id === item.id);
-        if (!hit) return item;
-        const newAmount = hit.price;
-        const qty = item.quantity || 1;
-        const lineTotal = newAmount * qty;
-        const discPct = item.discount_percent || 0;
-        return {
-          ...item,
-          amount: newAmount,
-          description: hit.description || item.description,
-          line_total: lineTotal,
-          discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
-        };
+        const updatedItem = hit ? (() => {
+          const newAmount = hit.price;
+          const qty = item.quantity || 1;
+          const lineTotal = newAmount * qty;
+          const discPct = item.discount_percent || 0;
+          return {
+            ...item,
+            amount: newAmount,
+            description: hit.description || item.description,
+            line_total: lineTotal,
+            discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
+          };
+        })() : item;
+
+        // ✅ Update sub-items
+        const updatedSubs = (updatedItem.subItems || []).map((sub: any) => {
+          const subResult = subItemResults.find(r => r && r.subId === sub.id);
+          if (!subResult) return sub;
+          const newAmt = subResult.price;
+          const sQty = sub.quantity || 1;
+          const sLine = newAmt * sQty;
+          const sPct = sub.discount_percent || 0;
+          return {
+            ...sub,
+            amount: newAmt,
+            description: subResult.description || sub.description,
+            line_total: sLine,
+            discounted_total: sPct > 0 ? sLine - sLine * (sPct / 100) : sLine,
+          };
+        });
+
+        return { ...updatedItem, subItems: updatedSubs };
       }));
     };
+
     updateAllPrices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doorType, roomType]);
 
   // ── Dynamic fitting recalculation ─────────────────────────────────────────
