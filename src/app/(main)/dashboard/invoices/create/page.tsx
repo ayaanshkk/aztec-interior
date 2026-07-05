@@ -125,11 +125,9 @@ export default function CreateInvoicePage() {
             email:   q.customer_email   || "",
           }));
 
-          doorRoomSetByLoad.current = 2; // suppress both upcoming effect fires
+          doorRoomSetByLoad.current = 2;
           if (q.door_type) setDoorType(q.door_type);
           if (q.room_type) setRoomType(q.room_type);
-          originalItemsRef.current = mapped;
-          originalDoorType.current = q.door_type || 'Carcass Only';
 
           setRoomName(q.room_name || "");
           if (q.carcass_colour)   setCarcassColour(q.carcass_colour);
