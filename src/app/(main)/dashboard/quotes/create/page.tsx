@@ -308,7 +308,21 @@ export default function CreateQuotePage() {
           setItems(prevItems => prevItems.map(item => {
             if (item.id === id) {
               const qty = fittingQty !== null ? fittingQty : (item.quantity || 1);
-              return { ...item, item: trimmedValue, description: autoDescription, amount: data.price || 0, quantity: qty, width: data.width, height: data.height, depth: data.depth, line_total: (data.price || 0) * qty };
+              const price = data.price || 0;
+              const lineTotal = price * qty;
+              const discPct = item.discount_percent || 0;
+              return {
+                ...item,
+                item: trimmedValue,
+                description: autoDescription,
+                amount: price,
+                quantity: qty,
+                width: data.width,
+                height: data.height,
+                depth: data.depth,
+                line_total: lineTotal,
+                discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
+              };
             }
             return item;
           }));
@@ -445,14 +459,19 @@ export default function CreateQuotePage() {
         setItems((prevItems) =>
           prevItems.map((item) => {
             if (item.id === id) {
+              const price = data.price || 0;
+              const qty = item.quantity || 1;
+              const lineTotal = price * qty;
+              const discPct = item.discount_percent || 0;
               return {
                 ...item,
                 item: data.item_code || item.item,
-                amount: data.price || 0,
+                amount: price,
                 width: data.width,
                 height: data.height,
                 depth: data.depth,
-                line_total: (data.price || 0) * (item.quantity || 1),
+                line_total: lineTotal,
+                discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
               };
             }
             return item;

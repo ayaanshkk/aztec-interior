@@ -466,9 +466,20 @@ export default function EditInvoicePage() {
       if (data.found) {
         setItems(prev => prev.map(item => {
           if (item.id !== id) return item;
-          return { ...item, item: data.item_code || item.item, amount: data.price || 0,
-            width: data.width, height: data.height, depth: data.depth,
-            line_total: (data.price || 0) * (item.quantity || 1) };
+          const price = data.price || 0;
+          const qty = item.quantity || 1;
+          const lineTotal = price * qty;
+          const discPct = item.discount_percent || 0;
+          return {
+            ...item,
+            item: data.item_code || item.item,
+            amount: price,
+            width: data.width,
+            height: data.height,
+            depth: data.depth,
+            line_total: lineTotal,
+            discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
+          };
         }));
       }
     } catch (e) { console.error("Description auto-fill failed:", e); }

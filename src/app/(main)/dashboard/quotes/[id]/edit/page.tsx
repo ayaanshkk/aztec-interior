@@ -407,14 +407,18 @@ export default function EditQuotePage() {
       const data = await response.json();
  
       if (data.found) {
-        const updatedItems = [...items];
+        const price = data.price || 0;
+        const qty = updatedItems[index].quantity || 1;
+        const lineTotal = price * qty;
+        const discPct = updatedItems[index].discount_percent || 0;
         updatedItems[index] = {
           ...updatedItems[index],
-          amount: data.price,
+          amount: price,
           width: data.width,
           height: data.height,
           depth: data.depth,
-          line_total: data.price * (updatedItems[index].quantity || 1),
+          line_total: lineTotal,
+          discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
           price_list_item_id: data.pricelist_id,
         };
         setItems(updatedItems);
@@ -571,16 +575,20 @@ export default function EditQuotePage() {
             const newItems = [...prevItems];
             const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
             const qty = fittingQty !== null ? fittingQty : (newItems[index].quantity || 1);
+            const price = data.price || 0;
+            const lineTotal = price * qty;
+            const discPct = newItems[index].discount_percent || 0;
             newItems[index] = {
               ...newItems[index],
               item: data.item_code || trimmedValue,
               description: autoDescription,
-              amount: data.price || 0,
+              amount: price,
               quantity: qty,
               width: data.width,
               height: data.height,
               depth: data.depth,
-              line_total: (data.price || 0) * qty,
+              line_total: lineTotal,
+              discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
             };
             return newItems;
           });
