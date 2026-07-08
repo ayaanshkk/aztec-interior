@@ -104,9 +104,10 @@ export default function EditInvoicePage() {
       if (!res.ok) { alert("Failed to load invoice"); return; }
       const data = await res.json();
 
-      setVatPercentage(data.vat_rate || 20);
+      setVatPercentage(data.vat_rate !== undefined && data.vat_rate !== null ? data.vat_rate : 20);
       setDeposit(data.deposit_paid || 0);
       if (data.section_discounts) setSectionDiscounts(data.section_discounts);
+      if (data.global_discount_percent !== undefined && data.global_discount_percent !== null) setGlobalDiscountPercent(data.global_discount_percent);
       doorRoomSetByLoad.current = 2; // suppress both fires
       if (data.door_type) setDoorType(data.door_type);
       if (data.room_type) setRoomType(data.room_type);
@@ -588,22 +589,23 @@ export default function EditInvoicePage() {
   };
 
   // ── Computed totals ───────────────────────────────────────────────────────
-  const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
+  const subtotalAfterSectionDiscounts = Math.round(SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    return total + sectionItems.reduce((sum, item) => {
+    const sectionTotal = sectionItems.reduce((sum, item) => {
       const qty = item.quantity || 1;
       const amt = item.amount || 0;
       const pct = item.discount_percent || 0;
-      const itemTotal = pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty;
+      const itemTotal = Math.round((pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty) * 100) / 100;
       const subTotal = (item.subItems || []).reduce((s, sub) => {
         const sQty = sub.quantity || 1;
         const sAmt = sub.amount || 0;
         const sPct = sub.discount_percent || 0;
-        return s + (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty);
+        return s + Math.round((sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty) * 100) / 100;
       }, 0);
-      return sum + itemTotal + subTotal;
+      return sum + Math.round((itemTotal + subTotal) * 100) / 100;
     }, 0);
-  }, 0);
+    return total + Math.round(sectionTotal * 100) / 100;
+  }, 0) * 100) / 100;
 
   const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
   const subtotal = Math.round((subtotalAfterSectionDiscounts - globalDiscountAmount) * 100) / 100;

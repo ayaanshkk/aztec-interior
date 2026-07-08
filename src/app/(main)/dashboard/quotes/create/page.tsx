@@ -211,7 +211,7 @@ export default function CreateQuotePage() {
         setAutoFilling(id);
         const token = localStorage.getItem("token");
         const tenantId = localStorage.getItem("tenantId") || "7";
-        const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW'];
+        const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'PANW'];
         const currentItemsSnapshot = itemsRef.current
           .filter(i => i.id !== id)
           .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));

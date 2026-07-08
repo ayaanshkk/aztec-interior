@@ -325,7 +325,7 @@ export default function EditQuotePage() {
           setGlobalDiscountPercent(data.global_discount_percent);
         }
         // Load VAT percentage if saved
-        if (data.vat_percentage) {
+        if (data.vat_percentage !== undefined && data.vat_percentage !== null) {
           setVatPercentage(data.vat_percentage);
         }
         if (data.section_discounts) {
@@ -462,7 +462,7 @@ export default function EditQuotePage() {
         const token = localStorage.getItem("token");
         const tenantId = localStorage.getItem("tenantId") || "7";
 
-        const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW'];
+        const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'PANW'];
 
         const currentItemsSnapshot = itemsRef.current
           .filter((_, i) => i !== index)
@@ -830,22 +830,23 @@ export default function EditQuotePage() {
   }
 
   // ✅ ADD CALCULATIONS HERE - BEFORE THE RETURN
-  const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
+  const subtotalAfterSectionDiscounts = Math.round(SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    return total + sectionItems.reduce((sum, item) => {
+    const sectionTotal = sectionItems.reduce((sum, item) => {
       const qty = item.quantity || 1;
       const amt = item.amount || 0;
       const pct = item.discount_percent || 0;
-      const itemTotal = pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty;
+      const itemTotal = Math.round((pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty) * 100) / 100;
       const subTotal = (item.subItems || []).reduce((s, sub) => {
         const sQty = sub.quantity || 1;
         const sAmt = sub.amount || 0;
         const sPct = sub.discount_percent || 0;
-        return s + (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty);
+        return s + Math.round((sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty) * 100) / 100;
       }, 0);
       return sum + itemTotal + subTotal;
     }, 0);
-  }, 0);
+    return total + Math.round(sectionTotal * 100) / 100;
+  }, 0) * 100) / 100;
 
 
   const handleAddSubItem = (parentIndex: number) => {

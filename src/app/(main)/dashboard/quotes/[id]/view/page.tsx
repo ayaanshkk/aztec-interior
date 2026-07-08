@@ -58,7 +58,7 @@ export default function ViewQuotePage() {
         setItems(data.items || []);
         
         // Load VAT percentage if saved
-        if (data.vat_percentage) {
+        if (data.vat_percentage !== undefined && data.vat_percentage !== null) {
           setVatPercentage(data.vat_percentage);
         }
       } else {

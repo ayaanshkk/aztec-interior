@@ -134,8 +134,9 @@ export default function CreateInvoicePage() {
           if (q.door_colour)      setDoorColour(q.door_colour);
           if (q.panelwork_colour) setPanelworkColour(q.panelwork_colour);
           if (q.door_style)       setDoorStyle(q.door_style);
-          if (q.vat_percentage)   setVatPercentage(q.vat_percentage);
+          if (q.vat_percentage !== undefined && q.vat_percentage !== null) setVatPercentage(q.vat_percentage);
           if (q.section_discounts) setSectionDiscounts(q.section_discounts);
+          if (q.global_discount_percent !== undefined && q.global_discount_percent !== null) setGlobalDiscountPercent(q.global_discount_percent);
 
           if (q.items && q.items.length > 0) {
             const mapped: InvoiceItem[] = q.items.map((item: any, idx: number) => {
@@ -311,7 +312,7 @@ export default function CreateInvoicePage() {
         setAutoFilling(id);
         const token = localStorage.getItem("token");
         const tenantId = localStorage.getItem("tenantId") || "7";
-        const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW'];
+        const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'PANW'];
         const currentItemsSnapshot = itemsRef.current
           .filter(i => i.id !== id)
           .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
@@ -738,22 +739,23 @@ export default function CreateInvoicePage() {
     if (!formData.address?.trim()) { alert("Customer address is required"); return; }
     if (!roomName.trim()) { alert("Room name is required"); return; }
 
-    const subtotalBeforeDiscount = SECTIONS.reduce((total, section) => {
+    const subtotalBeforeDiscount = Math.round(SECTIONS.reduce((total, section) => {
       const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-      return total + sectionItems.reduce((sum, item) => {
+      const sectionTotal = sectionItems.reduce((sum, item) => {
         const qty = item.quantity || 1;
         const amt = item.amount || 0;
         const pct = item.discount_percent || 0;
-        const itemTotal = pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty;
+        const itemTotal = Math.round((pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty) * 100) / 100;
         const subTotal = (item.subItems || []).reduce((s, sub) => {
           const sQty = sub.quantity || 1;
           const sAmt = sub.amount || 0;
           const sPct = sub.discount_percent || 0;
-          return s + (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty);
+          return s + Math.round((sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty) * 100) / 100;
         }, 0);
-        return sum + itemTotal + subTotal;
+        return sum + Math.round((itemTotal + subTotal) * 100) / 100;
       }, 0);
-    }, 0);
+      return total + Math.round(sectionTotal * 100) / 100;
+    }, 0) * 100) / 100;
 
     const globalDiscountAmount = Math.round(subtotalBeforeDiscount * (globalDiscountPercent / 100) * 100) / 100;
     const subtotal = Math.round((subtotalBeforeDiscount - globalDiscountAmount) * 100) / 100;
@@ -785,6 +787,8 @@ export default function CreateInvoicePage() {
           panelwork_colour: panelworkColour,
           section_discounts: sectionDiscounts,
           door_style: doorStyle,
+          deposit_paid: deposit,
+          total_remaining: Math.max(0, total - deposit),
           items: items
             .filter(i => i.item || i.description || i.line_total > 0)
             .flatMap(i => [
@@ -846,23 +850,23 @@ export default function CreateInvoicePage() {
     }
   };
 
-  const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
+  const subtotalAfterSectionDiscounts = Math.round(SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
     const sectionTotal = sectionItems.reduce((sum, item) => {
       const qty = item.quantity || 1;
       const amt = item.amount || 0;
       const pct = item.discount_percent || 0;
-      const itemTotal = pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty;
+      const itemTotal = Math.round((pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty) * 100) / 100;
       const subTotal = (item.subItems || []).reduce((s, sub) => {
         const sQty = sub.quantity || 1;
         const sAmt = sub.amount || 0;
         const sPct = sub.discount_percent || 0;
-        return s + (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty);
+        return s + Math.round((sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty) * 100) / 100;
       }, 0);
-      return sum + itemTotal + subTotal;
+      return sum + Math.round((itemTotal + subTotal) * 100) / 100;
     }, 0);
-    return total + sectionTotal;
-  }, 0);
+    return total + Math.round(sectionTotal * 100) / 100;
+  }, 0) * 100) / 100;
 
   const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
   const subtotal = Math.round((subtotalAfterSectionDiscounts - globalDiscountAmount) * 100) / 100;

@@ -46,8 +46,8 @@ export default function ViewInvoicePage() {
         const data = await res.json();
         setInvoice(data);
         setItems(data.items || []);
-        if (data.vat_rate)               setVatPercentage(data.vat_rate);
-        if (data.global_discount_percent) setGlobalDiscountPercent(data.global_discount_percent);
+        if (data.vat_rate !== undefined && data.vat_rate !== null)                             setVatPercentage(data.vat_rate);
+        if (data.global_discount_percent !== undefined && data.global_discount_percent !== null) setGlobalDiscountPercent(data.global_discount_percent);
       } else {
         alert("Failed to load invoice");
       }
@@ -79,27 +79,27 @@ export default function ViewInvoicePage() {
 
   const sectionDiscountsData = invoice?.section_discounts || {};
 
-  const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
+  const subtotalAfterSectionDiscounts = Math.round(SECTIONS.reduce((total, section) => {
     const sectionItems = validItems.filter(i => (i.section || 'Furniture') === section);
     const sectionTotal = sectionItems.reduce((sum, item) => {
-      const itemTotal = (item.discount_percent && item.discount_percent > 0)
+      const itemTotal = Math.round(((item.discount_percent && item.discount_percent > 0)
         ? (item.discounted_total ?? item.discounted_amount ?? (item.amount || 0) * (item.quantity || 1))
-        : (item.amount || 0) * (item.quantity || 1);
+        : (item.amount || 0) * (item.quantity || 1)) * 100) / 100;
       const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
-        s + ((sub.discount_percent && sub.discount_percent > 0)
+        s + Math.round(((sub.discount_percent && sub.discount_percent > 0)
           ? (sub.discounted_total ?? sub.discounted_amount ?? (sub.amount || 0) * (sub.quantity || 1))
-          : (sub.amount || 0) * (sub.quantity || 1)), 0);
-      return sum + itemTotal + subTotal;
+          : (sub.amount || 0) * (sub.quantity || 1)) * 100) / 100, 0);
+      return sum + Math.round((itemTotal + subTotal) * 100) / 100;
     }, 0);
-    return total + sectionTotal;
-  }, 0);
+    return total + Math.round(sectionTotal * 100) / 100;
+  }, 0) * 100) / 100;
 
-  const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
-  const subtotal             = subtotalAfterSectionDiscounts - globalDiscountAmount;
-  const vat                  = subtotal * (vatPercentage / 100);
-  const total                = subtotal + vat;
-  const deposit              = invoice.deposit_paid    || 0;
-  const totalRemaining       = invoice.total_remaining ?? Math.max(0, total - deposit);
+  const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
+  const subtotal             = Math.round((subtotalAfterSectionDiscounts - globalDiscountAmount) * 100) / 100;
+  const vat                  = Math.round(subtotal * (vatPercentage / 100) * 100) / 100;
+  const total                = Math.round((subtotal + vat) * 100) / 100;
+  const deposit        = invoice.deposit_paid || 0;
+  const totalRemaining = Math.max(0, total - deposit);
 
   return (
     <div className="min-h-screen bg-white">

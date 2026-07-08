@@ -63,10 +63,10 @@ export default function ViewQuotePage() {
         setItems(data.items || []);
         
         // Load VAT percentage if saved
-        if (data.vat_percentage) {
+        if (data.vat_percentage !== undefined && data.vat_percentage !== null) {
           setVatPercentage(data.vat_percentage);
         }
-        if (data.global_discount_percent) {
+        if (data.global_discount_percent !== undefined && data.global_discount_percent !== null) {
           setGlobalDiscountPercent(data.global_discount_percent);
         }
       } else {
@@ -114,9 +114,12 @@ export default function ViewQuotePage() {
       door_colour:      quotation.door_colour      || "",
       panelwork_colour: quotation.panelwork_colour || "",
       door_style:       quotation.door_style       || "",
-      vat_percentage:   quotation.vat_percentage   || quotation.vat_rate || 20,
+      vat_percentage:   (quotation.vat_percentage !== undefined && quotation.vat_percentage !== null)
+                          ? quotation.vat_percentage
+                          : (quotation.vat_rate ?? 20),
       client_id:        quotation.client_id        || quotation.customer_id || null,
       section_discounts: quotation.section_discounts || {},
+      global_discount_percent: quotation.global_discount_percent || 0,
       items: (quotation.items || []).map((item: any) => ({
         item:             item.item        || item.item_code || "",
         description:      item.description || "",
