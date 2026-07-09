@@ -93,16 +93,6 @@ export default function EditQuotePage() {
     }).format(value);
   };
 
-  // ✅ NEW: Initialize door type and room type from URL params
-  useEffect(() => {
-    const urlDoorType = searchParams.get("doorType");
-    const urlRoomType = searchParams.get("roomType");
-    let count = 0;
-    if (urlDoorType) { setDoorType(urlDoorType); originalDoorType.current = urlDoorType; count++; }
-    if (urlRoomType) { setRoomType(urlRoomType); count++; }
-    if (count > 0) doorRoomSetByLoad.current += count;
-  }, [searchParams]);
-
   useEffect(() => {
     fetchQuotation();
   }, [quoteId]);
@@ -328,15 +318,12 @@ export default function EditQuotePage() {
         }
         const urlDoorType = searchParams.get("doorType");
         const urlRoomType = searchParams.get("roomType");
-        if (!urlDoorType && data.door_type) {
-          setDoorType(data.door_type);
-          originalDoorType.current = data.door_type;
-          doorRoomSetByLoad.current += 1;
-        }
-        if (!urlRoomType && data.room_type) {
-          setRoomType(data.room_type);
-          doorRoomSetByLoad.current += 1;
-        }
+        const finalDoorType = urlDoorType || data.door_type;
+        const finalRoomType = urlRoomType || data.room_type;
+        doorRoomSetByLoad.current = 2;
+        if (finalDoorType) { setDoorType(finalDoorType); originalDoorType.current = finalDoorType; }
+        if (finalRoomType) { setRoomType(finalRoomType); }
+        
         setCarcassColour(data.carcass_colour || '');
         setDoorColour(data.door_colour || '');
         setPanelworkColour(data.panelwork_colour || '');
