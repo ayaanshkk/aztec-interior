@@ -1376,8 +1376,15 @@ export default function EditQuotePage() {
                             <td className="border border-black p-0">
                               <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(index, subIndex, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
                             </td>
-                            <td className="border border-black px-2 py-1 text-right text-xs">
-                              {sub.discount_percent && sub.discount_percent > 0 ? formatCurrency(sub.discounted_total || 0) : formatCurrency(sub.line_total)}
+                            <td className="border border-black px-2 py-1 text-right">
+                              {sub.discount_percent && sub.discount_percent > 0 ? (
+                                <div>
+                                  <div className="text-xs text-gray-500 line-through">{formatCurrency(sub.line_total)}</div>
+                                  <div className="font-semibold text-green-700 text-xs">{formatCurrency(sub.discounted_total || 0)}</div>
+                                </div>
+                              ) : (
+                                <span className="font-semibold text-xs">{formatCurrency(sub.line_total)}</span>
+                              )}
                             </td>
                             <td className="border border-black p-1 text-center">
                               <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(index, subIndex)} className="text-red-600 hover:bg-red-50 h-6 w-6">

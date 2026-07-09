@@ -156,12 +156,38 @@ export default function CreateQuotePage() {
         }
       });
 
-      const results = await Promise.all(updatePromises);
+      const subItemPromises = currentItems.flatMap((item) =>
+        (item.subItems || []).map(async (sub: any) => {
+          if (!sub.item || sub.item.trim().length === 0) return null;
+          const code = sub.item.trim();
+          const hasSuffix = code.includes('-');
+          const baseCode = code.split('-')[0];
+          const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+          const requestBody: any = { description: code };
+          if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; }
+          else if (!isApplianceCode)          { requestBody.room_type = roomType; }
+          try {
+            const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+              body: JSON.stringify(requestBody),
+            });
+            const data = await response.json();
+            if (data.found) return { subId: sub.id, price: data.price, description: data.description || data.item_name };
+          } catch { /* silent */ }
+          return null;
+        })
+      );
+
+      const [results, subItemResults] = await Promise.all([
+        Promise.all(updatePromises),
+        Promise.all(subItemPromises),
+      ]);
 
       setItems((prevItems) =>
         prevItems.map((item) => {
           const result = results.find((r) => r && r.id === item.id);
-          if (result) {
+          const updatedItem = result ? (() => {
             const newAmount = result.price;
             const qty = item.quantity || 1;
             const lineTotal = newAmount * qty;
@@ -173,8 +199,25 @@ export default function CreateQuotePage() {
               line_total: lineTotal,
               discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
             };
-          }
-          return item;
+          })() : item;
+
+          const updatedSubs = (updatedItem.subItems || []).map((sub: any) => {
+            const subResult = subItemResults.find(r => r && r.subId === sub.id);
+            if (!subResult) return sub;
+            const newAmt = subResult.price;
+            const sQty = sub.quantity || 1;
+            const sLine = newAmt * sQty;
+            const sPct = sub.discount_percent || 0;
+            return {
+              ...sub,
+              amount: newAmt,
+              description: subResult.description || sub.description,
+              line_total: sLine,
+              discounted_total: sPct > 0 ? sLine - sLine * (sPct / 100) : sLine,
+            };
+          });
+
+          return { ...updatedItem, subItems: updatedSubs };
         })
       );
     };
@@ -1087,7 +1130,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                               <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
                             </td>
                             <td className="border border-black p-0">
-                              <Input type="number" step="0.01" value={item.amount} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
+                              <Input type="number" step="0.01" value={parseFloat((item.amount || 0).toFixed(2))} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
                             </td>
                             <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
                               {formatCurrency(item.line_total)}
@@ -1161,10 +1204,15 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                               <td className="border border-black p-0">
                                 <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(item.id, sub.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
                               </td>
-                              <td className="border border-black px-2 py-1 text-right text-xs">
-                                {sub.discount_percent && sub.discount_percent > 0
-                                  ? formatCurrency(sub.discounted_total || 0)
-                                  : formatCurrency(sub.line_total)}
+                              <td className="border border-black px-2 py-1 text-right">
+                                {sub.discount_percent && sub.discount_percent > 0 ? (
+                                  <div>
+                                    <div className="text-xs text-gray-500 line-through">{formatCurrency(sub.line_total)}</div>
+                                    <div className="font-semibold text-green-700 text-xs">{formatCurrency(sub.discounted_total || 0)}</div>
+                                  </div>
+                                ) : (
+                                  <span className="font-semibold text-xs">{formatCurrency(sub.line_total)}</span>
+                                )}
                               </td>
                               <td className="border border-black p-1 text-center">
                                 <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(item.id, sub.id)} className="text-red-600 hover:bg-red-50 h-6 w-6">
