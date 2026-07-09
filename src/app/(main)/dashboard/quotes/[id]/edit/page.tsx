@@ -43,7 +43,7 @@ export default function EditQuotePage() {
   const originalItemsRef = useRef<QuoteItem[]>([]);
   const originalDoorType = useRef<string>('');
   useEffect(() => { itemsRef.current = items; }, [items]);
-  const doorRoomSetByLoad = useRef(false);
+  const doorRoomSetByLoad = useRef(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [autoFilling, setAutoFilling] = useState<number | null>(null);
@@ -97,15 +97,10 @@ export default function EditQuotePage() {
   useEffect(() => {
     const urlDoorType = searchParams.get("doorType");
     const urlRoomType = searchParams.get("roomType");
-    if (urlDoorType) {
-      doorRoomSetByLoad.current = true;
-      setDoorType(urlDoorType);
-      originalDoorType.current = urlDoorType;
-    }
-    if (urlRoomType) {
-      doorRoomSetByLoad.current = true;
-      setRoomType(urlRoomType);
-    }
+    let count = 0;
+    if (urlDoorType) { setDoorType(urlDoorType); originalDoorType.current = urlDoorType; count++; }
+    if (urlRoomType) { setRoomType(urlRoomType); count++; }
+    if (count > 0) doorRoomSetByLoad.current += count;
   }, [searchParams]);
 
   useEffect(() => {
@@ -114,8 +109,8 @@ export default function EditQuotePage() {
 
   // ✅ NEW: Update all prices when door type or room type changes
   useEffect(() => {
-    if (doorRoomSetByLoad.current) {
-      doorRoomSetByLoad.current = false;
+    if (doorRoomSetByLoad.current > 0) {
+      doorRoomSetByLoad.current -= 1;
       return;
     }
 
@@ -334,13 +329,13 @@ export default function EditQuotePage() {
         const urlDoorType = searchParams.get("doorType");
         const urlRoomType = searchParams.get("roomType");
         if (!urlDoorType && data.door_type) {
-          doorRoomSetByLoad.current = true;
           setDoorType(data.door_type);
-          originalDoorType.current = data.door_type;  // ← ADD THIS
+          originalDoorType.current = data.door_type;
+          doorRoomSetByLoad.current += 1;
         }
         if (!urlRoomType && data.room_type) {
-          doorRoomSetByLoad.current = true; // ← ADD
           setRoomType(data.room_type);
+          doorRoomSetByLoad.current += 1;
         }
         setCarcassColour(data.carcass_colour || '');
         setDoorColour(data.door_colour || '');
