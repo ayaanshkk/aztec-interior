@@ -76,8 +76,9 @@ export default function CreateQuotePage() {
   const [roomName, setRoomName] = useState('');
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
-  const itemsLoadedFromQuote = useRef(false);  
-
+  const itemsLoadedFromQuote = useRef(false);
+  const [fillerType, setFillerType] = useState<string>('Basic Slab');
+  
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
   };
@@ -131,8 +132,10 @@ export default function CreateQuotePage() {
         if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
+          requestBody.filler_door_type = fillerType;
         } else if (!isApplianceCode) {
           requestBody.room_type = roomType;
+          requestBody.filler_door_type = fillerType;
         }
 
         try {
@@ -164,8 +167,8 @@ export default function CreateQuotePage() {
           const baseCode = code.split('-')[0];
           const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
           const requestBody: any = { description: code };
-          if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; }
-          else if (!isApplianceCode)          { requestBody.room_type = roomType; }
+          if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
+          else if (!isApplianceCode)          { requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
           try {
             const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
               method: "POST",
@@ -332,8 +335,10 @@ export default function CreateQuotePage() {
         if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
+          requestBody.filler_door_type = fillerType;
         } else if (!isApplianceCode) {
           requestBody.room_type = roomType;
+          requestBody.filler_door_type = fillerType;
         }
         const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
           method: "POST",
@@ -493,6 +498,9 @@ export default function CreateQuotePage() {
           description: value,
           door_type: doorType,
           room_type: roomType,
+          filler_type: fillerType,
+          room_name: roomName,
+          filler_door_type: fillerType,
         }),
       });
 
@@ -595,6 +603,7 @@ export default function CreateQuotePage() {
           date: formData.date,
           door_type: doorType,
           room_type: roomType,
+          filler_door_type: fillerType,
           room_name: roomName,
           carcass_colour: carcassColour,
           door_colour: doorColour,
@@ -743,8 +752,10 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
       if (!hasSuffix && !isApplianceCode) {
         requestBody.door_type = doorType;
         requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
       } else if (!isApplianceCode) {
         requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
       }
 
       const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
@@ -872,7 +883,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
         <h1 className="mb-6 text-center text-2xl font-bold">QUOTATION</h1>
 
         {/* Door Type and Room Type */}
-        <div className="mb-6 grid grid-cols-2 gap-4">
+        <div className="mb-6 grid grid-cols-3 gap-4">
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">
               Room Type <span className="text-red-600">*</span>
@@ -901,6 +912,21 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
               <option value="Timber">Timber</option>
               <option value="Vinyl">Vinyl</option>
               <option value="Black Glass">Black Glass</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Fillers & End Panels Type
+            </label>
+            <select
+              value={fillerType}
+              onChange={(e) => setFillerType(e.target.value)}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Basic Slab">Slab</option>
+              <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
+              <option value="Vinyl Doors">Vinyl Doors</option>
+              <option value="Timber">Timber</option>
             </select>
           </div>
         </div>

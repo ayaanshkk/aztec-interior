@@ -61,6 +61,7 @@ export default function EditQuotePage() {
   const [doorStyle, setDoorStyle] = useState<string>('');
   const [roomName, setRoomName] = useState('');
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
+  const [fillerType, setFillerType] = useState<string>('Basic Slab');
 
   // Customer form data
   const [customerData, setCustomerData] = useState({
@@ -147,10 +148,11 @@ export default function EditQuotePage() {
         if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
+          requestBody.filler_door_type = fillerType;
         } else if (!isApplianceCode) {
           requestBody.room_type = roomType;
+          requestBody.filler_door_type = fillerType;
         }
-
         try {
           const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
             method: "POST",
@@ -187,8 +189,10 @@ export default function EditQuotePage() {
           if (!hasSuffix && !isApplianceCode) {
             requestBody.door_type = doorType;
             requestBody.room_type = roomType;
+            requestBody.filler_door_type = fillerType;
           } else if (!isApplianceCode) {
             requestBody.room_type = roomType;
+            requestBody.filler_door_type = fillerType;
           }
           try {
             const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
@@ -322,7 +326,8 @@ export default function EditQuotePage() {
         const finalRoomType = urlRoomType || data.room_type;
         doorRoomSetByLoad.current = 2;
         if (finalDoorType) { setDoorType(finalDoorType); originalDoorType.current = finalDoorType; }
-        if (finalRoomType) { setRoomType(finalRoomType); }
+        if (finalRoomType) { setRoomType(finalRoomType);
+        if (data.filler_type) setFillerType(data.filler_type); }
         
         setCarcassColour(data.carcass_colour || '');
         setDoorColour(data.door_colour || '');
@@ -367,13 +372,14 @@ export default function EditQuotePage() {
         description: value,
         door_type: doorType,
         room_type: roomType,
+        filler_door_type: fillerType,
       };
-
       // If it's an appliance code, don't send door_type
       if (isApplianceCode) {
         console.log('🔥 Detected appliance code pattern');
         delete requestBody.door_type;
         delete requestBody.room_type;
+        delete requestBody.filler_door_type;
       }
       
       const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
@@ -532,9 +538,9 @@ export default function EditQuotePage() {
       if (!isApplianceCode) {
         requestBody.door_type = doorType;
         requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
       }
-
-      fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+      fetch(`${BACKEND_URL}/quotations/auto-price-lookup`,{
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -730,6 +736,7 @@ export default function EditQuotePage() {
           date: customerData.date,
           door_type: doorType,
           room_type: roomType,
+          filler_type: fillerType,
           section_discounts: sectionDiscounts,
           room_name: roomName,
           carcass_colour: carcassColour,
@@ -902,17 +909,17 @@ export default function EditQuotePage() {
       if (!hasSuffix && !isApplianceCode) {
         requestBody.door_type = doorType;
         requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
       } else if (!isApplianceCode) {
         requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
       }
-
       const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
         body: JSON.stringify(requestBody),
       });
       const data = await response.json();
-
       if (data.found) {
         let autoDescription = data.description || data.item_name || '';
         if (data.is_fitting) autoDescription = data.item_name || '';
@@ -1016,7 +1023,7 @@ export default function EditQuotePage() {
         <h1 className="mb-6 text-center text-2xl font-bold">QUOTATION</h1>
 
         {/* ✅ NEW: Door Type and Room Type Selection */}
-        <div className="mb-6 grid grid-cols-2 gap-4">
+        <div className="mb-6 grid grid-cols-3 gap-4">
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">
               Room Type <span className="text-red-600">*</span>
@@ -1048,8 +1055,23 @@ export default function EditQuotePage() {
               <option value="Black Glass">Black Glass</option>
             </select>
           </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Fillers & End Panels Type
+            </label>
+            <select
+              value={fillerType}
+              onChange={(e) => setFillerType(e.target.value)}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Basic Slab">Slab</option>
+              <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
+              <option value="Vinyl Doors">Vinyl Doors</option>
+              <option value="Timber">Timber</option>
+            </select>
+          </div>
         </div>
-
+        
         {/* ✅ NEW: Info Banner */}
         <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-4">
           <p className="font-medium text-sm text-blue-900 mb-2">
