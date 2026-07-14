@@ -2216,8 +2216,10 @@ export default function CustomerDetailsPage() {
         const room = formDataRaw?.room?.trim();
         return room ? `Bedroom Checklist – ${room}` : "Bedroom Checklist";
       }
-      case "kitchen":
-        return "Kitchen Checklist";
+      case "kitchen": {
+        const room = formDataRaw?.room?.trim();
+        return room ? `Kitchen Checklist – ${room}` : "Kitchen Checklist";
+      }
       case "document":
         const parts = formTypeRaw.split(/[-_]/);
         const cleanedParts = parts.filter((word: string, index: number) => {

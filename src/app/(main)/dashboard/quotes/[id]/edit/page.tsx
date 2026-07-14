@@ -105,6 +105,8 @@ export default function EditQuotePage() {
       return;
     }
 
+    if (loading) return;
+
     const updateAllPrices = async () => {
       if (items.length === 0 || loading) return;
 
@@ -144,8 +146,15 @@ export default function EditQuotePage() {
         const baseCode = itemCode.split('-')[0];
         const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
 
+        const FILLER_SUFFIXES = ['-S', '-LS', '-V', '-T'];
+        const isFillerSuffix = FILLER_SUFFIXES.some(s => itemCode.endsWith(s));
+        const isFillerItem = item.section === 'Fillers and End Panels';
+
         const requestBody: any = { description: itemCode };
-        if (!hasSuffix && !isApplianceCode) {
+        if (isFillerItem || isFillerSuffix) {
+          requestBody.room_type = roomType;
+          requestBody.filler_door_type = fillerType;
+        } else if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
           requestBody.filler_door_type = fillerType;
@@ -186,8 +195,14 @@ export default function EditQuotePage() {
           const baseCode = code.split('-')[0];
           const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
           const requestBody: any = { description: code };
+          const FILLER_SUFFIXES_SUB = ['-S', '-LS', '-V', '-T'];
+          const isFillerSuffixSub = FILLER_SUFFIXES_SUB.some(s => code.endsWith(s));
+
           if (!hasSuffix && !isApplianceCode) {
             requestBody.door_type = doorType;
+            requestBody.room_type = roomType;
+            requestBody.filler_door_type = fillerType;
+          } else if (isFillerSuffixSub) {
             requestBody.room_type = roomType;
             requestBody.filler_door_type = fillerType;
           } else if (!isApplianceCode) {
@@ -251,10 +266,10 @@ export default function EditQuotePage() {
     };
 
     const hasItemsWithCodes = items.some(item => item.item && item.item.trim().length > 0);
-    if (hasItemsWithCodes && !loading) {
+    if (hasItemsWithCodes) {
       updateAllPrices();
     }
-  }, [doorType, roomType]);
+  }, [doorType, roomType, fillerType]);
  
   const fetchQuotation = async () => {
     try {
@@ -326,8 +341,10 @@ export default function EditQuotePage() {
         const finalRoomType = urlRoomType || data.room_type;
         doorRoomSetByLoad.current = 2;
         if (finalDoorType) { setDoorType(finalDoorType); originalDoorType.current = finalDoorType; }
-        if (finalRoomType) { setRoomType(finalRoomType);
-        if (data.filler_type) setFillerType(data.filler_type); }
+        if (finalRoomType) { setRoomType(finalRoomType); }
+        if (data.filler_type || data.filler_door_type) {
+          setFillerType(data.filler_type || data.filler_door_type);
+        }
         
         setCarcassColour(data.carcass_colour || '');
         setDoorColour(data.door_colour || '');
@@ -737,6 +754,8 @@ export default function EditQuotePage() {
           door_type: doorType,
           room_type: roomType,
           filler_type: fillerType,
+          filler_type: fillerType,
+          filler_door_type: fillerType,
           section_discounts: sectionDiscounts,
           room_name: roomName,
           carcass_colour: carcassColour,

@@ -49,6 +49,7 @@ export default function KitchenChecklist() {
     customer_address: "",
     customer_postcode: "",
     postcode: "",
+    room: "",
     survey_date: "",
     appointment_date: "",
     installation_date: "",
@@ -401,6 +402,7 @@ export default function KitchenChecklist() {
       errors.push("Postcode");
     }
 
+    if (!formData.room?.trim()) errors.push("Room");
     if (!formData.door_style?.trim()) errors.push("Door Style");
     if (!formData.door_color?.trim()) errors.push("Door Color");
     if (formData.door_style === "glazed" && !formData.glazing_material?.trim()) errors.push("Glazing Material");
@@ -642,7 +644,7 @@ export default function KitchenChecklist() {
             {/* Customer Information */}
             <div className="mb-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-6 print:mb-2 print:p-3">
               <h3 className="mb-4 text-xl font-bold text-blue-900 print:mb-2">Customer Information</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-4 print:gap-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-5 print:gap-2">  {/* ← 4 → 5 */}
                 <div>
                   <label className="mb-1 block text-sm font-bold text-gray-700">Customer Name</label>
                   <Input 
@@ -677,6 +679,15 @@ export default function KitchenChecklist() {
                     }}
                     className="bg-white" 
                     placeholder="Enter postcode"
+                  />
+                </div>
+                <div>  {/* ← ADD THIS BLOCK */}
+                  <label className="mb-1 block text-sm font-bold text-gray-700">Room</label>
+                  <Input 
+                    value={formData.room || ""} 
+                    onChange={(e) => handleInputChange("room", e.target.value)}
+                    className="bg-white" 
+                    placeholder="e.g. Kitchen"
                   />
                 </div>
               </div>

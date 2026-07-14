@@ -465,6 +465,11 @@ function ChecklistViewContent() {
   const handleSave = async () => {
     if (!formData || !canEdit() || isSaving) return;
 
+    if (!formData.room?.trim()) {
+      alert("Please fill in the Room field before saving.");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const token = localStorage.getItem("token");
@@ -1153,7 +1158,7 @@ function ChecklistViewContent() {
             {/* Customer Information - Blue Section */}
             <div className="mb-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-6 print:mb-2 print:p-3">
               <h3 className="mb-4 text-xl font-bold text-blue-900 print:mb-2">Customer Information</h3>
-              <div className={`grid grid-cols-1 gap-4 ${formType === "bedroom" ? "md:grid-cols-4" : "md:grid-cols-3"} print:gap-2`}>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4 print:gap-2">
                 <div>
                   <label className="mb-1 block text-sm font-bold text-gray-700">Customer Name</label>
                   <Input 
@@ -1181,17 +1186,15 @@ function ChecklistViewContent() {
                     className="bg-white" 
                   />
                 </div>
-                {formType === "bedroom" && (
-                  <div>
-                    <label className="mb-1 block text-sm font-bold text-gray-700">Room</label>
-                    <Input 
-                      value={formData.room || ""} 
-                      onChange={(e) => handleInputChange("room", e.target.value)}
-                      readOnly={!isEditing} 
-                      className="bg-white" 
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="mb-1 block text-sm font-bold text-gray-700">Room</label>
+                  <Input 
+                    value={formData.room || ""} 
+                    onChange={(e) => handleInputChange("room", e.target.value)}
+                    readOnly={!isEditing} 
+                    className="bg-white" 
+                  />
+                </div>
               </div>
             </div>
 
@@ -3371,7 +3374,11 @@ function ChecklistViewContent() {
 
               {formData.signature_data && (signatureMode === "existing" || !isEditing) && (
                 <div className="mb-4 rounded-lg border border-gray-300 bg-white p-4">
-                  <img src={formData.signature_data} alt="Customer Signature" className="mx-auto max-h-32" />
+                  {formData.signature_data.startsWith("data:image") ? (
+                    <img src={formData.signature_data} alt="Customer Signature" className="mx-auto max-h-32" />
+                  ) : (
+                    <p className="text-left font-signature text-2xl italic text-gray-800">{formData.signature_data}</p>
+                  )}
                 </div>
               )}
               

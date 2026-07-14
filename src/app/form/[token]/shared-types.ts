@@ -64,6 +64,7 @@ export interface AdditionalWorktop {
 }
 
 export interface KitchenFormData extends BaseFormData {
+  room: string;
   accessories: string;
   lighting_spec: string;
   worktop_material_type: string;

@@ -405,6 +405,11 @@ export default function ChecklistViewPage() {
   const handleSave = async () => {
     if (!formData || !canEdit() || isSaving) return;
 
+    if (!formData.room?.trim()) {
+      alert("Please fill in the Room field before saving.");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const token = localStorage.getItem("token");
@@ -680,7 +685,7 @@ export default function ChecklistViewPage() {
             {/* Customer Information - Blue Section */}
             <div className="mb-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-6">
               <h3 className="mb-4 text-xl font-bold text-blue-900">Customer Information</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">  {/* ← 3 → 4 */}
                 <div>
                   <label className="mb-1 block text-sm font-bold text-gray-700">Customer Name</label>
                   <Input
@@ -712,18 +717,16 @@ export default function ChecklistViewPage() {
                     disabled={!isEditing}
                   />
                 </div>
-                {formType === "bedroom" && (
-                  <div>
-                    <label className="mb-1 block text-sm font-bold text-gray-700">Room</label>
-                    <Input
-                      placeholder="Enter room details"
-                      className="w-full bg-white"
-                      value={formData.room || ""}
-                      onChange={(e) => handleInputChange("room", e.target.value)}
-                      disabled={!isEditing}
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="mb-1 block text-sm font-bold text-gray-700">Room</label>
+                  <Input
+                    placeholder="Enter room details"
+                    className="w-full bg-white"
+                    value={formData.room || ""}
+                    onChange={(e) => handleInputChange("room", e.target.value)}
+                    disabled={!isEditing}
+                  />
+                </div>
               </div>
             </div>
 
