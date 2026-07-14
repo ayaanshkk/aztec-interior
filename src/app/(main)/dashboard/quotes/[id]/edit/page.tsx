@@ -62,6 +62,8 @@ export default function EditQuotePage() {
   const [roomName, setRoomName] = useState('');
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [fillerType, setFillerType] = useState<string>('Basic Slab');
+  const lastChangedField = useRef<'door' | 'filler' | 'room' | null>(null);
+
 
   // Customer form data
   const [customerData, setCustomerData] = useState({
@@ -105,13 +107,13 @@ export default function EditQuotePage() {
       return;
     }
 
-    if (loading) return;
-
     const updateAllPrices = async () => {
-      if (items.length === 0 || loading) return;
+      if (itemsRef.current.length === 0) return;
 
-      // ✅ If user returned to original door type, restore saved prices instead of re-fetching
-      if (doorType === originalDoorType.current && originalItemsRef.current.length > 0) {
+      const originalFillerType = (originalItemsRef.current as any).__fillerType || null;
+
+      // Restore original prices if user switches back to original door type
+      if (lastChangedField.current === 'door' && doorType === originalDoorType.current && originalItemsRef.current.length > 0) {
         setItems(prevItems =>
           prevItems.map((item, index) => {
             const original = originalItemsRef.current[index];
@@ -130,6 +132,29 @@ export default function EditQuotePage() {
             };
           })
         );
+        lastChangedField.current = null;
+        return;
+      }
+
+      // Restore filler-section prices if user switches back to original filler type
+      if (lastChangedField.current === 'filler' && fillerType === originalFillerType && originalItemsRef.current.length > 0) {
+        setItems(prevItems =>
+          prevItems.map((item, index) => {
+            if (item.section !== 'Fillers and End Panels') return item;
+            const original = originalItemsRef.current[index];
+            if (!original) return item;
+            return {
+              ...item,
+              amount: original.amount,
+              description: original.description,
+              line_total: (item.quantity || 1) * original.amount,
+              discounted_total: item.discount_percent && item.discount_percent > 0
+                ? calculateDiscountedTotal(item.quantity || 1, original.amount, item.discount_percent)
+                : (item.quantity || 1) * original.amount,
+            };
+          })
+        );
+        lastChangedField.current = null;
         return;
       }
 
@@ -137,7 +162,7 @@ export default function EditQuotePage() {
       const tenantId = localStorage.getItem("tenantId") || "7";
       const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW', 'FITTING'];
 
-      const updatePromises = items.map(async (item, index) => {
+      const updatePromises = itemsRef.current.map(async (item, index) => {
         const itemCode = (item.item || '').trim();
         if (!itemCode) return null;
         if (FITTING_CODES.includes(itemCode.toUpperCase())) return null;
@@ -187,7 +212,7 @@ export default function EditQuotePage() {
         }
       });
 
-      const subItemPromises = items.flatMap((item) =>
+      const subItemPromises = itemsRef.current.flatMap((item) =>
         (item.subItems || []).map(async (sub: any) => {
           if (!sub.item || sub.item.trim().length === 0) return null;
           const code = sub.item.trim();
@@ -263,9 +288,11 @@ export default function EditQuotePage() {
           return { ...updatedItem, subItems: updatedSubs };
         })
       );
+
+      lastChangedField.current = null;
     };
 
-    const hasItemsWithCodes = items.some(item => item.item && item.item.trim().length > 0);
+    const hasItemsWithCodes = itemsRef.current.some(item => item.item && item.item.trim().length > 0);
     if (hasItemsWithCodes) {
       updateAllPrices();
     }
@@ -324,6 +351,7 @@ export default function EditQuotePage() {
         }));
         setItems(itemsWithTotals);
         originalItemsRef.current = itemsWithTotals;
+        (originalItemsRef.current as any).__fillerType = data.filler_type || data.filler_door_type || 'Basic Slab';
 
         if (data.global_discount_percent) {
           setGlobalDiscountPercent(data.global_discount_percent);
@@ -339,9 +367,14 @@ export default function EditQuotePage() {
         const urlRoomType = searchParams.get("roomType");
         const finalDoorType = urlDoorType || data.door_type;
         const finalRoomType = urlRoomType || data.room_type;
-        doorRoomSetByLoad.current = 2;
-        if (finalDoorType) { setDoorType(finalDoorType); originalDoorType.current = finalDoorType; }
-        if (finalRoomType) { setRoomType(finalRoomType); }
+        doorRoomSetByLoad.current = 1; // only 1 fire even if 3 states change in same batch
+
+        if (finalDoorType) { originalDoorType.current = finalDoorType; }
+
+        // Use flushSync or just set all 3 together via a single ref, then trigger:
+        // React batches these in the same event handler, so effect fires once:
+        if (finalDoorType) setDoorType(finalDoorType);
+        if (finalRoomType) setRoomType(finalRoomType);
         if (data.filler_type || data.filler_door_type) {
           setFillerType(data.filler_type || data.filler_door_type);
         }
@@ -754,7 +787,6 @@ export default function EditQuotePage() {
           door_type: doorType,
           room_type: roomType,
           filler_type: fillerType,
-          filler_type: fillerType,
           filler_door_type: fillerType,
           section_discounts: sectionDiscounts,
           room_name: roomName,
@@ -1049,7 +1081,7 @@ export default function EditQuotePage() {
             </label>
             <select
               value={roomType}
-              onChange={(e) => setRoomType(e.target.value)}
+              onChange={(e) => { lastChangedField.current = 'room'; setRoomType(e.target.value); }}
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Kitchen">Kitchen</option>
@@ -1063,7 +1095,7 @@ export default function EditQuotePage() {
             </label>
             <select
               value={doorType}
-              onChange={(e) => setDoorType(e.target.value)}
+              onChange={(e) => { lastChangedField.current = 'door'; setDoorType(e.target.value); }}
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm"
             >
               <option value="Carcass Only">Carcass Only (No Doors/Drawers)</option>
@@ -1080,7 +1112,7 @@ export default function EditQuotePage() {
             </label>
             <select
               value={fillerType}
-              onChange={(e) => setFillerType(e.target.value)}
+              onChange={(e) => { lastChangedField.current = 'filler'; setFillerType(e.target.value); }}
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Basic Slab">Slab</option>

@@ -131,6 +131,8 @@ export default function CreateQuotePage() {
         const isFillerSuffix = FILLER_SUFFIXES.some(s => itemCode.endsWith(s));
         const isFillerItem = item.section === 'Fillers and End Panels';
 
+        const requestBody: any = { description: itemCode };
+
         if (isFillerItem || isFillerSuffix) {
           requestBody.room_type = roomType;
           requestBody.filler_door_type = fillerType;
