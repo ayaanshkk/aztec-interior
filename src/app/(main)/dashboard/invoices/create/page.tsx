@@ -79,6 +79,7 @@ export default function CreateInvoicePage() {
   const [roomName, setRoomName] = useState('');
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
+  const [fillerType, setFillerType] = useState<string>('Basic Slab');
   const doorRoomSetByLoad = useRef(0);
   const originalItemsRef = useRef<InvoiceItem[]>([]);
   const originalDoorType = useRef<string>('');
@@ -125,9 +126,10 @@ export default function CreateInvoicePage() {
             email:   q.customer_email   || "",
           }));
 
-          doorRoomSetByLoad.current = 2;
+          doorRoomSetByLoad.current = 3;
           if (q.door_type) setDoorType(q.door_type);
           if (q.room_type) setRoomType(q.room_type);
+          if (q.filler_type || q.filler_door_type) setFillerType(q.filler_type || q.filler_door_type);
 
           setRoomName(q.room_name || "");
           if (q.carcass_colour)   setCarcassColour(q.carcass_colour);
@@ -247,8 +249,10 @@ export default function CreateInvoicePage() {
         if (!hasSuffix && !isApplianceCode) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
+          requestBody.filler_door_type = fillerType;
         } else if (!isApplianceCode) {
           requestBody.room_type = roomType;
+          requestBody.filler_door_type = fillerType;
         }
         try {
           const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
@@ -281,7 +285,7 @@ export default function CreateInvoicePage() {
     };
 
     updateAllPrices();
-  }, [doorType, roomType]);
+  }, [doorType, roomType, fillerType]);
 
   // ============================================================================
   // SMART AUTO-FILL - Triggers when item code is entered
@@ -386,49 +390,52 @@ export default function CreateInvoicePage() {
           current_items: isFittingCode ? [] : currentItemsSnapshot,
         };
 
-        if (!hasSuffix && !isApplianceCode) {
-          requestBody.door_type = doorType;
-          requestBody.room_type = roomType;
-        } else if (!isApplianceCode) {
-          requestBody.room_type = roomType;
+      if (!hasSuffix && !isApplianceCode) {
+        requestBody.door_type = doorType;
+        requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
+      } else if (!isApplianceCode) {
+        requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
+      }
+
+      const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+        body: JSON.stringify(requestBody),
+      });
+      const data = await response.json();
+
+      if (data.found) {
+        let autoDescription = data.description || data.item_name || '';
+        if (data.is_fitting) autoDescription = data.item_name || '';
+        else if (isApplianceCode && data.brand && data.series_level) {
+          autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
         }
-        const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
-          body: JSON.stringify(requestBody),
-        });
-        const data = await response.json();
-        if (data.found) {
-          let autoDescription = data.description || data.item_name || '';
-          if (data.is_fitting) autoDescription = data.item_name || '';
-          else if (isApplianceCode && data.brand && data.series_level) {
-            autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
-          }
-          const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
-          setItems(prevItems => prevItems.map(item => {
-            if (item.id === id) {
-              const qty = fittingQty !== null ? fittingQty : (item.quantity || 1);
-              const price = data.price || 0;
-              const lineTotal = price * qty;
-              const discPct = item.discount_percent || 0;
-              return {
-                ...item,
-                item: trimmedValue,
-                description: autoDescription,
-                amount: price,
-                quantity: qty,
-                width: data.width,
-                height: data.height,
-                depth: data.depth,
-                line_total: lineTotal,
-                discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
-              };
-            }
-            return item;
-          }));
-        } else {
-          console.log("❌ No pricing found for code:", trimmedValue);
-        }
+        const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
+
+        setItems(prevItems => prevItems.map(item => {
+          if (item.id !== id) return item;
+          const qty = fittingQty !== null ? fittingQty : (item.quantity || 1);
+          const price = data.price || 0;
+          const lineTotal = price * qty;
+          const discPct = item.discount_percent || 0;
+          return {
+            ...item,
+            item: trimmedValue,
+            description: autoDescription,
+            amount: price,
+            quantity: qty,
+            width: data.width,
+            height: data.height,
+            depth: data.depth,
+            line_total: lineTotal,
+            discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
+          };
+        }));
+      } else {
+        console.log("❌ No pricing found for code:", trimmedValue);
+      }
       } catch (error) {
         console.error("Auto-price lookup failed:", error);
       } finally {
@@ -680,8 +687,10 @@ export default function CreateInvoicePage() {
       if (!hasSuffix && !isApplianceCode) {
         requestBody.door_type = doorType;
         requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
       } else if (!isApplianceCode) {
         requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
       }
 
       const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
@@ -781,6 +790,8 @@ export default function CreateInvoicePage() {
           due_date: formData.due_date,
           door_type: doorType,
           room_type: roomType,
+          filler_type: fillerType,
+          filler_door_type: fillerType,
           room_name: roomName,
           carcass_colour: carcassColour,
           door_colour: doorColour,
@@ -927,7 +938,7 @@ export default function CreateInvoicePage() {
         <h1 className="mb-6 text-center text-2xl font-bold">INVOICE</h1>
 
         {/* Door Type and Room Type */}
-        <div className="mb-6 grid grid-cols-2 gap-4">
+        <div className="mb-6 grid grid-cols-3 gap-4">
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">
               Room Type <span className="text-red-600">*</span>
@@ -956,6 +967,21 @@ export default function CreateInvoicePage() {
               <option value="Timber">Timber</option>
               <option value="Vinyl Doors">Vinyl</option>
               <option value="Black Glass">Black Glass</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Fillers &amp; End Panels Type
+            </label>
+            <select
+              value={fillerType}
+              onChange={(e) => setFillerType(e.target.value)}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Basic Slab">Slab</option>
+              <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
+              <option value="Vinyl Doors">Vinyl Doors</option>
+              <option value="Timber">Timber</option>
             </select>
           </div>
         </div>

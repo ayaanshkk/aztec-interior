@@ -559,6 +559,7 @@ export default function CreateQuotePage() {
     setItems([
       ...items,
       {
+        id: Date.now().toString(),
         item: "",
         description: "",
         color: "",

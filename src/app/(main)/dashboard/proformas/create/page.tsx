@@ -68,6 +68,7 @@ export default function CreateProformaPage() {
   const [roomName, setRoomName] = useState('');
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
+  const [fillerType, setFillerType] = useState<string>('Basic Slab');
   const doorRoomSetByLoad = useRef(0);
 
   const formatCurrency = (value: number) =>
@@ -116,8 +117,8 @@ export default function CreateProformaPage() {
         const baseCode = itemCode.split('-')[0];
         const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
         const requestBody: any = { description: itemCode };
-        if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; }
-        else if (!isApplianceCode)          { requestBody.room_type = roomType; }
+        if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
+        else if (!isApplianceCode)          { requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
         try {
           const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
             method: "POST",
@@ -138,8 +139,8 @@ export default function CreateProformaPage() {
           const baseCode = code.split('-')[0];
           const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
           const requestBody: any = { description: code };
-          if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; }
-          else if (!isApplianceCode)          { requestBody.room_type = roomType; }
+          if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
+          else if (!isApplianceCode)          { requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
           try {
             const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
               method: "POST",
@@ -195,7 +196,7 @@ export default function CreateProformaPage() {
     };
 
     updateAllPrices();
-  }, [doorType, roomType]);
+  }, [doorType, roomType, fillerType]);
 
   // ── FITTING CODES ─────────────────────────────────────────────────────────
   const FITTING_CODES_LIST = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW'];
@@ -329,8 +330,9 @@ export default function CreateProformaPage() {
         description: trimmedValue,
         current_items: isFittingCode ? [] : currentItemsSnapshot,
       };
-      if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; }
-      else if (!isApplianceCode)          { requestBody.room_type = roomType; }
+      if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
+      else if (!isApplianceCode)          { requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
+
       const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
@@ -364,6 +366,8 @@ export default function CreateProformaPage() {
           }
           return item;
         }));
+      } else {
+        console.log("❌ No pricing found for code:", trimmedValue);
       }
     } catch (error) { console.error("Auto-price lookup failed:", error); }
     finally { setAutoFilling(null); }
@@ -466,8 +470,9 @@ export default function CreateProformaPage() {
       const baseCode = trimmedValue.split('-')[0];
       const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
       const requestBody: any = { description: trimmedValue, current_items: [] };
-      if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; }
-      else if (!isApplianceCode)          { requestBody.room_type = roomType; }
+      if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
+      else if (!isApplianceCode)          { requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
+
       const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
@@ -498,6 +503,8 @@ export default function CreateProformaPage() {
             }),
           };
         }));
+      } else {
+        console.log("❌ No pricing found for sub-item code:", trimmedValue);
       }
     } catch (error) { console.error("Sub-item auto-price lookup failed:", error); }
   };
@@ -560,6 +567,8 @@ export default function CreateProformaPage() {
           due_date:         formData.due_date,
           door_type:        doorType,
           room_type:        roomType,
+          filler_type:      fillerType,
+          filler_door_type: fillerType,
           room_name:        roomName,
           carcass_colour:   carcassColour,
           door_colour:      doorColour,
@@ -656,7 +665,7 @@ export default function CreateProformaPage() {
         <h1 className="mb-6 text-center text-2xl font-bold">PROFORMA INVOICE</h1>
 
         {/* Door / Room type */}
-        <div className="mb-6 grid grid-cols-2 gap-4">
+        <div className="mb-6 grid grid-cols-3 gap-4">
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">Room Type <span className="text-red-600">*</span></label>
             <select value={roomType} onChange={e => setRoomType(e.target.value)}
@@ -675,6 +684,16 @@ export default function CreateProformaPage() {
               <option value="Timber">Timber</option>
               <option value="Vinyl Doors">Vinyl</option>
               <option value="Black Glass">Black Glass</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">Fillers &amp; End Panels Type</label>
+            <select value={fillerType} onChange={e => setFillerType(e.target.value)}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="Basic Slab">Slab</option>
+              <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
+              <option value="Vinyl Doors">Vinyl Doors</option>
+              <option value="Timber">Timber</option>
             </select>
           </div>
         </div>
