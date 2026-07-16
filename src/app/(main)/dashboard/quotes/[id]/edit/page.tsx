@@ -43,7 +43,7 @@ export default function EditQuotePage() {
   const originalItemsRef = useRef<QuoteItem[]>([]);
   const originalDoorType = useRef<string>('');
   useEffect(() => { itemsRef.current = items; }, [items]);
-  const doorRoomSetByLoad = useRef(0);
+  const initialLoadComplete = useRef(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [autoFilling, setAutoFilling] = useState<number | null>(null);
@@ -102,10 +102,7 @@ export default function EditQuotePage() {
 
   // ✅ NEW: Update all prices when door type or room type changes
   useEffect(() => {
-    if (doorRoomSetByLoad.current > 0) {
-      doorRoomSetByLoad.current -= 1;
-      return;
-    }
+    if (!initialLoadComplete.current) return;
 
     const updateAllPrices = async () => {
       if (itemsRef.current.length === 0) return;
@@ -367,17 +364,17 @@ export default function EditQuotePage() {
         const urlRoomType = searchParams.get("roomType");
         const finalDoorType = urlDoorType || data.door_type;
         const finalRoomType = urlRoomType || data.room_type;
-        doorRoomSetByLoad.current = 1; // only 1 fire even if 3 states change in same batch
 
         if (finalDoorType) { originalDoorType.current = finalDoorType; }
 
-        // Use flushSync or just set all 3 together via a single ref, then trigger:
-        // React batches these in the same event handler, so effect fires once:
         if (finalDoorType) setDoorType(finalDoorType);
         if (finalRoomType) setRoomType(finalRoomType);
         if (data.filler_type || data.filler_door_type) {
           setFillerType(data.filler_type || data.filler_door_type);
         }
+
+        // Mark load complete after React has batched and flushed the above state sets
+        setTimeout(() => { initialLoadComplete.current = true; }, 200);
         
         setCarcassColour(data.carcass_colour || '');
         setDoorColour(data.door_colour || '');
@@ -539,20 +536,26 @@ export default function EditQuotePage() {
           }
 
           setItems(prevItems => {
-            const newItems = prevItems.filter((_, i) => i !== index);
-            const newFittingRows = validFittings.map(f => ({
-              item: f.code,
-              description: f.name,
-              color: '',
-              quantity: f.quantity,
-              amount: f.price,
-              line_total: f.price * f.quantity,
-              discount_percent: 0,
-              discounted_total: f.price * f.quantity,
-              autoFitting: true,
-              section: 'Fittings',
-            }));
-            return [...newItems, ...newFittingRows];
+            const newItems = [...prevItems];
+            const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
+            const qty = fittingQty !== null ? fittingQty : (newItems[index].quantity || 1);
+            const price = data.price || 0;
+            const lineTotal = price * qty;
+            const discPct = newItems[index].discount_percent || sectionDiscounts[newItems[index].section || 'Furniture'] || 0;
+            newItems[index] = {
+              ...newItems[index],
+              item: data.item_code || trimmedValue,
+              description: autoDescription,
+              amount: price,
+              quantity: qty,
+              width: data.width,
+              height: data.height,
+              depth: data.depth,
+              line_total: lineTotal,
+              discount_percent: discPct,
+              discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
+            };
+            return newItems;
           });
 
         } catch (error) {
@@ -723,6 +726,7 @@ export default function EditQuotePage() {
   }, [items]);
 
   const handleAddItem = (section: string) => {
+    const existingDiscount = sectionDiscounts[section] || 0;
     setItems([
       ...items,
       {
@@ -732,6 +736,8 @@ export default function EditQuotePage() {
         quantity: 1,
         amount: 0,
         line_total: 0,
+        discount_percent: existingDiscount,
+        discounted_total: 0,
         section,
       },
     ]);
@@ -892,6 +898,7 @@ export default function EditQuotePage() {
   const handleAddSubItem = (parentIndex: number) => {
     setItems(prevItems => prevItems.map((item, idx) => {
       if (idx === parentIndex) {
+        const existingDiscount = sectionDiscounts[item.section || 'Furniture'] || 0;
         const newSub: QuoteItem = {
           item: "",
           description: "",
@@ -899,7 +906,7 @@ export default function EditQuotePage() {
           quantity: 1,
           amount: 0,
           line_total: 0,
-          discount_percent: 0,
+          discount_percent: existingDiscount,
           discounted_total: 0,
         };
         return { ...item, subItems: [...(item.subItems || []), newSub] };
@@ -985,6 +992,7 @@ export default function EditQuotePage() {
           const updatedSubs = [...item.subItems];
           const sub = updatedSubs[subIndex];
           const qty = fittingQty !== null ? fittingQty : (sub.quantity || 1);
+          const subDiscPct = sub.discount_percent || sectionDiscounts[item.section || 'Furniture'] || 0;
           updatedSubs[subIndex] = {
             ...sub,
             item: data.item_code || trimmedValue,
@@ -995,8 +1003,9 @@ export default function EditQuotePage() {
             height: data.height,
             depth: data.depth,
             line_total: price * qty,
-            discounted_total: sub.discount_percent
-              ? calculateDiscountedTotal(qty, price, sub.discount_percent)
+            discount_percent: subDiscPct,
+            discounted_total: subDiscPct > 0
+              ? calculateDiscountedTotal(qty, price, subDiscPct)
               : price * qty,
           };
           return { ...item, subItems: updatedSubs };

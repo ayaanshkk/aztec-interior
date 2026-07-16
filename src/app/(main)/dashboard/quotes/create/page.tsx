@@ -375,7 +375,7 @@ export default function CreateQuotePage() {
               const qty = fittingQty !== null ? fittingQty : (item.quantity || 1);
               const price = data.price || 0;
               const lineTotal = price * qty;
-              const discPct = item.discount_percent || 0;
+              const discPct = item.discount_percent || sectionDiscounts[item.section || 'Furniture'] || 0;
               return {
                 ...item,
                 item: trimmedValue,
@@ -386,6 +386,7 @@ export default function CreateQuotePage() {
                 height: data.height,
                 depth: data.depth,
                 line_total: lineTotal,
+                discount_percent: discPct,
                 discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
               };
             }
@@ -554,16 +555,18 @@ export default function CreateQuotePage() {
   };
 
   const handleAddItem = (section: string) => {
+    const existingDiscount = sectionDiscounts[section] || 0;
     setItems([
       ...items,
       {
-        id: Date.now().toString(),
         item: "",
         description: "",
         color: "",
         quantity: 1,
         amount: 0,
         line_total: 0,
+        discount_percent: existingDiscount,
+        discounted_total: 0,
         section,
       },
     ]);
@@ -696,6 +699,7 @@ export default function CreateQuotePage() {
   const handleAddSubItem = (parentId: string) => {
     setItems(prevItems => prevItems.map(item => {
       if (item.id === parentId) {
+        const existingDiscount = sectionDiscounts[item.section || 'Furniture'] || 0;
         const newSub: QuoteItem = {
           id: `sub-${Date.now()}-${Math.random()}`,
           item: "",
@@ -704,7 +708,7 @@ export default function CreateQuotePage() {
           quantity: 1,
           amount: 0,
           line_total: 0,
-          discount_percent: 0,
+          discount_percent: existingDiscount,
           discounted_total: 0,
         };
         return { ...item, subItems: [...(item.subItems || []), newSub] };
@@ -798,6 +802,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
               if (sub.id !== subId) return sub;
               const qty = fittingQty !== null ? fittingQty : (sub.quantity || 1);
               const price = data.price || 0;
+              const subDiscPct = sub.discount_percent || sectionDiscounts[item.section || 'Furniture'] || 0;
               return {
                 ...sub,
                 item: data.item_code || trimmedValue,
@@ -808,8 +813,9 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                 height: data.height,
                 depth: data.depth,
                 line_total: price * qty,
-                discounted_total: sub.discount_percent
-                  ? calculateDiscountedTotal(qty, price, sub.discount_percent)
+                discount_percent: subDiscPct,
+                discounted_total: subDiscPct > 0
+                  ? calculateDiscountedTotal(qty, price, subDiscPct)
                   : price * qty,
               };
             })
