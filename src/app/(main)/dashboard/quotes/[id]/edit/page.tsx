@@ -537,23 +537,32 @@ export default function EditQuotePage() {
 
           setItems(prevItems => {
             const newItems = [...prevItems];
-            const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
-            const qty = fittingQty !== null ? fittingQty : (newItems[index].quantity || 1);
-            const price = data.price || 0;
-            const lineTotal = price * qty;
+            // Replace the FITTING row with the first fitting, add rest as sub-items
+            const [first, ...rest] = validFittings;
+            const firstLineTotal = first.price * first.quantity;
             const discPct = newItems[index].discount_percent || sectionDiscounts[newItems[index].section || 'Furniture'] || 0;
             newItems[index] = {
               ...newItems[index],
-              item: data.item_code || trimmedValue,
-              description: autoDescription,
-              amount: price,
-              quantity: qty,
-              width: data.width,
-              height: data.height,
-              depth: data.depth,
-              line_total: lineTotal,
+              item: first.code,
+              description: first.name,
+              amount: first.price,
+              quantity: first.quantity,
+              line_total: firstLineTotal,
               discount_percent: discPct,
-              discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
+              discounted_total: discPct > 0 ? firstLineTotal - firstLineTotal * (discPct / 100) : firstLineTotal,
+              subItems: rest.map(f => {
+                const subLine = f.price * f.quantity;
+                return {
+                  item: f.code,
+                  description: f.name,
+                  color: '',
+                  quantity: f.quantity,
+                  amount: f.price,
+                  line_total: subLine,
+                  discount_percent: discPct,
+                  discounted_total: discPct > 0 ? subLine - subLine * (discPct / 100) : subLine,
+                };
+              }),
             };
             return newItems;
           });
