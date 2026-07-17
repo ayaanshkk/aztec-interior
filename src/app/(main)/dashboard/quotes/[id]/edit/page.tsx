@@ -537,10 +537,10 @@ export default function EditQuotePage() {
 
           setItems(prevItems => {
             const newItems = [...prevItems];
-            // Replace the FITTING row with the first fitting, add rest as sub-items
+            const discPct = newItems[index].discount_percent || sectionDiscounts[newItems[index].section || 'Furniture'] || 0;
+            // Replace the FITTING placeholder row with the first fitting
             const [first, ...rest] = validFittings;
             const firstLineTotal = first.price * first.quantity;
-            const discPct = newItems[index].discount_percent || sectionDiscounts[newItems[index].section || 'Furniture'] || 0;
             newItems[index] = {
               ...newItems[index],
               item: first.code,
@@ -550,20 +550,25 @@ export default function EditQuotePage() {
               line_total: firstLineTotal,
               discount_percent: discPct,
               discounted_total: discPct > 0 ? firstLineTotal - firstLineTotal * (discPct / 100) : firstLineTotal,
-              subItems: rest.map(f => {
-                const subLine = f.price * f.quantity;
-                return {
-                  item: f.code,
-                  description: f.name,
-                  color: '',
-                  quantity: f.quantity,
-                  amount: f.price,
-                  line_total: subLine,
-                  discount_percent: discPct,
-                  discounted_total: discPct > 0 ? subLine - subLine * (discPct / 100) : subLine,
-                };
-              }),
+              subItems: [],
             };
+            // Insert remaining fittings as separate top-level rows after this index
+            const restRows = rest.map(f => {
+              const subLine = f.price * f.quantity;
+              return {
+                item: f.code,
+                description: f.name,
+                color: '',
+                quantity: f.quantity,
+                amount: f.price,
+                line_total: subLine,
+                discount_percent: discPct,
+                discounted_total: discPct > 0 ? subLine - subLine * (discPct / 100) : subLine,
+                autoFitting: true,
+                section: 'Fittings',
+              };
+            });
+            newItems.splice(index + 1, 0, ...restRows);
             return newItems;
           });
 
