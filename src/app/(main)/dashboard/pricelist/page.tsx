@@ -479,6 +479,24 @@ export default function PricelistPage() {
           unit: 'each'
         });
 
+      } else if (activeTab === 'Fittings') {
+        if (!newItemForm.base_price) {
+          alert('Please enter a price');
+          return;
+        }
+        if (!newItemForm.subcategory) {
+          alert('Please select a subcategory');
+          return;
+        }
+        await api.createPricelistItem({
+          category: 'Fittings',
+          item_code: newItemForm.item_code,
+          item_name: newItemForm.item_name,
+          description: newItemForm.subcategory,
+          base_price: parseFloat(newItemForm.base_price),
+          door_type: 'Standard',
+          unit: 'each',
+        });
       } else if (activeTab === 'Sink and Tap' || activeTab === 'Worktops') {
         if (!newItemForm.base_price) {
           alert('Please enter a price');
