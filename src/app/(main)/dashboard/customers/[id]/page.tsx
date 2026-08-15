@@ -683,7 +683,7 @@ export default function CustomerDetailsPage() {
         formData.append("file", file);
         formData.append("customer_id", id);
 
-        const response = await fetch("https://aztec-interior.onrender.com/files/forms", {
+        const response = await fetch("https://api.aztec.techmynt.com/files/forms", {
           method: "POST",
           headers: headers,
           body: formData,
@@ -759,9 +759,9 @@ export default function CustomerDetailsPage() {
       let endpoint = "";
       
       if (draggedItem.type === "form") {
-        endpoint = `https://aztec-interior.onrender.com/form-submissions/${draggedItem.id}`;
+        endpoint = `https://api.aztec.techmynt.com/form-submissions/${draggedItem.id}`;
       } else if (draggedItem.type === "drawing") {
-        endpoint = `https://aztec-interior.onrender.com/files/drawings/${draggedItem.id}`;
+        endpoint = `https://api.aztec.techmynt.com/files/drawings/${draggedItem.id}`;
       }
 
       const response = await fetch(endpoint, {
@@ -799,7 +799,7 @@ export default function CustomerDetailsPage() {
   };
 
   const handleViewFormDocument = (doc: FormDocument) => {
-    const BACKEND_URL = "https://aztec-interior.onrender.com";
+    const BACKEND_URL = "https://api.aztec.techmynt.com";
     let viewUrl = doc.url;
 
     if (viewUrl && viewUrl.startsWith('http')) {
@@ -833,7 +833,7 @@ export default function CustomerDetailsPage() {
 
     try {
       const res = await fetch(
-        `https://aztec-interior.onrender.com/files/forms/${formDocToDelete.id}`,
+        `https://api.aztec.techmynt.com/files/forms/${formDocToDelete.id}`,
         { method: "DELETE", headers }
       );
 
@@ -967,7 +967,7 @@ export default function CustomerDetailsPage() {
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
     const deletePromises = Array.from(selectedFormDocs).map(docId =>
-      fetch(`https://aztec-interior.onrender.com/files/forms/${docId}`, {
+      fetch(`https://api.aztec.techmynt.com/files/forms/${docId}`, {
         method: "DELETE",
         headers
       })
@@ -1097,7 +1097,7 @@ export default function CustomerDetailsPage() {
   };
 
   const handleViewDrawing = (doc: DrawingDocument) => {
-    const BACKEND_URL = "https://aztec-interior.onrender.com";
+    const BACKEND_URL = "https://api.aztec.techmynt.com";
     let viewUrl = doc.url;
 
     if (viewUrl && viewUrl.startsWith('http')) {
@@ -1186,7 +1186,7 @@ export default function CustomerDetailsPage() {
   };
 
   const getPdfUrl = (doc: FinancialDocument): string | null => {
-    const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+    const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.aztec.techmynt.com';
     const api  = `${base}/api/form`;
     switch (doc.type) {
       case 'quotation':     return `${base}/quotations/${doc.id}/pdf`;
@@ -1199,7 +1199,7 @@ export default function CustomerDetailsPage() {
   };
 
   const handleReceiptPdf = async (doc: FinancialDocument) => {
-    const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+    const base = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.aztec.techmynt.com';
     const api  = `${base}/api/form`;
  
     // Find the form_data from the financial doc — it was mapped from form submissions
@@ -1665,7 +1665,7 @@ export default function CustomerDetailsPage() {
     };
 
     try {
-      const response = await fetch(`https://aztec-interior.onrender.com/projects/${selectedProject.id}`, {
+      const response = await fetch(`https://api.aztec.techmynt.com/projects/${selectedProject.id}`, {
         method: "PUT",
         headers: headers,
         body: JSON.stringify(dataToSave),
@@ -1747,7 +1747,7 @@ export default function CustomerDetailsPage() {
 
     try {
       const response = await fetch(
-        `https://aztec-interior.onrender.com/form-submissions/${selectedForm.id}`,
+        `https://api.aztec.techmynt.com/form-submissions/${selectedForm.id}`,
         {
           method: "PUT",
           headers: {

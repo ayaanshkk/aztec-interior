@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { CheckSquare, ArrowLeft, Trash2, Download } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://aztec-interior.onrender.com";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.aztec.techmynt.com";
 const API_FORM = `${BACKEND_URL}/api/form`;
 
 // ── Shared UI primitives ──────────────────────────────────────────────────────

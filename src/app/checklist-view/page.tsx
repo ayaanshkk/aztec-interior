@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/sidebar";
 import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://aztec-interior.onrender.com';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.aztec.techmynt.com';
 
 interface User {
   id: number;

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Download, Edit, X, CheckSquare, Printer } from "lucide-react";
 import Image from 'next/image';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://aztec-interior.onrender.com";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.aztec.techmynt.com";
 const API_FORM    = `${BACKEND_URL}/api/form`;
 
 interface PaymentRow {
