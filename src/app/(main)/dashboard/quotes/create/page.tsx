@@ -242,165 +242,172 @@ export default function CreateQuotePage() {
   // SMART AUTO-FILL - Triggers when item code is entered
   // ============================================================================
   const handleItemChange = async (id: string, field: keyof QuoteItem, value: any) => {
-      const updatedItems = items.map((item) => {
-        if (item.id === id) {
-          const updatedItem = { ...item, [field]: value };
-          if (['quantity', 'amount', 'discount_percent'].includes(field)) {
-            const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItem.quantity || 1;
-            const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItem.amount || 0;
-            const discountPercent = field === 'discount_percent' ? parseFloat(value) || 0 : updatedItem.discount_percent || 0;
-            updatedItem.line_total = qty * amount;
-            updatedItem.discounted_total = calculateDiscountedTotal(qty, amount, discountPercent);
-          }
-          return updatedItem;
-        }
-        return item;
-      });
-      setItems(updatedItems);
-
-      if (field !== 'item' || !value || value.length < 1) return;
-
-      const trimmedValue = value.trim().toUpperCase();
-
-      // ── FITTING EXPANSION ────────────────────────────────────────────
-      if (trimmedValue === 'FITTING') {
-        setAutoFilling(id);
-        const token = localStorage.getItem("token");
-        const tenantId = localStorage.getItem("tenantId") || "7";
-        const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'PANW'];
-        const currentItemsSnapshot = itemsRef.current
-          .filter(i => i.id !== id)
-          .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
-        console.log('📦 FITTING snapshot:', JSON.stringify(currentItemsSnapshot));
-        try {
-          const fittingResults = await Promise.all(
-            FITTING_CODES.map(async (code) => {
-              try {
-                const res = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
-                  body: JSON.stringify({ description: code, current_items: currentItemsSnapshot }),
-                });
-                const data = await res.json();
-                if (data.found && data.quantity > 0) {
-                  return { code, price: data.price, quantity: data.quantity, name: data.item_name };
-                }
-                return null;
-              } catch { return null; }
-            })
-          );
-          const validFittings = fittingResults.filter(Boolean) as { code: string; price: number; quantity: number; name: string }[];
-          if (validFittings.length === 0) {
-            alert('No fitting items detected in the quote. Add kitchen/bedroom units first.');
-            setAutoFilling(null);
-            return;
-          }
-          setItems(prevItems => {
-            const withoutPlaceholder = prevItems.filter(i => i.id !== id);
-            const newFittingRows = validFittings.map(f => ({
-              id: `fitting-${f.code}-${Date.now()}-${Math.random()}`,
-              item: f.code,
-              description: f.name,
-              color: '',
-              quantity: f.quantity,
-              amount: f.price,
-              line_total: f.price * f.quantity,
-              discount_percent: 0,
-              discounted_total: f.price * f.quantity,
-              autoFitting: true,
-              section: 'Fittings',
-            }));
-            return [...withoutPlaceholder, ...newFittingRows];
-          });
-        } catch (error) {
-          console.error('Fitting expansion failed:', error);
-        } finally {
-          setAutoFilling(null);
-        }
-        return;
-      }
-      // ── END FITTING EXPANSION ────────────────────────────────────────
-
-      if (trimmedValue.length > 100) return;
-
-      setAutoFilling(id);
-      try {
-        const token = localStorage.getItem("token");
-        const tenantId = localStorage.getItem("tenantId") || "7";
-        const hasSuffix = trimmedValue.includes('-');
-        const baseCode = trimmedValue.split('-')[0];
-        const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
-        const currentItemsSnapshot = itemsRef.current
-          .filter(i => i.id !== id)
-          .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
-          
-        const MANUAL_FITTING_CODES = ['APPL', 'SINKTAP', 'KUNIT', 'BUNIT', 'ROBE', 'WTJT', 'FITDR', 'PANW'];
-        const isFittingCode = MANUAL_FITTING_CODES.includes(trimmedValue.toUpperCase());
-
-        const FILLER_SUFFIXES = ['-S', '-LS', '-V', '-T'];
-        const isFillerSuffix = FILLER_SUFFIXES.some(s => trimmedValue.endsWith(s));
-
-        const requestBody: any = {
-          description: trimmedValue,
-          current_items: isFittingCode ? [] : currentItemsSnapshot,
+    const updatedItems = items.map((item) => {
+      if (item.id === id) {
+        const updatedItem = {
+          ...item,
+          [field]: ['quantity', 'amount', 'discount_percent'].includes(field)
+            ? (parseFloat(value) || 0)
+            : value,
         };
+        if (['quantity', 'amount', 'discount_percent'].includes(field)) {
+          const qty = field === 'quantity' ? (parseFloat(value) || 0) : (updatedItem.quantity || 0);
+          const amount = field === 'amount' ? (parseFloat(value) || 0) : (updatedItem.amount || 0);
+          const discountPercent = field === 'discount_percent' ? (parseFloat(value) || 0) : (updatedItem.discount_percent || 0);
+          const lineTotal = qty * amount;
+          updatedItem.line_total = isNaN(lineTotal) ? 0 : lineTotal;
+          const discounted = calculateDiscountedTotal(qty, amount, discountPercent);
+          updatedItem.discounted_total = isNaN(discounted) ? 0 : discounted;
+        }
+        return updatedItem;
+      }
+      return item;
+    });
+    setItems(updatedItems);
 
-        if (!hasSuffix && !isApplianceCode) {
-          requestBody.door_type = doorType;
-          requestBody.room_type = roomType;
-          requestBody.filler_door_type = fillerType;
-        } else if (isFillerSuffix) {
-          // Filler suffix codes: pass room_type only, backend resolves from suffix
-          requestBody.room_type = roomType;
-          requestBody.filler_door_type = fillerType;
-        } else if (!isApplianceCode) {
-          requestBody.room_type = roomType;
-          requestBody.filler_door_type = fillerType;
+    if (field !== 'item' || !value || value.length < 1) return;
+
+    const trimmedValue = value.trim().toUpperCase();
+
+    // ── FITTING EXPANSION ────────────────────────────────────────────
+    if (trimmedValue === 'FITTING') {
+      setAutoFilling(id);
+      const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+      const FITTING_CODES = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'PANW'];
+      const currentItemsSnapshot = itemsRef.current
+        .filter(i => i.id !== id)
+        .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
+      console.log('📦 FITTING snapshot:', JSON.stringify(currentItemsSnapshot));
+      try {
+        const fittingResults = await Promise.all(
+          FITTING_CODES.map(async (code) => {
+            try {
+              const res = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+                body: JSON.stringify({ description: code, current_items: currentItemsSnapshot }),
+              });
+              const data = await res.json();
+              if (data.found && data.quantity > 0) {
+                return { code, price: data.price, quantity: data.quantity, name: data.item_name };
+              }
+              return null;
+            } catch { return null; }
+          })
+        );
+        const validFittings = fittingResults.filter(Boolean) as { code: string; price: number; quantity: number; name: string }[];
+        if (validFittings.length === 0) {
+          alert('No fitting items detected in the quote. Add kitchen/bedroom units first.');
+          setAutoFilling(null);
+          return;
         }
-        const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
-          body: JSON.stringify(requestBody),
-        });
-        const data = await response.json();
-        if (data.found) {
-          let autoDescription = data.description || data.item_name || '';
-          if (data.is_fitting) autoDescription = data.item_name || '';
-          else if (isApplianceCode && data.brand && data.series_level) {
-            autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
-          }
-          const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
-          setItems(prevItems => prevItems.map(item => {
-            if (item.id === id) {
-              const qty = fittingQty !== null ? fittingQty : (item.quantity || 1);
-              const price = data.price || 0;
-              const lineTotal = price * qty;
-              const discPct = item.discount_percent || sectionDiscounts[item.section || 'Furniture'] || 0;
-              return {
-                ...item,
-                item: trimmedValue,
-                description: autoDescription,
-                amount: price,
-                quantity: qty,
-                width: data.width,
-                height: data.height,
-                depth: data.depth,
-                line_total: lineTotal,
-                discount_percent: discPct,
-                discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
-              };
-            }
-            return item;
+        setItems(prevItems => {
+          const withoutPlaceholder = prevItems.filter(i => i.id !== id);
+          const newFittingRows = validFittings.map(f => ({
+            id: `fitting-${f.code}-${Date.now()}-${Math.random()}`,
+            item: f.code,
+            description: f.name,
+            color: '',
+            quantity: f.quantity,
+            amount: f.price,
+            line_total: isNaN(f.price * f.quantity) ? 0 : f.price * f.quantity,
+            discount_percent: 0,
+            discounted_total: isNaN(f.price * f.quantity) ? 0 : f.price * f.quantity,
+            autoFitting: true,
+            section: 'Fittings',
           }));
-        } else {
-          console.log("❌ No pricing found for code:", trimmedValue);
-        }
+          return [...withoutPlaceholder, ...newFittingRows];
+        });
       } catch (error) {
-        console.error("Auto-price lookup failed:", error);
+        console.error('Fitting expansion failed:', error);
       } finally {
         setAutoFilling(null);
       }
-    };
+      return;
+    }
+    // ── END FITTING EXPANSION ────────────────────────────────────────
+
+    if (trimmedValue.length > 100) return;
+
+    setAutoFilling(id);
+    try {
+      const token = localStorage.getItem("token");
+      const tenantId = localStorage.getItem("tenantId") || "7";
+      const hasSuffix = trimmedValue.includes('-');
+      const baseCode = trimmedValue.split('-')[0];
+      const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
+      const currentItemsSnapshot = itemsRef.current
+        .filter(i => i.id !== id)
+        .map(i => ({ item: i.item, description: i.description, quantity: i.quantity }));
+
+      const MANUAL_FITTING_CODES = ['APPL', 'SINKTAP', 'KUNIT', 'BUNIT', 'ROBE', 'WTJT', 'FITDR', 'PANW'];
+      const isFittingCode = MANUAL_FITTING_CODES.includes(trimmedValue.toUpperCase());
+
+      const FILLER_SUFFIXES = ['-S', '-LS', '-V', '-T'];
+      const isFillerSuffix = FILLER_SUFFIXES.some(s => trimmedValue.endsWith(s));
+
+      const requestBody: any = {
+        description: trimmedValue,
+        current_items: isFittingCode ? [] : currentItemsSnapshot,
+      };
+
+      if (!hasSuffix && !isApplianceCode) {
+        requestBody.door_type = doorType;
+        requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
+      } else if (isFillerSuffix) {
+        requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
+      } else if (!isApplianceCode) {
+        requestBody.room_type = roomType;
+        requestBody.filler_door_type = fillerType;
+      }
+
+      const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
+        body: JSON.stringify(requestBody),
+      });
+      const data = await response.json();
+      if (data.found) {
+        let autoDescription = data.description || data.item_name || '';
+        if (data.is_fitting) autoDescription = data.item_name || '';
+        else if (isApplianceCode && data.brand && data.series_level) {
+          autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
+        }
+        const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
+        setItems(prevItems => prevItems.map(item => {
+          if (item.id === id) {
+            const qty = fittingQty !== null ? fittingQty : (item.quantity || 1);
+            const price = data.price || 0;
+            const lineTotal = price * qty;
+            const discPct = item.discount_percent || sectionDiscounts[item.section || 'Furniture'] || 0;
+            return {
+              ...item,
+              item: trimmedValue,
+              description: autoDescription,
+              amount: price,
+              quantity: qty,
+              width: data.width,
+              height: data.height,
+              depth: data.depth,
+              line_total: isNaN(lineTotal) ? 0 : lineTotal,
+              discount_percent: discPct,
+              discounted_total: isNaN(lineTotal) ? 0 : (discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal),
+            };
+          }
+          return item;
+        }));
+      } else {
+        console.log("❌ No pricing found for code:", trimmedValue);
+      }
+    } catch (error) {
+      console.error("Auto-price lookup failed:", error);
+    } finally {
+      setAutoFilling(null);
+    }
+  };
 
   // ============================================================================
   // DYNAMIC FITTING RECALCULATION - Auto-update fitting rows when items change
@@ -1180,7 +1187,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                               <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
                             </td>
                             <td className="border border-black p-0">
-                              <Input type="number" step="0.01" value={parseFloat((item.amount || 0).toFixed(2))} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
+                              <Input type="number" step="0.01" value={item.amount ?? 0} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
                             </td>
                             <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
                               {formatCurrency(item.line_total)}
