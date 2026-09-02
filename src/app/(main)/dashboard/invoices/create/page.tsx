@@ -1009,7 +1009,7 @@ export default function CreateInvoicePage() {
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-LST</code> = Carcass + Lacquered Slab total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-TT</code> = Carcass + Timber total</li>
                 <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
-                <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50R-BGT</code> = Carcass + Black Glass total</li>
               </>}
             </ul>
           </div>
