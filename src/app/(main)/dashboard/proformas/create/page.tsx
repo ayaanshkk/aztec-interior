@@ -706,14 +706,22 @@ export default function CreateProformaPage() {
           <div className="mt-3 pt-3 border-t border-blue-200">
             <p className="text-xs font-semibold text-blue-900 mb-1">🎯 Component-Only Pricing (Advanced):</p>
             <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
-              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = {doorType === 'Carcass Only' ? 'Carcass only' : `Carcass + ${doorType} total (auto)`}</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = {doorType === 'Carcass Only' ? 'Carcass only' : `Carcass + ${doorType === 'Acrylic Gloss/Matt' ? 'Lacquered Slab' : doorType} total (auto)`}</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only (when door type selected)</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-S</code> = Slab door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-LS</code> = Lacquered Slab door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-T</code> = Timber door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
               <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">FITTING</code> = Auto-detect all fittings from items</li>
+              <li>• <code className="bg-blue-100 px-1 rounded">50B-BGT</code> = Carcass + Black Glass total</li>
+              {doorType === 'Carcass Only' && <>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-ST</code> = Carcass + Slab total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-LST</code> = Carcass + Lacquered Slab total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-TT</code> = Carcass + Timber total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">50R-BGT</code> = Carcass + Black Glass total</li>
+                <li>• <code className="bg-blue-100 px-1 rounded">FITTING</code> = Auto-detect all fittings from quote items</li>
+              </>}
             </ul>
           </div>
         </div>
