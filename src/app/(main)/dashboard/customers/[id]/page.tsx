@@ -3050,7 +3050,7 @@ export default function CustomerDetailsPage() {
             {/* Edit Button */}
             {canEdit() && (
               <Button
-                onClick={() => setIsEditingCustomer(true)}
+                onClick={handleEditCustomer}
                 className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800"
               >
                 <Edit className="h-4 w-4" />
