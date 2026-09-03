@@ -86,7 +86,14 @@ export default function PricelistPage() {
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
   const [newSectionForm, setNewSectionForm] = useState<any>({ name: '' });
   const [savingSection, setSavingSection] = useState(false);
-  const [customSections, setCustomSections] = useState<string[]>([]);
+  const [customSections, setCustomSections] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('pricelist_custom_sections');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // Door types based on active tab
   const doorTypes: DoorType[] = activeTab === 'Kitchen'
@@ -580,7 +587,9 @@ export default function PricelistPage() {
         alert('A section with this name already exists');
         return;
       }
-      setCustomSections(prev => [...prev, name]);
+      const updated = [...customSections, name];
+      setCustomSections(updated);
+      localStorage.setItem('pricelist_custom_sections', JSON.stringify(updated));
       setActiveTab(name);
       setShowAddSectionModal(false);
       setNewSectionForm({ name: '' });
@@ -630,11 +639,7 @@ export default function PricelistPage() {
 
           {/* Tabs */}
           <div className="flex flex-wrap items-center gap-3 mb-4">
-            {([
-              'Kitchen', 'Bedrooms', 'Appliances', 'Handles', 'Accessories',
-              'Fillers & End Panels', 'Fittings', 'Sink and Tap', 'Worktops',
-              ...customSections
-            ] as Category[]).map(tab => (
+            {(['Kitchen', 'Bedrooms', 'Appliances', 'Handles', 'Accessories', 'Fillers & End Panels', 'Fittings', 'Sink and Tap', 'Worktops'] as Category[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -646,6 +651,33 @@ export default function PricelistPage() {
               >
                 {tab}
               </button>
+            ))}
+            {customSections.map(tab => (
+              <div key={tab} className="flex items-center gap-1">
+                <button
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-5 py-2 rounded-lg font-medium transition text-sm ${
+                    activeTab === tab
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {tab}
+                </button>
+                <button
+                  onClick={() => {
+                    if (!confirm(`Delete section "${tab}"?`)) return;
+                    const updated = customSections.filter(s => s !== tab);
+                    setCustomSections(updated);
+                    localStorage.setItem('pricelist_custom_sections', JSON.stringify(updated));
+                    if (activeTab === tab) setActiveTab('Kitchen');
+                  }}
+                  className="text-gray-400 hover:text-red-500 text-xs px-1 leading-none"
+                  title="Remove tab"
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </div>
 
