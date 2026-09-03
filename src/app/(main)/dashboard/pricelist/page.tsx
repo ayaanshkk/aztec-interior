@@ -17,7 +17,8 @@ import {
   ChevronRight
 } from 'lucide-react';
 
-type Category = 'Kitchen' | 'Bedrooms' | 'Appliances' | 'Fillers & End Panels' | 'Accessories' | 'Handles' | 'Fittings' | 'Sink and Tap' | 'Worktops';
+type BuiltInCategory = 'Kitchen' | 'Bedrooms' | 'Appliances' | 'Fillers & End Panels' | 'Accessories' | 'Handles' | 'Fittings' | 'Sink and Tap' | 'Worktops';
+type Category = string;
 type DoorType = 'Carcass Only' | 'Basic Slab' | 'Acrylic Gloss/Matt' | 'Vinyl Doors' | 'Black Glass' | 'Base Cabinet Only' | 'Standard' | 'Timber';
 type ApplianceSeries = 'Low' | 'Mid' | 'High';
 
@@ -82,6 +83,10 @@ export default function PricelistPage() {
   const [newItemForm, setNewItemForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [fittingSubcategories, setFittingSubcategories] = useState<string[]>([]);
+  const [showAddSectionModal, setShowAddSectionModal] = useState(false);
+  const [newSectionForm, setNewSectionForm] = useState<any>({ name: '' });
+  const [savingSection, setSavingSection] = useState(false);
+  const [customSections, setCustomSections] = useState<string[]>([]);
 
   // Door types based on active tab
   const doorTypes: DoorType[] = activeTab === 'Kitchen'
@@ -90,12 +95,10 @@ export default function PricelistPage() {
     ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Base Cabinet Only']
     : activeTab === 'Fillers & End Panels'
     ? ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Timber']
-    : activeTab === 'Accessories'
+    : activeTab === 'Accessories' || activeTab === 'Handles' || activeTab === 'Fittings'
     ? ['Standard']
-    : activeTab === 'Handles'
-    ? ['Standard']
-    : activeTab === 'Fittings'
-    ? ['Standard']
+    : customSections.includes(activeTab)
+    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Timber']  // custom sections default
     : [];
 
   const applianceSeries: ApplianceSeries[] = ['Low', 'Mid', 'High'];
@@ -145,7 +148,12 @@ export default function PricelistPage() {
         filteredItems = filteredItems.filter((item: PricelistItem) =>
           item.category === 'Worktops'
         );
-      } else {
+      } else if (customSections.includes(activeTab)) {
+        filteredItems = filteredItems.filter((item: PricelistItem) =>
+          item.category === activeTab
+        );
+      } 
+      else {
         filteredItems = filteredItems.filter((item: PricelistItem) =>
           item.category === activeTab
         );
@@ -437,7 +445,7 @@ export default function PricelistPage() {
     }
   };
 
-  const TAB_TO_CATEGORY: Record<Category, string> = {
+  const TAB_TO_CATEGORY: Record<string, string> = {
     'Kitchen': 'Base Units',
     'Bedrooms': 'Wardrobes',
     'Appliances': 'Appliances',
@@ -447,6 +455,7 @@ export default function PricelistPage() {
     'Fittings': 'Fittings',
     'Sink and Tap': 'Sink and Tap',
     'Worktops': 'Worktops',
+    ...Object.fromEntries(customSections.map(s => [s, s])),
   };
 
   const handleAddItem = async () => {
@@ -561,6 +570,30 @@ export default function PricelistPage() {
     }
   };
 
+  const handleAddSection = async () => {
+    try {
+      setSavingSection(true);
+      const name = newSectionForm.name?.trim();
+      if (!name) { alert('Please enter a section name'); return; }
+      if (customSections.includes(name) || 
+          ['Kitchen','Bedrooms','Appliances','Fillers & End Panels','Accessories','Handles','Fittings','Sink and Tap','Worktops'].includes(name)) {
+        alert('A section with this name already exists');
+        return;
+      }
+      setCustomSections(prev => [...prev, name]);
+      setActiveTab(name);
+      setShowAddSectionModal(false);
+      setNewSectionForm({ name: '' });
+      setSuccess(`Section "${name}" created — now add items to it`);
+      setTimeout(() => setSuccess(null), 4000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to add section');
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
   };
@@ -575,18 +608,33 @@ export default function PricelistPage() {
               <h1 className="text-3xl font-bold text-gray-900">Price List Management</h1>
               <p className="text-gray-600 mt-1">Manage products, prices, and categories</p>
             </div>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
-            >
-              <Plus className="w-4 h-4" />
-              Add Item
-            </button>
+            <div className="flex items-center gap-2">
+              {(activeTab === 'Kitchen' || activeTab === 'Bedrooms' || activeTab === 'Fillers & End Panels') && (
+                <button
+                  onClick={() => setShowAddSectionModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Section
+                </button>
+              )}
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
+              >
+                <Plus className="w-4 h-4" />
+                Add Item
+              </button>
+            </div>
           </div>
 
           {/* Tabs */}
           <div className="flex flex-wrap items-center gap-3 mb-4">
-            {(['Kitchen', 'Bedrooms', 'Appliances', 'Handles', 'Accessories', 'Fillers & End Panels', 'Fittings', 'Sink and Tap', 'Worktops'] as Category[]).map(tab => (
+            {([
+              'Kitchen', 'Bedrooms', 'Appliances', 'Handles', 'Accessories',
+              'Fillers & End Panels', 'Fittings', 'Sink and Tap', 'Worktops',
+              ...customSections
+            ] as Category[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1372,6 +1420,69 @@ export default function PricelistPage() {
                 className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition disabled:opacity-50"
               >
                 {saving ? 'Adding...' : 'Add Item'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Section Modal */}
+      {showAddSectionModal && (
+        <div className="fixed inset-0 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full shadow-2xl">
+            <div className="border-b px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold">Add New Section</h2>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Create a new category tab alongside Kitchen, Bedrooms, etc.
+                </p>
+              </div>
+              <button
+                onClick={() => { setShowAddSectionModal(false); setNewSectionForm({ name: '' }); }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Section Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newSectionForm.name || ''}
+                  onChange={(e) => setNewSectionForm({ name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900"
+                  placeholder="e.g. Loft Storage, Utility Room, Garage"
+                  autoFocus
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  This will appear as a new tab. You can then add items to it.
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-800">
+                  Once created, switch to the new tab and use <strong>Add Item</strong> to populate it with products and prices.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border-t px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => { setShowAddSectionModal(false); setNewSectionForm({ name: '' }); }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddSection}
+                disabled={savingSection || !newSectionForm.name?.trim()}
+                className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition disabled:opacity-50 text-sm"
+              >
+                {savingSection ? 'Creating...' : 'Create Section'}
               </button>
             </div>
           </div>
