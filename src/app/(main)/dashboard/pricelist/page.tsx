@@ -618,15 +618,13 @@ export default function PricelistPage() {
               <p className="text-gray-600 mt-1">Manage products, prices, and categories</p>
             </div>
             <div className="flex items-center gap-2">
-              {(activeTab === 'Kitchen' || activeTab === 'Bedrooms' || activeTab === 'Fillers & End Panels') && (
-                <button
-                  onClick={() => setShowAddSectionModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Section
-                </button>
-              )}
+              <button
+                onClick={() => setShowAddSectionModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+              >
+                <Plus className="w-4 h-4" />
+                Add Section
+              </button>
               <button
                 onClick={() => setShowAddModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
