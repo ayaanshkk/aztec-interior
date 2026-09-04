@@ -986,34 +986,49 @@ export default function CreateInvoicePage() {
           </div>
         </div>
 
-        <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-4">
-          <p className="font-medium text-sm text-blue-900 mb-2">
-            💡 Selected: <span className="font-bold">{roomType}</span> with <span className="font-bold">{doorType}</span> doors
-          </p>
-          <p className="text-xs text-blue-700 mb-2">
-            Prices will be automatically looked up based on these selections when you enter item codes.
-          </p>
-          <div className="mt-3 pt-3 border-t border-blue-200">
-            <p className="text-xs font-semibold text-blue-900 mb-1">🎯 Component-Only Pricing (Advanced):</p>
-            <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
-              <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = {doorType === 'Carcass Only' ? 'Carcass only' : `Carcass + ${doorType} total (auto)`}</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only (when door type selected)</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-S</code> = Slab door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-LS</code> = Lacquered Slab door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-T</code> = Timber door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
-              <li>• <code className="bg-blue-100 px-1 rounded">FITTING</code> = Auto-detect all fittings from invoice items</li>
-              {doorType === 'Carcass Only' && <>
-                <li>• <code className="bg-blue-100 px-1 rounded">50B-ST</code> = Carcass + Slab total</li>
-                <li>• <code className="bg-blue-100 px-1 rounded">50B-LST</code> = Carcass + Lacquered Slab total</li>
-                <li>• <code className="bg-blue-100 px-1 rounded">50B-TT</code> = Carcass + Timber total</li>
-                <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
-                <li>• <code className="bg-blue-100 px-1 rounded">50R-BGT</code> = Carcass + Black Glass total</li>
-              </>}
-            </ul>
-          </div>
-        </div>
+        {(() => {
+          const DOOR_TYPE_DISPLAY: Record<string, string> = {
+            'Acrylic Gloss/Matt': 'Lacquered Slab',
+            'Basic Slab': 'Slab',
+            'Vinyl Doors': 'Vinyl',
+            'Carcass Only': 'Carcass Only',
+            'Timber': 'Timber',
+            'Black Glass': 'Black Glass',
+          };
+          const displayDoorType = DOOR_TYPE_DISPLAY[doorType] || doorType;
+
+          return (
+            <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-4">
+              <p className="font-medium text-sm text-blue-900 mb-2">
+                💡 Selected: <span className="font-bold">{roomType}</span> with <span className="font-bold">{displayDoorType}</span> doors
+              </p>
+              <p className="text-xs text-blue-700 mb-2">
+                Prices will be automatically looked up based on these selections when you enter item codes.
+              </p>
+              <div className="mt-3 pt-3 border-t border-blue-200">
+                <p className="text-xs font-semibold text-blue-900 mb-1">🎯 Component-Only Pricing (Advanced):</p>
+                <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
+                  <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = {doorType === 'Carcass Only' ? 'Carcass only' : `Carcass + ${displayDoorType} total (auto)`}</li>
+                  <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only (when door type selected)</li>
+                  <li>• <code className="bg-blue-100 px-1 rounded">50B-S</code> = Slab door component only</li>
+                  <li>• <code className="bg-blue-100 px-1 rounded">50B-LS</code> = Lacquered Slab door component only</li>
+                  <li>• <code className="bg-blue-100 px-1 rounded">50B-T</code> = Timber door component only</li>
+                  <li>• <code className="bg-blue-100 px-1 rounded">50B-VD</code> = Vinyl door component only</li>
+                  <li>• <code className="bg-blue-100 px-1 rounded">50B-BG</code> = Black Glass door component only</li>
+                  <li>• <code className="bg-blue-100 px-1 rounded">50R-BGT</code> = Carcass + Black Glass total</li>
+                  {doorType === 'Carcass Only' && <>
+                    <li>• <code className="bg-blue-100 px-1 rounded">50B-ST</code> = Carcass + Slab total</li>
+                    <li>• <code className="bg-blue-100 px-1 rounded">50B-LST</code> = Carcass + Lacquered Slab total</li>
+                    <li>• <code className="bg-blue-100 px-1 rounded">50B-TT</code> = Carcass + Timber total</li>
+                    <li>• <code className="bg-blue-100 px-1 rounded">50B-VDT</code> = Carcass + Vinyl total</li>
+                    <li>• <code className="bg-blue-100 px-1 rounded">50R-BGT</code> = Carcass + Black Glass total</li>
+                    <li>• <code className="bg-blue-100 px-1 rounded">FITTING</code> = Auto-detect all fittings from quote items</li>
+                  </>}
+                </ul>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Customer Information */}
         <div className="mb-6">
