@@ -100,12 +100,14 @@ export default function PricelistPage() {
     ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Timber']
     : activeTab === 'Bedrooms'
     ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Base Cabinet Only']
+    : activeTab === 'Doors'
+    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Timber']
     : activeTab === 'Fillers & End Panels'
     ? ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Timber']
     : activeTab === 'Accessories' || activeTab === 'Handles' || activeTab === 'Fittings'
     ? ['Standard']
     : customSections.includes(activeTab)
-    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Timber']  // custom sections default
+    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Timber']
     : [];
 
   const applianceSeries: ApplianceSeries[] = ['Low', 'Mid', 'High'];
@@ -125,7 +127,7 @@ export default function PricelistPage() {
         const kitchenCategories = [
           'Base Units', 'Dresser Units', 'Larder P/O',
           'Larder Units', 'Top Box', 'Finishing', 'Misc', 'Quad', 'Kitchen',
-          'Wall Units'
+          'Wall Units', 'Doors'
         ];
         filteredItems = filteredItems.filter((item: PricelistItem) =>
           kitchenCategories.includes(item.category)
@@ -154,6 +156,10 @@ export default function PricelistPage() {
       } else if (activeTab === 'Worktops') {
         filteredItems = filteredItems.filter((item: PricelistItem) =>
           item.category === 'Worktops'
+        );
+      } else if (activeTab === 'Doors') {
+        filteredItems = filteredItems.filter((item: PricelistItem) =>
+          item.category === 'Doors'
         );
       } else if (customSections.includes(activeTab)) {
         filteredItems = filteredItems.filter((item: PricelistItem) =>
@@ -637,7 +643,7 @@ export default function PricelistPage() {
 
           {/* Tabs */}
           <div className="flex flex-wrap items-center gap-3 mb-4">
-            {(['Kitchen', 'Bedrooms', 'Appliances', 'Handles', 'Accessories', 'Fillers & End Panels', 'Fittings', 'Sink and Tap', 'Worktops'] as Category[]).map(tab => (
+            {(['Kitchen', 'Bedrooms', 'Appliances', 'Handles', 'Accessories', 'Fillers & End Panels', 'Fittings', 'Sink and Tap', 'Worktops', 'Doors'] as Category[]).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}

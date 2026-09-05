@@ -127,16 +127,13 @@ export default function CreateQuotePage() {
         const baseCode = itemCode.split('-')[0];
         const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
 
-        const FILLER_SUFFIXES = ['-S', '-LS', '-V', '-T'];
-        const isFillerSuffix = FILLER_SUFFIXES.some(s => itemCode.endsWith(s));
+        // const FILLER_SUFFIXES = ['-S', '-LS', '-V', '-T'];
+        // const isFillerSuffix = FILLER_SUFFIXES.some(s => itemCode.endsWith(s));
         const isFillerItem = item.section === 'Fillers and End Panels';
 
         const requestBody: any = { description: itemCode };
 
-        if (isFillerItem || isFillerSuffix) {
-          requestBody.room_type = roomType;
-          requestBody.filler_door_type = fillerType;
-        } else if (!hasSuffix && !isApplianceCode) {
+        if (!hasSuffix && !isApplianceCode && !isFillerItem) {
           requestBody.door_type = doorType;
           requestBody.room_type = roomType;
           requestBody.filler_door_type = fillerType;
@@ -174,11 +171,16 @@ export default function CreateQuotePage() {
           const baseCode = code.split('-')[0];
           const isApplianceCode = /^[A-Z]{1,3}[0-9]{2}[A-Z0-9]{5,}$/i.test(baseCode) && baseCode.length >= 9;
           const requestBody: any = { description: code };
-          const FILLER_SUFFIXES_SUB = ['-S', '-LS', '-V', '-T'];
-          const isFillerSuffixSub = FILLER_SUFFIXES_SUB.some(s => code.endsWith(s));
-          if (!hasSuffix && !isApplianceCode) { requestBody.door_type = doorType; requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
-          else if (isFillerSuffixSub)         { requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
-          else if (!isApplianceCode)          { requestBody.room_type = roomType; requestBody.filler_door_type = fillerType; }
+          // const FILLER_SUFFIXES_SUB = ['-S', '-LS', '-V', '-T'];
+          // const isFillerSuffixSub = FILLER_SUFFIXES_SUB.some(s => code.endsWith(s));
+          if (!hasSuffix && !isApplianceCode) {
+            requestBody.door_type = doorType;
+            requestBody.room_type = roomType;
+            requestBody.filler_door_type = fillerType;
+          } else if (!isApplianceCode) {
+            requestBody.room_type = roomType;
+            requestBody.filler_door_type = fillerType;
+          }
           try {
             const response = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
               method: "POST",
@@ -344,9 +346,6 @@ export default function CreateQuotePage() {
       const MANUAL_FITTING_CODES = ['APPL', 'SINKTAP', 'KUNIT', 'BUNIT', 'ROBE', 'WTJT', 'FITDR', 'PANW'];
       const isFittingCode = MANUAL_FITTING_CODES.includes(trimmedValue.toUpperCase());
 
-      const FILLER_SUFFIXES = ['-S', '-LS', '-V', '-T'];
-      const isFillerSuffix = FILLER_SUFFIXES.some(s => trimmedValue.endsWith(s));
-
       const requestBody: any = {
         description: trimmedValue,
         current_items: isFittingCode ? [] : currentItemsSnapshot,
@@ -354,9 +353,6 @@ export default function CreateQuotePage() {
 
       if (!hasSuffix && !isApplianceCode) {
         requestBody.door_type = doorType;
-        requestBody.room_type = roomType;
-        requestBody.filler_door_type = fillerType;
-      } else if (isFillerSuffix) {
         requestBody.room_type = roomType;
         requestBody.filler_door_type = fillerType;
       } else if (!isApplianceCode) {
@@ -369,6 +365,7 @@ export default function CreateQuotePage() {
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "X-Tenant-ID": tenantId },
         body: JSON.stringify(requestBody),
       });
+
       const data = await response.json();
       if (data.found) {
         let autoDescription = data.description || data.item_name || '';
