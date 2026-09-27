@@ -502,6 +502,19 @@ function ChecklistViewContent() {
     }
   };
 
+  const handleMarkMaterialNA = () => {
+    if (!formData) return;
+    setFormData({
+      ...formData,
+      door_style: 'N/A',
+      door_type: 'N/A',
+      door_color: 'N/A',
+      end_panel_color: 'N/A',
+      plinth_filler_color: 'N/A',
+      cabinet_color: 'N/A',
+    });
+  };
+
   const handleMarkWorktopNA = () => {
     if (!formData) return;
     setFormData({
@@ -1206,22 +1219,22 @@ function ChecklistViewContent() {
                   {/* 1. Material Specifications - Green Section */}
                   <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-bold text-orange-900">3. Worktop Specifications</h3>
+                      <h3 className="text-xl font-bold text-green-900">1. Material Specifications</h3>
                       <div className="flex items-center gap-2">
                         {isEditing && (
                           <Button
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={handleMarkWorktopNA}
+                            onClick={handleMarkMaterialNA}
                             className="flex items-center gap-1 text-xs border-gray-400 text-gray-700 hover:bg-gray-100 print:hidden"
                           >
                             <X className="h-3 w-3" /> Mark All N/A
                           </Button>
                         )}
                         <OrderButton
-                          sectionTitle="Worktop Specifications"
-                          onClick={() => handleOpenOrderDialog("Worktop Specifications")}
+                          sectionTitle="Material Specifications"
+                          onClick={() => handleOpenOrderDialog("Material Specifications")}
                         />
                       </div>
                     </div>
