@@ -26,6 +26,7 @@ import {
   Bell,
   DollarSign,
   PoundSterlingIcon,
+  ClipboardList,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -103,6 +104,22 @@ const allSidebarItems: NavGroup[] = [
         url: "/dashboard/forms",
         icon: FileText,
         roles: ["Platform Admin", "Salesperson", "Production Team"],
+      },
+      {
+        title: "Checklists",
+        url: "/dashboard/checklists",
+        icon: ClipboardList,
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
+        subItems: [
+          {
+            title: "Kitchen",
+            url: "/dashboard/checklists/kitchen",
+          },
+          {
+            title: "Bedroom",
+            url: "/dashboard/checklists/bedroom",
+          },
+        ],
       },
       // {
       //   title: "Appliance Catalogue",

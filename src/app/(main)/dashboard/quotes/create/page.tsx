@@ -59,7 +59,7 @@ export default function CreateQuotePage() {
     },
   ]);
 
-  // âœ… Always-fresh ref for items (avoids stale closure in async handlers)
+  // ✅ Always-fresh ref for items (avoids stale closure in async handlers)
   const itemsRef = useRef(items);
   useEffect(() => { itemsRef.current = items; }, [items]);
 
@@ -402,7 +402,7 @@ export default function CreateQuotePage() {
           return item;
         }));
       } else {
-        console.log("âŒ No pricing found for code:", trimmedValue);
+        console.log("❌ No pricing found for code:", trimmedValue);
       }
     } catch (error) {
       console.error("Auto-price lookup failed:", error);
@@ -695,7 +695,7 @@ export default function CreateQuotePage() {
       if (response.ok) {
         const data = await response.json();
         const quoteId = data.quotation_id || data.id;
-        alert(`âœ… Quote #${quoteId} created successfully!`);
+        alert(`✅ Quote #${quoteId} created successfully!`);
         window.open(`/dashboard/quotes/${quoteId}`, '_blank');
         if (customerId) {
           router.push(`/dashboard/customers/${customerId}`);
@@ -704,11 +704,11 @@ export default function CreateQuotePage() {
         }
       } else {
         const error = await response.json();
-        alert(`âŒ Failed to save: ${error.error || 'Unknown error'}`);
+        alert(`❌ Failed to save: ${error.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error("Error saving quotation:", error);
-      alert("âŒ Error saving quotation");
+      alert("❌ Error saving quotation");
     } finally {
       setSaving(false);
     }
@@ -840,7 +840,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
           };
         }));
       } else {
-        console.log("âŒ No pricing found for sub-item code:", trimmedValue);
+        console.log("❌ No pricing found for sub-item code:", trimmedValue);
       }
     } catch (error) {
       console.error("Sub-item auto-price lookup failed:", error);
@@ -1053,7 +1053,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
             const sectionItems = items.filter((item) => (item.section || 'Furniture') === section);
             if (sectionItems.length === 0) return null;
 
-            // âœ… Section totals
+            // ✅ Section totals
             const sectionRaw = sectionItems.reduce((sum, item) => {
               const itemRaw = (item.amount || 0) * (item.quantity || 1);
               const subRaw = (item.subItems || []).reduce((s, sub) =>
@@ -1061,7 +1061,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
               return sum + itemRaw + subRaw;
             }, 0);
 
-            // âœ… After item-level discounts (discounted_total reflects section fill-down)
+            // ✅ After item-level discounts (discounted_total reflects section fill-down)
             const sectionAfterItemDiscounts = sectionItems.reduce((sum, item) => {
               const itemTotal = (item.discount_percent && item.discount_percent > 0)
                 ? (item.discounted_total ?? (item.amount || 0) * (item.quantity || 1))

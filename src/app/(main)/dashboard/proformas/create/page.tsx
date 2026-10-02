@@ -372,7 +372,7 @@ export default function CreateProformaPage() {
           return item;
         }));
       } else {
-        console.log("âŒ No pricing found for code:", trimmedValue);
+        console.log("❌ No pricing found for code:", trimmedValue);
       }
     } catch (error) { console.error("Auto-price lookup failed:", error); }
     finally { setAutoFilling(null); }
@@ -509,7 +509,7 @@ export default function CreateProformaPage() {
           };
         }));
       } else {
-        console.log("âŒ No pricing found for sub-item code:", trimmedValue);
+        console.log("❌ No pricing found for sub-item code:", trimmedValue);
       }
     } catch (error) { console.error("Sub-item auto-price lookup failed:", error); }
   };
@@ -620,16 +620,16 @@ export default function CreateProformaPage() {
       if (res.ok) {
         const data  = await res.json();
         const invId = data.invoice_id || data.id;
-        alert(`âœ… Proforma #${invId} created successfully!`);
+        alert(`✅ Proforma #${invId} created successfully!`);
         window.open(`/dashboard/proformas/${invId}`, '_blank');
         router.push(customerId ? `/dashboard/customers/${customerId}` : "/dashboard/proformas");
       } else {
         const error = await res.json();
-        alert(`âŒ Failed to save: ${error.error || 'Unknown error'}`);
+        alert(`❌ Failed to save: ${error.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error("Error saving proforma:", error);
-      alert("âŒ Error saving proforma");
+      alert("❌ Error saving proforma");
     } finally {
       setSaving(false);
     }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useChecklistModal } from "@/contexts/ChecklistModalContext";
 
 import { PlusCircleIcon, MailIcon, ChevronRight } from "lucide-react";
 
@@ -40,10 +41,14 @@ const NavItemExpanded = ({
   item,
   isActive,
   isSubmenuOpen,
+  interceptUrls,
+  onSubItemClick,
 }: {
   item: NavMainItem;
   isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
   isSubmenuOpen: (subItems?: NavMainItem["subItems"]) => boolean;
+  interceptUrls?: Set<string>;
+  onSubItemClick?: (url: string) => void;
 }) => {
   return (
     <Collapsible key={item.title} asChild defaultOpen={isSubmenuOpen(item.subItems)} className="group/collapsible">
@@ -78,17 +83,32 @@ const NavItemExpanded = ({
         {item.subItems && (
           <CollapsibleContent>
             <SidebarMenuSub>
-              {item.subItems.map((subItem) => (
-                <SidebarMenuSubItem key={subItem.title}>
-                  <SidebarMenuSubButton aria-disabled={subItem.comingSoon} isActive={isActive(subItem.url)} asChild>
-                    <Link href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
-                      {subItem.icon && <subItem.icon />}
-                      <span>{subItem.title}</span>
-                      {subItem.comingSoon && <IsComingSoon />}
-                    </Link>
-                  </SidebarMenuSubButton>
-                </SidebarMenuSubItem>
-              ))}
+              {item.subItems.map((subItem) => {
+                const isIntercepted = interceptUrls?.has(subItem.url);
+                return (
+                  <SidebarMenuSubItem key={subItem.title}>
+                    {isIntercepted ? (
+                      <SidebarMenuSubButton
+                        aria-disabled={subItem.comingSoon}
+                        isActive={isActive(subItem.url)}
+                        onClick={() => onSubItemClick?.(subItem.url)}
+                      >
+                        {subItem.icon && <subItem.icon />}
+                        <span>{subItem.title}</span>
+                        {subItem.comingSoon && <IsComingSoon />}
+                      </SidebarMenuSubButton>
+                    ) : (
+                      <SidebarMenuSubButton aria-disabled={subItem.comingSoon} isActive={isActive(subItem.url)} asChild>
+                        <Link href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
+                          {subItem.icon && <subItem.icon />}
+                          <span>{subItem.title}</span>
+                          {subItem.comingSoon && <IsComingSoon />}
+                        </Link>
+                      </SidebarMenuSubButton>
+                    )}
+                  </SidebarMenuSubItem>
+                );
+              })}
             </SidebarMenuSub>
           </CollapsibleContent>
         )}
@@ -100,9 +120,13 @@ const NavItemExpanded = ({
 const NavItemCollapsed = ({
   item,
   isActive,
+  interceptUrls,
+  onSubItemClick,
 }: {
   item: NavMainItem;
   isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
+  interceptUrls?: Set<string>;
+  onSubItemClick?: (url: string) => void;
 }) => {
   return (
     <SidebarMenuItem key={item.title}>
@@ -119,33 +143,43 @@ const NavItemCollapsed = ({
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-50 space-y-1" side="right" align="start">
-          {item.subItems?.map((subItem) => (
-            <DropdownMenuItem key={subItem.title} asChild>
-              <SidebarMenuSubButton
-                key={subItem.title}
-                asChild
-                className="focus-visible:ring-0"
-                aria-disabled={subItem.comingSoon}
-                isActive={isActive(subItem.url)}
-              >
-                <Link href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
-                  {subItem.icon && <subItem.icon className="[&>svg]:text-sidebar-foreground" />}
-                  <span>{subItem.title}</span>
-                  {subItem.comingSoon && <IsComingSoon />}
-                </Link>
-              </SidebarMenuSubButton>
-            </DropdownMenuItem>
-          ))}
+          {item.subItems?.map((subItem) => {
+            const isIntercepted = interceptUrls?.has(subItem.url);
+            return (
+              <DropdownMenuItem key={subItem.title} asChild={!isIntercepted} onClick={isIntercepted ? () => onSubItemClick?.(subItem.url) : undefined}>
+                {isIntercepted ? (
+                  <SidebarMenuSubButton className="focus-visible:ring-0" aria-disabled={subItem.comingSoon} isActive={isActive(subItem.url)}>
+                    {subItem.icon && <subItem.icon />}
+                    <span>{subItem.title}</span>
+                  </SidebarMenuSubButton>
+                ) : (
+                  <SidebarMenuSubButton asChild className="focus-visible:ring-0" aria-disabled={subItem.comingSoon} isActive={isActive(subItem.url)}>
+                    <Link href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
+                      {subItem.icon && <subItem.icon className="[&>svg]:text-sidebar-foreground" />}
+                      <span>{subItem.title}</span>
+                      {subItem.comingSoon && <IsComingSoon />}
+                    </Link>
+                  </SidebarMenuSubButton>
+                )}
+              </DropdownMenuItem>
+            );
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
     </SidebarMenuItem>
   );
 };
 
+const CHECKLIST_URLS: Record<string, "kitchen" | "bedroom"> = {
+  "/dashboard/checklists/kitchen": "kitchen",
+  "/dashboard/checklists/bedroom": "bedroom",
+};
+
 export function NavMain({ items }: NavMainProps) {
   const path = usePathname();
   const { state, isMobile } = useSidebar();
   const { user } = useAuth();
+  const { openChecklist } = useChecklistModal();
 
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
     if (subItems?.length) {
@@ -219,10 +253,20 @@ export function NavMain({ items }: NavMainProps) {
                       </SidebarMenuItem>
                     );
                   }
-                  return <NavItemCollapsed key={item.title} item={item} isActive={isItemActive} />;
+                  return <NavItemCollapsed key={item.title} item={item} isActive={isItemActive} interceptUrls={new Set(Object.keys(CHECKLIST_URLS))} onSubItemClick={(url) => { const type = CHECKLIST_URLS[url]; if (type) openChecklist(type); }} />;
                 }
                 return (
-                  <NavItemExpanded key={item.title} item={item} isActive={isItemActive} isSubmenuOpen={isSubmenuOpen} />
+                  <NavItemExpanded
+                    key={item.title}
+                    item={item}
+                    isActive={isItemActive}
+                    isSubmenuOpen={isSubmenuOpen}
+                    interceptUrls={new Set(Object.keys(CHECKLIST_URLS))}
+                    onSubItemClick={(url) => {
+                      const type = CHECKLIST_URLS[url];
+                      if (type) openChecklist(type);
+                    }}
+                  />
                 );
               })}
             </SidebarMenu>

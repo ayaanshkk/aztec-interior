@@ -93,14 +93,14 @@ export default function CreateReceiptPage() {
       });
 
       if (res.ok) {
-        setSaveMsg("âœ… Receipt saved successfully!");
+        setSaveMsg("✅ Receipt saved successfully!");
         setTimeout(() => router.push(customerId ? `/dashboard/customers/${customerId}` : "/dashboard"), 1200);
       } else {
         const err = await res.json();
-        setSaveMsg(`âŒ ${err.error || "Failed to save"}`);
+        setSaveMsg(`❌ ${err.error || "Failed to save"}`);
       }
     } catch {
-      setSaveMsg("âŒ Network error");
+      setSaveMsg("❌ Network error");
     } finally {
       setSaving(false);
     }
@@ -136,12 +136,12 @@ export default function CreateReceiptPage() {
         a.download = `Receipt_${formData.customerName.replace(/\s/g, "_")}_${formData.receiptDate}.pdf`;
         document.body.appendChild(a); a.click(); a.remove();
         window.URL.revokeObjectURL(url);
-        setSaveMsg("âœ… PDF downloaded!");
+        setSaveMsg("✅ PDF downloaded!");
       } else {
-        setSaveMsg("âŒ PDF generation failed");
+        setSaveMsg("❌ PDF generation failed");
       }
     } catch {
-      setSaveMsg("âŒ Network error");
+      setSaveMsg("❌ Network error");
     } finally {
       setTimeout(() => setSaveMsg(""), 4000);
     }
@@ -170,8 +170,8 @@ export default function CreateReceiptPage() {
       </div>
       {saveMsg && (
         <div className={`px-8 py-2 text-sm font-medium border-b ${
-          saveMsg.startsWith("âœ…") ? "bg-green-50 text-green-700 border-green-100" :
-          saveMsg.startsWith("âŒ") ? "bg-red-50 text-red-700 border-red-100" :
+          saveMsg.startsWith("✅") ? "bg-green-50 text-green-700 border-green-100" :
+          saveMsg.startsWith("❌") ? "bg-red-50 text-red-700 border-red-100" :
           "bg-blue-50 text-blue-700 border-blue-100"}`}>
           {saveMsg}
         </div>

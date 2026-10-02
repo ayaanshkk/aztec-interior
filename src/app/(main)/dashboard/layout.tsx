@@ -14,6 +14,7 @@ import {
 } from "@/types/preferences/layout";
 import { ThemeSwitcher } from "@/app/(main)/dashboard/_components/sidebar/theme-switcher";
 import { DashboardAuthGuard } from "./_components/dashboard-auth-guard";
+import { ChecklistModalWrapper } from "./_components/ChecklistModalWrapper";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
@@ -27,6 +28,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
 
   return (
     <DashboardAuthGuard>
+      <ChecklistModalWrapper>
       <SidebarProvider defaultOpen={defaultOpen}>
         <AppSidebar variant={sidebarVariant} collapsible={sidebarCollapsible} />
         <SidebarInset
@@ -49,6 +51,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           <div className="h-full p-4 md:p-6">{children}</div>
         </SidebarInset>
       </SidebarProvider>
+      </ChecklistModalWrapper>
     </DashboardAuthGuard>
   );
 }

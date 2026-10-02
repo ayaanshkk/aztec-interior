@@ -102,17 +102,17 @@ export default function CreatePaymentTermsPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setSaveMsg(`âœ… Payment Terms #${data.pt_number} created!`);
+        setSaveMsg(`✅ Payment Terms #${data.pt_number} created!`);
         setTimeout(() => {
           window.open(`/dashboard/payment-terms/${data.pt_id}`, "_blank");
           router.push(customerId ? `/dashboard/customers/${customerId}` : "/dashboard/payment-terms");
         }, 800);
       } else {
         const err = await res.json();
-        setSaveMsg(`âŒ ${err.error || "Failed to save"}`);
+        setSaveMsg(`❌ ${err.error || "Failed to save"}`);
       }
     } catch {
-      setSaveMsg("âŒ Network error");
+      setSaveMsg("❌ Network error");
     } finally {
       setSaving(false);
     }
@@ -138,7 +138,7 @@ export default function CreatePaymentTermsPage() {
       </div>
       {saveMsg && (
         <div className={`px-8 py-2 text-sm font-medium border-b print:hidden ${
-          saveMsg.startsWith("âœ…") ? "bg-green-50 text-green-700 border-green-100" : "bg-red-50 text-red-700 border-red-100"}`}>
+          saveMsg.startsWith("✅") ? "bg-green-50 text-green-700 border-green-100" : "bg-red-50 text-red-700 border-red-100"}`}>
           {saveMsg}
         </div>
       )}

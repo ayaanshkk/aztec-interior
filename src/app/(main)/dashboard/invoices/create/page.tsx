@@ -62,7 +62,7 @@ export default function CreateInvoicePage() {
     },
   ]);
 
-  // âœ… Always-fresh ref for items (avoids stale closure in async handlers)
+  // ✅ Always-fresh ref for items (avoids stale closure in async handlers)
   const itemsRef = useRef(items);
   useEffect(() => { itemsRef.current = items; }, [items]);
 
@@ -439,7 +439,7 @@ export default function CreateInvoicePage() {
           };
         }));
       } else {
-        console.log("âŒ No pricing found for code:", trimmedValue);
+        console.log("❌ No pricing found for code:", trimmedValue);
       }
       } catch (error) {
         console.error("Auto-price lookup failed:", error);
@@ -739,7 +739,7 @@ export default function CreateInvoicePage() {
           };
         }));
       } else {
-        console.log("âŒ No pricing found for sub-item code:", trimmedValue);
+        console.log("❌ No pricing found for sub-item code:", trimmedValue);
       }
     } catch (error) {
       console.error("Sub-item auto-price lookup failed:", error);
@@ -855,7 +855,7 @@ export default function CreateInvoicePage() {
       if (response.ok) {
         const data = await response.json();
         const invoiceId = data.invoice_id || data.id;
-        alert(`âœ… Invoice #${invoiceId} created successfully!`);
+        alert(`✅ Invoice #${invoiceId} created successfully!`);
         window.open(`/dashboard/invoices/${invoiceId}`, '_blank');
         if (customerId) {
           router.push(`/dashboard/customers/${customerId}`);
@@ -864,11 +864,11 @@ export default function CreateInvoicePage() {
         }
       } else {
         const error = await response.json();
-        alert(`âŒ Failed to save: ${error.error || 'Unknown error'}`);
+        alert(`❌ Failed to save: ${error.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error("Error saving invoice:", error);
-      alert("âŒ Error saving invoice");
+      alert("❌ Error saving invoice");
     } finally {
       setSaving(false);
     }
