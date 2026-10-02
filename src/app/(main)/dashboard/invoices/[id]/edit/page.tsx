@@ -1299,7 +1299,7 @@ export default function EditInvoicePage() {
         </div>
 
         {/* Signature */}
-        <SignatureField customerName={formData.name} onChange={setSignatureData} initialData={signatureData || undefined} />
+        <SignatureField customerName={formData.customer_name} onChange={setSignatureData} initialData={signatureData || undefined} />
 
         {/* Bottom save bar */}
         <div className="mt-10 flex justify-end gap-3 border-t pt-6">

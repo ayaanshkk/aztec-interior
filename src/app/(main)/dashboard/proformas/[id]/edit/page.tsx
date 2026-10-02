@@ -1132,7 +1132,7 @@ export default function EditProformaPage() {
           </div>
         </div>
 
-        <SignatureField customerName={formData.name} onChange={setSignatureData} initialData={signatureData || undefined} />
+        <SignatureField customerName={formData.customer_name} onChange={setSignatureData} initialData={signatureData || undefined} />
 
         <div className="mt-10 flex justify-end gap-3 border-t pt-6">
           <Button variant="outline" onClick={() => router.push(`/dashboard/proformas/${invoiceId}`)}>Cancel</Button>
