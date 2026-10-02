@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -8,6 +8,7 @@ import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BACKEND_URL } from "@/lib/api";
 import Image from 'next/image';
+import { SignatureField } from "@/components/ui/SignatureField";
 
 const API_FORM = `${BACKEND_URL}/api/form`;
 
@@ -61,7 +62,7 @@ export default function CreateInvoicePage() {
     },
   ]);
 
-  // ✅ Always-fresh ref for items (avoids stale closure in async handlers)
+  // âœ… Always-fresh ref for items (avoids stale closure in async handlers)
   const itemsRef = useRef(items);
   useEffect(() => { itemsRef.current = items; }, [items]);
 
@@ -80,6 +81,10 @@ export default function CreateInvoicePage() {
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [fillerType, setFillerType] = useState<string>('Basic Slab');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [additionalTerms, setAdditionalTerms] = useState<string[]>([]);
+  const [additionalNotes, setAdditionalNotes] = useState<string>('');
+  const [signatureData, setSignatureData] = useState<import('@/components/ui/SignatureField').SignatureData | null>(null);
   const doorRoomSetByLoad = useRef(0);
   const originalItemsRef = useRef<InvoiceItem[]>([]);
   const originalDoorType = useRef<string>('');
@@ -99,7 +104,7 @@ export default function CreateInvoicePage() {
     const fromQuote       = searchParams.get("fromQuote");
 
     if (fromQuote === "1") {
-      // ── Load from quote ──────────────────────────────────────────────
+      // â”€â”€ Load from quote â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const raw = localStorage.getItem("invoiceFromQuote");
       if (raw) {
         try {
@@ -189,7 +194,7 @@ export default function CreateInvoicePage() {
         }
       }
     } else {
-      // ── Normal customer pre-fill from URL ────────────────────────────
+      // â”€â”€ Normal customer pre-fill from URL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const customerName    = searchParams.get("customerName");
       const customerAddress = searchParams.get("customerAddress");
       const customerPhone   = searchParams.get("customerPhone");
@@ -311,7 +316,7 @@ export default function CreateInvoicePage() {
 
       const trimmedValue = value.trim().toUpperCase();
 
-      // ── FITTING EXPANSION ────────────────────────────────────────────
+      // â”€â”€ FITTING EXPANSION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (trimmedValue === 'FITTING') {
         setAutoFilling(id);
         const token = localStorage.getItem("token");
@@ -367,7 +372,7 @@ export default function CreateInvoicePage() {
         }
         return;
       }
-      // ── END FITTING EXPANSION ────────────────────────────────────────
+      // â”€â”€ END FITTING EXPANSION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
       if (trimmedValue.length > 100) return;
 
@@ -434,7 +439,7 @@ export default function CreateInvoicePage() {
           };
         }));
       } else {
-        console.log("❌ No pricing found for code:", trimmedValue);
+        console.log("âŒ No pricing found for code:", trimmedValue);
       }
       } catch (error) {
         console.error("Auto-price lookup failed:", error);
@@ -734,7 +739,7 @@ export default function CreateInvoicePage() {
           };
         }));
       } else {
-        console.log("❌ No pricing found for sub-item code:", trimmedValue);
+        console.log("âŒ No pricing found for sub-item code:", trimmedValue);
       }
     } catch (error) {
       console.error("Sub-item auto-price lookup failed:", error);
@@ -788,6 +793,7 @@ export default function CreateInvoicePage() {
           customer_email: formData.email,
           invoice_date: formData.invoice_date,
           due_date: formData.due_date,
+          invoice_number: invoiceNumber || undefined,
           door_type: doorType,
           room_type: roomType,
           filler_type: fillerType,
@@ -836,13 +842,20 @@ export default function CreateInvoicePage() {
           vat_percentage: vatPercentage,
           global_discount_percent: globalDiscountPercent,
           global_discount_amount: globalDiscountAmount,
+          additional_terms: additionalTerms.filter(t => t.trim()),
+          additional_notes: additionalNotes,
+          signature_type: signatureData?.type || 'none',
+          signature_image: signatureData?.imageData || null,
+          signature_text: signatureData?.text || null,
+          signature_name: signatureData?.name || '',
+          signature_date: signatureData?.date || '',
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
         const invoiceId = data.invoice_id || data.id;
-        alert(`✅ Invoice #${invoiceId} created successfully!`);
+        alert(`âœ… Invoice #${invoiceId} created successfully!`);
         window.open(`/dashboard/invoices/${invoiceId}`, '_blank');
         if (customerId) {
           router.push(`/dashboard/customers/${customerId}`);
@@ -851,11 +864,11 @@ export default function CreateInvoicePage() {
         }
       } else {
         const error = await response.json();
-        alert(`❌ Failed to save: ${error.error || 'Unknown error'}`);
+        alert(`âŒ Failed to save: ${error.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error("Error saving invoice:", error);
-      alert("❌ Error saving invoice");
+      alert("âŒ Error saving invoice");
     } finally {
       setSaving(false);
     }
@@ -887,55 +900,42 @@ export default function CreateInvoicePage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="border-b bg-gray-50 px-8 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Create New Invoice</h1>
-              <p className="text-sm text-gray-600">Fill in the details below to create an invoice</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={handleSave} disabled={saving}>
-              <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save Invoice"}
-            </Button>
-          </div>
+      <div className="border-b px-8 py-3 print:hidden flex items-center justify-between bg-white">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-gray-600 font-medium">New Invoice</span>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.back()}>Cancel</Button>
+          <Button size="sm" onClick={handleSave} disabled={saving} className="bg-gray-900 hover:bg-gray-800 text-white">
+            <Save className="mr-2 h-3.5 w-3.5" />
+            {saving ? "Saving..." : "Save Invoice"}
+          </Button>
         </div>
       </div>
 
-      <div className="px-4 py-8">
+      <div className="px-8 py-10">
         {/* Company Header */}
-        <div className="mb-8 flex items-center justify-center gap-3">
-          <Image
-            src="/images/logo3.png"
-            alt="Logo"
-            width={80}
-            height={80}
-            className="object-contain"
-          />
-          <div className="text-4xl font-bold tracking-wider text-gray-800">ATELIER LUXE INTERIORS</div>
+        <div className="flex items-center justify-between border-b-2 border-gray-900 pb-7 mb-10">
+          <Image src="/images/logo-full.png" alt="Atelier Luxe Interiors" width={340} height={92} className="object-contain" />
+          <div className="text-right text-xs leading-6 text-gray-600">
+            <p className="font-semibold text-sm text-gray-900 mb-1">Atelier Luxe Interiors Ltd</p>
+            <p>127c Barkby Road, Leicester, LE4 9LG</p>
+            <p>M: 07821 328849</p>
+              <p>E: accounts@atelierluxe.co.uk</p>
+            <p className="text-gray-400 mt-1">Registered in England No. 17200862</p>
+          </div>
         </div>
 
-        <div className="mb-6 space-y-1 bg-green-200 p-3 text-sm">
-          <p className="font-semibold">Registered to England No 5246881</p>
+        {/* Document title */}
+        <div className="flex items-start justify-between mb-10">
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-1.5">Invoice</p>
+            <h1 className="text-2xl font-semibold text-gray-900">New Invoice</h1>
+          </div>
         </div>
-
-        <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
-          <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
-          <p className="font-semibold">Bank : ClearBank</p>
-          <p className="font-semibold">Sort Code: 04 06 05</p>
-          <p className="font-semibold">Acc No: 31621197</p>
-        </div>
-
-        <div className="mb-6 bg-gray-100 p-3 text-sm">
-          <p>Please use your name and/or road name as reference:</p>
-        </div>
-
-        <h1 className="mb-6 text-center text-2xl font-bold">INVOICE</h1>
 
         {/* Door Type and Room Type */}
         <div className="mb-6 grid grid-cols-3 gap-4">
@@ -1000,13 +1000,13 @@ export default function CreateInvoicePage() {
           return (
             <div className="mb-6 rounded-md bg-blue-50 border border-blue-200 p-4">
               <p className="font-medium text-sm text-blue-900 mb-2">
-                💡 Selected: <span className="font-bold">{roomType}</span> with <span className="font-bold">{displayDoorType}</span> doors
+                Selected: <span className="font-bold">{roomType}</span> with <span className="font-bold">{displayDoorType}</span> doors
               </p>
               <p className="text-xs text-blue-700 mb-2">
                 Prices will be automatically looked up based on these selections when you enter item codes.
               </p>
               <div className="mt-3 pt-3 border-t border-blue-200">
-                <p className="text-xs font-semibold text-blue-900 mb-1">🎯 Component-Only Pricing (Advanced):</p>
+                <p className="text-xs font-semibold text-blue-900 mb-1">Component-Only Pricing (Advanced):</p>
                 <ul className="text-xs text-blue-700 mt-1 ml-4 space-y-0.5">
                   <li>• <code className="bg-blue-100 px-1 rounded">50B</code> = {doorType === 'Carcass Only' ? 'Carcass only' : `Carcass + ${displayDoorType} total (auto)`}</li>
                   <li>• <code className="bg-blue-100 px-1 rounded">50B-C</code> = Carcass only (when door type selected)</li>
@@ -1030,88 +1030,40 @@ export default function CreateInvoicePage() {
           );
         })()}
 
-        {/* Customer Information */}
-        <div className="mb-6">
-          <table className="w-full border-collapse">
-            <tbody>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50" style={{ width: '20%' }}>INVOICE DATE:</td>
-                <td className="border border-black p-0">
-                  <Input type="date" value={formData.invoice_date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, invoice_date: e.target.value }))}
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DUE DATE:</td>
-                <td className="border border-black p-0">
-                  <Input type="date" value={formData.due_date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">NAME:</td>
-                <td className="border border-black p-0">
-                  <Input value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="Customer name" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" required />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ADDRESS:</td>
-                <td className="border border-black p-0">
-                  <textarea value={formData.address} onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))} placeholder="Customer address" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2 resize-none" rows={2} required />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">TEL:</td>
-                <td className="border border-black p-0">
-                  <Input value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} placeholder="Phone number" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">EMAIL:</td>
-                <td className="border border-black p-0">
-                  <Input type="email" value={formData.email} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="Email address" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ROOM NAME: <span className="text-red-600">*</span></td>
-                <td className="border border-black p-0">
-                  <Input
-                    value={roomName}
-                    onChange={(e) => setRoomName(e.target.value)}
-                    placeholder="e.g. Kitchen, Master Bedroom"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                    required
-                  />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">CARCASS COLOUR:</td>
-                <td className="border border-black p-0">
-                  <Input value={carcassColour} onChange={(e) => setCarcassColour(e.target.value)} placeholder="Carcass colour" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR COLOUR:</td>
-                <td className="border border-black p-0">
-                  <Input value={doorColour} onChange={(e) => setDoorColour(e.target.value)} placeholder="Door colour" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">PANELWORK COLOUR:</td>
-                <td className="border border-black p-0">
-                  <Input value={panelworkColour} onChange={(e) => setPanelworkColour(e.target.value)} placeholder="Panelwork colour" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR STYLE:</td>
-                <td className="border border-black p-0">
-                  <Input value={doorStyle} onChange={(e) => setDoorStyle(e.target.value)} placeholder="Door style" className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        {/* Customer + Invoice Details — 2-column layout */}
+        <div className="grid grid-cols-2 gap-4 mb-10">
+          {/* Left: Bill To */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Bill To</p>
+            <div>
+              <Input value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="Customer Name" className="border-none border-b border-gray-100 focus-visible:ring-0 px-0 rounded-none text-base font-medium placeholder:text-gray-300 mb-1 h-auto py-2" required />
+              <textarea value={formData.address} onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))} placeholder="Address" rows={3} className="w-full bg-transparent border-none outline-none resize-none text-sm text-gray-700 placeholder:text-gray-300 py-2 border-b border-gray-100" required />
+              <Input value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} placeholder="Phone" className="border-none border-b border-gray-100 focus-visible:ring-0 px-0 rounded-none text-sm text-gray-700 placeholder:text-gray-300 h-auto py-2" />
+              <Input type="email" value={formData.email} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="Email" className="border-none border-b border-gray-100 focus-visible:ring-0 px-0 rounded-none text-sm text-gray-700 placeholder:text-gray-300 h-auto py-2" />
+            </div>
+          </div>
+
+          {/* Right: Invoice Details */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Invoice Details</p>
+            <div className="space-y-0">
+              {([
+                { label: 'Invoice No',       content: <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Auto-generated" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+                { label: 'Invoice Date',     content: <Input type="date" value={formData.invoice_date} onChange={(e) => setFormData(prev => ({ ...prev, invoice_date: e.target.value }))} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+                { label: 'Due Date',         content: <Input type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+                { label: 'Room',             content: <Input value={roomName} onChange={(e) => setRoomName(e.target.value)} placeholder="e.g. Kitchen" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+                { label: 'Carcass Colour',   content: <Input value={carcassColour} onChange={(e) => setCarcassColour(e.target.value)} placeholder="" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+                { label: 'Door Colour',      content: <Input value={doorColour} onChange={(e) => setDoorColour(e.target.value)} placeholder="" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+                { label: 'Panelwork',        content: <Input value={panelworkColour} onChange={(e) => setPanelworkColour(e.target.value)} placeholder="" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+                { label: 'Door Style',       content: <Input value={doorStyle} onChange={(e) => setDoorStyle(e.target.value)} placeholder="" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+              ] as const).map(({ label, content }) => (
+                <div key={label} className="flex items-center border-b border-gray-100 py-0.5">
+                  <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">{label}</span>
+                  <div className="flex-1">{content}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Items Table */}
@@ -1144,33 +1096,34 @@ export default function CreateInvoicePage() {
             const sectionDiscount = itemDiscountTotal;
 
             return (
-              <div key={section} className="mb-6">
-                <div className="mb-3">
-                  <h3 className="text-lg font-bold">{section}</h3>
+              <div key={section} className="mb-0 mt-8">
+                <div className="flex items-center gap-3 mt-8 mb-3">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-500 whitespace-nowrap">{section}</span>
+                  <div className="flex-1 border-t border-gray-200" />
                 </div>
 
-                <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                <div className="rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-1"><table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                   <thead>
-                    <tr className="bg-white">
-                      <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '8%' }}>ITEM</th>
-                      <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '20%' }}>DESCRIPTION</th>
-                      <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '10%' }}>COLOUR</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>QTY</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>W</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>H</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>D</th>
-                      <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '8%' }}>PRICE</th>
-                      <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>AMOUNT</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '6%' }}>DISC %</th>
-                      <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>FINAL</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}></th>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '8%' }}>Item</th>
+                      <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '22%' }}>Description</th>
+                      <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '10%' }}>Colour</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '5%' }}>Qty</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '4%' }}>W</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '4%' }}>H</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '4%' }}>D</th>
+                      <th className="py-3 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '9%' }}>Price</th>
+                      <th className="py-3 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '10%' }}>Amount</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '7%' }}>Disc %</th>
+                      <th className="py-3 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '10%' }}>Final</th>
+                      <th className="py-3 px-3" style={{ width: '4%' }}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {sectionItems.map((item) => (
                       <React.Fragment key={item.id}>
                         <tr>
-                          <td className="border border-black p-0">
+                          <td className="border-b border-gray-50 px-2 py-2">
                             <Input
                               value={item.item}
                               onChange={(e) => {
@@ -1178,17 +1131,17 @@ export default function CreateInvoicePage() {
                               }}
                               onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
                               placeholder="50B"
-                              className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
+                              className={`border-none focus-visible:ring-0 font-mono text-sm h-auto py-0 px-0 w-full ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
                             />
                           </td>
-                          <td className="border border-black p-0">
+                          <td className="border-b border-gray-50 px-2 py-2">
                             <textarea
                               value={item.description}
                               onChange={(e) => handleDescriptionChange(item.id, e.target.value)}
                               placeholder="Description"
-                              className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
-                              rows={2}
-                              style={{ minHeight: '35px', lineHeight: '1.3' }}
+                              className={`border-none outline-none w-full resize-none overflow-hidden text-sm bg-transparent placeholder:text-gray-300 ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
+                              rows={1}
+                              style={{ minHeight: '24px', lineHeight: '1.5' }}
                               onInput={(e) => {
                                 const target = e.target as HTMLTextAreaElement;
                                 target.style.height = 'auto';
@@ -1196,51 +1149,51 @@ export default function CreateInvoicePage() {
                               }}
                             />
                           </td>
-                          <td className="border border-black p-0">
-                            <Input value={item.color} onChange={(e) => handleItemChange(item.id, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 min-w-[70px] text-xs" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input value={item.color} onChange={(e) => handleItemChange(item.id, "color", e.target.value)} placeholder="" className="border-none focus-visible:ring-0 text-sm h-auto py-0 px-0 w-full placeholder:text-gray-300" />
                           </td>
-                          <td className="border border-black p-0">
-                            <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="1" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="1" />
                           </td>
-                          <td className="border border-black p-0">
-                            <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="W" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                           </td>
-                          <td className="border border-black p-0">
-                            <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="H" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                           </td>
-                          <td className="border border-black p-0">
-                            <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="D" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                           </td>
-                          <td className="border border-black p-0">
-                            <Input type="number" step="0.01" value={parseFloat((item.amount || 0).toFixed(2))} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" step="0.01" value={parseFloat((item.amount || 0).toFixed(2))} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="0" placeholder="0.00" />
                           </td>
-                          <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
+                          <td className="border-b border-gray-50 px-2 py-2 text-right text-sm text-gray-600">
                             {formatCurrency(item.line_total)}
                           </td>
-                          <td className="border border-black p-0">
-                            <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(item.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" max="100" placeholder="0" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(item.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" max="100" placeholder="0" />
                           </td>
-                          <td className="border border-black px-2 py-1 text-right">
+                          <td className="border-b border-gray-50 px-2 py-2 text-right">
                             {item.discount_percent && item.discount_percent > 0 ? (
                               <div>
-                                <div className="text-xs text-gray-500 line-through">{formatCurrency(item.line_total)}</div>
-                                <div className="font-semibold text-green-700 text-xs">{formatCurrency(item.discounted_total || 0)}</div>
+                                <div className="text-xs text-gray-400 line-through">{formatCurrency(item.line_total)}</div>
+                                <div className="text-sm font-semibold text-gray-900">{formatCurrency(item.discounted_total || 0)}</div>
                               </div>
                             ) : (
-                              <span className="font-semibold text-xs">{formatCurrency(item.line_total)}</span>
+                              <span className="text-sm font-semibold text-gray-900">{formatCurrency(item.line_total)}</span>
                             )}
                           </td>
-                          <td className="border border-black p-1 text-center">
-                            <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7">
-                              <Trash2 className="h-3 w-3" />
+                          <td className="border-b border-gray-50 px-2 py-2 text-center">
+                            <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)} className="text-gray-300 hover:text-red-500 h-7 w-7">
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </td>
                         </tr>
 
                         {/* SUB-ITEMS */}
                         {(item.subItems || []).map((sub) => (
-                          <tr key={sub.id} className="bg-gray-50">
-                            <td className="border border-black p-0 pl-4">
+                          <tr key={sub.id} className="bg-gray-50/40">
+                            <td className="border-b border-gray-50 px-2 py-1.5 pl-6">
                               <Input
                                 value={sub.item}
                                 onChange={(e) => {
@@ -1254,40 +1207,38 @@ export default function CreateInvoicePage() {
                                 }}
                                 onBlur={(e) => handleSubItemAutoFill(item.id, sub.id, e.target.value)}
                                 placeholder="sub-code"
-                                className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
+                                className="border-none focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 font-mono placeholder:text-gray-300"
                               />
                             </td>
-                            <td className="border border-black p-0">
-                              <Input value={sub.description} onChange={(e) => handleSubItemChange(item.id, sub.id, "description", e.target.value)} placeholder="Sub-item description" className="border-none focus-visible:ring-0 w-full text-xs px-1" />
+                            <td className="border-b border-gray-50 px-2 py-1.5">
+                              <Input value={sub.description} onChange={(e) => handleSubItemChange(item.id, sub.id, "description", e.target.value)} placeholder="Sub-item description" className="border-none focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
                             </td>
-                            <td className="border border-black p-0">
-                              <Input value={sub.color} onChange={(e) => handleSubItemChange(item.id, sub.id, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 w-full text-xs px-1" />
+                            <td className="border-b border-gray-50 px-2 py-1.5">
+                              <Input value={sub.color} onChange={(e) => handleSubItemChange(item.id, sub.id, "color", e.target.value)} placeholder="" className="border-none focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
                             </td>
-                            <td className="border border-black p-0">
-                              <Input type="number" value={sub.quantity} onChange={(e) => handleSubItemChange(item.id, sub.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="1" />
+                            <td className="border-b border-gray-50 px-2 py-1.5">
+                              <Input type="number" value={sub.quantity} onChange={(e) => handleSubItemChange(item.id, sub.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="1" />
                             </td>
-                            <td className="border border-black p-0"></td>
-                            <td className="border border-black p-0"></td>
-                            <td className="border border-black p-0"></td>
-                            <td className="border border-black p-0">
-                              <Input type="number" step="0.01" value={sub.amount} onChange={(e) => handleSubItemChange(item.id, sub.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs px-1" min="0" placeholder="0.00" />
+                            <td className="border-b border-gray-50" /><td className="border-b border-gray-50" /><td className="border-b border-gray-50" />
+                            <td className="border-b border-gray-50 px-2 py-1.5">
+                              <Input type="number" step="0.01" value={sub.amount} onChange={(e) => handleSubItemChange(item.id, sub.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="0" placeholder="0.00" />
                             </td>
-                            <td className="border border-black px-2 py-1 text-right text-xs">{formatCurrency(sub.line_total)}</td>
-                            <td className="border border-black p-0">
-                              <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(item.id, sub.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
+                            <td className="border-b border-gray-50 px-2 py-1.5 text-right text-sm text-gray-500">{formatCurrency(sub.line_total)}</td>
+                            <td className="border-b border-gray-50 px-2 py-1.5">
+                              <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(item.id, sub.id, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" max="100" placeholder="0" />
                             </td>
-                            <td className="border border-black px-2 py-1 text-right">
+                            <td className="border-b border-gray-50 px-2 py-1.5 text-right">
                               {sub.discount_percent && sub.discount_percent > 0 ? (
                                 <div>
-                                  <div className="text-xs text-gray-500 line-through">{formatCurrency(sub.line_total)}</div>
-                                  <div className="font-semibold text-green-700 text-xs">{formatCurrency(sub.discounted_total || 0)}</div>
+                                  <div className="text-xs text-gray-400 line-through">{formatCurrency(sub.line_total)}</div>
+                                  <div className="text-sm font-semibold text-gray-800">{formatCurrency(sub.discounted_total || 0)}</div>
                                 </div>
                               ) : (
-                                <span className="font-semibold text-xs">{formatCurrency(sub.line_total)}</span>
+                                <span className="text-sm text-gray-600">{formatCurrency(sub.line_total)}</span>
                               )}
                             </td>
-                            <td className="border border-black p-1 text-center">
-                              <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(item.id, sub.id)} className="text-red-600 hover:bg-red-50 h-6 w-6">
+                            <td className="border-b border-gray-50 px-2 py-1.5 text-center">
+                              <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(item.id, sub.id)} className="text-gray-300 hover:text-red-500 h-6 w-6">
                                 <Trash2 className="h-3 w-3" />
                               </Button>
                             </td>
@@ -1296,7 +1247,7 @@ export default function CreateInvoicePage() {
 
                         {/* ADD SUB-ITEM BUTTON ROW */}
                         <tr>
-                          <td colSpan={12} className="border border-black px-2 py-1 bg-gray-50">
+                          <td colSpan={12} className="border-b border-gray-50 px-2 py-1">
                             <button
                               onClick={() => handleAddSubItem(item.id)}
                               className="text-xs text-blue-600 hover:underline flex items-center gap-1"
@@ -1307,126 +1258,113 @@ export default function CreateInvoicePage() {
                         </tr>
                       </React.Fragment>
                     ))}
+                      {/* ADD ITEM BUTTON ROW */}
+                      <tr>
+                        <td colSpan={12} className="px-3 py-2">
+                          <button
+                            onClick={() => handleAddItem(section)}
+                            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <Plus className="h-3 w-3" /> Add item
+                          </button>
+                        </td>
+                      </tr>
                   </tbody>
-                </table>
+                </table></div>
 
-                {/* ✅ Section Totals */}
+                {/* Section Totals */}
                 {(() => {
                   const sectionDiscountPct = sectionDiscounts[section] || 0;
                   const sectionTotal = sectionAfterItemDiscounts;
 
                   return (
-                    <div className="flex justify-end mt-2 mb-4">
-                      <table className="border-collapse text-sm" style={{ width: '40%' }}>
-                        <tbody>
-                          <tr>
-                            <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs">
-                              {section} Subtotal
-                            </td>
-                            <td className="border border-gray-300 px-3 py-1 text-right text-xs">
-                              {formatCurrency(sectionRaw)}
-                            </td>
-                          </tr>
-                          {hasItemDiscount && (
-                            <tr>
-                              <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs text-red-600">
-                                Section Discount ({parseFloat(sectionDiscountPct.toFixed(2))}%)
-                              </td>
-                              <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
-                                -{formatCurrency(itemDiscountTotal)}
-                              </td>
-                            </tr>
-                          )}
-                          <tr>
-                            <td className="border border-gray-300 px-3 py-1 bg-gray-50 text-xs">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium">Section Discount</span>
-                                <div className="flex items-center gap-2">
-                                  <div className="flex items-center gap-1">
-                                    <Input
-                                      type="number"
-                                      value={sectionDiscountPct || ''}
-                                      onChange={(e) => {
-                                        const pct = parseFloat(e.target.value) || 0;
-                                        const prevPct = sectionDiscounts[section] || 0;
-                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
-                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
-                                        setItems(prevItems => prevItems.map(item => {
-                                          if ((item.section || 'Furniture') !== section) return item;
-                                          const itemDisc = item.discount_percent || 0;
-                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevPct) ? item : {
-                                            ...item,
-                                            discount_percent: pct,
-                                            discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
-                                          };
-                                          const updatedSubs = (item.subItems || []).map(sub => {
-                                            const subDisc = sub.discount_percent || 0;
-                                            if (subDisc > 0 && subDisc !== prevPct) return sub;
-                                            return {
-                                              ...sub,
-                                              discount_percent: pct,
-                                              discounted_total: calculateDiscountedTotal(sub.quantity || 1, sub.amount || 0, pct),
-                                            };
-                                          });
-                                          return { ...updatedItem, subItems: updatedSubs };
-                                        }));
-                                      }}
-                                      className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"
-                                      min="0" max="100" step="0.1" placeholder="0"
-                                    />
-                                    <span className="text-xs text-gray-500">%</span>
-                                  </div>
-                                  <span className="text-xs text-gray-400">or</span>
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-xs text-gray-500">£</span>
-                                    <Input
-                                      type="number"
-                                      value={
-                                        sectionDiscountAmounts[section] !== undefined && sectionDiscountAmounts[section] !== ''
-                                          ? sectionDiscountAmounts[section]
-                                          : itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : ''
-                                      }
-                                      onChange={(e) => {
-                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }));
-                                      }}
-                                      onBlur={(e) => {
-                                        const amtVal = parseFloat(e.target.value) || 0;
-                                        const pct = sectionRaw > 0 ? (amtVal / sectionRaw) * 100 : 0;
-                                        const prevPct = sectionDiscounts[section] || 0;
-                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
-                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: amtVal > 0 ? amtVal.toFixed(2) : '' }));
-                                        setItems(prevItems => prevItems.map(item => {
-                                          if ((item.section || 'Furniture') !== section) return item;
-                                          const itemDisc = item.discount_percent || 0;
-                                          if (itemDisc > 0 && itemDisc !== prevPct) return item;
-                                          return {
-                                            ...item,
-                                            discount_percent: pct,
-                                            discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
-                                          };
-                                        }));
-                                      }}
-                                      className="border border-gray-300 rounded px-1 py-0.5 w-20 text-right text-xs"
-                                      min="0" step="0.01" placeholder="0.00"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
-                              {hasItemDiscount ? `-${formatCurrency(itemDiscountTotal)}` : '—'}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="border border-gray-300 px-3 py-1 font-bold bg-gray-100 text-xs">
-                              {section} Total
-                            </td>
-                            <td className="border border-gray-300 px-3 py-1 text-right font-bold text-xs">
-                              {formatCurrency(sectionTotal)}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                    <div className="flex justify-end mt-3 mb-8">
+                      <div className="w-80 text-sm rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                        {hasItemDiscount && (
+                          <div className="flex justify-between px-5 py-2.5 border-b border-gray-100 text-gray-600">
+                            <span>{section} Subtotal</span>
+                            <span>{formatCurrency(sectionRaw)}</span>
+                          </div>
+                        )}
+                        {hasItemDiscount && (
+                          <div className="flex justify-between px-5 py-2.5 border-b border-gray-100 text-red-500">
+                            <span>Item Discounts ({parseFloat(sectionDiscountPct.toFixed(2))}%)</span>
+                            <span>-{formatCurrency(itemDiscountTotal)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
+                          <div className="flex items-center gap-2 text-gray-500">
+                            <span>Section Discount</span>
+                            <Input
+                              type="number"
+                              value={sectionDiscountPct || ''}
+                              onChange={(e) => {
+                                const pct = parseFloat(e.target.value) || 0;
+                                const prevPct = sectionDiscounts[section] || 0;
+                                setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                                setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
+                                setItems(prevItems => prevItems.map(item => {
+                                  if ((item.section || 'Furniture') !== section) return item;
+                                  const itemDisc = item.discount_percent || 0;
+                                  const updatedItem = (itemDisc > 0 && itemDisc !== prevPct) ? item : {
+                                    ...item,
+                                    discount_percent: pct,
+                                    discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
+                                  };
+                                  const updatedSubs = (item.subItems || []).map(sub => {
+                                    const subDisc = sub.discount_percent || 0;
+                                    if (subDisc > 0 && subDisc !== prevPct) return sub;
+                                    return {
+                                      ...sub,
+                                      discount_percent: pct,
+                                      discounted_total: calculateDiscountedTotal(sub.quantity || 1, sub.amount || 0, pct),
+                                    };
+                                  });
+                                  return { ...updatedItem, subItems: updatedSubs };
+                                }));
+                              }}
+                              className="border border-gray-200 rounded px-1 py-0.5 w-12 text-right text-xs h-auto"
+                              min="0" max="100" step="0.1" placeholder="0"
+                            />
+                            <span className="text-gray-400">%</span>
+                            <span className="text-gray-300">or £</span>
+                            <Input
+                              type="number"
+                              value={
+                                sectionDiscountAmounts[section] !== undefined && sectionDiscountAmounts[section] !== ''
+                                  ? sectionDiscountAmounts[section]
+                                  : itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : ''
+                              }
+                              onChange={(e) => {
+                                setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }));
+                              }}
+                              onBlur={(e) => {
+                                const amtVal = parseFloat(e.target.value) || 0;
+                                const pct = sectionRaw > 0 ? (amtVal / sectionRaw) * 100 : 0;
+                                const prevPct = sectionDiscounts[section] || 0;
+                                setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                                setSectionDiscountAmounts(prev => ({ ...prev, [section]: amtVal > 0 ? amtVal.toFixed(2) : '' }));
+                                setItems(prevItems => prevItems.map(item => {
+                                  if ((item.section || 'Furniture') !== section) return item;
+                                  const itemDisc = item.discount_percent || 0;
+                                  if (itemDisc > 0 && itemDisc !== prevPct) return item;
+                                  return {
+                                    ...item,
+                                    discount_percent: pct,
+                                    discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
+                                  };
+                                }));
+                              }}
+                              className="border border-gray-200 rounded px-1 py-0.5 w-16 text-right text-xs h-auto"
+                              min="0" step="0.01" placeholder="0.00"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-between px-5 py-3.5 font-semibold bg-gray-900 text-white">
+                          <span>{section} Total</span>
+                          <span>{formatCurrency(sectionTotal)}</span>
+                        </div>
+                      </div>
                     </div>
                   );
                 })()}
@@ -1434,122 +1372,132 @@ export default function CreateInvoicePage() {
             );
           })}
 
-          <div className="flex flex-wrap gap-2">
-            {SECTIONS.map((section) => (
-              <Button key={section} onClick={() => handleAddItem(section)} size="sm" variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Item to {section}
-              </Button>
-            ))}
-          </div>
+        {/* Dynamic Add Section buttons — shown for sections with no items */}
+        {(() => {
+          const emptySections = SECTIONS.filter(s => !items.some(item => (item.section || 'Furniture') === s));
+          if (emptySections.length === 0) return null;
+          return (
+            <div className="flex flex-wrap gap-2 mt-6 mb-4">
+              {emptySections.map(section => (
+                <button
+                  key={section}
+                  onClick={() => handleAddItem(section)}
+                  className="text-xs text-gray-500 border border-dashed border-gray-300 hover:border-gray-500 hover:text-gray-700 rounded-lg px-3 py-2 transition-colors flex items-center gap-1.5"
+                >
+                  <Plus className="h-3 w-3" /> Add {section}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+
         </div>
 
         {/* Totals */}
-        <div className="mb-6 flex justify-end">
-          <table className="border-collapse" style={{ width: '40%' }}>
-            <tbody>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalAfterSectionDiscounts)}</td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>DISCOUNT</span>
-                    <div className="flex items-center gap-1">
-                      <Input type="number" value={globalDiscountPercent} onChange={(e) => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)} className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm" min="0" max="100" step="0.1" />
-                      <span className="text-sm">%</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="border border-black px-3 py-2 text-right text-red-600">
-                  {globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}
-                </td>
-              </tr>
-              {globalDiscountPercent > 0 && (
-                <tr>
-                  <td className="border border-black px-3 py-2 font-semibold bg-blue-50">SUBTOTAL AFTER DISCOUNT</td>
-                  <td className="border border-black px-3 py-2 text-right font-semibold">{formatCurrency(subtotal)}</td>
-                </tr>
-              )}
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>VAT</span>
-                    <div className="flex items-center gap-1">
-                      <Input type="number" value={vatPercentage} onChange={(e) => setVatPercentage(parseFloat(e.target.value) || 0)} className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm" min="0" max="100" step="0.1" />
-                      <span className="text-sm">%</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(vat)}</td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-bold bg-gray-50">TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right font-bold">{formatCurrency(total)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mb-6 flex justify-end">
-          <table className="border-collapse" style={{ width: '40%' }}>
-            <tbody>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>DEPOSIT PAID</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm text-gray-500">£</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={deposit || ""}
-                        onChange={e => setDeposit(parseFloat(e.target.value) || 0)}
-                        placeholder="0.00"
-                        className="w-28 rounded border border-gray-300 px-2 py-1 text-right text-sm"
-                      />
-                    </div>
-                  </div>
-                </td>
-                <td className="border border-black px-3 py-2 text-right text-green-700 font-semibold">
-                  {deposit > 0 ? `-${formatCurrency(deposit)}` : "—"}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-bold bg-gray-50 text-base">TOTAL REMAINING</td>
-                <td className={`border border-black px-3 py-2 text-right font-bold text-base ${total - deposit < 0 ? "text-red-600" : ""}`}>
-                  {formatCurrency(Math.max(0, total - deposit))}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mb-6 space-y-2 text-sm">
-          <p className="font-semibold">Only Bacs or Cash will be accepted on Delivery and Completion</p>
-          <p className="font-semibold">NOTE: Payment is due within 30 days of the invoice date.</p>
-        </div>
-
-        <div className="mb-8 text-sm font-semibold text-red-600">
-          <p>Please sign here to confirm.</p>
-        </div>
-
-        <div className="space-y-4 text-sm">
-          <div className="flex items-center">
-            <span className="mr-2">Customer Signature:</span>
-            <span className="border-b border-dotted border-black flex-1"></span>
-          </div>
-          <div className="flex items-center">
-            <span className="mr-2">Customer Name:</span>
-            <span className="border-b border-dotted border-black flex-1"></span>
-          </div>
-          <div className="flex items-center">
-            <span className="mr-2">Date:</span>
-            <span className="border-b border-dotted border-black flex-1"></span>
+        <div className="mb-10 flex justify-end">
+          <div className="w-80 rounded-xl border border-gray-100 shadow-md overflow-hidden text-sm">
+            <div className="flex justify-between px-5 py-2.5 border-b border-gray-100 text-gray-600">
+              <span>Subtotal</span>
+              <span>{formatCurrency(subtotalAfterSectionDiscounts)}</span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
+              <div className="flex items-center gap-2 text-gray-600">
+                <span>Discount</span>
+                <Input type="number" value={globalDiscountPercent} onChange={(e) => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)} className="border border-gray-200 rounded px-2 py-0.5 w-14 text-right text-xs h-auto" min="0" max="100" step="0.1" />
+                <span className="text-gray-400 text-xs">%</span>
+              </div>
+              <span className="text-red-500">{globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}</span>
+            </div>
+            {globalDiscountPercent > 0 && (
+              <div className="flex justify-between px-5 py-2.5 border-b border-gray-100 text-gray-600">
+                <span>After Discount</span>
+                <span>{formatCurrency(subtotal)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
+              <div className="flex items-center gap-2 text-gray-600">
+                <span>VAT</span>
+                <Input type="number" value={vatPercentage} onChange={(e) => setVatPercentage(parseFloat(e.target.value) || 0)} className="border border-gray-200 rounded px-2 py-0.5 w-14 text-right text-xs h-auto" min="0" max="100" step="0.1" />
+                <span className="text-gray-400 text-xs">%</span>
+              </div>
+              <span className="text-gray-600">{formatCurrency(vat)}</span>
+            </div>
+            <div className="flex justify-between px-5 py-4 bg-gray-900 text-white font-semibold">
+              <span>Total</span>
+              <span>{formatCurrency(total)}</span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100 mt-2">
+              <div className="flex items-center gap-2 text-gray-600">
+                <span className="text-sm">Deposit Paid</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-gray-400 text-xs">£</span>
+                  <Input
+                    type="number" min="0" step="0.01"
+                    value={deposit || ""}
+                    onChange={e => setDeposit(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className="w-24 rounded border border-gray-200 px-2 py-0.5 text-right text-xs h-auto"
+                  />
+                </div>
+              </div>
+              <span className="text-green-700">{deposit > 0 ? `-${formatCurrency(deposit)}` : "—"}</span>
+            </div>
+            <div className="flex justify-between px-5 py-4 bg-gray-900 text-white font-semibold">
+              <span>Balance Due</span>
+              <span>{formatCurrency(Math.max(0, total - deposit))}</span>
+            </div>
           </div>
         </div>
+
+        <div className="border-t border-gray-200 pt-8 mb-6 text-sm text-gray-600">
+          {/* Payment Details */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-5 shadow-sm mb-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Payment Details</p>
+            <p>Acc name: Atelier Luxe Interiors LTD</p>
+                          <p>Bank: ClearBank</p>
+                          <p>Sort Code: 04 06 05</p>
+                          <p>Acc No: 31621197</p>
+                          <p className="mt-2 text-xs text-gray-400">Please use your name and/or road name as reference</p>
+                        </div>
+                        <div>
+          </div>
+          {/* Terms */}
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Terms</p>
+            <p>Only Bacs or Cash accepted on Delivery and Completion.</p>
+                          <p className="mt-1">Payment is due within 30 days of the invoice date.</p>
+              {additionalTerms.map((term, i) => (
+                <div key={i} className="flex items-center gap-2 mt-1.5">
+                  <input
+                    type="text"
+                    value={term}
+                    onChange={e => setAdditionalTerms(prev => prev.map((t, idx) => idx === i ? e.target.value : t))}
+                    placeholder="Additional term..."
+                    className="flex-1 text-sm border-b border-gray-200 bg-transparent focus:outline-none focus:border-gray-400 py-0.5"
+                  />
+                  <button onClick={() => setAdditionalTerms(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                </div>
+              ))}
+              <button
+                onClick={() => setAdditionalTerms(prev => [...prev, ''])}
+                className="mt-2 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+              >
+                + Add term
+              </button>
+          </div>
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">Additional Notes <span className="normal-case font-normal">(optional)</span></p>
+            <textarea
+              value={additionalNotes}
+              onChange={e => setAdditionalNotes(e.target.value)}
+              placeholder="Add any additional notes for the customer..."
+              rows={3}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-transparent focus:outline-none focus:border-gray-400 resize-none placeholder:text-gray-300"
+            />
+          </div>
+        </div>
+
+        <SignatureField customerName={formData.name} onChange={setSignatureData} />
       </div>
     </div>
   );

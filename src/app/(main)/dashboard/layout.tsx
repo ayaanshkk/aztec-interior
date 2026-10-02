@@ -12,8 +12,6 @@ import {
   type SidebarCollapsible,
   type ContentLayout,
 } from "@/types/preferences/layout";
-import { AccountSwitcher } from "@/app/(main)/dashboard/_components/sidebar/account-switcher";
-import { LayoutControls } from "@/app/(main)/dashboard/_components/sidebar/layout-controls";
 import { ThemeSwitcher } from "@/app/(main)/dashboard/_components/sidebar/theme-switcher";
 import { DashboardAuthGuard } from "./_components/dashboard-auth-guard";
 
@@ -26,12 +24,6 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     getPreference<SidebarCollapsible>("sidebar_collapsible", SIDEBAR_COLLAPSIBLE_VALUES, "icon"),
     getPreference<ContentLayout>("content_layout", CONTENT_LAYOUT_VALUES, "centered"),
   ]);
-
-  const layoutPreferences = {
-    contentLayout,
-    variant: sidebarVariant,
-    collapsible: sidebarCollapsible,
-  };
 
   return (
     <DashboardAuthGuard>
@@ -50,9 +42,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
                 <SidebarTrigger className="-ml-1" />
               </div>
               <div className="flex items-center gap-2">
-                <LayoutControls {...layoutPreferences} />
                 <ThemeSwitcher />
-                <AccountSwitcher />
               </div>
             </div>
           </header>

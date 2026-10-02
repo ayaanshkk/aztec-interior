@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Printer, Download, Edit } from "lucide-react";
 import Image from 'next/image';
 import { FileText } from "lucide-react";
+import { SignatureField } from "@/components/ui/SignatureField";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.aztec.techmynt.com';
 
@@ -188,132 +189,103 @@ export default function ViewQuotePage() {
   const total = subtotal + vat;
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header - Hidden when printing */}
-      <div className="border-b bg-gray-50 px-8 py-4 print:hidden">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Quotation {quotation.reference_number}</h1>
-              <p className="text-sm text-gray-600">Customer: {quotation.customer_name}</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={handleEdit} variant="outline">
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Quote
-            </Button>
-            {/* <Button onClick={handlePrint} variant="outline">
-              <Printer className="mr-2 h-4 w-4" />
-              Print
-            </Button> */}
-            <Button onClick={() => window.open(`${BACKEND_URL}/quotations/${quoteId}/pdf`, '_blank')}>
-              <Download className="mr-2 h-4 w-4" />
-              Download PDF
-            </Button>
-            <Button
-              onClick={handleGenerateInvoice}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              <FileText className="mr-2 h-4 w-4" /> Generate Invoice
-            </Button>
-          </div>
+    <div className="min-h-screen bg-white" data-force-light>
+      {/* Nav bar */}
+      <div className="border-b px-8 py-3 print:hidden flex items-center justify-between bg-white">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-gray-600 font-medium">Quotation {quotation.reference_number}</span>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={handleEdit} variant="outline" size="sm">
+            <Edit className="mr-2 h-3.5 w-3.5" /> Edit
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => window.open(`${BACKEND_URL}/quotations/${quoteId}/pdf`, '_blank')}>
+            <Download className="mr-2 h-3.5 w-3.5" /> Download PDF
+          </Button>
+          <Button size="sm" onClick={handleGenerateInvoice} className="bg-gray-900 hover:bg-gray-800 text-white">
+            <FileText className="mr-2 h-3.5 w-3.5" /> Generate Invoice
+          </Button>
         </div>
       </div>
 
-      {/* Quotation Content */}
-      <div className="mx-auto max-w-6xl px-8 py-8">
-        {/* Company Header */}
-        <div className="mb-8 flex items-center justify-center gap-3">
-          <Image
-            src="/images/logo3.png"
-            alt="Logo"
-            width={80}
-            height={80}
-            className="object-contain"
-          />
-          <div className="text-4xl font-bold tracking-wider text-gray-800">
-            ATELIER LUXE INTERIORS
+      {/* Document */}
+      <div className="px-8 py-10">
+
+        {/* Letterhead */}
+        <div className="flex items-center justify-between border-b-2 border-gray-900 pb-7 mb-10">
+          <Image src="/images/logo-full.png" alt="Atelier Luxe Interiors" width={340} height={92} className="object-contain" />
+          <div className="text-right text-xs leading-6 text-gray-600">
+            <p className="font-semibold text-sm text-gray-900 mb-1">Atelier Luxe Interiors Ltd</p>
+            <p>127c Barkby Road, Leicester, LE4 9LG</p>
+            <p>M: 07821 328849</p>
+              <p>E: accounts@atelierluxe.co.uk</p>
+            <p className="text-gray-400 mt-1">Registered in England No. 17200862</p>
           </div>
         </div>
 
-        {/* Company Registration Details */}
-        <div className="mb-6 space-y-1 bg-green-200 p-3 text-sm">
-          <p className="font-semibold">Registered to England No 5246881</p>
-          {/* <p className="font-semibold">VAT Reg No.686 8010 72</p> */}
+        {/* Document type + reference */}
+        <div className="flex items-start justify-between mb-10">
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-1.5">Quotation</p>
+            <h1 className="text-2xl font-semibold text-gray-900">{quotation.reference_number || 'Draft'}</h1>
+            <p className="text-sm text-gray-400 mt-0.5">
+              {quotation.created_at ? new Date(quotation.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+          </div>
         </div>
 
-        <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
-          <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
-          <p className="font-semibold">Bank : ClearBank</p>
-          <p className="font-semibold">Sort Code: 04 06 05</p>
-          <p className="font-semibold">Acc No: 31621197</p>
+        {/* Prepared For + Specification */}
+        <div className="grid grid-cols-2 gap-4 mb-10">
+          <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Prepared For</p>
+            <p className="font-semibold text-gray-900">{quotation.customer_name || quotation.client_company_name || quotation.client_name || '—'}</p>
+            <p className="text-sm text-gray-600 mt-1 leading-relaxed">{quotation.customer_address || '—'}</p>
+            <p className="text-sm text-gray-600">{quotation.customer_phone || '—'}</p>
+          </div>
+          {(quotation.room_name || quotation.carcass_colour || quotation.door_colour || quotation.panelwork_colour || quotation.door_style) && (
+            <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 shadow-sm">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Specification</p>
+              <div className="space-y-1.5 text-sm">
+                {quotation.room_name && (
+                  <div className="flex gap-4">
+                    <span className="text-gray-400 w-32 flex-shrink-0">Room</span>
+                    <span className="text-gray-800">{quotation.room_name}</span>
+                  </div>
+                )}
+                {quotation.carcass_colour && (
+                  <div className="flex gap-4">
+                    <span className="text-gray-400 w-32 flex-shrink-0">Carcass Colour</span>
+                    <span className="text-gray-800">{quotation.carcass_colour}</span>
+                  </div>
+                )}
+                {quotation.door_colour && (
+                  <div className="flex gap-4">
+                    <span className="text-gray-400 w-32 flex-shrink-0">Door Colour</span>
+                    <span className="text-gray-800">{quotation.door_colour}</span>
+                  </div>
+                )}
+                {quotation.panelwork_colour && (
+                  <div className="flex gap-4">
+                    <span className="text-gray-400 w-32 flex-shrink-0">Panelwork</span>
+                    <span className="text-gray-800">{quotation.panelwork_colour}</span>
+                  </div>
+                )}
+                {quotation.door_style && (
+                  <div className="flex gap-4">
+                    <span className="text-gray-400 w-32 flex-shrink-0">Door Style</span>
+                    <span className="text-gray-800">{quotation.door_style}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="mb-6 bg-gray-100 p-3 text-sm">
-          <p>Please use your name and/or road name as reference:</p>
-        </div>
-
-        {/* Quotation Title */}
-        <h1 className="mb-6 text-center text-2xl font-bold">QUOTATION</h1>
-
-        {/* Customer Information */}
-        <div className="mb-6">
-          <table className="w-full border-collapse">
-            <tbody>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50" style={{ width: '20%' }}>DATE:</td>
-                <td className="border border-black px-3 py-2">
-                  {quotation.created_at ? new Date(quotation.created_at).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB')}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">NAME:</td>
-                <td className="border border-black px-3 py-2">
-                  {quotation.customer_name || quotation.client_company_name || quotation.client_name || '—'}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ADDRESS:</td>
-                <td className="border border-black px-3 py-2">
-                  {quotation.customer_address || quotation.client_address || '—'}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">TEL:</td>
-                <td className="border border-black px-3 py-2">
-                  {quotation.customer_phone || quotation.client_phone || '—'}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ROOM NAME:</td>
-                <td className="border border-black px-3 py-2">{quotation.room_name || '—'}</td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">CARCASS COLOUR:</td>
-                <td className="border border-black px-3 py-2">{quotation.carcass_colour || '—'}</td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR COLOUR:</td>
-                <td className="border border-black px-3 py-2">{quotation.door_colour || '—'}</td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">PANELWORK COLOUR:</td>
-                <td className="border border-black px-3 py-2">{quotation.panelwork_colour || '—'}</td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR STYLE:</td>
-                <td className="border border-black px-3 py-2">{quotation.door_style || '—'}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* Items Table */}
-        <div className="mb-4">
+        {/* Items by section */}
+        <div className="mb-10">
           {(() => {
             const validItems = items.filter(item => {
               const hasItem = item.item?.trim() || item.item_name?.trim();
@@ -323,30 +295,13 @@ export default function ViewQuotePage() {
             });
 
             if (validItems.length === 0) {
-              return (
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-white">
-                      <th className="border border-black px-3 py-2 text-left font-bold">ITEM</th>
-                      <th className="border border-black px-3 py-2 text-left font-bold">DESCRIPTION</th>
-                      <th className="border border-black px-3 py-2 text-left font-bold">COLOUR</th>
-                      <th className="border border-black px-3 py-2 text-center font-bold">QTY</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td colSpan={4} className="border border-black px-3 py-8 text-center text-gray-500">No items in this quotation</td>
-                    </tr>
-                  </tbody>
-                </table>
-              );
+              return <p className="text-sm text-gray-400 py-8 text-center">No items in this quotation.</p>;
             }
 
             return SECTIONS.map((section) => {
               const sectionItems = validItems.filter((item) => (item.section || 'Furniture') === section);
               if (sectionItems.length === 0) return null;
 
-              // ✅ Section totals
               const sectionRaw = sectionItems.reduce((sum, item) => {
                 const itemRaw = (item.amount || 0) * (item.quantity || 1);
                 const subRaw = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
@@ -354,7 +309,6 @@ export default function ViewQuotePage() {
                 return sum + itemRaw + subRaw;
               }, 0);
 
-              // ✅ After item-level discounts from DB
               const sectionAfterItemDiscounts = sectionItems.reduce((sum, item) => {
                 const itemTotal = (item.discount_percent && item.discount_percent > 0)
                   ? (item.discounted_total ?? item.discounted_amount ?? (item.amount || 0) * (item.quantity || 1))
@@ -366,85 +320,61 @@ export default function ViewQuotePage() {
                 return sum + itemTotal + subTotal;
               }, 0);
 
-              const sectionSubtotal = sectionRaw;
               const itemDiscountTotal = sectionRaw - sectionAfterItemDiscounts;
               const hasItemDiscount = itemDiscountTotal > 0;
 
               return (
-                <div key={section} className="mb-6">
-                  <h3 className="mb-3 text-lg font-bold">{section}</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-white">
-                          <th className="border border-black px-3 py-2 text-left font-bold">ITEM</th>
-                          <th className="border border-black px-3 py-2 text-left font-bold">DESCRIPTION</th>
-                          <th className="border border-black px-3 py-2 text-left font-bold">COLOUR</th>
-                          <th className="border border-black px-3 py-2 text-center font-bold">QTY</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sectionItems.map((item, index) => (
-                          <React.Fragment key={index}>
-                            <tr>
-                              <td className="border border-black px-3 py-2">{item.item || item.item_name || '—'}</td>
-                              <td className="border border-black px-3 py-2">{item.description || '—'}</td>
-                              <td className="border border-black px-3 py-2">{item.color || item.colour || '—'}</td>
-                              <td className="border border-black px-3 py-2 text-center">{item.quantity || 1}</td>
-                            </tr>
-                            {(item.subItems || item.sub_items || []).map((sub: any, subIndex: number) => (
-                              <tr key={`${index}-sub-${subIndex}`} className="bg-gray-50">
-                                <td className="border border-black px-3 py-2 pl-6 text-sm">{sub.item || '—'}</td>
-                                <td className="border border-black px-3 py-2 text-sm">{sub.description || '—'}</td>
-                                <td className="border border-black px-3 py-2 text-sm">{sub.color || sub.colour || '—'}</td>
-                                <td className="border border-black px-3 py-2 text-center text-sm">{sub.quantity || 1}</td>
-                              </tr>
-                            ))}
-                          </React.Fragment>
-                        ))}
-                      </tbody>
-                    </table>
+                <div key={section} className="mb-10">
+                  <div className="flex items-center gap-3 mt-8 mb-3">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-gray-500 whitespace-nowrap">{section}</span>
+                    <div className="flex-1 border-t border-gray-200" />
                   </div>
-
-                  {/* ✅ Section Totals */}
-                  <div className="flex justify-end mt-2">
-                    <table className="border-collapse" style={{ width: '35%' }}>
-                      <tbody>
-                        {(() => {
-                          const secTotal = sectionAfterItemDiscounts;
-                          return (
-                            <>
-                              <tr>
-                                <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-sm">
-                                  {section} Subtotal
-                                </td>
-                                <td className="border border-gray-300 px-3 py-1 text-right text-sm">
-                                  {formatCurrency(sectionRaw)}
-                                </td>
-                              </tr>
-                              {hasItemDiscount && (
-                                <tr>
-                                  <td className="border border-gray-300 px-3 py-1 text-sm text-red-600">
-                                    Section Discount
-                                  </td>
-                                  <td className="border border-gray-300 px-3 py-1 text-right text-sm text-red-600">
-                                    -{formatCurrency(itemDiscountTotal)}
-                                  </td>
-                                </tr>
-                              )}
-                              <tr>
-                                <td className="border border-gray-300 px-3 py-1 font-bold bg-gray-100 text-sm">
-                                  {section} Total
-                                </td>
-                                <td className="border border-gray-300 px-3 py-1 text-right font-bold text-sm">
-                                  {formatCurrency(secTotal)}
-                                </td>
-                              </tr>
-                            </>
-                          );
-                        })()}
-                      </tbody>
-                    </table>
+                  <div className="rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-1"><table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400 w-1/4">Item</th>
+                        <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400">Description</th>
+                        <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400 w-32">Colour</th>
+                        <th className="py-3 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400 text-center w-12">Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sectionItems.map((item, index) => (
+                        <React.Fragment key={index}>
+                          <tr className="border-b border-gray-50 transition-colors hover:bg-gray-50/50">
+                            <td className="py-3 px-3 text-gray-800">{item.item || item.item_name || '—'}</td>
+                            <td className="py-3 px-3 text-gray-600">{item.description || '—'}</td>
+                            <td className="py-3 px-3 text-gray-600">{item.color || item.colour || '—'}</td>
+                            <td className="py-3 px-3 text-center text-gray-800">{item.quantity || 1}</td>
+                          </tr>
+                          {(item.subItems || item.sub_items || []).map((sub: any, subIndex: number) => (
+                            <tr key={`${index}-sub-${subIndex}`} className="border-b border-gray-50">
+                              <td className="py-2 px-3 pl-5 text-xs text-gray-400">{sub.item || '—'}</td>
+                              <td className="py-2 px-3 text-xs text-gray-400">{sub.description || '—'}</td>
+                              <td className="py-2 px-3 text-xs text-gray-400">{sub.color || sub.colour || '—'}</td>
+                              <td className="py-2 px-3 text-center text-xs text-gray-400">{sub.quantity || 1}</td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table></div>
+                  <div className="flex justify-end mt-2 mb-8">
+                    <div className="w-72 text-sm rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                      {hasItemDiscount && (
+                        <>
+                          <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
+                            <span>Subtotal</span><span>{formatCurrency(sectionRaw)}</span>
+                          </div>
+                          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50 text-red-500">
+                            <span>Discount</span><span>-{formatCurrency(itemDiscountTotal)}</span>
+                          </div>
+                        </>
+                      )}
+                      <div className="flex justify-between px-5 py-3.5 font-semibold bg-gray-900 text-white">
+                        <span>{section} Total</span><span>{formatCurrency(sectionAfterItemDiscounts)}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
@@ -452,59 +382,76 @@ export default function ViewQuotePage() {
           })()}
         </div>
 
-        {/* Totals */}
-        <div className="mb-6 flex justify-end">
-          <table className="border-collapse" style={{ width: '40%' }}>
-            <tbody>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalAfterSectionDiscounts)}</td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DISCOUNT {globalDiscountPercent > 0 ? `(${globalDiscountPercent}%)` : ''}</td>
-                <td className="border border-black px-3 py-2 text-right text-red-600">
-                  {globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">VAT ({vatPercentage}%)</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(vat)}</td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-bold bg-gray-50">TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right font-bold">{formatCurrency(total)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* Payment Terms */}
-        <div className="mb-6 space-y-2 text-sm">
-          <p className="font-semibold">Only Bacs or Cash will be accepted on Delivery and Completion</p>
-          <p className="font-semibold">
-            NOTE: If you wish to proceed with this quote, you will be required to make the full payment upfront
-          </p>
-        </div>
-
-        <div className="mb-8 text-sm font-semibold text-red-600">
-          <p>Please sign here to confirm.</p>
-        </div>
-
-        {/* Signature Section */}
-        <div className="space-y-4 text-sm">
-          <div className="flex items-center">
-            <span className="mr-2">Customer Signature:</span>
-            <span className="border-b border-dotted border-black flex-1"></span>
-          </div>
-          <div className="flex items-center">
-            <span className="mr-2">Customer Name:</span>
-            <span className="border-b border-dotted border-black flex-1"></span>
-          </div>
-          <div className="flex items-center">
-            <span className="mr-2">Date:</span>
-            <span className="border-b border-dotted border-black flex-1"></span>
+        {/* Grand totals */}
+        <div className="flex justify-end mb-12">
+          <div className="w-80 rounded-xl border border-gray-100 shadow-md overflow-hidden text-sm mt-6">
+            <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
+              <span>Subtotal</span><span className="text-gray-800">{formatCurrency(subtotalAfterSectionDiscounts)}</span>
+            </div>
+            {globalDiscountPercent > 0 && (
+              <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
+                <span>Discount ({globalDiscountPercent}%)</span><span className="text-gray-800">-{formatCurrency(globalDiscountAmount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
+              <span>VAT ({vatPercentage}%)</span><span className="text-gray-800">{formatCurrency(vat)}</span>
+            </div>
+            <div className="flex justify-between px-5 py-4 bg-gray-900 text-white">
+              <span className="font-semibold text-sm">Total</span><span className="font-bold text-lg">{formatCurrency(total)}</span>
+            </div>
           </div>
         </div>
+
+        {/* Payment details + terms */}
+        <div className="border-t border-gray-200 pt-8 mb-12 grid grid-cols-2 gap-12 text-sm">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Payment Details</p>
+            <div className="space-y-1 text-gray-600">
+              <p>Account: Atelier Luxe Interiors LTD</p>
+              <p>Bank: ClearBank</p>
+              <p>Sort Code: 04 06 05</p>
+              <p>Account No: 31621197</p>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Terms</p>
+            <div className="space-y-1.5 text-gray-600">
+              <p>Only Bacs or Cash accepted on Delivery and Completion.</p>
+              <p>Full payment required upfront to proceed.</p>
+              <p>Please use your name and/or road name as payment reference.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Terms */}
+        {quotation.additional_terms && quotation.additional_terms.filter((t: string) => t.trim()).length > 0 && (
+          <div className="border-t border-gray-100 pt-4 mb-4 text-sm text-gray-600">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">Additional Terms</p>
+            <div className="space-y-1">
+              {quotation.additional_terms.filter((t: string) => t.trim()).map((term: string, i: number) => (
+                <p key={i}>{term}</p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Additional Notes */}
+        {quotation.additional_notes && quotation.additional_notes.trim() && (
+          <div className="border-t border-gray-100 pt-4 mb-8 text-sm text-gray-600">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">Notes</p>
+            <p className="whitespace-pre-wrap">{quotation.additional_notes}</p>
+          </div>
+        )}
+
+        {/* Signature */}
+        <SignatureField customerName={quotation.customer_name} initialData={{
+          type: (quotation.signature_type as any) || "none",
+          imageData: quotation.signature_image || undefined,
+          text: quotation.signature_text || "",
+          name: quotation.signature_name || "",
+          date: quotation.signature_date || "",
+        }} />
+
       </div>
     </div>
   );

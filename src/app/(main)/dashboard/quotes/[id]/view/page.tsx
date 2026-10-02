@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -134,57 +135,47 @@ export default function ViewQuotePage() {
       {/* Quotation Content */}
       <div className="mx-auto max-w-6xl px-8 py-8">
         {/* Company Header */}
-        <div className="mb-8 text-center">
-          <div className="mb-4 text-4xl font-bold tracking-wider text-gray-800">
-            ATELIER LUXE INTERIORS
+        <div className="flex items-center justify-between border-b-2 border-gray-900 pb-7 mb-10">
+          <Image src="/images/logo-full.png" alt="Atelier Luxe Interiors" width={340} height={92} className="object-contain" />
+          <div className="text-right text-xs leading-5 text-gray-600">
+            <p className="font-semibold text-sm text-gray-900 mb-1">Atelier Luxe Interiors Ltd</p>
+            <p>127c Barkby Road, Leicester, LE4 9LG</p>
+            <p>M: 07821 328849</p>
+            <p>accounts@atelierluxe.co.uk</p>
           </div>
         </div>
 
-        {/* Company Registration Details */}
-        <div className="mb-6 space-y-1 bg-green-200 p-3 text-sm">
-          <p className="font-semibold">Registered to England No 5246881</p>
-          {/* <p className="font-semibold">VAT Reg No.686 8010 72</p> */}
+        {/* Document title */}
+        <div className="flex items-start justify-between mb-8">
+          <h1 className="text-lg font-semibold tracking-widest uppercase text-gray-900">Quotation</h1>
+          <p className="text-xs text-gray-400">Registered in England No. 17200862</p>
         </div>
-
-        <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
-          <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
-          <p className="font-semibold">Bank : ClearBank</p>
-          <p className="font-semibold">Sort Code: 04 06 05</p>
-          <p className="font-semibold">Acc No: 31621197</p>
-        </div>
-
-        <div className="mb-6 bg-gray-100 p-3 text-sm">
-          <p>Please use your name and/or road name as reference:</p>
-        </div>
-
-        {/* Quotation Title */}
-        <h1 className="mb-6 text-center text-2xl font-bold">QUOTATION</h1>
 
         {/* Customer Information */}
         <div className="mb-6">
           <table className="w-full border-collapse">
             <tbody>
               <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50" style={{ width: '20%' }}>DATE:</td>
-                <td className="border border-black px-3 py-2">
+                <td className="border-b border-gray-100 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400" style={{ width: '20%' }}>DATE:</td>
+                <td className="border-b border-gray-100 px-4 py-2.5">
                   {quotation.created_at ? new Date(quotation.created_at).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB')}
                 </td>
               </tr>
               <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">NAME:</td>
-                <td className="border border-black px-3 py-2">
+                <td className="border-b border-gray-100 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">NAME:</td>
+                <td className="border-b border-gray-100 px-4 py-2.5">
                   {quotation.customer_name || quotation.client_company_name || quotation.client_name || '—'}
                 </td>
               </tr>
               <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ADDRESS:</td>
-                <td className="border border-black px-3 py-2">
+                <td className="border-b border-gray-100 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">ADDRESS:</td>
+                <td className="border-b border-gray-100 px-4 py-2.5">
                   {quotation.customer_address || quotation.client_address || '—'}
                 </td>
               </tr>
               <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">TEL:</td>
-                <td className="border border-black px-3 py-2">
+                <td className="border-b border-gray-100 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">TEL:</td>
+                <td className="border-b border-gray-100 px-4 py-2.5">
                   {quotation.customer_phone || quotation.client_phone || '—'}
                 </td>
               </tr>
@@ -198,11 +189,11 @@ export default function ViewQuotePage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-white">
-                  <th className="border border-black px-3 py-2 text-left font-bold">ITEM</th>
-                  <th className="border border-black px-3 py-2 text-left font-bold">DESCRIPTION</th>
-                  <th className="border border-black px-3 py-2 text-left font-bold">COLOUR</th>
-                  <th className="border border-black px-3 py-2 text-center font-bold">QTY</th>
-                  <th className="border border-black px-3 py-2 text-right font-bold">AMOUNT</th>
+                  <th className="border-b border-gray-100 px-4 py-2.5 text-left font-bold">ITEM</th>
+                  <th className="border-b border-gray-100 px-4 py-2.5 text-left font-bold">DESCRIPTION</th>
+                  <th className="border-b border-gray-100 px-4 py-2.5 text-left font-bold">COLOUR</th>
+                  <th className="border-b border-gray-100 px-4 py-2.5 text-center font-bold">QTY</th>
+                  <th className="border-b border-gray-100 px-4 py-2.5 text-right font-bold">AMOUNT</th>
                 </tr>
               </thead>
               <tbody>
@@ -216,11 +207,11 @@ export default function ViewQuotePage() {
                   return hasItem || hasDescription || hasAmount;
                 }).map((item, index) => (
                   <tr key={index}>
-                    <td className="border border-black px-3 py-2">{item.item || item.item_name || '—'}</td>
-                    <td className="border border-black px-3 py-2">{item.description || '—'}</td>
-                    <td className="border border-black px-3 py-2">{item.color || item.colour || '—'}</td>
-                    <td className="border border-black px-3 py-2 text-center">{item.quantity || 1}</td>
-                    <td className="border border-black px-3 py-2 text-right font-semibold">
+                    <td className="border-b border-gray-100 px-4 py-2.5">{item.item || item.item_name || '—'}</td>
+                    <td className="border-b border-gray-100 px-4 py-2.5">{item.description || '—'}</td>
+                    <td className="border-b border-gray-100 px-4 py-2.5">{item.color || item.colour || '—'}</td>
+                    <td className="border-b border-gray-100 px-4 py-2.5 text-center">{item.quantity || 1}</td>
+                    <td className="border-b border-gray-100 px-4 py-2.5 text-right font-semibold">
                       {formatCurrency((item.amount || 0) * (item.quantity || 1))}
                     </td>
                   </tr>
@@ -233,7 +224,7 @@ export default function ViewQuotePage() {
                   return hasItem || hasDescription || hasAmount;
                 }).length === 0 && (
                   <tr>
-                    <td colSpan={5} className="border border-black px-3 py-8 text-center text-gray-500">
+                    <td colSpan={5} className="border-b border-gray-100 px-3 py-8 text-center text-gray-500">
                       No items in this quotation
                     </td>
                   </tr>
@@ -248,16 +239,16 @@ export default function ViewQuotePage() {
           <table className="border-collapse" style={{ width: '40%' }}>
             <tbody>
               <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotal)}</td>
+                <td className="border-b border-gray-100 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">SUB TOTAL</td>
+                <td className="border-b border-gray-100 px-4 py-2.5 text-right">{formatCurrency(subtotal)}</td>
               </tr>
               <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">VAT ({vatPercentage}%)</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(vat)}</td>
+                <td className="border-b border-gray-100 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">VAT ({vatPercentage}%)</td>
+                <td className="border-b border-gray-100 px-4 py-2.5 text-right">{formatCurrency(vat)}</td>
               </tr>
               <tr>
-                <td className="border border-black px-3 py-2 font-bold bg-gray-50">TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right font-bold">{formatCurrency(total)}</td>
+                <td className="border-b border-gray-100 px-4 py-2.5 font-bold bg-gray-50">TOTAL</td>
+                <td className="border-b border-gray-100 px-4 py-2.5 text-right font-bold">{formatCurrency(total)}</td>
               </tr>
             </tbody>
           </table>

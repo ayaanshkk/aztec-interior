@@ -172,6 +172,141 @@ These serve as the fallback; there is no separate default.css file. */
   }
 }
 
+/* ═══ Dark mode: remap hardcoded Tailwind color utilities ═══════════════
+   Pages that use bg-white / text-gray-* now respond to .dark.
+   Document/print view pages add data-force-light to stay white.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Backgrounds */
+.dark .bg-white                     { background-color: oklch(0.205 0 0) !important; }
+.dark .bg-gray-50                   { background-color: oklch(0.232 0 0) !important; }
+.dark .bg-gray-100                  { background-color: oklch(0.269 0 0) !important; }
+.dark .bg-gray-200                  { background-color: oklch(0.31 0 0)  !important; }
+.dark .bg-stone-50                  { background-color: oklch(0.232 0 0) !important; }
+.dark .bg-stone-100                 { background-color: oklch(0.269 0 0) !important; }
+
+/* Text */
+.dark .text-gray-950,
+.dark .text-gray-900                { color: oklch(0.965 0 0) !important; }
+.dark .text-gray-800                { color: oklch(0.88 0 0)  !important; }
+.dark .text-gray-700                { color: oklch(0.76 0 0)  !important; }
+.dark .text-gray-600                { color: oklch(0.65 0 0)  !important; }
+.dark .text-gray-500                { color: oklch(0.55 0 0)  !important; }
+.dark .text-gray-400                { color: oklch(0.47 0 0)  !important; }
+.dark .text-gray-300                { color: oklch(0.40 0 0)  !important; }
+.dark .text-stone-600               { color: oklch(0.65 0 0)  !important; }
+.dark .text-stone-500               { color: oklch(0.55 0 0)  !important; }
+.dark .text-stone-400               { color: oklch(0.47 0 0)  !important; }
+
+/* Borders */
+.dark .border-gray-100              { border-color: oklch(1 0 0 / 8%)   !important; }
+.dark .border-gray-200              { border-color: oklch(1 0 0 / 12%)  !important; }
+.dark .border-gray-300              { border-color: oklch(1 0 0 / 18%)  !important; }
+.dark .border-stone-100             { border-color: oklch(1 0 0 / 8%)   !important; }
+.dark .border-stone-200             { border-color: oklch(1 0 0 / 12%)  !important; }
+.dark .border-stone-300             { border-color: oklch(1 0 0 / 18%)  !important; }
+
+/* Shadows softer in dark */
+.dark .shadow-sm  { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.5)                                              !important; }
+.dark .shadow-md  { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.4)         !important; }
+.dark .shadow-xl  { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.7), 0 8px 10px -6px rgb(0 0 0 / 0.5)      !important; }
+.dark .shadow-2xl { box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.8)                                        !important; }
+
+/* Dividers */
+.dark .divide-gray-200 > * + * { border-color: oklch(1 0 0 / 12%) !important; }
+
+/* Hover states */
+.dark .hover\:bg-gray-50:hover   { background-color: oklch(0.248 0 0) !important; }
+.dark .hover\:bg-gray-100:hover  { background-color: oklch(0.285 0 0) !important; }
+.dark .hover\:bg-gray-200:hover  { background-color: oklch(0.32 0 0)  !important; }
+
+/* Tinted bg colors used in calendars / highlights */
+.dark .bg-blue-50  { background-color: oklch(0.24 0.04 265) !important; }
+.dark .bg-red-50   { background-color: oklch(0.24 0.04 20)  !important; }
+.dark .bg-green-50 { background-color: oklch(0.24 0.04 145) !important; }
+.dark .bg-yellow-50{ background-color: oklch(0.24 0.04 90)  !important; }
+.dark .bg-red-100  { background-color: oklch(0.27 0.06 20)  !important; }
+.dark .bg-green-100{ background-color: oklch(0.27 0.06 145) !important; }
+.dark .bg-yellow-100{background-color: oklch(0.27 0.06 90)  !important; }
+
+/* Input / textarea backgrounds */
+.dark input:not([type="range"]),
+.dark textarea,
+.dark select {
+  background-color: oklch(0.232 0 0);
+  color: oklch(0.965 0 0);
+  border-color: oklch(1 0 0 / 12%);
+}
+/* Reset for document pages */
+[data-force-light] input,
+[data-force-light] textarea,
+[data-force-light] select {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border-color: #e5e7eb !important;
+}
+
+/* Ring/outline for focused elements in dark */
+.dark .ring-gray-200 { --tw-ring-color: oklch(1 0 0 / 12%) !important; }
+.dark .ring-gray-300 { --tw-ring-color: oklch(1 0 0 / 18%) !important; }
+
+/* ═══ Force light mode for document/print view pages ════════════════════
+   Any element with [data-force-light] resets to light-mode values so the
+   overrides above render as white inside those containers.
+   ══════════════════════════════════════════════════════════════════════ */
+[data-force-light],
+[data-force-light] * {
+  color-scheme: light;
+}
+/* the wrapper itself */
+[data-force-light].bg-white,
+[data-force-light] .bg-white          { background-color: #ffffff !important; }
+[data-force-light].bg-gray-50,
+[data-force-light] .bg-gray-50,
+[data-force-light].bg-stone-50,
+[data-force-light] .bg-stone-50       { background-color: #fafaf9 !important; }
+[data-force-light].bg-gray-100,
+[data-force-light] .bg-gray-100,
+[data-force-light].bg-stone-100,
+[data-force-light] .bg-stone-100      { background-color: #f5f5f4 !important; }
+[data-force-light].text-gray-900,
+[data-force-light] .text-gray-900,
+[data-force-light].text-gray-950,
+[data-force-light] .text-gray-950     { color: #111827 !important; }
+[data-force-light].text-gray-800,
+[data-force-light] .text-gray-800     { color: #1f2937 !important; }
+[data-force-light].text-gray-700,
+[data-force-light] .text-gray-700     { color: #374151 !important; }
+[data-force-light].text-gray-600,
+[data-force-light] .text-gray-600,
+[data-force-light].text-stone-600,
+[data-force-light] .text-stone-600    { color: #4b5563 !important; }
+[data-force-light].text-gray-500,
+[data-force-light] .text-gray-500,
+[data-force-light].text-stone-500,
+[data-force-light] .text-stone-500    { color: #6b7280 !important; }
+[data-force-light].text-gray-400,
+[data-force-light] .text-gray-400,
+[data-force-light].text-stone-400,
+[data-force-light] .text-stone-400    { color: #9ca3af !important; }
+[data-force-light].border-gray-100,
+[data-force-light] .border-gray-100,
+[data-force-light].border-stone-100,
+[data-force-light] .border-stone-100  { border-color: #f3f4f6 !important; }
+[data-force-light].border-gray-200,
+[data-force-light] .border-gray-200,
+[data-force-light].border-stone-200,
+[data-force-light] .border-stone-200  { border-color: #e5e7eb !important; }
+[data-force-light].border-gray-300,
+[data-force-light] .border-gray-300,
+[data-force-light].border-stone-300,
+[data-force-light] .border-stone-300  { border-color: #d1d5db !important; }
+[data-force-light] .shadow-sm         { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important; }
+[data-force-light] .shadow-md         { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important; }
+
+/* ═══ Responsive: tables scroll horizontally on small screens ════════ */
+.overflow-x-auto { -webkit-overflow-scrolling: touch; }
+
 .disable-transitions * {
   transition: none !important;
 }

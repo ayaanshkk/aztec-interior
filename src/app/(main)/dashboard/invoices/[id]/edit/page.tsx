@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -8,6 +8,7 @@ import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { BACKEND_URL } from "@/lib/api";
+import { SignatureField } from "@/components/ui/SignatureField";
 
 const API_FORM = `${BACKEND_URL}/api/form`;
 
@@ -66,6 +67,7 @@ export default function EditInvoicePage() {
     door_colour:      "",
     panelwork_colour: "",
     door_style:       "",
+    invoice_number:   "",
   });
 
   const [items,                  setItems]                  = useState<InvoiceItem[]>([]);
@@ -77,6 +79,8 @@ export default function EditInvoicePage() {
   const [doorType,               setDoorType]               = useState("Carcass Only");
   const [roomType,               setRoomType]               = useState("Kitchen");
   const [fillerType,             setFillerType]             = useState("Basic Slab");
+  const [additionalTerms,       setAdditionalTerms]        = useState<string[]>([]);
+  const [additionalNotes,       setAdditionalNotes]        = useState<string>('');
   const doorRoomSetByLoad = useRef(0);
   const originalItemsRef = useRef<InvoiceItem[]>([]);
   const originalDoorType = useRef<string>('');
@@ -109,6 +113,8 @@ export default function EditInvoicePage() {
       setDeposit(data.deposit_paid || 0);
       if (data.section_discounts) setSectionDiscounts(data.section_discounts);
       if (data.global_discount_percent !== undefined && data.global_discount_percent !== null) setGlobalDiscountPercent(data.global_discount_percent);
+      setAdditionalTerms(data.additional_terms || []);
+      setAdditionalNotes(data.additional_notes || '');
       doorRoomSetByLoad.current = 3; // suppress all three fires
       if (data.door_type) setDoorType(data.door_type);
       if (data.room_type) setRoomType(data.room_type);
@@ -127,6 +133,7 @@ export default function EditInvoicePage() {
         door_colour:      data.door_colour      || "",
         panelwork_colour: data.panelwork_colour || "",
         door_style:       data.door_style       || "",
+        invoice_number:   data.invoice_number   || "",
       });
 
       const allItems = data.items || [];
@@ -639,6 +646,8 @@ export default function EditInvoicePage() {
           section_discounts:       sectionDiscounts,
 					global_discount_percent: globalDiscountPercent,
 					global_discount_amount:  globalDiscountAmount,
+          additional_terms:        additionalTerms.filter(t => t.trim()),
+          additional_notes:        additionalNotes,
 					items: items
 						.filter(i => i.item || i.description || i.line_total > 0)
 						.flatMap(i => [
@@ -698,55 +707,45 @@ export default function EditInvoicePage() {
     <div className="min-h-screen bg-white">
 
       {/* Header */}
-      <div className="border-b bg-gray-50 px-8 py-4 print:hidden">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/invoices/${invoiceId}`)}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Edit Invoice</h1>
-              <p className="text-sm text-gray-600">
-                {formData.customer_name ? `Customer: ${formData.customer_name}` : "Make your changes and save"}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push(`/dashboard/invoices/${invoiceId}`)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>
-              <Save className="mr-2 h-4 w-4" />
-              {saving ? "Saving..." : "Save Invoice"}
-            </Button>
-          </div>
+      <div className="border-b px-8 py-3 print:hidden flex items-center justify-between bg-white">
+        <Button variant="ghost" size="sm" onClick={() => router.push(`/dashboard/invoices/${invoiceId}`)} className="flex items-center gap-2 text-gray-500 hover:text-gray-900">
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+        <div className="flex items-center gap-2">
+          {saveMsg && (
+            <span className={`text-xs font-medium px-3 py-1 rounded-full ${
+              saveMsg.startsWith("✅") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+              {saveMsg}
+            </span>
+          )}
+          <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/invoices/${invoiceId}`)}>Cancel</Button>
+          <Button size="sm" onClick={handleSave} disabled={saving} className="flex items-center gap-2">
+            <Save className="h-4 w-4" />
+            {saving ? "Saving..." : "Save Invoice"}
+          </Button>
         </div>
-        {saveMsg && (
-          <div className={`mt-2 rounded-md px-4 py-2 text-sm font-medium ${
-            saveMsg.startsWith("✅") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-            {saveMsg}
-          </div>
-        )}
       </div>
 
-      <div className="px-4 py-8">
+      <div className="px-8 py-10">
 
-        {/* Company header */}
-        <div className="mb-8 flex items-center justify-center gap-3">
-          <Image src="/images/logo3.png" alt="Logo" width={80} height={80} className="object-contain" />
-          <div className="text-4xl font-bold tracking-wider text-gray-800">ATELIER LUXE INTERIORS</div>
+        {/* Company Header */}
+        <div className="flex items-center justify-between border-b-2 border-gray-900 pb-7 mb-10">
+          <Image src="/images/logo-full.png" alt="Atelier Luxe Interiors" width={340} height={92} className="object-contain" />
+          <div className="text-right text-xs leading-6 text-gray-600">
+            <p className="font-semibold text-sm text-gray-900 mb-1">Atelier Luxe Interiors Ltd</p>
+            <p>127c Barkby Road, Leicester, LE4 9LG</p>
+            <p>M: 07821 328849</p>
+              <p>E: accounts@atelierluxe.co.uk</p>
+            <p className="text-gray-400 mt-1">Registered in England No. 17200862</p>
+          </div>
         </div>
-        <div className="mb-6 space-y-1 bg-green-200 p-3 text-sm">
-          <p className="font-semibold">Registered to England No 5246881</p>
+        <div className="flex items-start justify-between mb-10">
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-1.5">Invoice</p>
+            <h1 className="text-2xl font-semibold text-gray-900">Edit Invoice</h1>
+          </div>
         </div>
-        <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
-          <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
-          <p className="font-semibold">Bank : ClearBank</p>
-          <p className="font-semibold">Sort Code: 04 06 05</p>
-          <p className="font-semibold">Acc No: 31621197</p>
-        </div>
-        <div className="mb-6 bg-gray-100 p-3 text-sm">
-          <p>Please use your name and/or road name as reference:</p>
-        </div>
-        <h1 className="mb-6 text-center text-2xl font-bold">INVOICE</h1>
 
         {/* Door / Room type */}
         <div className="mb-6 grid grid-cols-3 gap-4">
@@ -827,50 +826,49 @@ export default function EditInvoicePage() {
           );
         })()}
 
-        {/* Customer info */}
-        <div className="mb-6">
-          <table className="w-full border-collapse">
-            <tbody>
-              {[
-                { label: "INVOICE DATE:", field: "invoice_date", type: "date"     },
-                { label: "DUE DATE:",     field: "due_date",     type: "date"     },
-                { label: "NAME:",         field: "customer_name",    type: "text" },
-                { label: "ADDRESS:",      field: "customer_address", type: "textarea" },
-                { label: "TEL:",          field: "customer_phone",   type: "text" },
-                { label: "EMAIL:",        field: "customer_email",   type: "email" },
-                { label: "ROOM NAME:",        field: "room_name",        type: "text" },
-                { label: "CARCASS COLOUR:",   field: "carcass_colour",   type: "text" },
-                { label: "DOOR COLOUR:",      field: "door_colour",      type: "text" },
-                { label: "PANELWORK COLOUR:", field: "panelwork_colour", type: "text" },
-                { label: "DOOR STYLE:",       field: "door_style",       type: "text" },
-              ].map(({ label, field, type }) => (
-                <tr key={field}>
-                  <td className="border border-black px-3 py-2 font-semibold bg-gray-50" style={{ width: "20%" }}>{label}</td>
-                  <td className="border border-black p-0">
-                    {type === "textarea" ? (
-                      <textarea value={(formData as any)[field]}
-                        onChange={e => setFormData(prev => ({ ...prev, [field]: e.target.value }))}
-                        className="w-full resize-none px-3 py-2 text-sm focus:outline-none" rows={2} />
-                    ) : type === "select" ? (
-                      <select value={(formData as any)[field]}
-                        onChange={e => setFormData(prev => ({ ...prev, [field]: e.target.value }))}
-                        className="w-full border-none px-3 py-2 text-sm focus:outline-none">
-                        <option value="Draft">Draft</option>
-                        <option value="Sent">Sent</option>
-                        <option value="Paid">Paid</option>
-                        <option value="Overdue">Overdue</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                    ) : (
-                      <Input type={type} value={(formData as any)[field]}
-                        onChange={e => setFormData(prev => ({ ...prev, [field]: e.target.value }))}
-                        className="border-none focus-visible:ring-0 w-full h-full px-3 py-2" />
-                    )}
-                  </td>
-                </tr>
+        {/* Customer + Invoice Details — 2-column layout */}
+        <div className="grid grid-cols-2 gap-4 mb-10">
+          {/* Left: Bill To */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Bill To</p>
+            <Input value={formData.customer_name} onChange={e => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
+              placeholder="Customer name" required
+              className="border-none border-b border-gray-100 focus-visible:ring-0 px-0 rounded-none text-base font-medium placeholder:text-gray-300 mb-1 h-auto py-2" />
+            <textarea value={formData.customer_address} onChange={e => setFormData(prev => ({ ...prev, customer_address: e.target.value }))}
+              rows={3} placeholder="Address" required
+              className="w-full bg-transparent border-none outline-none resize-none text-sm text-gray-700 placeholder:text-gray-300 py-2 border-b border-gray-100" />
+            <Input value={formData.customer_phone} onChange={e => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))}
+              placeholder="Phone"
+              className="border-none border-b border-gray-100 focus-visible:ring-0 px-0 rounded-none text-sm text-gray-700 placeholder:text-gray-300 h-auto py-2" />
+            <Input type="email" value={formData.customer_email} onChange={e => setFormData(prev => ({ ...prev, customer_email: e.target.value }))}
+              placeholder="Email"
+              className="border-none border-b border-gray-100 focus-visible:ring-0 px-0 rounded-none text-sm text-gray-700 placeholder:text-gray-300 h-auto py-2" />
+          </div>
+          {/* Right: Invoice Details */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Invoice Details</p>
+            <div className="space-y-0">
+              {([
+                { label: 'Invoice No',     field: 'invoice_number',   type: 'text' },
+                { label: 'Invoice Date',   field: 'invoice_date',     type: 'date' },
+                { label: 'Due Date',       field: 'due_date',         type: 'date' },
+                { label: 'Room',           field: 'room_name',        type: 'text' },
+                { label: 'Carcass Colour', field: 'carcass_colour',   type: 'text' },
+                { label: 'Door Colour',    field: 'door_colour',      type: 'text' },
+                { label: 'Panelwork',      field: 'panelwork_colour', type: 'text' },
+                { label: 'Door Style',     field: 'door_style',       type: 'text' },
+              ] as const).map(({ label, field, type }) => (
+                <div key={field} className="flex items-center border-b border-gray-100 py-0.5">
+                  <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">{label}</span>
+                  <div className="flex-1">
+                    <Input type={type} value={(formData as any)[field]}
+                      onChange={e => setFormData(prev => ({ ...prev, [field]: e.target.value }))}
+                      className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" />
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
 
         {/* Sections + Items */}
@@ -905,31 +903,34 @@ export default function EditInvoicePage() {
             const sectionTotal = sectionAfterItemDiscounts;
 
             return (
-              <div key={section} className="mb-6">
-                <div className="mb-3"><h3 className="text-lg font-bold">{section}</h3></div>
+              <div key={section} className="mb-0 mt-8">
+                <div className="flex items-center gap-3 mt-8 mb-3">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-500 whitespace-nowrap">{section}</span>
+                  <div className="flex-1 border-t border-gray-200" />
+                </div>
 
-                <table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
+                <div className="rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-1"><table className="w-full border-collapse" style={{ tableLayout: "fixed" }}>
                   <thead>
-                    <tr className="bg-white">
-                      <th className="border border-black px-1 py-2 text-left font-bold text-xs"   style={{ width: "8%" }}>ITEM</th>
-                      <th className="border border-black px-1 py-2 text-left font-bold text-xs"   style={{ width: "20%" }}>DESCRIPTION</th>
-                      <th className="border border-black px-1 py-2 text-left font-bold text-xs"   style={{ width: "7%" }}>COLOUR</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: "5%" }}>QTY</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: "5%" }}>W</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: "5%" }}>H</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: "5%" }}>D</th>
-                      <th className="border border-black px-1 py-2 text-right font-bold text-xs"  style={{ width: "8%" }}>PRICE</th>
-                      <th className="border border-black px-1 py-2 text-right font-bold text-xs"  style={{ width: "9%" }}>AMOUNT</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: "6%" }}>DISC %</th>
-                      <th className="border border-black px-1 py-2 text-right font-bold text-xs"  style={{ width: "9%" }}>FINAL</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: "4%" }}></th>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400"   style={{ width: "8%" }}>Item</th>
+                      <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400"   style={{ width: "22%" }}>Description</th>
+                      <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400"   style={{ width: "10%" }}>Colour</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "5%" }}>Qty</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "4%" }}>W</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "4%" }}>H</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "4%" }}>D</th>
+                      <th className="py-3 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400"  style={{ width: "9%" }}>Price</th>
+                      <th className="py-3 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400"  style={{ width: "10%" }}>Amount</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "7%" }}>Disc %</th>
+                      <th className="py-3 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400"  style={{ width: "10%" }}>Final</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "4%" }}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {sectionItems.map(item => (
                       <React.Fragment key={item.id}>
                         <tr>
-                          <td className="border border-black p-0">
+                          <td className="border-b border-gray-50 px-2 py-2">
                             <Input
                               value={item.item}
                               onChange={(e) => {
@@ -937,64 +938,64 @@ export default function EditInvoicePage() {
                               }}
                               onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(item.id, "item", val); }}
                               placeholder="50B"
-                              className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
+                              className={`border-none focus-visible:ring-0 w-full font-mono text-sm h-auto py-0 px-0 placeholder:text-gray-300 ${autoFilling === item.id ? 'bg-blue-50 animate-pulse' : ''}`}
                             />
                           </td>
-                          <td className="border border-black p-0">
+                          <td className="border-b border-gray-50 px-2 py-2">
                             <textarea value={item.description}
                               onChange={e => handleDescriptionChange(item.id, e.target.value)}
-                              placeholder="Description" rows={2}
-                              style={{ minHeight: "35px", lineHeight: "1.3" }}
+                              placeholder="Description" rows={1}
+                              style={{ minHeight: "24px", lineHeight: "1.5" }}
                               onInput={e => { const t = e.target as HTMLTextAreaElement; t.style.height = "auto"; t.style.height = `${t.scrollHeight}px`; }}
-                              className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${autoFilling === item.id ? "bg-blue-50 animate-pulse" : ""}`} />
+                              className={`border-none outline-none w-full resize-none overflow-hidden text-sm bg-transparent placeholder:text-gray-300 ${autoFilling === item.id ? "bg-blue-50 animate-pulse" : ""}`} />
                           </td>
-                          <td className="border border-black p-0">
+                          <td className="border-b border-gray-50 px-2 py-2">
                             <Input value={item.color} onChange={e => handleItemChange(item.id, "color", e.target.value)}
-                              placeholder="Colour" className="border-none focus-visible:ring-0 min-w-[70px] text-xs" />
+                              placeholder="—" className="border-none focus-visible:ring-0 text-sm h-auto py-0 px-0 w-full placeholder:text-gray-300" />
                           </td>
-                          <td className="border border-black p-0">
+                          <td className="border-b border-gray-50 px-2 py-2">
                             <Input type="number" value={item.quantity} min="1"
                               onChange={e => handleItemChange(item.id, "quantity", e.target.value)}
-                              className="border-none text-center focus-visible:ring-0 w-full text-xs" />
+                              className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" />
                           </td>
                           {(["width", "height", "depth"] as const).map(dim => (
-                            <td key={dim} className="border border-black p-0">
+                            <td key={dim} className="border-b border-gray-50 px-2 py-2">
                               <Input type="number" value={item[dim] || ""} placeholder="—" min="0"
                                 onChange={e => handleItemChange(item.id, dim, e.target.value)}
-                                className="border-none text-center focus-visible:ring-0 w-full text-xs" />
+                                className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
                             </td>
                           ))}
-                          <td className="border border-black p-0">
+                          <td className="border-b border-gray-50 px-2 py-2">
                             <Input type="number" step="0.01" min="0" value={parseFloat((item.amount || 0).toFixed(2))} placeholder="0.00"
                               onChange={e => handleItemChange(item.id, "amount", e.target.value)}
-                              className="border-none text-right focus-visible:ring-0 w-full text-xs" />
+                              className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" />
                           </td>
-                          <td className="border border-black px-2 py-1 text-right font-semibold text-xs">{fmt(item.line_total)}</td>
-                          <td className="border border-black p-0">
+                          <td className="border-b border-gray-50 px-2 py-2 text-right text-sm text-gray-600">{fmt(item.line_total)}</td>
+                          <td className="border-b border-gray-50 px-2 py-2">
                             <Input type="number" step="0.1" min="0" max="100" value={item.discount_percent || ""} placeholder="0"
                               onChange={e => handleItemChange(item.id, "discount_percent", e.target.value)}
-                              className="border-none text-center focus-visible:ring-0 w-full text-xs" />
+                              className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
                           </td>
-                          <td className="border border-black px-2 py-1 text-right">
+                          <td className="border-b border-gray-50 px-2 py-2 text-right">
                             {item.discount_percent && item.discount_percent > 0 ? (
                               <div>
-                                <div className="text-xs text-gray-500 line-through">{fmt(item.line_total)}</div>
-                                <div className="font-semibold text-green-700 text-xs">{fmt(item.discounted_total || 0)}</div>
+                                <div className="text-xs text-gray-400 line-through">{fmt(item.line_total)}</div>
+                                <div className="text-sm font-semibold text-gray-900">{fmt(item.discounted_total || 0)}</div>
                               </div>
-                            ) : <span className="font-semibold text-xs">{fmt(item.line_total)}</span>}
+                            ) : <span className="text-sm font-semibold text-gray-900">{fmt(item.line_total)}</span>}
                           </td>
-                          <td className="border border-black p-1 text-center">
+                          <td className="border-b border-gray-50 px-2 py-2 text-center">
                             <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)}
-                              className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7">
-                              <Trash2 className="h-3 w-3" />
+                              className="text-gray-300 hover:text-red-500 h-7 w-7">
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </td>
                         </tr>
 
                         {/* SUB-ITEMS */}
                         {(item.subItems || []).map(sub => (
-                          <tr key={sub.id} className="bg-gray-50">
-                            <td className="border border-black p-0 pl-4">
+                          <tr key={sub.id} className="bg-gray-50/40">
+                            <td className="border-b border-gray-50 px-2 py-1.5 pl-6">
                               <Input
                                 value={sub.item}
                                 onChange={(e) => {
@@ -1008,47 +1009,47 @@ export default function EditInvoicePage() {
                                 }}
                                 onBlur={(e) => handleSubItemAutoFill(item.id, sub.id, e.target.value)}
                                 placeholder="sub-code"
-                                className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
+                                className="border-none focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 font-mono placeholder:text-gray-300"
                               />
                             </td>
-                            <td className="border border-black p-0">
+                            <td className="border-b border-gray-50 px-2 py-1.5">
                               <Input value={sub.description} onChange={e => handleSubItemChange(item.id, sub.id, "description", e.target.value)}
-                                placeholder="Sub-item description" className="border-none focus-visible:ring-0 w-full text-xs px-1" />
+                                placeholder="Sub-item description" className="border-none focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
                             </td>
-                            <td className="border border-black p-0">
+                            <td className="border-b border-gray-50 px-2 py-1.5">
                               <Input value={sub.color} onChange={e => handleSubItemChange(item.id, sub.id, "color", e.target.value)}
-                                placeholder="Colour" className="border-none focus-visible:ring-0 w-full text-xs px-1" />
+                                placeholder="—" className="border-none focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
                             </td>
-                            <td className="border border-black p-0">
+                            <td className="border-b border-gray-50 px-2 py-1.5">
                               <Input type="number" value={sub.quantity} min="1"
                                 onChange={e => handleSubItemChange(item.id, sub.id, "quantity", e.target.value)}
-                                className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" />
+                                className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" />
                             </td>
-                            <td className="border border-black p-0" /><td className="border border-black p-0" /><td className="border border-black p-0" />
-                            <td className="border border-black p-0">
+                            <td className="border-b border-gray-50" /><td className="border-b border-gray-50" /><td className="border-b border-gray-50" />
+                            <td className="border-b border-gray-50 px-2 py-1.5">
                               <Input type="number" step="0.01" value={sub.amount} placeholder="0.00" min="0"
                                 onChange={e => handleSubItemChange(item.id, sub.id, "amount", e.target.value)}
-                                className="border-none text-right focus-visible:ring-0 w-full text-xs px-1" />
+                                className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" />
                             </td>
-                            <td className="border border-black px-2 py-1 text-right text-xs">{fmt(sub.line_total)}</td>
-                            <td className="border border-black p-0">
+                            <td className="border-b border-gray-50 px-2 py-1.5 text-right text-sm text-gray-500">{fmt(sub.line_total)}</td>
+                            <td className="border-b border-gray-50 px-2 py-1.5">
                               <Input type="number" step="0.1" min="0" max="100" value={sub.discount_percent || ""} placeholder="0"
                                 onChange={e => handleSubItemChange(item.id, sub.id, "discount_percent", e.target.value)}
-                                className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" />
+                                className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
                             </td>
-                            <td className="border border-black px-2 py-1 text-right">
+                            <td className="border-b border-gray-50 px-2 py-1.5 text-right">
                               {sub.discount_percent && sub.discount_percent > 0 ? (
                                 <div>
-                                  <div className="text-xs text-gray-500 line-through">{fmt(sub.line_total)}</div>
-                                  <div className="font-semibold text-green-700 text-xs">{fmt(sub.discounted_total || 0)}</div>
+                                  <div className="text-xs text-gray-400 line-through">{fmt(sub.line_total)}</div>
+                                  <div className="text-sm font-semibold text-gray-800">{fmt(sub.discounted_total || 0)}</div>
                                 </div>
                               ) : (
-                                <span className="font-semibold text-xs">{fmt(sub.line_total)}</span>
+                                <span className="text-sm text-gray-600">{fmt(sub.line_total)}</span>
                               )}
                             </td>
-                            <td className="border border-black p-1 text-center">
+                            <td className="border-b border-gray-50 px-2 py-1.5 text-center">
                               <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(item.id, sub.id)}
-                                className="text-red-600 hover:bg-red-50 h-6 w-6">
+                                className="text-gray-300 hover:text-red-500 h-6 w-6">
                                 <Trash2 className="h-3 w-3" />
                               </Button>
                             </td>
@@ -1057,7 +1058,7 @@ export default function EditInvoicePage() {
 
                         {/* ADD SUB-ITEM */}
                         <tr>
-                          <td colSpan={12} className="border border-black px-2 py-1 bg-gray-50">
+                          <td colSpan={12} className="border-b border-gray-50 px-2 py-1">
                             <button onClick={() => handleAddSubItem(item.id)}
                               className="text-xs text-blue-600 hover:underline flex items-center gap-1">
                               <Plus className="h-3 w-3" /> Add sub-item
@@ -1066,223 +1067,239 @@ export default function EditInvoicePage() {
                         </tr>
                       </React.Fragment>
                     ))}
+                    {/* ADD ITEM BUTTON ROW */}
+                    <tr>
+                      <td colSpan={12} className="px-3 py-2">
+                        <button
+                          onClick={() => handleAddItem(section)}
+                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          <Plus className="h-3 w-3" /> Add item
+                        </button>
+                      </td>
+                    </tr>
                   </tbody>
-                </table>
+                </table></div>
 
                 {/* Section totals */}
-                <div className="flex justify-end mt-2 mb-4">
-                  <table className="border-collapse text-sm" style={{ width: "40%" }}>
-                    <tbody>
-                      <tr>
-                        <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs">{section} Subtotal</td>
-                        <td className="border border-gray-300 px-3 py-1 text-right text-xs">{fmt(sectionRaw)}</td>
-                      </tr>
-                      {hasItemDiscount && (
-                        <tr>
-                          <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs text-red-600">
-                            Section Discount ({parseFloat(sectionDiscountPct.toFixed(2))}%)
-                          </td>
-                          <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">-{fmt(itemDiscountTotal)}</td>
-                        </tr>
-                      )}
-                      <tr>
-                        <td className="border border-gray-300 px-3 py-1 bg-gray-50 text-xs">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium">Section Discount</span>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1">
-                                <Input type="number" value={sectionDiscountPct || ""}
-                                      onChange={(e) => {
-                                        const pct = parseFloat(e.target.value) || 0;
-                                        const prevPct = sectionDiscounts[section] || 0;
-                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
-                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
-                                        setItems(prevItems => prevItems.map(item => {
-                                          if ((item.section || 'Furniture') !== section) return item;
-                                          const itemDisc = item.discount_percent || 0;
-                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevPct) ? item : {
-                                            ...item,
-                                            discount_percent: pct,
-                                            discounted_total: calcDiscounted(item.quantity || 1, item.amount || 0, pct),
-                                          };
-                                          const updatedSubs = (item.subItems || []).map(sub => {
-                                            const subDisc = sub.discount_percent || 0;
-                                            if (subDisc > 0 && subDisc !== prevPct) return sub;
-                                            return {
-                                              ...sub,
-                                              discount_percent: pct,
-                                              discounted_total: calcDiscounted(sub.quantity || 1, sub.amount || 0, pct),
-                                            };
-                                          });
-                                          return { ...updatedItem, subItems: updatedSubs };
-                                        }));
-                                      }}
-                                  className="border border-gray-300 rounded px-1 py-0.5 w-14 text-right text-xs"
-                                  min="0" max="100" step="0.1" placeholder="0" />
-                                <span className="text-xs text-gray-500">%</span>
-                              </div>
-                              <span className="text-xs text-gray-400">or</span>
-                              <div className="flex items-center gap-1">
-                                <span className="text-xs text-gray-500">£</span>
-                                <Input type="number"
-                                  value={
-                                    sectionDiscountAmounts[section] !== undefined && sectionDiscountAmounts[section] !== ''
-                                      ? sectionDiscountAmounts[section]
-                                      : itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : ''
-                                  }
-                                  onChange={e => setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }))}
-                                  onBlur={e => {
-                                    const amt = parseFloat(e.target.value) || 0;
-                                    const pct = sectionRaw > 0 ? (amt / sectionRaw) * 100 : 0;
-                                    const prevPct = sectionDiscounts[section] || 0;
-                                    setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
-                                    setSectionDiscountAmounts(prev => ({ ...prev, [section]: "" }));
-                                    setItems(prevItems => prevItems.map(item => {
-                                      if ((item.section || 'Furniture') !== section) return item;
-                                      const itemDisc = item.discount_percent || 0;
-                                      if (itemDisc > 0 && itemDisc !== prevPct) return item;
-                                      return {
-                                        ...item,
-                                        discount_percent: pct,
-                                        discounted_total: calcDiscounted(item.quantity || 1, item.amount || 0, pct),
-                                      };
-                                    }));
-                                  }}
-                                  className="border border-gray-300 rounded px-1 py-0.5 w-20 text-right text-xs"
-                                  min="0" step="0.01" placeholder="0.00" />
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
-                          {sectionDiscountPct > 0 ? `-${fmt(sectionDiscountAmt)}` : "—"}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="border border-gray-300 px-3 py-1 font-bold bg-gray-100 text-xs">{section} Total</td>
-                        <td className="border border-gray-300 px-3 py-1 text-right font-bold text-xs">{fmt(sectionTotal)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="flex justify-end mt-3 mb-8">
+                  <div className="w-80 text-sm rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    {hasItemDiscount && (
+                      <div className="flex justify-between px-5 py-2.5 border-b border-gray-100 text-gray-600">
+                        <span>{section} Subtotal</span>
+                        <span>{fmt(sectionRaw)}</span>
+                      </div>
+                    )}
+                    {hasItemDiscount && (
+                      <div className="flex justify-between px-5 py-2.5 border-b border-gray-100 text-red-500">
+                        <span>Item Discounts ({parseFloat(sectionDiscountPct.toFixed(2))}%)</span>
+                        <span>-{fmt(itemDiscountTotal)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
+                      <div className="flex items-center gap-2 text-gray-500">
+                        <span>Section Discount</span>
+                        <Input type="number" value={sectionDiscountPct || ""}
+                          onChange={(e) => {
+                            const pct = parseFloat(e.target.value) || 0;
+                            const prevPct = sectionDiscounts[section] || 0;
+                            setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                            setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
+                            setItems(prevItems => prevItems.map(item => {
+                              if ((item.section || 'Furniture') !== section) return item;
+                              const itemDisc = item.discount_percent || 0;
+                              const updatedItem = (itemDisc > 0 && itemDisc !== prevPct) ? item : {
+                                ...item,
+                                discount_percent: pct,
+                                discounted_total: calcDiscounted(item.quantity || 1, item.amount || 0, pct),
+                              };
+                              const updatedSubs = (item.subItems || []).map(sub => {
+                                const subDisc = sub.discount_percent || 0;
+                                if (subDisc > 0 && subDisc !== prevPct) return sub;
+                                return {
+                                  ...sub,
+                                  discount_percent: pct,
+                                  discounted_total: calcDiscounted(sub.quantity || 1, sub.amount || 0, pct),
+                                };
+                              });
+                              return { ...updatedItem, subItems: updatedSubs };
+                            }));
+                          }}
+                          className="border border-gray-200 rounded px-1 py-0.5 w-12 text-right text-xs h-auto"
+                          min="0" max="100" step="0.1" placeholder="0" />
+                        <span className="text-gray-400">%</span>
+                        <span className="text-gray-300">or £</span>
+                        <Input type="number"
+                          value={
+                            sectionDiscountAmounts[section] !== undefined && sectionDiscountAmounts[section] !== ''
+                              ? sectionDiscountAmounts[section]
+                              : itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : ''
+                          }
+                          onChange={e => setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }))}
+                          onBlur={e => {
+                            const amt = parseFloat(e.target.value) || 0;
+                            const pct = sectionRaw > 0 ? (amt / sectionRaw) * 100 : 0;
+                            const prevPct = sectionDiscounts[section] || 0;
+                            setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                            setSectionDiscountAmounts(prev => ({ ...prev, [section]: "" }));
+                            setItems(prevItems => prevItems.map(item => {
+                              if ((item.section || 'Furniture') !== section) return item;
+                              const itemDisc = item.discount_percent || 0;
+                              if (itemDisc > 0 && itemDisc !== prevPct) return item;
+                              return {
+                                ...item,
+                                discount_percent: pct,
+                                discounted_total: calcDiscounted(item.quantity || 1, item.amount || 0, pct),
+                              };
+                            }));
+                          }}
+                          className="border border-gray-200 rounded px-1 py-0.5 w-16 text-right text-xs h-auto"
+                          min="0" step="0.01" placeholder="0.00" />
+                      </div>
+                      <span className="text-red-500">{sectionDiscountPct > 0 ? `-${fmt(sectionDiscountAmt)}` : "—"}</span>
+                    </div>
+                    <div className="flex justify-between px-5 py-3.5 font-semibold bg-gray-900 text-white">
+                      <span>{section} Total</span>
+                      <span>{fmt(sectionTotal)}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             );
           })}
 
-          {/* Add Item buttons */}
-          <div className="flex flex-wrap gap-2">
-            {SECTIONS.map(section => (
-              <Button key={section} onClick={() => handleAddItem(section)} size="sm" variant="outline">
-                <Plus className="mr-2 h-4 w-4" /> Add Item to {section}
-              </Button>
-            ))}
-          </div>
+        {/* Dynamic Add Section buttons — shown for sections with no items */}
+        {(() => {
+          const emptySections = SECTIONS.filter(s => !items.some(item => (item.section || 'Furniture') === s));
+          if (emptySections.length === 0) return null;
+          return (
+            <div className="flex flex-wrap gap-2 mt-6 mb-4">
+              {emptySections.map(section => (
+                <button
+                  key={section}
+                  onClick={() => handleAddItem(section)}
+                  className="text-xs text-gray-500 border border-dashed border-gray-300 hover:border-gray-500 hover:text-gray-700 rounded-lg px-3 py-2 transition-colors flex items-center gap-1.5"
+                >
+                  <Plus className="h-3 w-3" /> Add {section}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+
         </div>
 
         {/* Global totals */}
-        <div className="mb-6 flex justify-end">
-          <table className="border-collapse" style={{ width: "40%" }}>
-            <tbody>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{fmt(subtotalAfterSectionDiscounts)}</td>
-              </tr>
-							<tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>DISCOUNT</span>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number" min="0" max="100" step="0.1"
-                        value={globalDiscountPercent}
-                        onChange={e => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)}
-                        className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm"
-                      />
-                      <span className="text-sm">%</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="border border-black px-3 py-2 text-right text-red-600">
-                  {globalDiscountAmount > 0 ? `-${fmt(globalDiscountAmount)}` : "—"}
-                </td>
-              </tr>
-              {globalDiscountAmount > 0 && (
-                <tr>
-                  <td className="border border-black px-3 py-2 font-semibold bg-blue-50">SUBTOTAL AFTER DISCOUNT</td>
-                  <td className="border border-black px-3 py-2 text-right font-semibold">{fmt(subtotal)}</td>
-                </tr>
-              )}
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>VAT</span>
-                    <div className="flex items-center gap-1">
-                      <Input type="number" min="0" max="100" step="0.1" value={vatPercentage}
-                        onChange={e => setVatPercentage(parseFloat(e.target.value) || 0)}
-                        className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm" />
-                      <span className="text-sm">%</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="border border-black px-3 py-2 text-right">{fmt(vat)}</td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-bold bg-gray-50">TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right font-bold">{fmt(total)}</td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>DEPOSIT PAID</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm text-gray-500">£</span>
-                      <Input type="number" min="0" step="0.01" value={deposit || ""} placeholder="0.00"
-                        onChange={e => setDeposit(parseFloat(e.target.value) || 0)}
-                        className="w-24 rounded border border-gray-300 px-2 py-1 text-right text-sm" />
-                    </div>
-                  </div>
-                </td>
-                <td className="border border-black px-3 py-2 text-right text-green-700 font-semibold">
-                  {deposit > 0 ? fmt(deposit) : "—"}
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-bold bg-gray-50 text-base">TOTAL REMAINING</td>
-                <td className={`border border-black px-3 py-2 text-right font-bold text-base ${total - deposit < 0 ? "text-red-600" : ""}`}>
-                  {fmt(Math.max(0, total - deposit))}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="mb-10 flex justify-end">
+          <div className="w-80 rounded-xl border border-gray-100 shadow-md overflow-hidden text-sm">
+            <div className="flex justify-between px-5 py-2.5 border-b border-gray-100 text-gray-600">
+              <span>Subtotal</span>
+              <span>{fmt(subtotalAfterSectionDiscounts)}</span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
+              <div className="flex items-center gap-2 text-gray-600">
+                <span>Discount</span>
+                <Input
+                  type="number" min="0" max="100" step="0.1"
+                  value={globalDiscountPercent}
+                  onChange={e => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)}
+                  className="border border-gray-200 rounded px-2 py-0.5 w-14 text-right text-xs h-auto"
+                />
+                <span className="text-gray-400 text-xs">%</span>
+              </div>
+              <span className="text-red-500">{globalDiscountAmount > 0 ? `-${fmt(globalDiscountAmount)}` : "—"}</span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
+              <div className="flex items-center gap-2 text-gray-600">
+                <span>VAT</span>
+                <Input type="number" min="0" max="100" step="0.1" value={vatPercentage}
+                  onChange={e => setVatPercentage(parseFloat(e.target.value) || 0)}
+                  className="border border-gray-200 rounded px-2 py-0.5 w-14 text-right text-xs h-auto" />
+                <span className="text-gray-400 text-xs">%</span>
+              </div>
+              <span className="text-gray-600">{fmt(vat)}</span>
+            </div>
+            <div className="flex justify-between px-5 py-4 bg-gray-900 text-white font-semibold">
+              <span>Total</span>
+              <span>{fmt(total)}</span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100 mt-2">
+              <div className="flex items-center gap-2 text-gray-600">
+                <span>Deposit Paid</span>
+                <span className="text-gray-400 text-xs">£</span>
+                <Input type="number" min="0" step="0.01" value={deposit || ""} placeholder="0.00"
+                  onChange={e => setDeposit(parseFloat(e.target.value) || 0)}
+                  className="border border-gray-200 rounded px-2 py-0.5 w-20 text-right text-xs h-auto" />
+              </div>
+              <span className="text-green-700">{deposit > 0 ? `-${fmt(deposit)}` : "—"}</span>
+            </div>
+            <div className="flex justify-between px-5 py-4 font-semibold bg-gray-900 text-white">
+              <span>Balance Due</span>
+              <span>{fmt(Math.max(0, total - deposit))}</span>
+            </div>
+          </div>
         </div>
 
         {/* Notes */}
-        <div className="mb-6">
-          <label className="mb-2 block text-sm font-semibold text-gray-700">Notes</label>
+        <div className="mb-8">
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">Notes</p>
           <textarea value={formData.notes}
             onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
             rows={3} placeholder="Any additional notes for this invoice..."
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            className="w-full border-b border-gray-200 px-0 py-2 text-sm text-gray-700 focus:border-gray-400 focus:outline-none resize-none bg-transparent" />
         </div>
 
-        {/* Payment terms */}
-        <div className="mb-6 space-y-2 text-sm">
-          <p className="font-semibold">Only Bacs or Cash will be accepted on Delivery and Completion</p>
-          <p className="font-semibold">NOTE: Payment is due within 30 days of the invoice date.</p>
-        </div>
-        <div className="mb-8 text-sm font-semibold text-red-600">
-          <p>Please contact us if you have any queries regarding this invoice.</p>
+        {/* Payment + Terms */}
+        <div className="border-t border-gray-200 pt-8 mb-6 text-sm text-gray-600">
+          {/* Payment Details */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-5 shadow-sm mb-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Payment Details</p>
+            <p>Acc name: Atelier Luxe Interiors LTD</p>
+                          <p>Bank: ClearBank</p>
+                          <p>Sort Code: 04 06 05</p>
+                          <p>Acc No: 31621197</p>
+                          <p className="mt-2 text-xs text-gray-400">Please use your name and/or road name as reference</p>
+                        </div>
+                        <div>
+          </div>
+          {/* Terms */}
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Terms</p>
+            <p>Only Bacs or Cash accepted on Delivery and Completion.</p>
+                          <p className="mt-1">Payment is due within 30 days of the invoice date.</p>
+              {additionalTerms.map((term, i) => (
+                <div key={i} className="flex items-center gap-2 mt-1.5">
+                  <input
+                    type="text"
+                    value={term}
+                    onChange={e => setAdditionalTerms(prev => prev.map((t, idx) => idx === i ? e.target.value : t))}
+                    placeholder="Additional term..."
+                    className="flex-1 text-sm border-b border-gray-200 bg-transparent focus:outline-none focus:border-gray-400 py-0.5"
+                  />
+                  <button onClick={() => setAdditionalTerms(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                </div>
+              ))}
+              <button
+                onClick={() => setAdditionalTerms(prev => [...prev, ''])}
+                className="mt-2 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+              >
+                + Add term
+              </button>
+          </div>
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">Additional Notes <span className="normal-case font-normal">(optional)</span></p>
+            <textarea
+              value={additionalNotes}
+              onChange={e => setAdditionalNotes(e.target.value)}
+              placeholder="Add any additional notes for the customer..."
+              rows={3}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-transparent focus:outline-none focus:border-gray-400 resize-none placeholder:text-gray-300"
+            />
+          </div>
         </div>
 
         {/* Signature */}
-        <div className="space-y-4 text-sm">
-          {["Customer Signature:", "Customer Name:", "Date:"].map(label => (
-            <div key={label} className="flex items-center">
-              <span className="mr-2">{label}</span>
-              <span className="flex-1 border-b border-dotted border-black" />
-            </div>
-          ))}
-        </div>
+        <SignatureField customerName={formData.name} onChange={setSignatureData} initialData={signatureData || undefined} />
 
         {/* Bottom save bar */}
         <div className="mt-10 flex justify-end gap-3 border-t pt-6">

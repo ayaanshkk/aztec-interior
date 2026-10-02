@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
  
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save, Trash2, Plus } from "lucide-react";
 import Image from 'next/image';
+import { SignatureField } from "@/components/ui/SignatureField";
  
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.aztec.techmynt.com';
 
@@ -62,6 +63,9 @@ export default function EditQuotePage() {
   const [roomName, setRoomName] = useState('');
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [fillerType, setFillerType] = useState<string>('Basic Slab');
+  const [additionalTerms, setAdditionalTerms] = useState<string[]>([]);
+  const [additionalNotes, setAdditionalNotes] = useState<string>('');
+  const [signatureData, setSignatureData] = useState<import('@/components/ui/SignatureField').SignatureData | null>(null);
   const lastChangedField = useRef<'door' | 'filler' | 'room' | null>(null);
 
 
@@ -70,8 +74,9 @@ export default function EditQuotePage() {
     name: '',
     address: '',
     phone: '',
-    email: '',  // ← ADD THIS
-    date: new Date().toISOString().split('T')[0]
+    email: '',
+    date: new Date().toISOString().split('T')[0],
+    referenceNumber: '',
   });
 
   const calculateDiscountedTotal = (
@@ -314,7 +319,8 @@ export default function EditQuotePage() {
           address: data.customer_address || data.client_address || '',
           phone: data.customer_phone || data.client_phone || '',
           email: data.customer_email || data.client_email || '',
-          date: data.created_at ? new Date(data.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+          date: data.created_at ? new Date(data.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          referenceNumber: data.reference_number || '',
         });
         
         const itemsWithTotals = (data.items || []).map((item: any) => ({
@@ -383,6 +389,17 @@ export default function EditQuotePage() {
         setRoomName(data.room_name || '');
         if (data.section_discounts) {
           setSectionDiscounts(data.section_discounts);
+        }
+        setAdditionalTerms(data.additional_terms || []);
+        setAdditionalNotes(data.additional_notes || '');
+        if (data.signature_type && data.signature_type !== 'none') {
+          setSignatureData({
+            type: data.signature_type,
+            imageData: data.signature_image || undefined,
+            text: data.signature_text || '',
+            name: data.signature_name || '',
+            date: data.signature_date || '',
+          });
         }
       } else {
         alert("Failed to load quotation");
@@ -798,12 +815,13 @@ export default function EditQuotePage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          client_id: quotation.client_id, // Use quotation.client_id instead of customerId
+          client_id: quotation.client_id,
           customer_name: customerData.name,
           customer_address: customerData.address,
           customer_phone: customerData.phone,
-          customer_email: customerData.email || '', // Add fallback
+          customer_email: customerData.email || '',
           date: customerData.date,
+          reference_number: customerData.referenceNumber || undefined,
           door_type: doorType,
           room_type: roomType,
           filler_type: fillerType,
@@ -855,6 +873,13 @@ export default function EditQuotePage() {
           vat_percentage: vatPercentage,
           global_discount_percent: globalDiscountPercent,
           global_discount_amount: globalDiscountAmount,
+          additional_terms: additionalTerms.filter(t => t.trim()),
+          additional_notes: additionalNotes,
+          signature_type: signatureData?.type || 'none',
+          signature_image: signatureData?.imageData || null,
+          signature_text: signatureData?.text || null,
+          signature_name: signatureData?.name || '',
+          signature_date: signatureData?.date || '',
         }),
       });
 
@@ -1063,38 +1088,24 @@ export default function EditQuotePage() {
       </div>
 
       {/* Quotation Form */}
-      <div className="px-4 py-8">
+      <div className="px-8 py-10">
         {/* Company Header */}
-        <div className="mb-8 flex items-center justify-center gap-3">
-          <Image
-            src="/images/logo3.png"
-            alt="Logo"
-            width={80}
-            height={80}
-            className="object-contain"
-          />
-          <div className="text-4xl font-bold tracking-wider text-gray-800">ATELIER LUXE INTERIORS</div>
+        <div className="flex items-center justify-between border-b-2 border-gray-900 pb-7 mb-10">
+          <Image src="/images/logo-full.png" alt="Atelier Luxe Interiors" width={340} height={92} className="object-contain" />
+          <div className="text-right text-xs leading-6 text-gray-600">
+            <p className="font-semibold text-sm text-gray-900 mb-1">Atelier Luxe Interiors Ltd</p>
+            <p>127c Barkby Road, Leicester, LE4 9LG</p>
+            <p>M: 07821 328849</p>
+              <p>E: accounts@atelierluxe.co.uk</p>
+            <p className="text-gray-400 mt-1">Registered in England No. 17200862</p>
+          </div>
         </div>
-
-        {/* Company Registration Details */}
-        <div className="mb-6 space-y-1 bg-green-200 p-3 text-sm">
-          <p className="font-semibold">Registered to England No 5246881</p>
-          {/* <p className="font-semibold">VAT Reg No.686 8010 72</p> */}
+        <div className="flex items-start justify-between mb-10">
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-1.5">Quotation</p>
+            <h1 className="text-2xl font-semibold text-gray-900">Edit Quotation</h1>
+          </div>
         </div>
-
-        <div className="mb-6 space-y-1 bg-yellow-200 p-3 text-sm">
-          <p className="font-semibold">Acc name : Atelier Luxe Interiors LTD</p>
-          <p className="font-semibold">Bank : ClearBank</p>
-          <p className="font-semibold">Sort Code: 04 06 05</p>
-          <p className="font-semibold">Acc No: 31621197</p>
-        </div>
-
-        <div className="mb-6 bg-gray-100 p-3 text-sm">
-          <p>Please use your name and/or road name as reference:</p>
-        </div>
-
-        {/* Quotation Title */}
-        <h1 className="mb-6 text-center text-2xl font-bold">QUOTATION</h1>
 
         {/* ✅ NEW: Door Type and Room Type Selection */}
         <div className="mb-6 grid grid-cols-3 gap-4">
@@ -1191,114 +1202,54 @@ export default function EditQuotePage() {
           );
         })()}
 
-        {/* Customer Information - EDITABLE */}
-        <div className="mb-6">
-          <table className="w-full border-collapse">
-            <tbody>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50" style={{ width: '20%' }}>DATE:</td>
-                <td className="border border-black p-0">
-                  <Input
-                    type="date"
-                    value={customerData.date}
-                    onChange={(e) => setCustomerData({ ...customerData, date: e.target.value })}
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                  />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">NAME:</td>
-                <td className="border border-black p-0">
-                  <Input
-                    value={customerData.name}
-                    onChange={(e) => setCustomerData({ ...customerData, name: e.target.value })}
-                    placeholder="Customer name"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                  />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ADDRESS:</td>
-                <td className="border border-black p-0">
-                  <textarea
-                    value={customerData.address}
-                    onChange={(e) => setCustomerData({ ...customerData, address: e.target.value })}
-                    placeholder="Customer address"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2 resize-none"
-                    rows={2}
-                  />
-                </td>
-              </tr>
-
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">TEL:</td>
-                <td className="border border-black p-0">
-                  <Input
-                    value={customerData.phone}
-                    onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
-                    placeholder="Phone number"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                  />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">ROOM NAME: <span className="text-red-600">*</span></td>
-                <td className="border border-black p-0">
-                  <Input
-                    value={roomName}
-                    onChange={(e) => setRoomName(e.target.value)}
-                    placeholder="e.g. Kitchen, Master Bedroom"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                    required
-                  />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">CARCASS COLOUR:</td>
-                <td className="border border-black p-0">
-                  <Input
-                    value={carcassColour}
-                    onChange={(e) => setCarcassColour(e.target.value)}
-                    placeholder="Carcass colour"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                  />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR COLOUR:</td>
-                <td className="border border-black p-0">
-                  <Input
-                    value={doorColour}
-                    onChange={(e) => setDoorColour(e.target.value)}
-                    placeholder="Door colour"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                  />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">PANELWORK COLOUR:</td>
-                <td className="border border-black p-0">
-                  <Input
-                    value={panelworkColour}
-                    onChange={(e) => setPanelworkColour(e.target.value)}
-                    placeholder="Panelwork colour"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                  />
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">DOOR STYLE:</td>
-                <td className="border border-black p-0">
-                  <Input
-                    value={doorStyle}
-                    onChange={(e) => setDoorStyle(e.target.value)}
-                    placeholder="Door style"
-                    className="border-none focus-visible:ring-0 w-full h-full px-3 py-2"
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        {/* Customer + Quote Details — 2-column layout */}
+        <div className="grid grid-cols-2 gap-4 mb-10">
+          {/* Left: Bill To */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Bill To</p>
+            <Input value={customerData.name} onChange={e => setCustomerData({ ...customerData, name: e.target.value })}
+              placeholder="Customer name"
+              className="border-none border-b border-gray-100 focus-visible:ring-0 px-0 rounded-none text-base font-medium placeholder:text-gray-300 mb-1 h-auto py-2" />
+            <textarea value={customerData.address} onChange={e => setCustomerData({ ...customerData, address: e.target.value })}
+              rows={3} placeholder="Address"
+              className="w-full bg-transparent border-none outline-none resize-none text-sm text-gray-700 placeholder:text-gray-300 py-2 border-b border-gray-100" />
+            <Input value={customerData.phone} onChange={e => setCustomerData({ ...customerData, phone: e.target.value })}
+              placeholder="Phone"
+              className="border-none border-b border-gray-100 focus-visible:ring-0 px-0 rounded-none text-sm text-gray-700 placeholder:text-gray-300 h-auto py-2" />
+          </div>
+          {/* Right: Quote Details */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 shadow-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Quote Details</p>
+            <div className="space-y-0">
+              {([
+                { label: 'Quote No',       key: 'referenceNumber', type: 'text', val: customerData.referenceNumber, set: (v: string) => setCustomerData({ ...customerData, referenceNumber: v }) },
+                { label: 'Date',           key: 'date',            type: 'date', val: customerData.date,            set: (v: string) => setCustomerData({ ...customerData, date: v }) },
+              ] as { label: string; key: string; type: string; val: string; set: (v: string) => void }[]).map(({ label, key, type, val, set }) => (
+                <div key={key} className="flex items-center border-b border-gray-100 py-0.5">
+                  <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">{label}</span>
+                  <div className="flex-1">
+                    <Input type={type} value={val} onChange={e => set(e.target.value)}
+                      className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" />
+                  </div>
+                </div>
+              ))}
+              {([
+                { label: 'Room',           val: roomName,        set: setRoomName },
+                { label: 'Carcass Colour', val: carcassColour,   set: setCarcassColour },
+                { label: 'Door Colour',    val: doorColour,      set: setDoorColour },
+                { label: 'Panelwork',      val: panelworkColour, set: setPanelworkColour },
+                { label: 'Door Style',     val: doorStyle,       set: setDoorStyle },
+              ] as { label: string; val: string; set: (v: string) => void }[]).map(({ label, val, set }) => (
+                <div key={label} className="flex items-center border-b border-gray-100 py-0.5">
+                  <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">{label}</span>
+                  <div className="flex-1">
+                    <Input value={val} onChange={e => set(e.target.value)}
+                      className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Items Table */}
@@ -1335,33 +1286,34 @@ export default function EditQuotePage() {
             const hasItemDiscount = itemDiscountTotal > 0;
 
             return (
-              <div key={section} className="mb-6">
-                <div className="mb-3">
-                  <h3 className="text-lg font-bold">{section}</h3>
+              <div key={section} className="mb-0 mt-8">
+                <div className="flex items-center gap-3 mt-8 mb-3">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-500 whitespace-nowrap">{section}</span>
+                  <div className="flex-1 border-t border-gray-200" />
                 </div>
 
-                <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+                <div className="rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-1"><table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                   <thead>
-                    <tr className="bg-white">
-                      <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '8%' }}>ITEM</th>
-                      <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '20%' }}>DESCRIPTION</th>
-                      <th className="border border-black px-1 py-2 text-left font-bold text-xs" style={{ width: '10%' }}>COLOUR</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>QTY</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>W</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>H</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '5%' }}>D</th>
-                      <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '8%' }}>PRICE</th>
-                      <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>AMOUNT</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '6%' }}>DISC %</th>
-                      <th className="border border-black px-1 py-2 text-right font-bold text-xs" style={{ width: '9%' }}>FINAL</th>
-                      <th className="border border-black px-1 py-2 text-center font-bold text-xs" style={{ width: '4%' }}></th>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '8%' }}>Item</th>
+                      <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '22%' }}>Description</th>
+                      <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '10%' }}>Colour</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '5%' }}>Qty</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '4%' }}>W</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '4%' }}>H</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '4%' }}>D</th>
+                      <th className="py-3 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '9%' }}>Price</th>
+                      <th className="py-3 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '10%' }}>Amount</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '7%' }}>Disc %</th>
+                      <th className="py-3 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '10%' }}>Final</th>
+                      <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: '4%' }}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {indexedItems.map(({ item, index }) => (
                       <React.Fragment key={index}>
-                        <tr>
-                          <td className="border border-black p-1">
+                        <tr className="border-b border-gray-50">
+                          <td className="border-b border-gray-50 px-2 py-2">
                             <Input
                               value={item.item}
                               onChange={(e) => {
@@ -1369,17 +1321,17 @@ export default function EditQuotePage() {
                               }}
                               onBlur={(e) => { const val = e.target.value.trim(); if (val.length >= 1) handleItemChange(index, "item", val); }}
                               placeholder="50B"
-                              className={`border-none focus-visible:ring-0 min-w-[90px] font-mono text-xs ${autoFilling === index ? 'bg-blue-50 animate-pulse' : ''}`}
+                              className={`border-none focus-visible:ring-0 w-full font-mono text-sm h-auto py-0 px-0 placeholder:text-gray-300 ${autoFilling === index ? 'bg-blue-50 animate-pulse' : ''}`}
                             />
                           </td>
-                          <td className="border border-black p-1">
+                          <td className="border-b border-gray-50 px-2 py-2">
                             <textarea
                               value={item.description}
                               onChange={(e) => handleDescriptionChange(index, e.target.value)}
                               placeholder="Description"
-                              className={`border-none focus-visible:ring-0 min-w-[140px] w-full resize-none overflow-hidden text-xs ${autoFilling === index ? 'bg-blue-50 animate-pulse' : ''}`}
-                              rows={2}
-                              style={{ minHeight: '35px', lineHeight: '1.3' }}
+                              className={`border-none outline-none w-full resize-none overflow-hidden text-sm bg-transparent placeholder:text-gray-300 ${autoFilling === index ? 'bg-blue-50 animate-pulse' : ''}`}
+                              rows={1}
+                              style={{ minHeight: '24px', lineHeight: '1.5' }}
                               onInput={(e) => {
                                 const target = e.target as HTMLTextAreaElement;
                                 target.style.height = 'auto';
@@ -1387,51 +1339,51 @@ export default function EditQuotePage() {
                               }}
                             />
                           </td>
-                          <td className="border border-black p-1">
-                            <Input value={item.color} onChange={(e) => handleItemChange(index, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 min-w-[70px] text-xs" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input value={item.color} onChange={(e) => handleItemChange(index, "color", e.target.value)} placeholder="—" className="border-none focus-visible:ring-0 text-sm h-auto py-0 px-0 w-full placeholder:text-gray-300" />
                           </td>
-                          <td className="border border-black p-1">
-                            <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(index, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="1" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(index, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="1" />
                           </td>
-                          <td className="border border-black p-0">
-                            <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(index, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(index, "width", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                           </td>
-                          <td className="border border-black p-0">
-                            <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(index, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(index, "height", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                           </td>
-                          <td className="border border-black p-0">
-                            <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(index, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-[55px] text-xs" min="0" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(index, "depth", e.target.value)} placeholder="—" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                           </td>
-                          <td className="border border-black p-0">
-                            <Input type="number" step="0.01" value={item.amount} onChange={(e) => handleItemChange(index, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs" min="0" placeholder="0.00" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" step="0.01" value={item.amount} onChange={(e) => handleItemChange(index, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="0" placeholder="0.00" />
                           </td>
-                          <td className="border border-black px-2 py-1 text-right font-semibold text-xs">
+                          <td className="border-b border-gray-50 px-2 py-2 text-right text-sm text-gray-600">
                             {formatCurrency((item.amount || 0) * (item.quantity || 1))}
                           </td>
-                          <td className="border border-black p-0">
-                            <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(index, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs" min="0" max="100" placeholder="0" />
+                          <td className="border-b border-gray-50 px-2 py-2">
+                            <Input type="number" step="0.1" value={item.discount_percent || ''} onChange={(e) => handleItemChange(index, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" max="100" placeholder="0" />
                           </td>
-                          <td className="border border-black px-2 py-1 text-right">
+                          <td className="border-b border-gray-50 px-2 py-2 text-right">
                             {item.discount_percent && item.discount_percent > 0 ? (
                               <div>
-                                <div className="text-xs text-gray-500 line-through">{formatCurrency((item.amount || 0) * (item.quantity || 1))}</div>
-                                <div className="font-semibold text-green-700 text-xs">{formatCurrency(item.discounted_total || 0)}</div>
+                                <div className="text-xs text-gray-400 line-through">{formatCurrency((item.amount || 0) * (item.quantity || 1))}</div>
+                                <div className="text-sm font-semibold text-gray-900">{formatCurrency(item.discounted_total || 0)}</div>
                               </div>
                             ) : (
-                              <span className="font-semibold text-xs">{formatCurrency((item.amount || 0) * (item.quantity || 1))}</span>
+                              <span className="text-sm font-semibold text-gray-900">{formatCurrency((item.amount || 0) * (item.quantity || 1))}</span>
                             )}
                           </td>
-                          <td className="border border-black p-1 text-center">
-                            <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(index)} className="text-red-600 hover:bg-red-50 hover:text-red-700 h-7 w-7">
-                              <Trash2 className="h-3 w-3" />
+                          <td className="border-b border-gray-50 px-2 py-2 text-center">
+                            <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(index)} className="text-gray-300 hover:text-red-500 h-7 w-7">
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </td>
                         </tr>
 
                         {/* SUB-ITEMS */}
                         {(item.subItems || []).map((sub, subIndex) => (
-                          <tr key={subIndex} className="bg-gray-50">
-                            <td className="border border-black p-0 pl-4">
+                          <tr key={subIndex} className="bg-gray-50/40">
+                            <td className="border-b border-gray-50 px-2 py-1.5 pl-6">
                               <Input
                                 value={sub.item}
                                 onChange={(e) => {
@@ -1444,40 +1396,38 @@ export default function EditQuotePage() {
                                 }}
                                 onBlur={(e) => handleSubItemAutoFill(index, subIndex, e.target.value)}
                                 placeholder="sub-code"
-                                className="border-none focus-visible:ring-0 w-full text-xs px-1 font-mono"
+                                className="border-none focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 font-mono placeholder:text-gray-300"
                               />
                             </td>
-                            <td className="border border-black p-0">
-                              <Input value={sub.description} onChange={(e) => handleSubItemChange(index, subIndex, "description", e.target.value)} placeholder="Sub-item description" className="border-none focus-visible:ring-0 w-full text-xs px-1" />
+                            <td className="border-b border-gray-50 px-2 py-1.5">
+                              <Input value={sub.description} onChange={(e) => handleSubItemChange(index, subIndex, "description", e.target.value)} placeholder="Sub-item description" className="border-none focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
                             </td>
-                            <td className="border border-black p-0">
-                              <Input value={sub.color} onChange={(e) => handleSubItemChange(index, subIndex, "color", e.target.value)} placeholder="Colour" className="border-none focus-visible:ring-0 w-full text-xs px-1" />
+                            <td className="border-b border-gray-50 px-2 py-1.5">
+                              <Input value={sub.color} onChange={(e) => handleSubItemChange(index, subIndex, "color", e.target.value)} placeholder="—" className="border-none focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
                             </td>
-                            <td className="border border-black p-0">
-                              <Input type="number" value={sub.quantity} onChange={(e) => handleSubItemChange(index, subIndex, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="1" />
+                            <td className="border-b border-gray-50 px-2 py-1.5">
+                              <Input type="number" value={sub.quantity} onChange={(e) => handleSubItemChange(index, subIndex, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="1" />
                             </td>
-                            <td className="border border-black p-0"></td>
-                            <td className="border border-black p-0"></td>
-                            <td className="border border-black p-0"></td>
-                            <td className="border border-black p-0">
-                              <Input type="number" step="0.01" value={sub.amount} onChange={(e) => handleSubItemChange(index, subIndex, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-xs px-1" min="0" placeholder="0.00" />
+                            <td className="border-b border-gray-50" /><td className="border-b border-gray-50" /><td className="border-b border-gray-50" />
+                            <td className="border-b border-gray-50 px-2 py-1.5">
+                              <Input type="number" step="0.01" value={sub.amount} onChange={(e) => handleSubItemChange(index, subIndex, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="0" placeholder="0.00" />
                             </td>
-                            <td className="border border-black px-2 py-1 text-right text-xs">{formatCurrency(sub.line_total)}</td>
-                            <td className="border border-black p-0">
-                              <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(index, subIndex, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-xs px-1" min="0" max="100" placeholder="0" />
+                            <td className="border-b border-gray-50 px-2 py-1.5 text-right text-sm text-gray-500">{formatCurrency(sub.line_total)}</td>
+                            <td className="border-b border-gray-50 px-2 py-1.5">
+                              <Input type="number" step="0.1" value={sub.discount_percent || ''} onChange={(e) => handleSubItemChange(index, subIndex, "discount_percent", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" max="100" placeholder="0" />
                             </td>
-                            <td className="border border-black px-2 py-1 text-right">
+                            <td className="border-b border-gray-50 px-2 py-1.5 text-right">
                               {sub.discount_percent && sub.discount_percent > 0 ? (
                                 <div>
-                                  <div className="text-xs text-gray-500 line-through">{formatCurrency(sub.line_total)}</div>
-                                  <div className="font-semibold text-green-700 text-xs">{formatCurrency(sub.discounted_total || 0)}</div>
+                                  <div className="text-xs text-gray-400 line-through">{formatCurrency(sub.line_total)}</div>
+                                  <div className="text-sm font-semibold text-gray-800">{formatCurrency(sub.discounted_total || 0)}</div>
                                 </div>
                               ) : (
-                                <span className="font-semibold text-xs">{formatCurrency(sub.line_total)}</span>
+                                <span className="text-sm text-gray-600">{formatCurrency(sub.line_total)}</span>
                               )}
                             </td>
-                            <td className="border border-black p-1 text-center">
-                              <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(index, subIndex)} className="text-red-600 hover:bg-red-50 h-6 w-6">
+                            <td className="border-b border-gray-50 px-2 py-1.5 text-center">
+                              <Button variant="ghost" size="icon" onClick={() => handleRemoveSubItem(index, subIndex)} className="text-gray-300 hover:text-red-500 h-6 w-6">
                                 <Trash2 className="h-3 w-3" />
                               </Button>
                             </td>
@@ -1486,7 +1436,7 @@ export default function EditQuotePage() {
 
                         {/* ADD SUB-ITEM BUTTON ROW */}
                         <tr>
-                          <td colSpan={12} className="border border-black px-2 py-1 bg-gray-50">
+                          <td colSpan={12} className="border-b border-gray-50 px-2 py-1">
                             <button onClick={() => handleAddSubItem(index)} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
                               <Plus className="h-3 w-3" /> Add sub-item
                             </button>
@@ -1494,247 +1444,220 @@ export default function EditQuotePage() {
                         </tr>
                       </React.Fragment>
                     ))}
+                    {/* ADD ITEM BUTTON ROW */}
+                    <tr>
+                      <td colSpan={12} className="px-3 py-2">
+                        <button onClick={() => handleAddItem(section)} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                          <Plus className="h-3 w-3" /> Add item
+                        </button>
+                      </td>
+                    </tr>
                   </tbody>
-                </table>
+                </table></div>
 
-                {/* ✅ Section Totals */}
+                {/* Section Totals */}
                 {(() => {
                   const sectionDiscountPct = sectionDiscounts[section] || 0;
                   const sectionTotal = sectionAfterItemDiscounts;
 
                   return (
-                    <div className="flex justify-end mt-2 mb-2">
-                      <table className="border-collapse text-sm" style={{ width: '40%' }}>
-                        <tbody>
-                          <tr>
-                            <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs">
-                              {section} Subtotal
-                            </td>
-                            <td className="border border-gray-300 px-3 py-1 text-right text-xs">
-                              {formatCurrency(sectionRaw)}
-                            </td>
-                          </tr>
-                          {hasItemDiscount && (
-                            <tr>
-                              <td className="border border-gray-300 px-3 py-1 font-medium bg-gray-50 text-xs text-red-600">
-                                Section Discount ({parseFloat(sectionDiscountPct.toFixed(2))}%)
-                              </td>
-                              <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
-                                -{formatCurrency(itemDiscountTotal)}
-                              </td>
-                            </tr>
-                          )}
-                          <tr>
-                            <td className="border border-gray-300 px-3 py-1 bg-gray-50 text-xs">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium">Section Discount</span>
-                                <div className="flex items-center gap-2">
-                                  <div className="flex items-center gap-1">
-                                    <Input
-                                      type="number"
-                                      value={sectionDiscountPct ? parseFloat(sectionDiscountPct.toFixed(2)) : ''}
-                                      onChange={(e) => {
-                                        const pct = parseFloat(e.target.value) || 0;
-                                        const prevPct = sectionDiscounts[section] || 0;
-                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
-                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
-                                        setItems(prevItems => prevItems.map(item => {
-                                          if ((item.section || 'Furniture') !== section) return item;
-                                          const itemDisc = item.discount_percent || 0;
-                                          const updatedItem = (itemDisc > 0 && itemDisc !== prevPct) ? item : {
-                                            ...item,
-                                            discount_percent: pct,
-                                            discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
-                                          };
-                                          const updatedSubs = (item.subItems || []).map(sub => {
-                                            const subDisc = sub.discount_percent || 0;
-                                            if (subDisc > 0 && subDisc !== prevPct) return sub;
-                                            return {
-                                              ...sub,
-                                              discount_percent: pct,
-                                              discounted_total: calculateDiscountedTotal(sub.quantity || 1, sub.amount || 0, pct),
-                                            };
-                                          });
-                                          return { ...updatedItem, subItems: updatedSubs };
-                                        }));
-                                      }}
-                                      className="border border-gray-300 rounded px-1 py-0.5 w-20 text-right text-xs"
-                                      min="0" max="100" step="0.1" placeholder="0"
-                                    />
-                                    <span className="text-xs text-gray-500">%</span>
-                                  </div>
-                                  <span className="text-xs text-gray-400">or</span>
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-xs text-gray-500">£</span>
-                                    <Input
-                                      type="number"
-                                      value={
-                                        sectionDiscountAmounts[section] !== undefined && sectionDiscountAmounts[section] !== ''
-                                          ? sectionDiscountAmounts[section]
-                                          : itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : ''
-                                      }
-                                      onChange={(e) => {
-                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }));
-                                      }}
-                                      onBlur={(e) => {
-                                        const amtVal = parseFloat(e.target.value) || 0;
-                                        const pct = sectionRaw > 0 ? (amtVal / sectionRaw) * 100 : 0;
-                                        const prevPct = sectionDiscounts[section] || 0;
-                                        setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
-                                        setSectionDiscountAmounts(prev => ({ ...prev, [section]: amtVal > 0 ? amtVal.toFixed(2) : '' }));
-                                        setItems(prevItems => prevItems.map(item => {
-                                          if ((item.section || 'Furniture') !== section) return item;
-                                          const itemDisc = item.discount_percent || 0;
-                                          if (itemDisc > 0 && itemDisc !== prevPct) return item;
-                                          return {
-                                            ...item,
-                                            discount_percent: pct,
-                                            discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
-                                          };
-                                        }));
-                                      }}
-                                      className="border border-gray-300 rounded px-1 py-0.5 w-24 text-right text-xs"
-                                      min="0" step="0.01" placeholder="0.00"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="border border-gray-300 px-3 py-1 text-right text-xs text-red-600">
-                              {hasItemDiscount ? `-${formatCurrency(itemDiscountTotal)}` : '—'}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="border border-gray-300 px-3 py-1 font-bold bg-gray-100 text-xs">
-                              {section} Total
-                            </td>
-                            <td className="border border-gray-300 px-3 py-1 text-right font-bold text-xs">
-                              {formatCurrency(sectionTotal)}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                    <div className="flex justify-end mt-2 mb-8">
+                      <div className="w-80 text-sm rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                        {/* Section discount row — inside card, one line */}
+                        <div className="flex items-center px-4 py-2.5 border-b border-gray-50 gap-2">
+                          <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">Section Discount</span>
+                          <div className="flex items-center gap-1 ml-auto">
+                            <Input
+                              type="number"
+                              value={sectionDiscountPct ? parseFloat(sectionDiscountPct.toFixed(2)) : ''}
+                              onChange={(e) => {
+                                const pct = parseFloat(e.target.value) || 0;
+                                const prevPct = sectionDiscounts[section] || 0;
+                                setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                                setSectionDiscountAmounts(prev => ({ ...prev, [section]: '' }));
+                                setItems(prevItems => prevItems.map(item => {
+                                  if ((item.section || 'Furniture') !== section) return item;
+                                  const itemDisc = item.discount_percent || 0;
+                                  const updatedItem = (itemDisc > 0 && itemDisc !== prevPct) ? item : {
+                                    ...item,
+                                    discount_percent: pct,
+                                    discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
+                                  };
+                                  const updatedSubs = (item.subItems || []).map(sub => {
+                                    const subDisc = sub.discount_percent || 0;
+                                    if (subDisc > 0 && subDisc !== prevPct) return sub;
+                                    return {
+                                      ...sub,
+                                      discount_percent: pct,
+                                      discounted_total: calculateDiscountedTotal(sub.quantity || 1, sub.amount || 0, pct),
+                                    };
+                                  });
+                                  return { ...updatedItem, subItems: updatedSubs };
+                                }));
+                              }}
+                              className="border border-gray-200 rounded px-1 py-0.5 w-12 text-right text-xs h-auto"
+                              min="0" max="100" step="0.1" placeholder="0"
+                            />
+                            <span className="text-gray-400">%</span>
+                            <span className="text-gray-300">or £</span>
+                            <Input
+                              type="number"
+                              value={
+                                sectionDiscountAmounts[section] !== undefined && sectionDiscountAmounts[section] !== ''
+                                  ? sectionDiscountAmounts[section]
+                                  : itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : ''
+                              }
+                              onChange={(e) => setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }))}
+                              onBlur={(e) => {
+                                const amtVal = parseFloat(e.target.value) || 0;
+                                const pct = sectionRaw > 0 ? (amtVal / sectionRaw) * 100 : 0;
+                                const prevPct = sectionDiscounts[section] || 0;
+                                setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
+                                setSectionDiscountAmounts(prev => ({ ...prev, [section]: amtVal > 0 ? amtVal.toFixed(2) : '' }));
+                                setItems(prevItems => prevItems.map(item => {
+                                  if ((item.section || 'Furniture') !== section) return item;
+                                  const itemDisc = item.discount_percent || 0;
+                                  if (itemDisc > 0 && itemDisc !== prevPct) return item;
+                                  return {
+                                    ...item,
+                                    discount_percent: pct,
+                                    discounted_total: calculateDiscountedTotal(item.quantity || 1, item.amount || 0, pct),
+                                  };
+                                }));
+                              }}
+                              className="border border-gray-200 rounded px-1 py-0.5 w-14 text-right text-xs h-auto"
+                              min="0" step="0.01" placeholder="0.00"
+                            />
+                          </div>
+                        </div>
+                        {hasItemDiscount && (
+                          <div className="flex justify-between px-4 py-2.5 border-b border-gray-50 text-gray-600 text-sm">
+                            <span>{section} Subtotal</span>
+                            <span>{formatCurrency(sectionRaw)}</span>
+                          </div>
+                        )}
+                        {hasItemDiscount && (
+                          <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 text-red-500 text-sm">
+                            <span>Item Discounts ({parseFloat(sectionDiscountPct.toFixed(2))}%)</span>
+                            <span>-{formatCurrency(itemDiscountTotal)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between px-4 py-3.5 font-semibold bg-gray-900 text-white">
+                          <span>{section} Total</span>
+                          <span>{formatCurrency(sectionTotal)}</span>
+                        </div>
+                      </div>
                     </div>
                   );
                 })()}
 
-              {/* Sections with no items at all — show an "Add to section" picker */}
-                <div className="mt-3 flex justify-start">
-                  <Button onClick={() => handleAddItem(section)} size="sm" variant="outline">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Item
-                  </Button>
-                </div>
               </div>
             );
           })}
 
-          {/* Sections with no items — show an "Add to section" picker */}
-          {SECTIONS.filter((s) => !items.some((item) => (item.section || 'Furniture') === s)).length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {SECTIONS.filter((s) => !items.some((item) => (item.section || 'Furniture') === s)).map((s) => (
-                <Button key={s} onClick={() => handleAddItem(s)} size="sm" variant="outline">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add to {s}
-                </Button>
+        {/* Dynamic Add Section buttons — shown for sections with no items */}
+        {(() => {
+          const emptySections = SECTIONS.filter(s => !items.some(item => (item.section || 'Furniture') === s));
+          if (emptySections.length === 0) return null;
+          return (
+            <div className="flex flex-wrap gap-2 mt-6 mb-4">
+              {emptySections.map(section => (
+                <button
+                  key={section}
+                  onClick={() => handleAddItem(section)}
+                  className="text-xs text-gray-500 border border-dashed border-gray-300 hover:border-gray-500 hover:text-gray-700 rounded-lg px-3 py-2 transition-colors flex items-center gap-1.5"
+                >
+                  <Plus className="h-3 w-3" /> Add {section}
+                </button>
               ))}
             </div>
-          )}
+          );
+        })()}
         </div>
         
         {/* Totals */}
-        <div className="mb-6 flex justify-end">
-          <table className="border-collapse" style={{ width: '40%' }}>
-            <tbody>
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">SUB TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(subtotalAfterSectionDiscounts)}</td>
-              </tr>
-              
-              {/* NEW: Global Discount Row */}
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>DISCOUNT</span>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number" min="0" max="100" step="0.1"
-                        value={globalDiscountPercent}
-                        onChange={e => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)}
-                        className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm"
-                      />
-                      <span className="text-sm">%</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="border border-black px-3 py-2 text-right text-red-600">
-                  {globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : "—"}
-                </td>
-              </tr>
-              
-              {/* Show adjusted subtotal if discount applied */}
-              {globalDiscountPercent > 0 && (
-                <tr>
-                  <td className="border border-black px-3 py-2 font-semibold bg-blue-50">SUBTOTAL AFTER DISCOUNT</td>
-                  <td className="border border-black px-3 py-2 text-right font-semibold">{formatCurrency(subtotal)}</td>
-                </tr>
-              )}
-              
-              <tr>
-                <td className="border border-black px-3 py-2 font-semibold bg-gray-50">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>VAT</span>
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        value={vatPercentage}
-                        onChange={(e) => setVatPercentage(parseFloat(e.target.value) || 0)}
-                        className="border border-gray-300 rounded px-2 py-1 w-16 text-right text-sm"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                      />
-                      <span className="text-sm">%</span>
-                    </div>
-                  </div>
-                </td>
-                <td className="border border-black px-3 py-2 text-right">{formatCurrency(vat)}</td>
-              </tr>
-              <tr>
-                <td className="border border-black px-3 py-2 font-bold bg-gray-50">TOTAL</td>
-                <td className="border border-black px-3 py-2 text-right font-bold">{formatCurrency(total)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* Payment Terms */}
-        <div className="mb-6 space-y-2 text-sm">
-          <p className="font-semibold">Only Bacs or Cash will be accepted on Delivery and Completion</p>
-          <p className="font-semibold">
-            NOTE: If you wish to proceed with this quote, you will be required to make the full payment upfront
-          </p>
-        </div>
-
-        <div className="mb-8 text-sm font-semibold text-red-600">
-          <p>Please sign here to confirm.</p>
-        </div>
-
-        {/* Signature Section */}
-        <div className="space-y-4 text-sm">
-          <div className="flex items-center">
-            <span className="mr-2">Customer Signature:</span>
-            <span className="border-b border-dotted border-black flex-1"></span>
-          </div>
-          <div className="flex items-center">
-            <span className="mr-2">Customer Name:</span>
-            <span className="border-b border-dotted border-black flex-1"></span>
-          </div>
-          <div className="flex items-center">
-            <span className="mr-2">Date:</span>
-            <span className="border-b border-dotted border-black flex-1"></span>
+        <div className="mb-10 flex justify-end">
+          <div className="w-80 rounded-xl border border-gray-100 shadow-md overflow-hidden text-sm">
+            <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
+              <span>Subtotal</span>
+              <span>{formatCurrency(subtotalAfterSectionDiscounts)}</span>
+            </div>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
+              <div className="flex items-center gap-2 text-gray-600">
+                <span>Discount</span>
+                <Input type="number" min="0" max="100" step="0.1" value={globalDiscountPercent} onChange={e => setGlobalDiscountPercent(parseFloat(e.target.value) || 0)} className="border border-gray-200 rounded px-2 py-0.5 w-14 text-right text-xs h-auto" />
+                <span className="text-gray-400 text-xs">%</span>
+              </div>
+              <span className="text-red-500">{globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : "—"}</span>
+            </div>
+            {globalDiscountPercent > 0 && (
+              <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
+                <span>After Discount</span>
+                <span>{formatCurrency(subtotal)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
+              <div className="flex items-center gap-2 text-gray-600">
+                <span>VAT</span>
+                <Input type="number" value={vatPercentage} onChange={(e) => setVatPercentage(parseFloat(e.target.value) || 0)} className="border border-gray-200 rounded px-2 py-0.5 w-14 text-right text-xs h-auto" min="0" max="100" step="0.1" />
+                <span className="text-gray-400 text-xs">%</span>
+              </div>
+              <span className="text-gray-600">{formatCurrency(vat)}</span>
+            </div>
+            <div className="flex justify-between px-5 py-4 bg-gray-900 text-white font-bold">
+              <span>Total</span>
+              <span>{formatCurrency(total)}</span>
+            </div>
           </div>
         </div>
+
+        <div className="border-t border-gray-200 pt-8 mb-6 text-sm text-gray-600">
+          {/* Payment Details */}
+          <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-5 shadow-sm mb-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Payment Details</p>
+            <p>Acc name: Atelier Luxe Interiors LTD</p>
+            <p>Bank: ClearBank</p>
+            <p>Sort Code: 04 06 05</p>
+            <p>Acc No: 31621197</p>
+            <p className="mt-2 text-xs text-gray-400">Please use your name and/or road name as reference</p>
+          </div>
+          {/* Terms */}
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">Terms</p>
+            <p>Only Bacs or Cash accepted on Delivery and Completion.</p>
+            <p className="mt-1">Full payment required upfront to confirm order.</p>
+              {additionalTerms.map((term, i) => (
+                <div key={i} className="flex items-center gap-2 mt-1.5">
+                  <input
+                    type="text"
+                    value={term}
+                    onChange={e => setAdditionalTerms(prev => prev.map((t, idx) => idx === i ? e.target.value : t))}
+                    placeholder="Additional term..."
+                    className="flex-1 text-sm border-b border-gray-200 bg-transparent focus:outline-none focus:border-gray-400 py-0.5"
+                  />
+                  <button onClick={() => setAdditionalTerms(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                </div>
+              ))}
+              <button
+                onClick={() => setAdditionalTerms(prev => [...prev, ''])}
+                className="mt-2 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+              >
+                + Add term
+              </button>
+          </div>
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-2">Additional Notes <span className="normal-case font-normal">(optional)</span></p>
+            <textarea
+              value={additionalNotes}
+              onChange={e => setAdditionalNotes(e.target.value)}
+              placeholder="Add any additional notes for the customer..."
+              rows={3}
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-transparent focus:outline-none focus:border-gray-400 resize-none placeholder:text-gray-300"
+            />
+          </div>
+        </div>
+
+        <SignatureField customerName={formData.name} onChange={setSignatureData} initialData={signatureData || undefined} />
       </div>
     </div>
   );
