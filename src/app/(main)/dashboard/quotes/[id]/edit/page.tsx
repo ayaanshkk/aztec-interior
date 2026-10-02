@@ -1657,7 +1657,7 @@ export default function EditQuotePage() {
           </div>
         </div>
 
-        <SignatureField customerName={formData.name} onChange={setSignatureData} initialData={signatureData || undefined} />
+        <SignatureField customerName={customerData.name} onChange={setSignatureData} initialData={signatureData || undefined} />
       </div>
     </div>
   );
