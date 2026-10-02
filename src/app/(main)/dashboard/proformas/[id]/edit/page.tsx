@@ -72,6 +72,7 @@ export default function EditProformaPage() {
   const [fillerType,             setFillerType]             = useState("Basic Slab");
   const [additionalTerms,       setAdditionalTerms]        = useState<string[]>([]);
   const [additionalNotes,       setAdditionalNotes]        = useState<string>('');
+  const [signatureData, setSignatureData] = useState<import('@/components/ui/SignatureField').SignatureData | null>(null);
   const doorRoomSetByLoad = useRef(0);
   const originalItemsRef  = useRef<ProformaItem[]>([]);
   const originalDoorType  = useRef<string>('');
@@ -106,6 +107,15 @@ export default function EditProformaPage() {
       if (data.global_discount_percent) setGlobalDiscountPercent(data.global_discount_percent);
       setAdditionalTerms(data.additional_terms || []);
       setAdditionalNotes(data.additional_notes || '');
+      if (data.signature_type && data.signature_type !== 'none') {
+        setSignatureData({
+          type: data.signature_type,
+          imageData: data.signature_image || undefined,
+          text: data.signature_text || '',
+          name: data.signature_name || '',
+          date: data.signature_date || '',
+        });
+      }
 
       doorRoomSetByLoad.current = 3;
       if (data.door_type) setDoorType(data.door_type);
@@ -617,6 +627,11 @@ export default function EditProformaPage() {
           global_discount_amount:  globalDiscountAmount,
           additional_terms:        additionalTerms.filter(t => t.trim()),
           additional_notes:        additionalNotes,
+          signature_type:          signatureData?.type || 'none',
+          signature_image:         signatureData?.imageData || null,
+          signature_text:          signatureData?.text || null,
+          signature_name:          signatureData?.name || '',
+          signature_date:          signatureData?.date || '',
           items: items
             .filter(i => i.item || i.description || i.line_total > 0)
             .flatMap(i => [
