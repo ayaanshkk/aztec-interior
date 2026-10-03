@@ -190,7 +190,7 @@ function LetterheadContent() {
 
       const headerTable = new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },
-        borders: { top: nil, bottom: nil, left: nil, right: nil, insideH: nil, insideV: nil },
+        borders: { top: nil, bottom: nil, left: nil, right: nil },
         rows: [new TableRow({ children: [
           new TableCell({
             width: { size: 55, type: WidthType.PERCENTAGE },
