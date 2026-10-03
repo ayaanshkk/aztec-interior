@@ -369,6 +369,7 @@ export default function CustomerDetailsPage() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   
   const [formDocuments, setFormDocuments] = useState<FormDocument[]>([]);
+  const [customerLetterheads, setCustomerLetterheads] = useState<any[]>([]);
   const [showDeleteFormDocDialog, setShowDeleteFormDocDialog] = useState(false);
   const [formDocToDelete, setFormDocToDelete] = useState<FormDocument | null>(null);
   const [isDeletingFormDoc, setIsDeletingFormDoc] = useState(false);
@@ -515,14 +516,16 @@ export default function CustomerDetailsPage() {
         quotationsData,
         invoicesData,
         receiptsData,
-        paymentTermsData
+        paymentTermsData,
+        letterheadsData
       ] = await Promise.all([
         fetchWithFallback(`${BACKEND_URL}/files/drawings?customer_id=${id}`),
         fetchWithFallback(`${BACKEND_URL}/customers/${id}/forms`),
         fetchWithFallback(`${BACKEND_URL}/quotations?customer_id=${id}`),
         fetchWithFallback(`${BACKEND_URL}/api/form/invoices?customer_id=${id}`),
         fetchWithFallback(`${BACKEND_URL}/api/form/receipts?customer_id=${id}`),
-        fetchWithFallback(`${BACKEND_URL}/api/form/payment-terms?customer_id=${id}`)
+        fetchWithFallback(`${BACKEND_URL}/api/form/payment-terms?customer_id=${id}`),
+        fetchWithFallback(`${BACKEND_URL}/api/letterheads?client_id=${id}`)
       ]);
 
       if (drawingsData && Array.isArray(drawingsData)) {
@@ -534,7 +537,7 @@ export default function CustomerDetailsPage() {
 
       if (formDocsData && Array.isArray(formDocsData)) {
         const formSubmissions = formDocsData.filter(form => {
-          return form && form.id && form.form_data;
+          return form && form.id && form.form_data && form.form_type !== 'letterhead';
         });
         
         setCustomer(prev => {
@@ -553,6 +556,12 @@ export default function CustomerDetailsPage() {
             form_submissions: []
           };
         });
+      }
+
+      if (letterheadsData && Array.isArray(letterheadsData)) {
+        setCustomerLetterheads(letterheadsData);
+      } else {
+        setCustomerLetterheads([]);
       }
 
       const allFinancialDocs: FinancialDocument[] = [];
@@ -3363,6 +3372,55 @@ export default function CustomerDetailsPage() {
                   </div>
                 </div>
               )}
+
+              {/* Letterheads Section */}
+              {customerLetterheads.length > 0 && (
+                <div className="mt-6">
+                  <span className="text-sm font-medium text-gray-500">Letterheads</span>
+                  <div className="mt-2 space-y-2">
+                    {customerLetterheads.map((letter) => {
+                      const data = letter.data || {};
+                      const recipientName = data.recipient
+                        ? (typeof data.recipient === 'string' ? data.recipient : data.recipient.name)
+                        : '';
+                      return (
+                        <div
+                          key={letter.id}
+                          onClick={() => window.open(`/dashboard/letterhead?id=${letter.id}`, '_blank')}
+                          className="group flex items-center justify-between rounded-lg border bg-gray-50 px-4 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{data.subject || letter.form_name || 'Untitled'}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {recipientName && <span className="mr-2">To: {recipientName}</span>}
+                              {data.date && <span className="mr-2">{new Date(data.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>}
+                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${letter.status === 'draft' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                                {letter.status === 'draft' ? 'Draft' : 'Saved'}
+                              </span>
+                            </p>
+                          </div>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!window.confirm('Delete this letterhead?')) return;
+                              const token = localStorage.getItem('token');
+                              const res = await fetch(`${BACKEND_URL}/api/letterheads/${letter.id}`, {
+                                method: 'DELETE',
+                                headers: { Authorization: `Bearer ${token}` },
+                              });
+                              if (res.ok) setCustomerLetterheads(prev => prev.filter(l => l.id !== letter.id));
+                            }}
+                            className="ml-3 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
+                            title="Delete letterhead"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </TabsContent>
 
@@ -4426,6 +4484,7 @@ export default function CustomerDetailsPage() {
         customerId={customer?.id || ""}
         customerName={customer?.name || ""}
       />
+
     </div>
   );
 }

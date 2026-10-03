@@ -124,6 +124,7 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [roomFilter, setRoomFilter] = useState("");
 
@@ -138,10 +139,11 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
   const [selectedCustomer, setSelected]   = useState("");
   const [pickerBusy, setPickerBusy]       = useState(false);
   const [pickerError, setPickerError]     = useState("");
+  const [pickerSearch, setPickerSearch]   = useState("");
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const openPicker = () => {
-    setSelected(""); setPickerError(""); setPickerBusy(false);
+    setSelected(""); setPickerError(""); setPickerBusy(false); setPickerSearch("");
     setPickerOpen(true);
     if (customers.length === 0) {
       setLoadingC(true);
@@ -237,14 +239,18 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
     }
   };
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearch(searchInput);
-    setPage(1);
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val);
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    searchDebounce.current = setTimeout(() => {
+      setSearch(val);
+      setPage(1);
+    }, 300);
   };
 
   const clearFilters = () => {
     setSearch(""); setSearchInput(""); setStatusFilter(""); setRoomFilter(""); setPage(1);
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
   };
 
   const handleDelete = async (doc: FinancialDoc) => {
@@ -361,18 +367,15 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
 
       {/* Search + Filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 flex-1 min-w-64">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder={`Search by ${config.docNumberLabel.toLowerCase()} or customer…`}
-              className="pl-9"
-              value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-            />
-          </div>
-          <Button type="submit" variant="outline" size="sm">Search</Button>
-        </form>
+        <div className="relative flex-1 min-w-64">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Input
+            placeholder={`Search by ${config.docNumberLabel.toLowerCase()} or customer…`}
+            className="pl-9"
+            value={searchInput}
+            onChange={e => handleSearchChange(e.target.value)}
+          />
+        </div>
 
         <select
           className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -571,16 +574,46 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
             {loadingC ? (
               <p className="text-sm text-gray-400 mb-3">Loading customers…</p>
             ) : (
-              <select
-                value={selectedCustomer}
-                onChange={e => { setSelected(e.target.value); setPickerError(""); }}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-              >
-                <option value="">— Select customer —</option>
-                {customers.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}{c.phone ? ` · ${c.phone}` : ""}</option>
-                ))}
-              </select>
+              <div>
+                <div className="relative mb-2">
+                  <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    autoFocus
+                    placeholder="Search by name or phone…"
+                    className="pl-8 h-9 text-sm"
+                    value={pickerSearch}
+                    onChange={e => { setPickerSearch(e.target.value); setSelected(""); setPickerError(""); }}
+                  />
+                </div>
+                <div className="max-h-52 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-50">
+                  {customers
+                    .filter(c => {
+                      const t = pickerSearch.toLowerCase();
+                      return !t || (c.name || "").toLowerCase().includes(t) || (c.phone || "").toLowerCase().includes(t);
+                    })
+                    .map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => { setSelected(c.id); setPickerError(""); }}
+                        className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
+                          selectedCustomer === c.id
+                            ? "bg-gray-900 text-white"
+                            : "hover:bg-gray-50 text-gray-800"
+                        }`}
+                      >
+                        <span className="font-medium">{c.name}</span>
+                        {c.phone && <span className={`ml-2 text-xs ${selectedCustomer === c.id ? "text-gray-300" : "text-gray-400"}`}>{c.phone}</span>}
+                      </button>
+                    ))}
+                  {customers.filter(c => {
+                    const t = pickerSearch.toLowerCase();
+                    return !t || (c.name || "").toLowerCase().includes(t) || (c.phone || "").toLowerCase().includes(t);
+                  }).length === 0 && (
+                    <p className="px-3 py-4 text-sm text-gray-400 text-center">No customers found</p>
+                  )}
+                </div>
+              </div>
             )}
 
             <div className="flex items-center gap-2 my-3">

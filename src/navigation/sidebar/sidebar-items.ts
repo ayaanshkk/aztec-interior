@@ -104,7 +104,7 @@ const allSidebarItems: NavGroup[] = [
         ],
       },
       {
-        title: "Financial Docs",
+        title: "Documents",
         url: "/dashboard/financial-docs/quotations",
         icon: FolderOpen,
         roles: ["Platform Admin", "Salesperson", "Production Team"],
@@ -116,6 +116,7 @@ const allSidebarItems: NavGroup[] = [
           { title: "Receipts",           url: "/dashboard/financial-docs/receipts" },
           { title: "Deposit Receipts",   url: "/dashboard/financial-docs/deposit-receipts" },
           { title: "Final Receipts",     url: "/dashboard/financial-docs/final-receipts" },
+          { title: "Letterhead",         url: "/dashboard/letterhead" },
         ],
       },
       {
