@@ -25,21 +25,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.aztec.techmynt.com';
 
@@ -190,11 +177,9 @@ function ChecklistViewContent() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   
   const [user, setUser] = useState<User | null>(null);
-  const [userRole, setUserRole] = useState<string>("platform admin");
-  const sidebarItems = getSidebarItems(userRole);
-  
   const [formData, setFormData] = useState<FormData | null>(null);
   const [originalFormData, setOriginalFormData] = useState<FormData | null>(null);
+  const [submissionStatus, setSubmissionStatus] = useState<string>("submitted");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -313,6 +298,7 @@ function ChecklistViewContent() {
 
         setFormData(parsedFormData);
         setOriginalFormData(JSON.parse(JSON.stringify(parsedFormData)));
+        setSubmissionStatus(data.submission_status || "submitted");
       } catch (err) {
         console.error("Error fetching form data:", err);
         setError(err instanceof Error ? err.message : "Unknown error");
@@ -1038,37 +1024,7 @@ function ChecklistViewContent() {
         </DialogContent>
       </Dialog>
 
-      <Sidebar>
-        <SidebarHeader>
-          <div className="flex items-center space-x-2 px-4 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-900 text-white">
-              <span className="text-sm font-bold">AI</span>
-            </div>
-            <span className="text-lg font-semibold">Atelier Luxe Interiors</span>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          {sidebarItems.map((group) => (
-            <SidebarGroup key={group.id}>
-              {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {group.items.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild isActive={item.url === "/dashboard/forms"}>
-                        <Link href={item.url}>
-                          {item.icon && <item.icon />}
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))}
-        </SidebarContent>
-      </Sidebar>
+      <AppSidebar />
 
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
@@ -1125,14 +1081,16 @@ function ChecklistViewContent() {
                 </>
               ) : (
                 <>
-                  {/* Generate Quote Button - ALWAYS SHOW when not editing */}
-                  <Button
-                    onClick={handleGenerateQuote}
-                    className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
-                  >
-                    <FileText className="h-4 w-4" />
-                    <span>Generate Quote</span>
-                  </Button>
+                  {/* Generate Quote Button - only for submitted forms, not drafts */}
+                  {submissionStatus !== 'draft' && (
+                    <Button
+                      onClick={handleGenerateQuote}
+                      className="flex items-center space-x-2 bg-green-600 hover:bg-green-700"
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>Generate Quote</span>
+                    </Button>
+                  )}
                   
                   {canEdit() && (
                     <Button

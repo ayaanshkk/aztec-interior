@@ -27,6 +27,8 @@ import {
   DollarSign,
   PoundSterlingIcon,
   ClipboardList,
+  FolderOpen,
+  Trash2,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -82,6 +84,41 @@ const allSidebarItems: NavGroup[] = [
         roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {
+        title: "Checklists",
+        url: "/dashboard/checklists",
+        icon: ClipboardList,
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
+        subItems: [
+          {
+            title: "Kitchen",
+            url: "/dashboard/checklists/kitchen",
+          },
+          {
+            title: "Bedroom",
+            url: "/dashboard/checklists/bedroom",
+          },
+          {
+            title: "Remedial Action",
+            url: "/dashboard/checklists/remedial",
+          },
+        ],
+      },
+      {
+        title: "Financial Docs",
+        url: "/dashboard/financial-docs/quotations",
+        icon: FolderOpen,
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
+        subItems: [
+          { title: "Quotation",         url: "/dashboard/financial-docs/quotations" },
+          { title: "Invoice",            url: "/dashboard/financial-docs/invoices" },
+          { title: "Proforma Invoice",   url: "/dashboard/financial-docs/proformas" },
+          { title: "Payment Terms",      url: "/dashboard/financial-docs/payment-terms" },
+          { title: "Receipts",           url: "/dashboard/financial-docs/receipts" },
+          { title: "Deposit Receipts",   url: "/dashboard/financial-docs/deposit-receipts" },
+          { title: "Final Receipts",     url: "/dashboard/financial-docs/final-receipts" },
+        ],
+      },
+      {
         title: "Calendar",
         url: "/dashboard/calendar",
         icon: Calendar,
@@ -99,28 +136,12 @@ const allSidebarItems: NavGroup[] = [
         icon: Package,
         roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
-      {
-        title: "Forms/Checklists",
-        url: "/dashboard/forms",
-        icon: FileText,
-        roles: ["Platform Admin", "Salesperson", "Production Team"],
-      },
-      {
-        title: "Checklists",
-        url: "/dashboard/checklists",
-        icon: ClipboardList,
-        roles: ["Platform Admin", "Salesperson", "Production Team"],
-        subItems: [
-          {
-            title: "Kitchen",
-            url: "/dashboard/checklists/kitchen",
-          },
-          {
-            title: "Bedroom",
-            url: "/dashboard/checklists/bedroom",
-          },
-        ],
-      },
+      // {
+      //   title: "Forms/Checklists",
+      //   url: "/dashboard/forms",
+      //   icon: FileText,
+      //   roles: ["Platform Admin", "Salesperson", "Production Team"],
+      // },
       // {
       //   title: "Appliance Catalogue",
       //   url: "/dashboard/appliances",
@@ -144,6 +165,12 @@ const allSidebarItems: NavGroup[] = [
         title: "Notifications",
         url: "/dashboard/notifications",
         icon: Bell,
+        roles: ["Platform Admin", "Salesperson", "Production Team"],
+      },
+      {
+        title: "Recycle Bin",
+        url: "/dashboard/recycle-bin",
+        icon: Trash2,
         roles: ["Platform Admin", "Salesperson", "Production Team"],
       },
       {

@@ -209,18 +209,20 @@ export default function CreateReceiptPage() {
         <div className="flex items-start justify-between mb-10">
           <div>
             <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-1.5">{receiptTypeLabel}</p>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-semibold text-gray-900">
-                {formData.receiptNumber || 'New Receipt'}
-              </h1>
-              <Input value={formData.receiptNumber}
-                onChange={e => set("receiptNumber", e.target.value)}
-                placeholder="Receipt No. (optional)"
-                className="border-none border-b border-gray-200 focus-visible:ring-0 px-0 rounded-none text-sm text-gray-400 placeholder:text-gray-300 h-auto py-1 w-52" />
-            </div>
+            <h1 className="text-2xl font-semibold text-gray-900">
+              {formData.receiptNumber || 'New Receipt'}
+            </h1>
+          </div>
+          <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2">
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-widest">Receipt No.</span>
+            <Input value={formData.receiptNumber}
+              onChange={e => set("receiptNumber", e.target.value)}
+              placeholder="Optional"
+              className="border-none border-b border-gray-200 focus-visible:ring-0 px-0 rounded-none text-sm text-gray-700 placeholder:text-gray-300 h-auto py-1 w-40" />
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-widest">Date</span>
             <Input type="date" value={formData.receiptDate}
               onChange={e => set("receiptDate", e.target.value)}
-              className="border-none focus-visible:ring-0 px-0 text-sm text-gray-400 h-auto py-0.5 w-44" />
+              className="border-none border-b border-gray-200 focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1 w-40" />
           </div>
         </div>
 

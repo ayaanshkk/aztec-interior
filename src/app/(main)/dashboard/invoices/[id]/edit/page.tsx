@@ -8,6 +8,7 @@ import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { BACKEND_URL } from "@/lib/api";
+import { useSessionDraft } from "@/hooks/useSessionDraft";
 import { SignatureField } from "@/components/ui/SignatureField";
 
 const API_FORM = `${BACKEND_URL}/api/form`;
@@ -39,6 +40,7 @@ const SECTIONS = [
   "Sink and Tap",
   "Worktops",
   "Fittings",
+  "Miscellaneous",
 ] as const;
 
 const FITTING_CODES_LIST = ["KUNIT", "BUNIT", "ROBE", "APPL", "SINKTAP", "FITDR", "PANW"];
@@ -82,6 +84,22 @@ export default function EditInvoicePage() {
   const [additionalTerms,       setAdditionalTerms]        = useState<string[]>([]);
   const [additionalNotes,       setAdditionalNotes]        = useState<string>('');
   const [signatureData, setSignatureData] = useState<import('@/components/ui/SignatureField').SignatureData | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const { saveDraft, loadDraft, clearDraft } = useSessionDraft(typeof window !== "undefined" ? window.location.pathname : "invoices-edit");
+  useEffect(() => {
+    if (loading) return;
+    const draft = loadDraft();
+    if (!draft) return;
+    if (draft.formData) setFormData(draft.formData as typeof formData);
+    if (draft.sectionDiscountAmounts) setSectionDiscountAmounts(draft.sectionDiscountAmounts as Record<string, string>);
+    if (draft.signatureData) setSignatureData(draft.signatureData as typeof signatureData);
+    setDraftRestored(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+  useEffect(() => {
+    if (loading) return;
+    saveDraft({ formData, sectionDiscountAmounts, signatureData });
+  }, [formData, sectionDiscountAmounts, signatureData, loading, saveDraft]);
   const doorRoomSetByLoad = useRef(0);
   const originalItemsRef = useRef<InvoiceItem[]>([]);
   const originalDoorType = useRef<string>('');
@@ -632,10 +650,14 @@ export default function EditInvoicePage() {
   const total = Math.round((subtotal + vat) * 100) / 100;
 
   // ── Save ──────────────────────────────────────────────────────────────────
-  const handleSave = async () => {
+  const handleSaveDraft = () => handleSaveWithStatus(true);
+  const handleSave = () => handleSaveWithStatus(false);
+  const handleSaveWithStatus = async (isDraft: boolean) => {
     if (saving) return;
-    if (!formData.customer_name?.trim())    { alert("Customer name is required");    return; }
-    if (!formData.customer_address?.trim()) { alert("Customer address is required"); return; }
+    if (!isDraft) {
+      if (!formData.customer_name?.trim())    { alert("Customer name is required");    return; }
+      if (!formData.customer_address?.trim()) { alert("Customer address is required"); return; }
+    }
 
     setSaving(true);
     setSaveMsg("");
@@ -697,7 +719,8 @@ export default function EditInvoicePage() {
       });
 
       if (res.ok) {
-        setSaveMsg("✅ Invoice updated successfully!");
+        clearDraft();
+      setSaveMsg("✅ Invoice updated successfully!");
         setTimeout(() => router.push(`/dashboard/invoices/${invoiceId}`), 800);
       } else {
         const err = await res.json();
@@ -735,6 +758,9 @@ export default function EditInvoicePage() {
             </span>
           )}
           <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/invoices/${invoiceId}`)}>Cancel</Button>
+          <Button size="sm" variant="outline" onClick={handleSaveDraft} disabled={saving}>
+            {saving ? "Saving..." : "Save as Draft"}
+          </Button>
           <Button size="sm" onClick={handleSave} disabled={saving} className="flex items-center gap-2">
             <Save className="h-4 w-4" />
             {saving ? "Saving..." : "Save Invoice"}

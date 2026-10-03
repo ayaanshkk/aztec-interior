@@ -3,17 +3,17 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import KitchenChecklist from "./kitchen-checklist";
 import BedroomChecklist from "./bedroom-checklist";
+import RemedialChecklist from "./remedial-checklist";
 
 export default function FormPage() {
   const searchParams = useSearchParams();
-  const [formType, setFormType] = useState<"bedroom" | "kitchen" | null>(null);
+  const [formType, setFormType] = useState<"bedroom" | "kitchen" | "remedial" | null>(null);
 
   useEffect(() => {
     const typeParam = searchParams.get("type");
-    if (typeParam === "kitchen" || typeParam === "bedroom") {
+    if (typeParam === "kitchen" || typeParam === "bedroom" || typeParam === "remedial") {
       setFormType(typeParam);
     } else {
-      // Default to bedroom if no type specified
       setFormType("bedroom");
     }
   }, [searchParams]);
@@ -29,5 +29,7 @@ export default function FormPage() {
     );
   }
 
-  return formType === "kitchen" ? <KitchenChecklist /> : <BedroomChecklist />;
+  if (formType === "kitchen") return <KitchenChecklist />;
+  if (formType === "remedial") return <RemedialChecklist />;
+  return <BedroomChecklist />;
 }

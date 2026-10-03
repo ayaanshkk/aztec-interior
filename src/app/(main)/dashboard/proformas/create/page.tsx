@@ -8,6 +8,7 @@ import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BACKEND_URL } from "@/lib/api";
 import Image from 'next/image';
+import { useSessionDraft } from "@/hooks/useSessionDraft";
 import { SignatureField } from "@/components/ui/SignatureField";
 
 const API_FORM = `${BACKEND_URL}/api/form`;
@@ -30,7 +31,7 @@ interface ProformaItem {
   section?: string;
 }
 
-const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings'] as const;
+const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings', 'Miscellaneous'] as const;
 
 export default function CreateProformaPage() {
   const router = useRouter();
@@ -74,6 +75,41 @@ export default function CreateProformaPage() {
   const [additionalTerms, setAdditionalTerms] = useState<string[]>([]);
   const [additionalNotes, setAdditionalNotes] = useState<string>('');
   const [signatureData, setSignatureData] = useState<import('@/components/ui/SignatureField').SignatureData | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  const { saveDraft, loadDraft, clearDraft } = useSessionDraft("proformas/create");
+
+  // Restore draft on mount — skip if customer params are in the URL (fresh navigation)
+  useEffect(() => {
+    if (searchParams.get("customerId")) { clearDraft(); return; }
+    const draft = loadDraft();
+    if (!draft) return;
+    if (draft.formData) setFormData(draft.formData as typeof formData);
+    if (draft.customerId !== undefined) setCustomerId(draft.customerId as string | null);
+    if (draft.items) setItems(draft.items as typeof items);
+    if (draft.doorType) setDoorType(draft.doorType as string);
+    if (draft.roomType) setRoomType(draft.roomType as string);
+    if (draft.vatPercentage !== undefined) setVatPercentage(draft.vatPercentage as number);
+    if (draft.carcassColour !== undefined) setCarcassColour(draft.carcassColour as string);
+    if (draft.doorColour !== undefined) setDoorColour(draft.doorColour as string);
+    if (draft.panelworkColour !== undefined) setPanelworkColour(draft.panelworkColour as string);
+    if (draft.doorStyle !== undefined) setDoorStyle(draft.doorStyle as string);
+    if (draft.roomName !== undefined) setRoomName(draft.roomName as string);
+    if (draft.sectionDiscounts) setSectionDiscounts(draft.sectionDiscounts as Record<string, number>);
+    if (draft.sectionDiscountAmounts) setSectionDiscountAmounts(draft.sectionDiscountAmounts as Record<string, string>);
+    if (draft.fillerType !== undefined) setFillerType(draft.fillerType as string);
+    if (draft.proformaNumber !== undefined) setProformaNumber(draft.proformaNumber as string);
+    if (draft.additionalTerms) setAdditionalTerms(draft.additionalTerms as string[]);
+    if (draft.additionalNotes !== undefined) setAdditionalNotes(draft.additionalNotes as string);
+    if (draft.globalDiscountPercent !== undefined) setGlobalDiscountPercent(draft.globalDiscountPercent as number);
+    if (draft.signatureData) setSignatureData(draft.signatureData as typeof signatureData);
+    setDraftRestored(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    saveDraft({ formData, customerId, items, doorType, roomType, vatPercentage, carcassColour, doorColour, panelworkColour, doorStyle, roomName, sectionDiscounts, sectionDiscountAmounts, fillerType, proformaNumber, additionalTerms, additionalNotes, globalDiscountPercent, signatureData });
+  }, [formData, customerId, items, doorType, roomType, vatPercentage, carcassColour, doorColour, panelworkColour, doorStyle, roomName, sectionDiscounts, sectionDiscountAmounts, fillerType, proformaNumber, additionalTerms, additionalNotes, globalDiscountPercent, signatureData, saveDraft]);
   const doorRoomSetByLoad = useRef(0);
 
   const formatCurrency = (value: number) =>
@@ -549,12 +585,17 @@ export default function CreateProformaPage() {
   const total    = Math.round((subtotal + vat) * 100) / 100;
 
   // â”€â”€ Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const handleSave = async () => {
+  const handleSaveDraft = () => handleSaveWithStatus(true);
+  const handleSave = () => handleSaveWithStatus(false);
+
+  const handleSaveWithStatus = async (isDraft: boolean) => {
     if (saving) return;
-    if (!formData.name?.trim())    { alert("Customer name is required");    return; }
-    if (!formData.address?.trim()) { alert("Customer address is required"); return; }
-    if (!roomName.trim())          { alert("Room name is required");        return; }
-    if (subtotal <= 0)             { alert("Please add at least one item with a valid price"); return; }
+    if (!isDraft) {
+      if (!formData.name?.trim())    { alert("Customer name is required");    return; }
+      if (!formData.address?.trim()) { alert("Customer address is required"); return; }
+      if (!roomName.trim())          { alert("Room name is required");        return; }
+      if (subtotal <= 0)             { alert("Please add at least one item with a valid price"); return; }
+    }
 
     setSaving(true);
     try {
@@ -609,6 +650,7 @@ export default function CreateProformaPage() {
           global_discount_amount:  globalDiscountAmount,
           additional_terms: additionalTerms.filter(t => t.trim()),
           additional_notes: additionalNotes,
+          status: isDraft ? 'Draft' : undefined,
           signature_type: signatureData?.type || 'none',
           signature_image: signatureData?.imageData || null,
           signature_text: signatureData?.text || null,
@@ -620,9 +662,15 @@ export default function CreateProformaPage() {
       if (res.ok) {
         const data  = await res.json();
         const invId = data.invoice_id || data.id;
-        alert(`✅ Proforma #${invId} created successfully!`);
-        window.open(`/dashboard/proformas/${invId}`, '_blank');
-        router.push(customerId ? `/dashboard/customers/${customerId}` : "/dashboard/proformas");
+        clearDraft();
+        if (isDraft) {
+          alert(`✅ Proforma #${invId} saved as draft!`);
+          router.push(`/dashboard/proformas/${invId}/edit`);
+        } else {
+          alert(`✅ Proforma #${invId} created successfully!`);
+          window.open(`/dashboard/proformas/${invId}`, '_blank');
+          router.push(customerId ? `/dashboard/customers/${customerId}` : "/dashboard/proformas");
+        }
       } else {
         const error = await res.json();
         alert(`❌ Failed to save: ${error.error || 'Unknown error'}`);

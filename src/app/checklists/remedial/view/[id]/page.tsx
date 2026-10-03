@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CheckSquare, ArrowLeft, Download, Edit, X, Trash2 } from "lucide-react";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.aztec.techmynt.com";
 const API_FORM    = `${BACKEND_URL}/api/form`;
@@ -285,7 +287,13 @@ export default function RemedialChecklistPage() {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-8">
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
+        </header>
+        <div className="mx-auto max-w-7xl space-y-6 p-8">
 
       {/* Top bar */}
       <div className="flex items-center justify-between">
@@ -502,6 +510,8 @@ export default function RemedialChecklistPage() {
           )}
         </div>
       </div>
-    </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

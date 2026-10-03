@@ -10,7 +10,7 @@ import { SignatureField } from "@/components/ui/SignatureField";
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.aztec.techmynt.com";
 const API_FORM    = `${BACKEND_URL}/api/form`;
 
-const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings'] as const;
+const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings', 'Miscellaneous'] as const;
 
 export default function ViewProformaPage() {
   const params    = useParams();

@@ -1,48 +1,17 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Download, UserPlus } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
 import { BACKEND_URL } from "@/lib/api";
 import { OrderButton, NAButton, OrderMaterialsDialog } from "./shared-components";
 import type { KitchenFormData, Appliance, AdditionalDoor, AdditionalHandle, AdditionalWorktop } from "./shared-types";
 
-export default function KitchenChecklist() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const formRef = useRef<HTMLDivElement>(null);
-  
-  const [userRole, setUserRole] = useState<string>("platform admin");
-  const sidebarItems = getSidebarItems(userRole);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<{
-    type: "success" | "error" | null;
-    message: string;
-  }>({ type: null, message: "" });
-
-  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
-  const [orderDialogSection, setOrderDialogSection] = useState('');
-  const [isWalkinMode, setIsWalkinMode] = useState(false);
-
-  const [formData, setFormData] = useState<KitchenFormData>({
+const KITCHEN_INITIAL_FORM_DATA: KitchenFormData = {
     customer_id: "",
     customer_name: "",
     customer_phone: "",
@@ -115,7 +84,28 @@ export default function KitchenChecklist() {
     integ_fridge_freezer_model: "",
     integ_fridge_freezer_order_date: "",
     additional_appliances: [],
-  });
+};
+
+export default function KitchenChecklist() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const formRef = useRef<HTMLDivElement>(null);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<{
+    type: "success" | "error" | null;
+    message: string;
+  }>({ type: null, message: "" });
+
+  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [orderDialogSection, setOrderDialogSection] = useState('');
+  const [isWalkinMode, setIsWalkinMode] = useState(false);
+  const userRole = "platform admin";
+  const [draftSaved, setDraftSaved] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const DRAFT_KEY = "checklist_draft_kitchen";
+
+  const [formData, setFormData] = useState<KitchenFormData>(KITCHEN_INITIAL_FORM_DATA);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -130,6 +120,20 @@ export default function KitchenChecklist() {
         setIsWalkinMode(true);
       }
 
+      // Restore saved draft if no URL customer params (i.e. returning to an in-progress form)
+      const hasCustParams = custName || custAddress || custPhone;
+      if (!hasCustParams) {
+        try {
+          const saved = localStorage.getItem(DRAFT_KEY) || sessionStorage.getItem(DRAFT_KEY);
+          if (saved) {
+            const draft = JSON.parse(saved);
+            setFormData((prev) => ({ ...prev, ...draft }));
+            if (draft.customer_name) setDraftRestored(true);
+            return;
+          }
+        } catch {}
+      }
+
       setFormData((prev) => ({
         ...prev,
         ...(custName ? { customer_name: custName } : {}),
@@ -137,11 +141,43 @@ export default function KitchenChecklist() {
         ...(custPhone ? { customer_phone: custPhone } : {}),
         ...(custPostcode ? {
           customer_postcode: custPostcode,
-          postcode: custPostcode 
+          postcode: custPostcode
         } : {}),
       }));
     }
-  }, []);
+  }, [DRAFT_KEY]);
+
+  // Auto-save to sessionStorage on every change (handles refresh/internet gone)
+  useEffect(() => {
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); } catch {}
+  }, [formData, DRAFT_KEY]);
+
+  const handleSaveDraft = useCallback(async () => {
+    const customerName = formData.customer_name?.trim();
+    if (!customerName) {
+      // No customer yet — just persist locally
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+        setDraftSaved(true);
+        setTimeout(() => setDraftSaved(false), 3000);
+      } catch { alert("Could not save draft."); }
+      return;
+    }
+    try {
+      const payload = { formData: { ...formData, form_type: "kitchen" }, isWalkinMode: true };
+      const res = await fetch(`${BACKEND_URL}/api/form/save-draft`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Save failed");
+      try { localStorage.removeItem(DRAFT_KEY); sessionStorage.removeItem(DRAFT_KEY); } catch {}
+      router.push(`/dashboard/customers/${data.customer_id}`);
+    } catch (err) {
+      alert(`Could not save draft: ${err instanceof Error ? err.message : "Unknown error"}`);
+    }
+  }, [formData, DRAFT_KEY, router]);
 
   type SingleField = keyof Omit<KitchenFormData, "worktop_features" | "appliances" | "additional_doors" | "additional_handles" | "additional_worktops" | "additional_appliances">;
 
@@ -530,7 +566,8 @@ export default function KitchenChecklist() {
       const result = await response.json();
 
       if (response.ok && result.success) {
-        const successMsg = isWalkinMode 
+        try { localStorage.removeItem(DRAFT_KEY); sessionStorage.removeItem(DRAFT_KEY); } catch {}
+        const successMsg = isWalkinMode
           ? "Customer created and form submitted successfully! Redirecting to customer profile..."
           : result.message || "Form submitted successfully! Redirecting...";
 
@@ -577,37 +614,7 @@ export default function KitchenChecklist() {
 
   return (
     <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <div className="flex items-center space-x-2 px-4 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-900 text-white">
-              <span className="text-sm font-bold">AI</span>
-            </div>
-            <span className="text-lg font-semibold">Atelier Luxe Interiors</span>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          {sidebarItems.map((group) => (
-            <SidebarGroup key={group.id}>
-              {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {group.items.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild isActive={item.url === "/dashboard/forms"}>
-                        <Link href={item.url}>
-                          {item.icon && <item.icon />}
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))}
-        </SidebarContent>
-      </Sidebar>
+      <AppSidebar />
 
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 print:hidden">
@@ -1760,8 +1767,22 @@ export default function KitchenChecklist() {
               </div>
             </div>
 
-            {/* Submit Button */}
-            <div className="border-t pt-3 text-center print:hidden">
+            {/* Draft / Submit buttons */}
+            {draftRestored && (
+              <div className="mb-3 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 print:hidden">
+                <span>Draft restored from a previous session.</span>
+                <button onClick={() => { try { localStorage.removeItem(DRAFT_KEY); sessionStorage.removeItem(DRAFT_KEY); } catch {} setFormData(KITCHEN_INITIAL_FORM_DATA); setDraftRestored(false); }} className="text-xs underline ml-4">Discard draft</button>
+              </div>
+            )}
+            {draftSaved && (
+              <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700 text-center print:hidden">
+                Draft saved — you can return to this form later.
+              </div>
+            )}
+            <div className="border-t pt-3 flex items-center justify-center gap-3 print:hidden">
+              <Button variant="outline" className="px-5 py-2 text-sm" onClick={handleSaveDraft} type="button">
+                Save as Draft
+              </Button>
               <Button className="px-6 py-2 text-base font-bold" onClick={handleSubmit} disabled={isSubmitting} type="button">
                 {isSubmitting ? "Submitting..." : "Submit Form"}
               </Button>

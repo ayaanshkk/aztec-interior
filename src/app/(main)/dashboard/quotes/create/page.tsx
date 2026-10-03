@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { BACKEND_URL } from "@/lib/api";
 import Image from 'next/image';
 import { SignatureField } from "@/components/ui/SignatureField";
+import { useSessionDraft } from "@/hooks/useSessionDraft";
 
 interface QuoteItem {
   id: string;
@@ -28,7 +29,7 @@ interface QuoteItem {
   section?: string;
 }
 
-const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings'] as const;
+const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings', 'Miscellaneous'] as const;
 
 export default function CreateQuotePage() {
   const router = useRouter();
@@ -80,9 +81,72 @@ export default function CreateQuotePage() {
   const itemsLoadedFromQuote = useRef(false);
   const [fillerType, setFillerType] = useState<string>('Basic Slab');
   const [referenceNumber, setReferenceNumber] = useState('');
+  const [quoteReference, setQuoteReference] = useState('');
   const [additionalTerms, setAdditionalTerms] = useState<string[]>([]);
   const [additionalNotes, setAdditionalNotes] = useState<string>('');
   const [signatureData, setSignatureData] = useState<import('@/components/ui/SignatureField').SignatureData | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  const { saveDraft, loadDraft, clearDraft } = useSessionDraft("quotes/create");
+
+  const handleDiscardDraft = () => {
+    clearDraft();
+    setFormData({ date: new Date().toISOString().split("T")[0], name: "", address: "", phone: "", email: "" });
+    setCustomerId(null);
+    setItems([{ id: "1", item: "", description: "", color: "", quantity: 1, amount: 0, line_total: 0, discount_percent: 0, discounted_total: 0, section: 'Furniture' }]);
+    setDoorType('Carcass Only');
+    setRoomType('Kitchen');
+    setVatPercentage(20);
+    setCarcassColour('');
+    setDoorColour('');
+    setPanelworkColour('');
+    setDoorStyle('');
+    setRoomName('');
+    setSectionDiscounts({});
+    setSectionDiscountAmounts({});
+    setFillerType('Basic Slab');
+    setReferenceNumber('');
+    setQuoteReference('');
+    setAdditionalTerms([]);
+    setAdditionalNotes('');
+    setGlobalDiscountPercent(0);
+    setSignatureData(null);
+    setDraftRestored(false);
+  };
+
+  // Restore draft on mount — skip if customer params are in the URL (fresh navigation)
+  useEffect(() => {
+    if (searchParams.get("customerId")) { clearDraft(); return; }
+    const draft = loadDraft();
+    if (!draft) return;
+    if (draft.formData) setFormData(draft.formData as typeof formData);
+    if (draft.customerId !== undefined) setCustomerId(draft.customerId as string | null);
+    if (draft.items) setItems(draft.items as typeof items);
+    if (draft.doorType) setDoorType(draft.doorType as string);
+    if (draft.roomType) setRoomType(draft.roomType as string);
+    if (draft.vatPercentage !== undefined) setVatPercentage(draft.vatPercentage as number);
+    if (draft.carcassColour !== undefined) setCarcassColour(draft.carcassColour as string);
+    if (draft.doorColour !== undefined) setDoorColour(draft.doorColour as string);
+    if (draft.panelworkColour !== undefined) setPanelworkColour(draft.panelworkColour as string);
+    if (draft.doorStyle !== undefined) setDoorStyle(draft.doorStyle as string);
+    if (draft.roomName !== undefined) setRoomName(draft.roomName as string);
+    if (draft.sectionDiscounts) setSectionDiscounts(draft.sectionDiscounts as Record<string, number>);
+    if (draft.sectionDiscountAmounts) setSectionDiscountAmounts(draft.sectionDiscountAmounts as Record<string, string>);
+    if (draft.fillerType !== undefined) setFillerType(draft.fillerType as string);
+    if (draft.referenceNumber !== undefined) setReferenceNumber(draft.referenceNumber as string);
+    if (draft.quoteReference !== undefined) setQuoteReference(draft.quoteReference as string);
+    if (draft.additionalTerms) setAdditionalTerms(draft.additionalTerms as string[]);
+    if (draft.additionalNotes !== undefined) setAdditionalNotes(draft.additionalNotes as string);
+    if (draft.globalDiscountPercent !== undefined) setGlobalDiscountPercent(draft.globalDiscountPercent as number);
+    if (draft.signatureData) setSignatureData(draft.signatureData as typeof signatureData);
+    setDraftRestored(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-save to sessionStorage on every change
+  useEffect(() => {
+    saveDraft({ formData, customerId, items, doorType, roomType, vatPercentage, carcassColour, doorColour, panelworkColour, doorStyle, roomName, sectionDiscounts, sectionDiscountAmounts, fillerType, referenceNumber, quoteReference, additionalTerms, additionalNotes, globalDiscountPercent, signatureData });
+  }, [formData, customerId, items, doorType, roomType, vatPercentage, carcassColour, doorColour, panelworkColour, doorStyle, roomName, sectionDiscounts, sectionDiscountAmounts, fillerType, referenceNumber, quoteReference, additionalTerms, additionalNotes, globalDiscountPercent, signatureData, saveDraft]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
@@ -588,12 +652,17 @@ export default function CreateQuotePage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSaveDraft = () => handleSaveWithStatus(true);
+  const handleSave = () => handleSaveWithStatus(false);
+
+  const handleSaveWithStatus = async (isDraft: boolean) => {
     if (saving) return;
 
-    if (!formData.name?.trim()) { alert("Customer name is required"); return; }
-    if (!formData.address?.trim()) { alert("Customer address is required"); return; }
-    if (!roomName.trim()) { alert("Room name is required"); return; }
+    if (!isDraft) {
+      if (!formData.name?.trim()) { alert("Customer name is required"); return; }
+      if (!formData.address?.trim()) { alert("Customer address is required"); return; }
+      if (!roomName.trim()) { alert("Room name is required"); return; }
+    }
 
   const subtotalBeforeDiscount = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
@@ -613,7 +682,7 @@ export default function CreateQuotePage() {
   const globalDiscountAmount = subtotalBeforeDiscount * (globalDiscountPercent / 100);
   const subtotal = subtotalBeforeDiscount - globalDiscountAmount;
 
-    if (subtotal <= 0) { alert("Please add at least one item with a valid price"); return; }
+    if (!isDraft && subtotal <= 0) { alert("Please add at least one item with a valid price"); return; }
 
     setSaving(true);
     try {
@@ -632,6 +701,7 @@ export default function CreateQuotePage() {
           customer_email: formData.email,
           date: formData.date,
           reference_number: referenceNumber || undefined,
+          quote_reference: quoteReference,
           door_type: doorType,
           room_type: roomType,
           filler_door_type: fillerType,
@@ -684,6 +754,7 @@ export default function CreateQuotePage() {
           global_discount_amount: globalDiscountAmount,
           additional_terms: additionalTerms.filter(t => t.trim()),
           additional_notes: additionalNotes,
+          status: isDraft ? 'Draft' : undefined,
           signature_type: signatureData?.type || 'none',
           signature_image: signatureData?.imageData || null,
           signature_text: signatureData?.text || null,
@@ -695,12 +766,18 @@ export default function CreateQuotePage() {
       if (response.ok) {
         const data = await response.json();
         const quoteId = data.quotation_id || data.id;
-        alert(`✅ Quote #${quoteId} created successfully!`);
-        window.open(`/dashboard/quotes/${quoteId}`, '_blank');
-        if (customerId) {
-          router.push(`/dashboard/customers/${customerId}`);
+        clearDraft();
+        if (isDraft) {
+          alert(`✅ Quote #${quoteId} saved as draft!`);
+          router.push(`/dashboard/quotes/${quoteId}/edit`);
         } else {
-          router.push("/dashboard/quotes");
+          alert(`✅ Quote #${quoteId} created successfully!`);
+          window.open(`/dashboard/quotes/${quoteId}`, '_blank');
+          if (customerId) {
+            router.push(`/dashboard/customers/${customerId}`);
+          } else {
+            router.push("/dashboard/quotes");
+          }
         }
       } else {
         const error = await response.json();
@@ -884,6 +961,9 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
             </div>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={handleSaveDraft} disabled={saving}>
+              {saving ? "Saving..." : "Save as Draft"}
+            </Button>
             <Button onClick={handleSave} disabled={saving}>
               <Save className="mr-2 h-4 w-4" />
               {saving ? "Saving..." : "Save Quotation"}
@@ -891,6 +971,13 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
           </div>
         </div>
       </div>
+
+      {draftRestored && (
+        <div className="mx-8 mt-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+          <span>Draft restored from your last session.</span>
+          <button onClick={handleDiscardDraft} className="text-xs underline ml-4">Discard draft</button>
+        </div>
+      )}
 
       <div className="px-8 py-10">
         {/* Company Header */}
@@ -1028,6 +1115,13 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                 <div className="flex-1"><Input value={referenceNumber} onChange={e => setReferenceNumber(e.target.value)} placeholder="Auto-generated" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full placeholder:text-gray-300" /></div>
               </div>
               <div className="flex items-center border-b border-gray-100 py-0.5">
+                <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">Quote Ref (£)</span>
+                <div className="flex-1 flex items-center gap-1">
+                  <span className="text-sm text-gray-500 flex-shrink-0">£</span>
+                  <Input value={quoteReference} onChange={e => setQuoteReference(e.target.value.replace(/[^\d.]/g, ''))} placeholder="Optional" inputMode="decimal" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full placeholder:text-gray-300" />
+                </div>
+              </div>
+              <div className="flex items-center border-b border-gray-100 py-0.5">
                 <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">Date</span>
                 <div className="flex-1"><Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /></div>
               </div>
@@ -1142,13 +1236,13 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                               <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="1" />
                             </td>
                             <td className="border-b border-gray-50 px-2 py-2">
-                              <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="W" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
+                              <Input type="number" value={item.width != null && item.width !== '' ? +item.width : ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="W" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                             </td>
                             <td className="border-b border-gray-50 px-2 py-2">
-                              <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="H" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
+                              <Input type="number" value={item.height != null && item.height !== '' ? +item.height : ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="H" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                             </td>
                             <td className="border-b border-gray-50 px-2 py-2">
-                              <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="D" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
+                              <Input type="number" value={item.depth != null && item.depth !== '' ? +item.depth : ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="D" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                             </td>
                             <td className="border-b border-gray-50 px-2 py-2">
                               <Input type="number" step="0.01" value={item.amount ?? 0} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="0" placeholder="0.00" />

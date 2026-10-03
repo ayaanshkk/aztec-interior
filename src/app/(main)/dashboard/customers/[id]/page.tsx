@@ -113,6 +113,7 @@ interface FormSubmission {
   form_data: any;
   project_id?: string;
   created_by?: number;
+  submission_status?: string;
 }
 
 interface Quotation {
@@ -2627,20 +2628,25 @@ export default function CustomerDetailsPage() {
     const formType = getFormType(submission);
     const isChecklist = formType === "bedroom" || formType === "kitchen";
     const isAssignedToProject = !!submission.project_id;
-    
+    const isDraft = submission.submission_status === 'draft';
+
     return (
       <div
-        // ✅ REMOVED: All drag and drop attributes
         className="flex items-center justify-between rounded-lg border bg-gray-50 p-4 transition hover:bg-gray-100"
       >
         <div className="flex items-center space-x-3 flex-1">
-          {/* ✅ REMOVED: Drag handle icon */}
-          
           <div className="flex flex-col flex-1">
-            <h3 className="text-lg font-semibold text-gray-900">{getFormTitle(submission)}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900">{getFormTitle(submission)}</h3>
+              {isDraft && (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200">
+                  Draft
+                </span>
+              )}
+            </div>
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-500">
-                Submitted: {formatDate(submission.submitted_at)}
+                {isDraft ? "Saved" : "Submitted"}: {formatDate(submission.submitted_at)}
               </span>
               {isAssignedToProject && (
                 <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
@@ -2648,7 +2654,6 @@ export default function CustomerDetailsPage() {
                   Assigned to project
                 </span>
               )}
-              {/* ✅ REMOVED: Drag to assign message */}
             </div>
           </div>
         </div>
@@ -3651,7 +3656,14 @@ export default function CustomerDetailsPage() {
                               {getFinancialDocIcon(doc.type)}
                             </div>
                             <div className="flex-1">
-                              <h3 className="font-semibold text-gray-900 line-clamp-1">{doc.title}</h3>
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-gray-900 line-clamp-1">{doc.title}</h3>
+                                {doc.status === 'Draft' && (
+                                  <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 border border-amber-200 shrink-0">
+                                    Draft
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-gray-600">{doc.reference || doc.type.replace('_', ' ')}</p>
                             </div>
                           </div>

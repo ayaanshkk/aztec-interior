@@ -19,6 +19,7 @@ const SECTIONS = [
   "Sink and Tap",
   "Worktops",
   "Fittings",
+  "Miscellaneous",
 ] as const;
 
 export default function ViewInvoicePage() {
@@ -78,7 +79,7 @@ export default function ViewInvoicePage() {
     </div>
   );
 
-  // ── Computed totals ──────────────────────────────────────────────────────
+  // ── Computed totals (mirrors list-page SQL logic exactly) ───────────────
   const validItems = items.filter(item =>
     item.item?.trim() || item.item_name?.trim() || item.description?.trim() ||
     (item.amount && parseFloat(item.amount) > 0)
@@ -86,23 +87,22 @@ export default function ViewInvoicePage() {
 
   const sectionDiscountsData = invoice?.section_discounts || {};
 
-  const subtotalAfterSectionDiscounts = Math.round(SECTIONS.reduce((total, section) => {
+  const subtotalAfterSectionDiscounts = SECTIONS.reduce((acc, section) => {
     const sectionItems = validItems.filter(i => (i.section || 'Furniture') === section);
-    const sectionTotal = sectionItems.reduce((sum, item) => {
-      const itemTotal = Math.round(((item.discount_percent && item.discount_percent > 0)
+    return acc + sectionItems.reduce((sum, item) => {
+      const itemTotal = (item.discount_percent && item.discount_percent > 0)
         ? (item.discounted_total ?? item.discounted_amount ?? (item.amount || 0) * (item.quantity || 1))
-        : (item.amount || 0) * (item.quantity || 1)) * 100) / 100;
+        : (item.amount || 0) * (item.quantity || 1);
       const subTotal = (item.subItems || item.sub_items || []).reduce((s: number, sub: any) =>
-        s + Math.round(((sub.discount_percent && sub.discount_percent > 0)
+        s + ((sub.discount_percent && sub.discount_percent > 0)
           ? (sub.discounted_total ?? sub.discounted_amount ?? (sub.amount || 0) * (sub.quantity || 1))
-          : (sub.amount || 0) * (sub.quantity || 1)) * 100) / 100, 0);
-      return sum + Math.round((itemTotal + subTotal) * 100) / 100;
+          : (sub.amount || 0) * (sub.quantity || 1)), 0);
+      return sum + itemTotal + subTotal;
     }, 0);
-    return total + Math.round(sectionTotal * 100) / 100;
-  }, 0) * 100) / 100;
+  }, 0);
 
-  const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
-  const subtotal             = Math.round((subtotalAfterSectionDiscounts - globalDiscountAmount) * 100) / 100;
+  const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
+  const subtotal             = subtotalAfterSectionDiscounts - globalDiscountAmount;
   const vat                  = Math.round(subtotal * (vatPercentage / 100) * 100) / 100;
   const total                = Math.round((subtotal + vat) * 100) / 100;
   const deposit        = invoice.deposit_paid || 0;

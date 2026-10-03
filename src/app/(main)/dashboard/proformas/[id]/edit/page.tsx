@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { BACKEND_URL } from "@/lib/api";
+import { useSessionDraft } from "@/hooks/useSessionDraft";
 import { SignatureField } from "@/components/ui/SignatureField";
 
 const API_FORM = `${BACKEND_URL}/api/form`;
@@ -31,7 +32,7 @@ interface ProformaItem {
 
 const SECTIONS = [
   "Furniture", "Fillers and End Panels", "Accessories", "Handles",
-  "Appliances", "Sink and Tap", "Worktops", "Fittings",
+  "Appliances", "Sink and Tap", "Worktops", "Fittings", "Miscellaneous",
 ] as const;
 
 const FITTING_CODES_LIST = ["KUNIT", "BUNIT", "ROBE", "APPL", "SINKTAP", "FITDR", "PANW"];
@@ -73,6 +74,22 @@ export default function EditProformaPage() {
   const [additionalTerms,       setAdditionalTerms]        = useState<string[]>([]);
   const [additionalNotes,       setAdditionalNotes]        = useState<string>('');
   const [signatureData, setSignatureData] = useState<import('@/components/ui/SignatureField').SignatureData | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const { saveDraft, loadDraft, clearDraft } = useSessionDraft(typeof window !== "undefined" ? window.location.pathname : "proformas-edit");
+  useEffect(() => {
+    if (loading) return;
+    const draft = loadDraft();
+    if (!draft) return;
+    if (draft.formData) setFormData(draft.formData as typeof formData);
+    if (draft.sectionDiscountAmounts) setSectionDiscountAmounts(draft.sectionDiscountAmounts as Record<string, string>);
+    if (draft.signatureData) setSignatureData(draft.signatureData as typeof signatureData);
+    setDraftRestored(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+  useEffect(() => {
+    if (loading) return;
+    saveDraft({ formData, sectionDiscountAmounts, signatureData });
+  }, [formData, sectionDiscountAmounts, signatureData, loading, saveDraft]);
   const doorRoomSetByLoad = useRef(0);
   const originalItemsRef  = useRef<ProformaItem[]>([]);
   const originalDoorType  = useRef<string>('');
@@ -603,10 +620,14 @@ export default function EditProformaPage() {
   const total    = Math.round((subtotal + vat) * 100) / 100;
 
   // ── Save ──────────────────────────────────────────────────────────────────
-  const handleSave = async () => {
+  const handleSaveDraft = () => handleSaveWithStatus(true);
+  const handleSave = () => handleSaveWithStatus(false);
+  const handleSaveWithStatus = async (isDraft: boolean) => {
     if (saving) return;
-    if (!formData.customer_name?.trim())    { alert("Customer name is required");    return; }
-    if (!formData.customer_address?.trim()) { alert("Customer address is required"); return; }
+    if (!isDraft) {
+      if (!formData.customer_name?.trim())    { alert("Customer name is required");    return; }
+      if (!formData.customer_address?.trim()) { alert("Customer address is required"); return; }
+    }
 
     setSaving(true);
     setSaveMsg("");
@@ -658,7 +679,8 @@ export default function EditProformaPage() {
       });
 
       if (res.ok) {
-        setSaveMsg("✅ Proforma updated successfully!");
+        clearDraft();
+      setSaveMsg("✅ Proforma updated successfully!");
         setTimeout(() => router.push(`/dashboard/proformas/${invoiceId}`), 800);
       } else {
         const err = await res.json();

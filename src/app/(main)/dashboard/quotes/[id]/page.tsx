@@ -10,7 +10,7 @@ import { SignatureField } from "@/components/ui/SignatureField";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.aztec.techmynt.com';
 
-const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings'] as const;
+const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings', 'Miscellaneous'] as const;
 
 export default function ViewQuotePage() {
   const params = useParams();
@@ -109,6 +109,7 @@ export default function ViewQuotePage() {
       customer_phone:   quotation.customer_phone   || quotation.phone   || "",
       customer_email:   quotation.customer_email   || quotation.email   || "",
       room_name:        quotation.room_name        || "",
+      quote_reference:  quotation.quote_reference  || "",
       door_type: mappedDoorType,
       room_type:        quotation.room_type        || "Kitchen",
       carcass_colour:   quotation.carcass_colour   || "",
@@ -168,7 +169,7 @@ export default function ViewQuotePage() {
 
   const sectionDiscountsData = quotation?.section_discounts || {};
 
-  const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
+  const subtotalAfterSectionDiscounts = SECTIONS.reduce((acc, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
     const sectionTotal = sectionItems.reduce((sum, item) => {
       const itemTotal = (item.discount_percent && item.discount_percent > 0)
@@ -180,7 +181,7 @@ export default function ViewQuotePage() {
           : (sub.amount || 0) * (sub.quantity || 1)), 0);
       return sum + itemTotal + subTotal;
     }, 0);
-    return total + sectionTotal;
+    return acc + sectionTotal;
   }, 0);
 
   const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);

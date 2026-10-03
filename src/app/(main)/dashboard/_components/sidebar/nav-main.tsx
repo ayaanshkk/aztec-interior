@@ -170,9 +170,10 @@ const NavItemCollapsed = ({
   );
 };
 
-const CHECKLIST_URLS: Record<string, "kitchen" | "bedroom"> = {
+const CHECKLIST_URLS: Record<string, "kitchen" | "bedroom" | "remedial"> = {
   "/dashboard/checklists/kitchen": "kitchen",
   "/dashboard/checklists/bedroom": "bedroom",
+  "/dashboard/checklists/remedial": "remedial",
 };
 
 export function NavMain({ items }: NavMainProps) {

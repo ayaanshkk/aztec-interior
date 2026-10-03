@@ -8,6 +8,7 @@ import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { BACKEND_URL } from "@/lib/api";
 import Image from 'next/image';
+import { useSessionDraft } from "@/hooks/useSessionDraft";
 import { SignatureField } from "@/components/ui/SignatureField";
 
 const API_FORM = `${BACKEND_URL}/api/form`;
@@ -30,7 +31,7 @@ interface InvoiceItem {
   section?: string;
 }
 
-const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings'] as const;
+const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings', 'Miscellaneous'] as const;
 
 export default function CreateInvoicePage() {
   const router = useRouter();
@@ -82,9 +83,48 @@ export default function CreateInvoicePage() {
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [fillerType, setFillerType] = useState<string>('Basic Slab');
   const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [quoteReference, setQuoteReference] = useState('');
   const [additionalTerms, setAdditionalTerms] = useState<string[]>([]);
   const [additionalNotes, setAdditionalNotes] = useState<string>('');
   const [signatureData, setSignatureData] = useState<import('@/components/ui/SignatureField').SignatureData | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  const { saveDraft, loadDraft, clearDraft } = useSessionDraft("invoices/create");
+
+  // Restore draft on mount — skip if customer params are in the URL (fresh navigation)
+  useEffect(() => {
+    if (searchParams.get("customerId")) { clearDraft(); return; }
+    const draft = loadDraft();
+    if (!draft) return;
+    if (draft.formData) setFormData(draft.formData as typeof formData);
+    if (draft.customerId !== undefined) setCustomerId(draft.customerId as string | null);
+    if (draft.items) setItems(draft.items as typeof items);
+    if (draft.doorType) setDoorType(draft.doorType as string);
+    if (draft.roomType) setRoomType(draft.roomType as string);
+    if (draft.vatPercentage !== undefined) setVatPercentage(draft.vatPercentage as number);
+    if (draft.carcassColour !== undefined) setCarcassColour(draft.carcassColour as string);
+    if (draft.doorColour !== undefined) setDoorColour(draft.doorColour as string);
+    if (draft.panelworkColour !== undefined) setPanelworkColour(draft.panelworkColour as string);
+    if (draft.doorStyle !== undefined) setDoorStyle(draft.doorStyle as string);
+    if (draft.roomName !== undefined) setRoomName(draft.roomName as string);
+    if (draft.sectionDiscounts) setSectionDiscounts(draft.sectionDiscounts as Record<string, number>);
+    if (draft.sectionDiscountAmounts) setSectionDiscountAmounts(draft.sectionDiscountAmounts as Record<string, string>);
+    if (draft.fillerType !== undefined) setFillerType(draft.fillerType as string);
+    if (draft.invoiceNumber !== undefined) setInvoiceNumber(draft.invoiceNumber as string);
+    if (draft.quoteReference !== undefined) setQuoteReference(draft.quoteReference as string);
+    if (draft.additionalTerms) setAdditionalTerms(draft.additionalTerms as string[]);
+    if (draft.additionalNotes !== undefined) setAdditionalNotes(draft.additionalNotes as string);
+    if (draft.globalDiscountPercent !== undefined) setGlobalDiscountPercent(draft.globalDiscountPercent as number);
+    if (draft.deposit !== undefined) setDeposit(draft.deposit as number);
+    if (draft.signatureData) setSignatureData(draft.signatureData as typeof signatureData);
+    setDraftRestored(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-save to sessionStorage
+  useEffect(() => {
+    saveDraft({ formData, customerId, items, doorType, roomType, vatPercentage, carcassColour, doorColour, panelworkColour, doorStyle, roomName, sectionDiscounts, sectionDiscountAmounts, fillerType, invoiceNumber, quoteReference, additionalTerms, additionalNotes, globalDiscountPercent, deposit, signatureData });
+  }, [formData, customerId, items, doorType, roomType, vatPercentage, carcassColour, doorColour, panelworkColour, doorStyle, roomName, sectionDiscounts, sectionDiscountAmounts, fillerType, invoiceNumber, quoteReference, additionalTerms, additionalNotes, globalDiscountPercent, deposit, signatureData, saveDraft]);
   const doorRoomSetByLoad = useRef(0);
   const originalItemsRef = useRef<InvoiceItem[]>([]);
   const originalDoorType = useRef<string>('');
@@ -144,6 +184,7 @@ export default function CreateInvoicePage() {
           if (q.vat_percentage !== undefined && q.vat_percentage !== null) setVatPercentage(q.vat_percentage);
           if (q.section_discounts) setSectionDiscounts(q.section_discounts);
           if (q.global_discount_percent !== undefined && q.global_discount_percent !== null) setGlobalDiscountPercent(q.global_discount_percent);
+          if (q.quote_reference) setQuoteReference(q.quote_reference);
 
           if (q.items && q.items.length > 0) {
             const mapped: InvoiceItem[] = q.items.map((item: any, idx: number) => {
@@ -746,12 +787,16 @@ export default function CreateInvoicePage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSaveDraft = () => handleSaveWithStatus(true);
+  const handleSave = () => handleSaveWithStatus(false);
+
+  const handleSaveWithStatus = async (isDraft: boolean) => {
     if (saving) return;
 
-    if (!formData.name?.trim()) { alert("Customer name is required"); return; }
-    if (!formData.address?.trim()) { alert("Customer address is required"); return; }
-    if (!roomName.trim()) { alert("Room name is required"); return; }
+    if (!isDraft) {
+        if (!formData.address?.trim()) { alert("Customer address is required"); return; }
+      if (!roomName.trim()) { alert("Room name is required"); return; }
+    }
 
     const subtotalBeforeDiscount = Math.round(SECTIONS.reduce((total, section) => {
       const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
@@ -774,7 +819,7 @@ export default function CreateInvoicePage() {
     const globalDiscountAmount = Math.round(subtotalBeforeDiscount * (globalDiscountPercent / 100) * 100) / 100;
     const subtotal = Math.round((subtotalBeforeDiscount - globalDiscountAmount) * 100) / 100;
 
-    if (subtotal <= 0) { alert("Please add at least one item with a valid price"); return; }
+    if (!isDraft && subtotal <= 0) { alert("Please add at least one item with a valid price"); return; }
 
     setSaving(true);
     try {
@@ -794,6 +839,7 @@ export default function CreateInvoicePage() {
           invoice_date: formData.invoice_date,
           due_date: formData.due_date,
           invoice_number: invoiceNumber || undefined,
+          quote_reference: quoteReference,
           door_type: doorType,
           room_type: roomType,
           filler_type: fillerType,
@@ -844,6 +890,7 @@ export default function CreateInvoicePage() {
           global_discount_amount: globalDiscountAmount,
           additional_terms: additionalTerms.filter(t => t.trim()),
           additional_notes: additionalNotes,
+          status: isDraft ? 'Draft' : undefined,
           signature_type: signatureData?.type || 'none',
           signature_image: signatureData?.imageData || null,
           signature_text: signatureData?.text || null,
@@ -855,12 +902,18 @@ export default function CreateInvoicePage() {
       if (response.ok) {
         const data = await response.json();
         const invoiceId = data.invoice_id || data.id;
-        alert(`✅ Invoice #${invoiceId} created successfully!`);
-        window.open(`/dashboard/invoices/${invoiceId}`, '_blank');
-        if (customerId) {
-          router.push(`/dashboard/customers/${customerId}`);
+        clearDraft();
+        if (isDraft) {
+          alert(`✅ Invoice #${invoiceId} saved as draft!`);
+          router.push(`/dashboard/invoices/${invoiceId}/edit`);
         } else {
-          router.push("/dashboard/invoices");
+          alert(`✅ Invoice #${invoiceId} created successfully!`);
+          window.open(`/dashboard/invoices/${invoiceId}`, '_blank');
+          if (customerId) {
+            router.push(`/dashboard/customers/${customerId}`);
+          } else {
+            router.push("/dashboard/invoices");
+          }
         }
       } else {
         const error = await response.json();
@@ -909,6 +962,9 @@ export default function CreateInvoicePage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => router.back()}>Cancel</Button>
+          <Button size="sm" variant="outline" onClick={handleSaveDraft} disabled={saving}>
+            {saving ? "Saving..." : "Save as Draft"}
+          </Button>
           <Button size="sm" onClick={handleSave} disabled={saving} className="bg-gray-900 hover:bg-gray-800 text-white">
             <Save className="mr-2 h-3.5 w-3.5" />
             {saving ? "Saving..." : "Save Invoice"}
@@ -1050,6 +1106,22 @@ export default function CreateInvoicePage() {
               {([
                 { label: 'Invoice No',       content: <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Auto-generated" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Invoice Date',     content: <Input type="date" value={formData.invoice_date} onChange={(e) => setFormData(prev => ({ ...prev, invoice_date: e.target.value }))} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+              ] as const).map(({ label, content }) => (
+                <div key={label} className="flex items-center border-b border-gray-100 py-0.5">
+                  <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">{label}</span>
+                  <div className="flex-1">{content}</div>
+                </div>
+              ))}
+              <div className="flex items-center border-b border-gray-100 py-0.5">
+                <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">Quote Ref (£)</span>
+                <div className="flex-1 flex items-center gap-1">
+                  <span className="text-sm text-gray-500 flex-shrink-0">£</span>
+                  <Input value={quoteReference} onChange={e => setQuoteReference(e.target.value.replace(/[^\d.]/g, ''))}
+                    placeholder="Optional" inputMode="decimal"
+                    className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" />
+                </div>
+              </div>
+              {([
                 { label: 'Due Date',         content: <Input type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Room',             content: <Input value={roomName} onChange={(e) => setRoomName(e.target.value)} placeholder="e.g. Kitchen" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Carcass Colour',   content: <Input value={carcassColour} onChange={(e) => setCarcassColour(e.target.value)} placeholder="" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
@@ -1156,13 +1228,13 @@ export default function CreateInvoicePage() {
                             <Input type="number" value={item.quantity} onChange={(e) => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="1" />
                           </td>
                           <td className="border-b border-gray-50 px-2 py-2">
-                            <Input type="number" value={item.width || ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="W" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
+                            <Input type="number" value={item.width != null && item.width !== '' ? +item.width : ''} onChange={(e) => handleItemChange(item.id, "width", e.target.value)} placeholder="W" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                           </td>
                           <td className="border-b border-gray-50 px-2 py-2">
-                            <Input type="number" value={item.height || ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="H" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
+                            <Input type="number" value={item.height != null && item.height !== '' ? +item.height : ''} onChange={(e) => handleItemChange(item.id, "height", e.target.value)} placeholder="H" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                           </td>
                           <td className="border-b border-gray-50 px-2 py-2">
-                            <Input type="number" value={item.depth || ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="D" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
+                            <Input type="number" value={item.depth != null && item.depth !== '' ? +item.depth : ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="D" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                           </td>
                           <td className="border-b border-gray-50 px-2 py-2">
                             <Input type="number" step="0.01" value={parseFloat((item.amount || 0).toFixed(2))} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="0" placeholder="0.00" />

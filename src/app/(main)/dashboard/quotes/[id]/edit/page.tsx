@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Save, Trash2, Plus } from "lucide-react";
 import Image from 'next/image';
+import { useSessionDraft } from "@/hooks/useSessionDraft";
 import { SignatureField } from "@/components/ui/SignatureField";
  
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.aztec.techmynt.com';
@@ -30,7 +31,7 @@ interface QuoteItem {
   section?: string;
 }
 
-const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings'] as const;
+const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings', 'Miscellaneous'] as const;
 
 export default function EditQuotePage() {
   const params = useParams();
@@ -66,8 +67,9 @@ export default function EditQuotePage() {
   const [additionalTerms, setAdditionalTerms] = useState<string[]>([]);
   const [additionalNotes, setAdditionalNotes] = useState<string>('');
   const [signatureData, setSignatureData] = useState<import('@/components/ui/SignatureField').SignatureData | null>(null);
-  const lastChangedField = useRef<'door' | 'filler' | 'room' | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
 
+  const { saveDraft, loadDraft, clearDraft } = useSessionDraft(typeof window !== 'undefined' ? window.location.pathname : 'quotes-edit');
 
   // Customer form data
   const [customerData, setCustomerData] = useState({
@@ -77,7 +79,44 @@ export default function EditQuotePage() {
     email: '',
     date: new Date().toISOString().split('T')[0],
     referenceNumber: '',
+    quoteReference: '',
   });
+
+  const lastChangedField = useRef<'door' | 'filler' | 'room' | null>(null);
+
+  // After server data loads, check for in-session draft
+  useEffect(() => {
+    if (loading) return;
+    const draft = loadDraft();
+    if (!draft) return;
+    if (draft.quotation) setQuotation(draft.quotation as typeof quotation);
+    if (draft.items) setItems(draft.items as typeof items);
+    if (draft.doorType) setDoorType(draft.doorType as string);
+    if (draft.roomType) setRoomType(draft.roomType as string);
+    if (draft.vatPercentage !== undefined) setVatPercentage(draft.vatPercentage as number);
+    if (draft.carcassColour !== undefined) setCarcassColour(draft.carcassColour as string);
+    if (draft.doorColour !== undefined) setDoorColour(draft.doorColour as string);
+    if (draft.panelworkColour !== undefined) setPanelworkColour(draft.panelworkColour as string);
+    if (draft.doorStyle !== undefined) setDoorStyle(draft.doorStyle as string);
+    if (draft.roomName !== undefined) setRoomName(draft.roomName as string);
+    if (draft.sectionDiscounts) setSectionDiscounts(draft.sectionDiscounts as Record<string, number>);
+    if (draft.sectionDiscountAmounts) setSectionDiscountAmounts(draft.sectionDiscountAmounts as Record<string, string>);
+    if (draft.fillerType !== undefined) setFillerType(draft.fillerType as string);
+    if (draft.additionalTerms) setAdditionalTerms(draft.additionalTerms as string[]);
+    if (draft.additionalNotes !== undefined) setAdditionalNotes(draft.additionalNotes as string);
+    if (draft.globalDiscountPercent !== undefined) setGlobalDiscountPercent(draft.globalDiscountPercent as number);
+    if (draft.signatureData) setSignatureData(draft.signatureData as typeof signatureData);
+    if (draft.customerData) setCustomerData(draft.customerData as typeof customerData);
+    setDraftRestored(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  // Auto-save on state changes
+  useEffect(() => {
+    if (loading) return;
+    saveDraft({ quotation, items, doorType, roomType, vatPercentage, carcassColour, doorColour, panelworkColour, doorStyle, roomName, sectionDiscounts, sectionDiscountAmounts, fillerType, additionalTerms, additionalNotes, globalDiscountPercent, signatureData, customerData });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quotation, items, doorType, roomType, vatPercentage, carcassColour, doorColour, panelworkColour, doorStyle, roomName, sectionDiscounts, sectionDiscountAmounts, fillerType, additionalTerms, additionalNotes, globalDiscountPercent, signatureData, customerData, loading]);
 
   const calculateDiscountedTotal = (
     quantity: number,
@@ -321,6 +360,7 @@ export default function EditQuotePage() {
           email: data.customer_email || data.client_email || '',
           date: data.created_at ? new Date(data.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           referenceNumber: data.reference_number || '',
+          quoteReference: data.quote_reference || '',
         });
         
         const itemsWithTotals = (data.items || []).map((item: any) => ({
@@ -780,26 +820,29 @@ export default function EditQuotePage() {
     }
   };
  
-  const handleSave = async () => {
+  const handleSaveDraft = () => handleSaveWithStatus(true);
+  const handleSave = () => handleSaveWithStatus(false);
+
+  const handleSaveWithStatus = async (isDraft: boolean) => {
     if (saving) return;
 
-    if (!customerData.name?.trim()) {
-      alert("Customer name is required");
-      return;
-    }
-
-    if (!customerData.address?.trim()) {
-      alert("Customer address is required");
-      return;
-    }
-    if (!roomName.trim()) {  // ✅ ADD THIS
-      alert("Room name is required");
-      return;
-    }
-    
-    if (subtotal <= 0) {
-      alert("Please add at least one item with a valid price");
-      return;
+    if (!isDraft) {
+      if (!customerData.name?.trim()) {
+        alert("Customer name is required");
+        return;
+      }
+      if (!customerData.address?.trim()) {
+        alert("Customer address is required");
+        return;
+      }
+      if (!roomName.trim()) {
+        alert("Room name is required");
+        return;
+      }
+      if (subtotal <= 0) {
+        alert("Please add at least one item with a valid price");
+        return;
+      }
     }
 
     setSaving(true);
@@ -822,6 +865,7 @@ export default function EditQuotePage() {
           customer_email: customerData.email || '',
           date: customerData.date,
           reference_number: customerData.referenceNumber || undefined,
+          quote_reference: customerData.quoteReference,
           door_type: doorType,
           room_type: roomType,
           filler_type: fillerType,
@@ -875,6 +919,7 @@ export default function EditQuotePage() {
           global_discount_amount: globalDiscountAmount,
           additional_terms: additionalTerms.filter(t => t.trim()),
           additional_notes: additionalNotes,
+          status: isDraft ? 'Draft' : undefined,
           signature_type: signatureData?.type || 'none',
           signature_image: signatureData?.imageData || null,
           signature_text: signatureData?.text || null,
@@ -1079,6 +1124,9 @@ export default function EditQuotePage() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={handleSaveDraft} disabled={saving}>
+              Save as Draft
+            </Button>
             <Button onClick={handleSave} disabled={saving}>
               <Save className="mr-2 h-4 w-4" />
               {saving ? "Saving..." : "Save Changes"}
@@ -1222,8 +1270,8 @@ export default function EditQuotePage() {
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Quote Details</p>
             <div className="space-y-0">
               {([
-                { label: 'Quote No',       key: 'referenceNumber', type: 'text', val: customerData.referenceNumber, set: (v: string) => setCustomerData({ ...customerData, referenceNumber: v }) },
-                { label: 'Date',           key: 'date',            type: 'date', val: customerData.date,            set: (v: string) => setCustomerData({ ...customerData, date: v }) },
+                { label: 'Quote No', key: 'referenceNumber', type: 'text', val: customerData.referenceNumber, set: (v: string) => setCustomerData({ ...customerData, referenceNumber: v }) },
+                { label: 'Date',     key: 'date',            type: 'date', val: customerData.date,            set: (v: string) => setCustomerData({ ...customerData, date: v }) },
               ] as { label: string; key: string; type: string; val: string; set: (v: string) => void }[]).map(({ label, key, type, val, set }) => (
                 <div key={key} className="flex items-center border-b border-gray-100 py-0.5">
                   <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">{label}</span>
@@ -1233,6 +1281,15 @@ export default function EditQuotePage() {
                   </div>
                 </div>
               ))}
+              <div className="flex items-center border-b border-gray-100 py-0.5">
+                <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">Quote Ref (£)</span>
+                <div className="flex-1 flex items-center gap-1">
+                  <span className="text-sm text-gray-500 flex-shrink-0">£</span>
+                  <Input value={customerData.quoteReference} onChange={e => setCustomerData({ ...customerData, quoteReference: e.target.value.replace(/[^\d.]/g, '') })}
+                    placeholder="Optional" inputMode="decimal"
+                    className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" />
+                </div>
+              </div>
               {([
                 { label: 'Room',           val: roomName,        set: setRoomName },
                 { label: 'Carcass Colour', val: carcassColour,   set: setCarcassColour },

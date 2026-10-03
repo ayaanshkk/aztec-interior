@@ -1,36 +1,70 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Download, UserPlus } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import { getSidebarItems } from "@/navigation/sidebar/sidebar-items";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
 import { BACKEND_URL } from "@/lib/api";
 import { OrderButton, NAButton, OrderMaterialsDialog } from "./shared-components";
 import type { BedroomFormData, AdditionalDoor, AdditionalHandle, AdditionalWorktop } from "./shared-types";
+
+const BEDROOM_INITIAL_FORM_DATA: BedroomFormData = {
+  customer_id: "",
+  customer_name: "",
+  customer_phone: "",
+  customer_address: "",
+  customer_postcode: "",
+  postcode: "",
+  room: "",
+  door_style: "",
+  door_color: "",
+  door_type: "",
+  door_manufacturer: "",
+  door_name: "",
+  glazing_material: "",
+  plinth_filler_color: "",
+  end_panel_color: "",
+  cabinet_color: "",
+  worktop_material_color: "",
+  additional_doors: [],
+  additional_handles: [],
+  handles_code: "",
+  handles_quantity: "",
+  handles_size: "",
+  bedside_cabinets_type: "",
+  bedside_cabinets_qty: "",
+  dresser_desk: "",
+  dresser_desk_details: "",
+  internal_mirror: "",
+  internal_mirror_details: "",
+  mirror_type: "",
+  mirror_qty: "",
+  soffit_lights_type: "",
+  soffit_lights_color: "",
+  gable_lights_type: "",
+  gable_lights_main_color: "",
+  gable_lights_profile_color: "",
+  other_accessories: "",
+  floor_protection: [],
+  terms_date: "",
+  gas_electric_info: "",
+  signature_name: "",
+  signature_date: "",
+  worktop_code: "",
+  additional_worktops: [],
+  worktop_material_type: "",
+  worktop_size: "",
+  worktop_features: [],
+  worktop_other_details: "",
+};
 
 export default function BedroomChecklist() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const formRef = useRef<HTMLDivElement>(null);
-  
-  const [userRole, setUserRole] = useState<string>("platform admin");
-  const sidebarItems = getSidebarItems(userRole);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<{
@@ -41,56 +75,12 @@ export default function BedroomChecklist() {
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [orderDialogSection, setOrderDialogSection] = useState('');
   const [isWalkinMode, setIsWalkinMode] = useState(false);
+  const userRole = "platform admin";
+  const [draftSaved, setDraftSaved] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const DRAFT_KEY = "checklist_draft_bedroom";
 
-  const [formData, setFormData] = useState<BedroomFormData>({
-    customer_id: "",
-    customer_name: "",
-    customer_phone: "",
-    customer_address: "",
-    customer_postcode: "",
-    postcode: "",
-    room: "",
-    door_style: "",
-    door_color: "",
-    door_type: "",
-    door_manufacturer: "",
-    door_name: "",
-    glazing_material: "",
-    plinth_filler_color: "",
-    end_panel_color: "",
-    cabinet_color: "",
-    worktop_material_color: "",
-    additional_doors: [],
-    additional_handles: [],
-    handles_code: "",
-    handles_quantity: "",
-    handles_size: "",
-    bedside_cabinets_type: "",
-    bedside_cabinets_qty: "",
-    dresser_desk: "",
-    dresser_desk_details: "",
-    internal_mirror: "",
-    internal_mirror_details: "",
-    mirror_type: "",
-    mirror_qty: "",
-    soffit_lights_type: "",
-    soffit_lights_color: "",
-    gable_lights_type: "",
-    gable_lights_main_color: "",
-    gable_lights_profile_color: "",
-    other_accessories: "",
-    floor_protection: [],
-    terms_date: "",
-    gas_electric_info: "",
-    signature_name: "",
-    signature_date: "",
-    worktop_code: "",
-    additional_worktops: [],
-    worktop_material_type: "",
-    worktop_size: "",
-    worktop_features: [],
-    worktop_other_details: "",
-  });
+  const [formData, setFormData] = useState<BedroomFormData>(BEDROOM_INITIAL_FORM_DATA);
   
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -105,6 +95,19 @@ export default function BedroomChecklist() {
         setIsWalkinMode(true);
       }
 
+      const hasCustParams = custName || custAddress || custPhone;
+      if (!hasCustParams) {
+        try {
+          const saved = localStorage.getItem(DRAFT_KEY) || sessionStorage.getItem(DRAFT_KEY);
+          if (saved) {
+            const draft = JSON.parse(saved);
+            setFormData((prev) => ({ ...prev, ...draft }));
+            if (draft.customer_name) setDraftRestored(true);
+            return;
+          }
+        } catch {}
+      }
+
       setFormData((prev) => ({
         ...prev,
         ...(custName ? { customer_name: custName } : {}),
@@ -116,7 +119,37 @@ export default function BedroomChecklist() {
         } : {}),
       }));
     }
-  }, []);
+  }, [DRAFT_KEY]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); } catch {}
+  }, [formData, DRAFT_KEY]);
+
+  const handleSaveDraft = useCallback(async () => {
+    const customerName = formData.customer_name?.trim();
+    if (!customerName) {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+        setDraftSaved(true);
+        setTimeout(() => setDraftSaved(false), 3000);
+      } catch { alert("Could not save draft."); }
+      return;
+    }
+    try {
+      const payload = { formData: { ...formData, form_type: "bedroom" }, isWalkinMode: true };
+      const res = await fetch(`${BACKEND_URL}/api/form/save-draft`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Save failed");
+      try { localStorage.removeItem(DRAFT_KEY); sessionStorage.removeItem(DRAFT_KEY); } catch {}
+      router.push(`/dashboard/customers/${data.customer_id}`);
+    } catch (err) {
+      alert(`Could not save draft: ${err instanceof Error ? err.message : "Unknown error"}`);
+    }
+  }, [formData, DRAFT_KEY, router]);
 
   type SingleField = keyof Omit<BedroomFormData, "floor_protection" | "additional_doors" | "additional_handles" | "additional_worktops" | "worktop_features">;
 
@@ -413,6 +446,7 @@ export default function BedroomChecklist() {
       const result = await response.json();
 
       if (response.ok && result.success) {
+        try { localStorage.removeItem(DRAFT_KEY); sessionStorage.removeItem(DRAFT_KEY); } catch {}
         const successMsg = isWalkinMode 
           ? "Customer created and form submitted successfully! Redirecting to customer profile..."
           : result.message || "Form submitted successfully! Redirecting...";
@@ -455,37 +489,7 @@ export default function BedroomChecklist() {
 
   return (
     <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <div className="flex items-center space-x-2 px-4 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded bg-gray-900 text-white">
-              <span className="text-sm font-bold">AI</span>
-            </div>
-            <span className="text-lg font-semibold">Atelier Luxe Interiors</span>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          {sidebarItems.map((group) => (
-            <SidebarGroup key={group.id}>
-              {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {group.items.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild isActive={item.url === "/dashboard/forms"}>
-                        <Link href={item.url}>
-                          {item.icon && <item.icon />}
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))}
-        </SidebarContent>
-      </Sidebar>
+      <AppSidebar />
 
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 print:hidden">
@@ -1500,7 +1504,21 @@ export default function BedroomChecklist() {
             </div>
 
             {/* Submit Button */}
-            <div className="border-t pt-3 text-center print:hidden">
+            {draftRestored && (
+              <div className="mb-3 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 print:hidden">
+                <span>Draft restored from a previous session.</span>
+                <button onClick={() => { try { localStorage.removeItem(DRAFT_KEY); sessionStorage.removeItem(DRAFT_KEY); } catch {} setFormData(BEDROOM_INITIAL_FORM_DATA); setDraftRestored(false); }} className="text-xs underline ml-4">Discard draft</button>
+              </div>
+            )}
+            {draftSaved && (
+              <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700 text-center print:hidden">
+                Draft saved — you can return to this form later.
+              </div>
+            )}
+            <div className="border-t pt-3 flex items-center justify-center gap-3 print:hidden">
+              <Button variant="outline" className="px-5 py-2 text-sm" onClick={handleSaveDraft} type="button">
+                Save as Draft
+              </Button>
               <Button className="px-6 py-2 text-base font-bold" onClick={handleSubmit} disabled={isSubmitting} type="button">
                 {isSubmitting ? "Submitting..." : "Submit Form"}
               </Button>
