@@ -224,7 +224,6 @@ function ChecklistViewContent() {
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setUser(userData);
-          setUserRole(userData.role || "platform admin");
         }
       } catch (err) {
         console.error("Error fetching user:", err);
