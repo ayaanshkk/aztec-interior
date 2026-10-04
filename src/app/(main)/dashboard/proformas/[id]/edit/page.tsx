@@ -906,11 +906,18 @@ export default function EditProformaPage() {
                             <td className="px-2 py-2">
                               <Input type="number" value={item.quantity} min="1" onChange={e => handleItemChange(item.id, "quantity", e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" />
                             </td>
-                            {(["width", "height", "depth"] as const).map(dim => (
-                              <td key={dim} className="px-2 py-2">
-                                <Input type="number" value={item[dim] || ""} placeholder="—" min="0" onChange={e => handleItemChange(item.id, dim, e.target.value)} className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
-                              </td>
-                            ))}
+                            {(["width", "height", "depth"] as const).map(dim => {
+                              const raw = item[dim];
+                              const displayVal = raw != null && raw !== "" ? (Number(raw) % 1 === 0 ? String(Math.round(Number(raw))) : String(raw)) : "";
+                              return (
+                                <td key={dim} className="px-2 py-2">
+                                  <Input type="number" value={displayVal} placeholder="—" min="0"
+                                    onChange={e => handleItemChange(item.id, dim, e.target.value)}
+                                    style={{ width: `${Math.max(3, (displayVal || "—").length + 1)}ch` }}
+                                    className="border-none text-center focus-visible:ring-0 text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
+                                </td>
+                              );
+                            })}
                             <td className="px-2 py-2">
                               <Input type="number" step="0.01" min="0" value={parseFloat(Number(item.amount || 0).toFixed(2))} placeholder="0.00" onChange={e => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
                             </td>
@@ -996,11 +1003,11 @@ export default function EditProformaPage() {
 
                 {/* Section totals */}
                 <div className="flex justify-end mt-2 mb-8">
-                  <div className="w-80 text-sm rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="flex items-center px-4 py-2.5 border-b border-gray-50 gap-2">
-                      <span className="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">Section Discount</span>
-                      <div className="flex items-center gap-1 ml-auto">
-                        <Input type="number" value={sectionDiscountPct || ""}
+                  <div className="w-96 text-sm rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50">
+                      <span className="text-gray-500 text-sm shrink-0">Section Discount</span>
+                      <div className="flex items-center gap-1 text-sm flex-nowrap">
+                        <Input type="number" value={sectionDiscountPct ? parseFloat(Number(sectionDiscountPct).toFixed(2)) : ""}
                           onChange={e => {
                             const pct = parseFloat(e.target.value) || 0;
                             const prevPct = sectionDiscounts[section] || 0;
@@ -1021,13 +1028,13 @@ export default function EditProformaPage() {
                               return { ...updatedItem, subItems: updatedSubs };
                             }));
                           }}
-                          className="border border-gray-200 rounded px-1 py-0.5 w-12 text-right text-xs h-auto"
+                          className="border border-gray-200 rounded px-1 py-0.5 w-10 text-right text-sm h-auto"
                           min="0" max="100" step="0.1" placeholder="0" />
-                        <span className="text-gray-400">%</span>
-                        <span className="text-gray-300 shrink-0">or £</span>
+                        <span className="text-gray-400 text-sm">%</span>
+                        <span className="text-gray-300 whitespace-nowrap">or £</span>
                         <Input
                           type="number"
-                          value={sectionDiscountAmounts[section] ?? (itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : '')}
+                          value={sectionDiscountAmounts[section] ?? (itemDiscountTotal > 0 ? Number(itemDiscountTotal).toFixed(2) : '')}
                           onChange={e => setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }))}
                           onBlur={e => {
                             const amtVal = parseFloat(e.target.value) || 0;
@@ -1039,15 +1046,13 @@ export default function EditProformaPage() {
                               if ((item.section || 'Furniture') !== section) return item;
                               const itemDisc = item.discount_percent || 0;
                               if (itemDisc > 0 && itemDisc !== prevPct) return item;
-                              return {
-                                ...item, discount_percent: pct,
-                                discounted_total: calcDiscounted(item.quantity || 1, item.amount || 0, pct),
-                              };
+                              return { ...item, discount_percent: pct, discounted_total: calcDiscounted(item.quantity || 1, item.amount || 0, pct) };
                             }));
                           }}
-                          className="border border-gray-200 rounded px-1 py-0.5 w-14 text-right text-xs h-auto"
+                          className="border border-gray-200 rounded px-1 py-0.5 w-12 text-right text-sm h-auto"
                           min="0" step="0.01" placeholder="0.00"
                         />
+                        <span className="text-red-500 ml-1 whitespace-nowrap text-sm">{sectionDiscountPct > 0 ? `-${fmt(sectionDiscountPct / 100 * sectionRaw)}` : "—"}</span>
                       </div>
                     </div>
                     {hasItemDiscount && (
@@ -1058,7 +1063,7 @@ export default function EditProformaPage() {
                     )}
                     {hasItemDiscount && (
                       <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 text-red-500 text-sm">
-                        <span>Item Discounts ({parseFloat(sectionDiscountPct.toFixed(2))}%)</span>
+                        <span>Item Discounts ({parseFloat(Number(sectionDiscountPct).toFixed(2))}%)</span>
                         <span>-{fmt(itemDiscountTotal)}</span>
                       </div>
                     )}

@@ -1000,13 +1000,18 @@ export default function EditInvoicePage() {
                               onChange={e => handleItemChange(item.id, "quantity", e.target.value)}
                               className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" />
                           </td>
-                          {(["width", "height", "depth"] as const).map(dim => (
-                            <td key={dim} className="border-b border-gray-50 px-2 py-2">
-                              <Input type="number" value={item[dim] || ""} placeholder="—" min="0"
-                                onChange={e => handleItemChange(item.id, dim, e.target.value)}
-                                className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
-                            </td>
-                          ))}
+                          {(["width", "height", "depth"] as const).map(dim => {
+                            const raw = item[dim];
+                            const displayVal = raw != null && raw !== "" ? (Number(raw) % 1 === 0 ? String(Math.round(Number(raw))) : String(raw)) : "";
+                            return (
+                              <td key={dim} className="border-b border-gray-50 px-2 py-2">
+                                <Input type="number" value={displayVal} placeholder="—" min="0"
+                                  onChange={e => handleItemChange(item.id, dim, e.target.value)}
+                                  style={{ width: `${Math.max(3, (displayVal || "—").length + 1)}ch` }}
+                                  className="border-none text-center focus-visible:ring-0 text-sm h-auto py-0 px-0 placeholder:text-gray-300" />
+                              </td>
+                            );
+                          })}
                           <td className="border-b border-gray-50 px-2 py-2">
                             <Input type="number" step="0.01" min="0" value={parseFloat(Number(item.amount || 0).toFixed(2))} placeholder="0.00"
                               onChange={e => handleItemChange(item.id, "amount", e.target.value)}
@@ -1125,7 +1130,7 @@ export default function EditInvoicePage() {
 
                 {/* Section totals */}
                 <div className="flex justify-end mt-3 mb-8">
-                  <div className="w-80 text-sm rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="w-96 text-sm rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                     {hasItemDiscount && (
                       <div className="flex justify-between px-5 py-2.5 border-b border-gray-100 text-gray-600">
                         <span>{section} Subtotal</span>
@@ -1134,14 +1139,14 @@ export default function EditInvoicePage() {
                     )}
                     {hasItemDiscount && (
                       <div className="flex justify-between px-5 py-2.5 border-b border-gray-100 text-red-500">
-                        <span>Item Discounts ({parseFloat(sectionDiscountPct.toFixed(2))}%)</span>
+                        <span>Item Discounts ({parseFloat(Number(sectionDiscountPct).toFixed(2))}%)</span>
                         <span>-{fmt(itemDiscountTotal)}</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
-                      <div className="flex items-center gap-2 text-gray-500 flex-nowrap whitespace-nowrap">
-                        <span className="shrink-0">Section Discount</span>
-                        <Input type="number" value={sectionDiscountPct || ""}
+                      <span className="text-gray-500 shrink-0">Section Discount</span>
+                      <div className="flex items-center gap-1 text-sm flex-nowrap">
+                        <Input type="number" value={sectionDiscountPct ? parseFloat(Number(sectionDiscountPct).toFixed(2)) : ""}
                           onChange={(e) => {
                             const pct = parseFloat(e.target.value) || 0;
                             const prevPct = sectionDiscounts[section] || 0;
@@ -1158,24 +1163,20 @@ export default function EditInvoicePage() {
                               const updatedSubs = (item.subItems || []).map(sub => {
                                 const subDisc = sub.discount_percent || 0;
                                 if (subDisc > 0 && subDisc !== prevPct) return sub;
-                                return {
-                                  ...sub,
-                                  discount_percent: pct,
-                                  discounted_total: calcDiscounted(sub.quantity || 1, sub.amount || 0, pct),
-                                };
+                                return { ...sub, discount_percent: pct, discounted_total: calcDiscounted(sub.quantity || 1, sub.amount || 0, pct) };
                               });
                               return { ...updatedItem, subItems: updatedSubs };
                             }));
                           }}
-                          className="border border-gray-200 rounded px-1 py-0.5 w-12 text-right text-xs h-auto"
+                          className="border border-gray-200 rounded px-1 py-0.5 w-10 text-right text-sm h-auto"
                           min="0" max="100" step="0.1" placeholder="0" />
-                        <span className="text-gray-400">%</span>
-                        <span className="text-gray-300 shrink-0">or £</span>
+                        <span className="text-gray-400 text-sm">%</span>
+                        <span className="text-gray-300 whitespace-nowrap">or £</span>
                         <Input type="number"
                           value={
                             sectionDiscountAmounts[section] !== undefined && sectionDiscountAmounts[section] !== ''
                               ? sectionDiscountAmounts[section]
-                              : itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : ''
+                              : itemDiscountTotal > 0 ? Number(itemDiscountTotal).toFixed(2) : ''
                           }
                           onChange={e => setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }))}
                           onBlur={e => {
@@ -1188,17 +1189,13 @@ export default function EditInvoicePage() {
                               if ((item.section || 'Furniture') !== section) return item;
                               const itemDisc = item.discount_percent || 0;
                               if (itemDisc > 0 && itemDisc !== prevPct) return item;
-                              return {
-                                ...item,
-                                discount_percent: pct,
-                                discounted_total: calcDiscounted(item.quantity || 1, item.amount || 0, pct),
-                              };
+                              return { ...item, discount_percent: pct, discounted_total: calcDiscounted(item.quantity || 1, item.amount || 0, pct) };
                             }));
                           }}
-                          className="border border-gray-200 rounded px-1 py-0.5 w-16 text-right text-xs h-auto"
+                          className="border border-gray-200 rounded px-1 py-0.5 w-12 text-right text-sm h-auto"
                           min="0" step="0.01" placeholder="0.00" />
+                        <span className="text-red-500 ml-1 whitespace-nowrap text-sm">{sectionDiscountPct > 0 ? `-${fmt(sectionDiscountAmt)}` : "—"}</span>
                       </div>
-                      <span className="text-red-500">{sectionDiscountPct > 0 ? `-${fmt(sectionDiscountAmt)}` : "—"}</span>
                     </div>
                     <div className="flex justify-between px-5 py-3.5 font-semibold bg-gray-900 text-white">
                       <span>{section} Total</span>
