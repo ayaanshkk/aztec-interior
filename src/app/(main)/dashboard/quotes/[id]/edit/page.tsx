@@ -1408,7 +1408,7 @@ export default function EditQuotePage() {
                           </td>
                           {(["width", "height", "depth"] as const).map(dim => {
                             const raw = item[dim];
-                            const displayVal = raw != null && raw !== 0 && raw !== "" ? (Number(raw) % 1 === 0 ? String(Math.round(Number(raw))) : String(raw)) : "";
+                            const displayVal = raw != null const displayVal = raw != null && raw !== 0 && raw !== "" ?const displayVal = raw != null && raw !== 0 && raw !== "" ? raw !== 0 ? (Number(raw) % 1 === 0 ? String(Math.round(Number(raw))) : String(raw)) : "";
                             return (
                               <td key={dim} className="border-b border-gray-50 px-2 py-2">
                                 <Input type="number" value={displayVal} onChange={(e) => handleItemChange(index, dim, e.target.value)} placeholder="—"
