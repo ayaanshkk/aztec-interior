@@ -926,7 +926,7 @@ export default function CreateProformaPage() {
                             </td>
                             {(["width","height","depth"] as const).map(dim => {
                               const raw = item[dim];
-                              const displayVal = raw != null && raw !== "" ? (Number(raw) % 1 === 0 ? String(Math.round(Number(raw))) : String(raw)) : "";
+                              const displayVal = raw != null ? (Number(raw) % 1 === 0 ? String(Math.round(Number(raw))) : String(raw)) : "";
                               return (
                                 <td key={dim} className="px-2 py-2">
                                   <Input type="number" value={displayVal} onChange={e => handleItemChange(item.id, dim, e.target.value)} placeholder="—"
