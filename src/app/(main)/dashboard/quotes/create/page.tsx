@@ -1249,9 +1249,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                                     className="border-none text-center focus-visible:ring-0 text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                                 </td>
                               );
-                            })
-                            }
-                            </td>
+                            })}
                             <td className="border-b border-gray-50 px-2 py-2">
                               <Input type="number" step="0.01" value={item.amount ?? 0} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="0" placeholder="0.00" />
                             </td>
