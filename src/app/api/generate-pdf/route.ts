@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import puppeteer from "puppeteer";
@@ -61,8 +61,8 @@ export async function POST(request: NextRequest) {
           <td>${item.description || ""}</td>
           <td>${item.colour || ""}</td>
           <td class="text-right">${item.quantity}</td>
-          <td class="text-right">£${item.unitPrice.toFixed(2)}</td>
-          <td class="text-right">£${item.amount.toFixed(2)}</td>
+          <td class="text-right">£${Number(item.unitPrice).toFixed(2)}</td>
+          <td class="text-right">£${Number(item.amount).toFixed(2)}</td>
         </tr>
       `;
     }); // Replace items placeholder

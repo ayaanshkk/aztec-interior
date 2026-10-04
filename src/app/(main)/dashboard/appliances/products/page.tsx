@@ -157,8 +157,8 @@ export default function ProductsPage() {
                     <TableCell>{product.brand}</TableCell>
                     <TableCell>{product.category}</TableCell>
                     <TableCell className="text-gray-500">{product.model_number || "—"}</TableCell>
-                    <TableCell>{product.cost_price ? `£${product.cost_price.toFixed(2)}` : "—"}</TableCell>
-                    <TableCell>{product.retail_price ? `£${product.retail_price.toFixed(2)}` : "—"}</TableCell>
+                    <TableCell>{product.cost_price ? `£${Number(product.cost_price).toFixed(2)}` : "—"}</TableCell>
+                    <TableCell>{product.retail_price ? `£${Number(product.retail_price).toFixed(2)}` : "—"}</TableCell>
                     <TableCell>{product.stock_quantity || 0}</TableCell>
                     <TableCell>
                       <Badge variant={product.is_active ? "default" : "secondary"}>

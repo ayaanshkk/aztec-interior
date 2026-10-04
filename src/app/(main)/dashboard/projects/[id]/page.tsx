@@ -816,7 +816,7 @@ export default function ProjectDetailsPage() {
           `✅ Quote generated successfully!\n\n` +
           `Reference: ${data.reference_number}\n` +
           `Items: ${data.items_count}\n` +
-          `Total: £${data.total.toFixed(2)}`
+          `Total: £${Number(data.total).toFixed(2)}`
         );
       } else {
         const error = await response.json();
@@ -1537,7 +1537,7 @@ export default function ProjectDetailsPage() {
                             {doc.total !== undefined && (
                               <p className="text-sm text-gray-700">
                                 <span className="font-medium">Total:</span>{' '}
-                                <span className="font-semibold text-gray-900">£{doc.total.toFixed(2)}</span>
+                                <span className="font-semibold text-gray-900">£{Number(doc.total).toFixed(2)}</span>
                               </p>
                             )}
 

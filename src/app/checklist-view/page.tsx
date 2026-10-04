@@ -623,7 +623,7 @@ function ChecklistViewContent() {
         `Items extracted: ${data.items_count}\n` +
         `Auto-priced: ${data.matched_items}\n` +
         `Manual pricing needed: ${data.manual_items}\n` +
-        `Total: £${data.total.toFixed(2)}\n` +
+        `Total: £${Number(data.total).toFixed(2)}\n` +
         `Type: ${data.checklist_type}`
       );
       

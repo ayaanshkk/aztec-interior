@@ -1238,7 +1238,7 @@ export default function CreateInvoicePage() {
                             <Input type="number" value={item.depth != null ? item.depth : ''} onChange={(e) => handleItemChange(item.id, "depth", e.target.value)} placeholder="D" className="border-none text-center focus-visible:ring-0 w-full text-sm h-auto py-0 px-0 placeholder:text-gray-300" min="0" />
                           </td>
                           <td className="border-b border-gray-50 px-2 py-2">
-                            <Input type="number" step="0.01" value={parseFloat((item.amount || 0).toFixed(2))} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="0" placeholder="0.00" />
+                            <Input type="number" step="0.01" value={parseFloat(Number(item.amount || 0).toFixed(2))} onChange={(e) => handleItemChange(item.id, "amount", e.target.value)} className="border-none text-right focus-visible:ring-0 w-full text-sm h-auto py-0 px-0" min="0" placeholder="0.00" />
                           </td>
                           <td className="border-b border-gray-50 px-2 py-2 text-right text-sm text-gray-600">
                             {formatCurrency(item.line_total)}

@@ -1923,7 +1923,7 @@ export default function CustomerDetailsPage() {
           `✅ Quote ${data.message?.includes('already exists') ? 'opened' : 'generated'} successfully!\n\n` +
           `Reference: ${data.reference_number}\n` +
           `Items: ${data.items_count}\n` +
-          `Total: £${data.total.toFixed(2)}`
+          `Total: £${Number(data.total).toFixed(2)}`
         );
       } else {
         const error = await response.json();
@@ -2725,14 +2725,14 @@ export default function CustomerDetailsPage() {
               <div className="mt-2 space-y-1">
                 {doc.total !== undefined && doc.total !== null && (
                   <p className="text-sm font-medium text-gray-900">
-                    Total: <span className="text-blue-600">£{doc.total.toFixed(2)}</span>
+                    Total: <span className="text-blue-600">£{Number(doc.total).toFixed(2)}</span>
                   </p>
                 )}
                 {doc.amount_paid !== undefined && doc.amount_paid !== null && doc.amount_paid > 0 && (
-                  <p className="text-sm text-green-600">Paid: £{doc.amount_paid.toFixed(2)}</p>
+                  <p className="text-sm text-green-600">Paid: £{Number(doc.amount_paid).toFixed(2)}</p>
                 )}
                 {doc.balance !== undefined && doc.balance !== null && doc.balance > 0 && (
-                  <p className="text-sm font-medium text-red-600">Balance: £{doc.balance.toFixed(2)}</p>
+                  <p className="text-sm font-medium text-red-600">Balance: £{Number(doc.balance).toFixed(2)}</p>
                 )}
               </div>
             </div>
@@ -3730,21 +3730,21 @@ export default function CustomerDetailsPage() {
                             {doc.total !== undefined && (
                               <p className="text-sm text-gray-700">
                                 <span className="font-medium">Total:</span>{' '}
-                                <span className="font-semibold text-gray-900">£{doc.total.toFixed(2)}</span>
+                                <span className="font-semibold text-gray-900">£{Number(doc.total).toFixed(2)}</span>
                               </p>
                             )}
 
                             {doc.amount_paid !== undefined && doc.amount_paid > 0 && (
                               <p className="text-sm text-green-700">
                                 <span className="font-medium">Paid:</span>{' '}
-                                <span className="font-semibold">£{doc.amount_paid.toFixed(2)}</span>
+                                <span className="font-semibold">£{Number(doc.amount_paid).toFixed(2)}</span>
                               </p>
                             )}
 
                             {doc.balance !== undefined && doc.balance > 0 && (
                               <p className="text-sm text-red-700">
                                 <span className="font-medium">Balance:</span>{' '}
-                                <span className="font-semibold">£{doc.balance.toFixed(2)}</span>
+                                <span className="font-semibold">£{Number(doc.balance).toFixed(2)}</span>
                               </p>
                             )}
 
