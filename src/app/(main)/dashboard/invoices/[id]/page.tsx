@@ -171,12 +171,6 @@ export default function ViewInvoicePage() {
                 : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
           </div>
-          {invoice.due_date && (
-            <div className="text-right text-sm">
-              <p className="text-xs text-gray-400 uppercase tracking-wider mb-0.5">Due</p>
-              <p className="text-gray-700">{new Date(invoice.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            </div>
-          )}
         </div>
 
         {/* Billed To + Specification */}

@@ -48,6 +48,7 @@ export default function EditQuotePage() {
   const initialLoadComplete = useRef(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [autoFilling, setAutoFilling] = useState<number | null>(null);
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState<number>(0);
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
@@ -824,7 +825,7 @@ export default function EditQuotePage() {
   const handleSave = () => handleSaveWithStatus(false);
 
   const handleSaveWithStatus = async (isDraft: boolean) => {
-    if (saving) return;
+    if (savingRef.current) return;
 
     if (!isDraft) {
       if (!customerData.name?.trim()) {
@@ -845,6 +846,7 @@ export default function EditQuotePage() {
       }
     }
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
@@ -939,6 +941,7 @@ export default function EditQuotePage() {
       console.error("Error saving quotation:", error);
       alert("❌ Error saving quotation");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };

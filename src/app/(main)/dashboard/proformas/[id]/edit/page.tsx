@@ -43,6 +43,7 @@ export default function EditProformaPage() {
 
   const [loading,     setLoading]     = useState(true);
   const [saving,      setSaving]      = useState(false);
+  const savingRef = useRef(false);
   const [saveMsg,     setSaveMsg]     = useState("");
   const [autoFilling, setAutoFilling] = useState<string | number | null>(null);
   const [nextId,      setNextId]      = useState(9000);
@@ -53,7 +54,6 @@ export default function EditProformaPage() {
     customer_phone:   "",
     customer_email:   "",
     invoice_date:     "",
-    due_date:         "",
     notes:            "",
     room_name:        "",
     carcass_colour:   "",
@@ -145,7 +145,6 @@ export default function EditProformaPage() {
         customer_phone:   data.customer_phone   || "",
         customer_email:   data.customer_email   || "",
         invoice_date:     (data.invoice_date || "").split("T")[0],
-        due_date:         (data.due_date     || "").split("T")[0],
         notes:            data.notes  || "",
         room_name:        data.room_name        || "",
         carcass_colour:   data.carcass_colour   || "",
@@ -623,12 +622,13 @@ export default function EditProformaPage() {
   const handleSaveDraft = () => handleSaveWithStatus(true);
   const handleSave = () => handleSaveWithStatus(false);
   const handleSaveWithStatus = async (isDraft: boolean) => {
-    if (saving) return;
+    if (savingRef.current) return;
     if (!isDraft) {
       if (!formData.customer_name?.trim())    { alert("Customer name is required");    return; }
       if (!formData.customer_address?.trim()) { alert("Customer address is required"); return; }
     }
 
+    savingRef.current = true;
     setSaving(true);
     setSaveMsg("");
     try {
@@ -690,6 +690,7 @@ export default function EditProformaPage() {
       console.error(e);
       setSaveMsg("❌ Network error saving proforma");
     } finally {
+      savingRef.current = false;
       setSaving(false);
       if (saveMsg.startsWith("❌")) setTimeout(() => setSaveMsg(""), 5000);
     }
@@ -805,7 +806,6 @@ export default function EditProformaPage() {
               {([
                 { label: "Proforma No",      field: "invoice_number",   type: "text" },
                 { label: "Proforma Date",    field: "invoice_date",     type: "date" },
-                { label: "Valid Until",      field: "due_date",         type: "date" },
                 { label: "Order Ref",         field: "room_name",        type: "text" },
                 { label: "Carcass Colour",   field: "carcass_colour",   type: "text" },
                 { label: "Door Colour",      field: "door_colour",      type: "text" },

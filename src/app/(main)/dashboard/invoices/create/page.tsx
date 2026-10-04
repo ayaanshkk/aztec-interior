@@ -41,7 +41,6 @@ export default function CreateInvoicePage() {
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     invoice_date: new Date().toISOString().split("T")[0],
-    due_date:     new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
     name: "",
     address: "",
     phone: "",
@@ -68,6 +67,7 @@ export default function CreateInvoicePage() {
   useEffect(() => { itemsRef.current = items; }, [items]);
 
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [autoFilling, setAutoFilling] = useState<string | null>(null);
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState<number>(0);
   const [deposit, setDeposit] = useState<number>(0);
@@ -791,7 +791,7 @@ export default function CreateInvoicePage() {
   const handleSave = () => handleSaveWithStatus(false);
 
   const handleSaveWithStatus = async (isDraft: boolean) => {
-    if (saving) return;
+    if (savingRef.current) return;
 
     if (!isDraft) {
         if (!formData.address?.trim()) { alert("Customer address is required"); return; }
@@ -821,6 +821,7 @@ export default function CreateInvoicePage() {
 
     if (!isDraft && subtotal <= 0) { alert("Please add at least one item with a valid price"); return; }
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
@@ -837,7 +838,6 @@ export default function CreateInvoicePage() {
           customer_phone: formData.phone,
           customer_email: formData.email,
           invoice_date: formData.invoice_date,
-          due_date: formData.due_date,
           invoice_number: invoiceNumber || undefined,
           quote_reference: quoteReference,
           door_type: doorType,
@@ -923,6 +923,7 @@ export default function CreateInvoicePage() {
       console.error("Error saving invoice:", error);
       alert("❌ Error saving invoice");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -1123,7 +1124,6 @@ export default function CreateInvoicePage() {
                 </div>
               </div>
               {([
-                { label: 'Due Date',         content: <Input type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Order Ref',        content: <Input value={roomName} onChange={(e) => setRoomName(e.target.value)} placeholder="e.g. Kitchen" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Carcass Colour',   content: <Input value={carcassColour} onChange={(e) => setCarcassColour(e.target.value)} placeholder="" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Door Colour',      content: <Input value={doorColour} onChange={(e) => setDoorColour(e.target.value)} placeholder="" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },

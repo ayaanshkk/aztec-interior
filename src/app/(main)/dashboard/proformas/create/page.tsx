@@ -41,7 +41,6 @@ export default function CreateProformaPage() {
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     invoice_date: new Date().toISOString().split("T")[0],
-    due_date:     new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
     name: "",
     address: "",
     phone: "",
@@ -58,6 +57,7 @@ export default function CreateProformaPage() {
   useEffect(() => { itemsRef.current = items; }, [items]);
 
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [autoFilling, setAutoFilling] = useState<string | null>(null);
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState<number>(0);
   const [doorType, setDoorType] = useState<string>('Carcass Only');
@@ -589,7 +589,7 @@ export default function CreateProformaPage() {
   const handleSave = () => handleSaveWithStatus(false);
 
   const handleSaveWithStatus = async (isDraft: boolean) => {
-    if (saving) return;
+    if (savingRef.current) return;
     if (!isDraft) {
       if (!formData.name?.trim())    { alert("Customer name is required");    return; }
       if (!formData.address?.trim()) { alert("Customer address is required"); return; }
@@ -597,6 +597,7 @@ export default function CreateProformaPage() {
       if (subtotal <= 0)             { alert("Please add at least one item with a valid price"); return; }
     }
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
@@ -610,7 +611,6 @@ export default function CreateProformaPage() {
           customer_phone:   formData.phone,
           customer_email:   formData.email,
           invoice_date:     formData.invoice_date,
-          due_date:         formData.due_date,
           invoice_number:   proformaNumber || undefined,
           door_type:        doorType,
           room_type:        roomType,
@@ -679,6 +679,7 @@ export default function CreateProformaPage() {
       console.error("Error saving proforma:", error);
       alert("❌ Error saving proforma");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -828,7 +829,6 @@ export default function CreateProformaPage() {
               {([
                 { label: 'Proforma No',    render: <Input value={proformaNumber} onChange={e => setProformaNumber(e.target.value)} placeholder="e.g. AL-PRO-000001" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full placeholder:text-gray-300" /> },
                 { label: 'Proforma Date',  render: <Input type="date" value={formData.invoice_date} onChange={e => setFormData(prev => ({ ...prev, invoice_date: e.target.value }))} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
-                { label: 'Valid Until',    render: <Input type="date" value={formData.due_date} onChange={e => setFormData(prev => ({ ...prev, due_date: e.target.value }))} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Order Ref',      render: <Input value={roomName} onChange={e => setRoomName(e.target.value)} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Carcass Colour', render: <Input value={carcassColour} onChange={e => setCarcassColour(e.target.value)} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Door Colour',    render: <Input value={doorColour} onChange={e => setDoorColour(e.target.value)} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },

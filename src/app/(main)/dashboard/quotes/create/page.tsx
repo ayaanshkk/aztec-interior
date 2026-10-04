@@ -65,6 +65,7 @@ export default function CreateQuotePage() {
   useEffect(() => { itemsRef.current = items; }, [items]);
 
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [autoFilling, setAutoFilling] = useState<string | null>(null);
   const [globalDiscountPercent, setGlobalDiscountPercent] = useState<number>(0);
 
@@ -656,7 +657,7 @@ export default function CreateQuotePage() {
   const handleSave = () => handleSaveWithStatus(false);
 
   const handleSaveWithStatus = async (isDraft: boolean) => {
-    if (saving) return;
+    if (savingRef.current) return;
 
     if (!isDraft) {
       if (!formData.name?.trim()) { alert("Customer name is required"); return; }
@@ -684,6 +685,7 @@ export default function CreateQuotePage() {
 
     if (!isDraft && subtotal <= 0) { alert("Please add at least one item with a valid price"); return; }
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const token = localStorage.getItem("token");
@@ -787,6 +789,7 @@ export default function CreateQuotePage() {
       console.error("Error saving quotation:", error);
       alert("❌ Error saving quotation");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };

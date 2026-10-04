@@ -89,7 +89,6 @@ export default function ViewProformaPage() {
   const total    = subtotal + vat;
 
   const invDate = invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString('en-GB') : '—';
-  const dueDate = invoice.due_date     ? new Date(invoice.due_date).toLocaleDateString('en-GB')     : '—';
 
   return (
     <div className="min-h-screen bg-white" data-force-light>
@@ -151,7 +150,6 @@ export default function ViewProformaPage() {
               {[
                 { label: "Proforma No",   value: invoice.invoice_number || '—' },
                 { label: "Date",          value: invDate },
-                { label: "Valid Until",   value: dueDate },
                 ...(invoice.room_name        ? [{ label: "Order Ref",       value: invoice.room_name }]        : []),
                 ...(invoice.carcass_colour   ? [{ label: "Carcass Colour",  value: invoice.carcass_colour }]   : []),
                 ...(invoice.door_colour      ? [{ label: "Door Colour",     value: invoice.door_colour }]      : []),
