@@ -661,7 +661,7 @@ export default function CreateQuotePage() {
     if (!isDraft) {
       if (!formData.name?.trim()) { alert("Customer name is required"); return; }
       if (!formData.address?.trim()) { alert("Customer address is required"); return; }
-      if (!roomName.trim()) { alert("Room name is required"); return; }
+      if (!roomName.trim()) { alert("Order reference is required"); return; }
     }
 
   const subtotalBeforeDiscount = SECTIONS.reduce((total, section) => {
@@ -989,6 +989,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
             <p>M: 07821 328849</p>
               <p>E: accounts@atelierluxe.co.uk</p>
             <p className="text-gray-400 mt-1">Registered in England No. 17200862</p>
+            {vatPercentage > 0 && <p className="text-gray-400">VAT Reg No: 528 7517 62</p>}
           </div>
         </div>
         <div className="flex items-start justify-between mb-10">
@@ -1112,7 +1113,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
             <div className="space-y-0">
               <div className="flex items-center border-b border-gray-100 py-0.5">
                 <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">Quote No</span>
-                <div className="flex-1"><Input value={referenceNumber} onChange={e => setReferenceNumber(e.target.value)} placeholder="Auto-generated" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full placeholder:text-gray-300" /></div>
+                <div className="flex-1"><Input value={referenceNumber} onChange={e => setReferenceNumber(e.target.value)} placeholder="e.g. AL-QT-000001" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full placeholder:text-gray-300" /></div>
               </div>
               <div className="flex items-center border-b border-gray-100 py-0.5">
                 <span className="text-xs text-gray-400 uppercase tracking-wider w-32 flex-shrink-0">Quote Ref (£)</span>
@@ -1126,7 +1127,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                 <div className="flex-1"><Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /></div>
               </div>
               {([
-                { label: 'Room',           val: roomName,        set: setRoomName },
+                { label: 'Order Ref',      val: roomName,        set: setRoomName },
                 { label: 'Carcass Colour', val: carcassColour,   set: setCarcassColour },
                 { label: 'Door Colour',    val: doorColour,      set: setDoorColour },
                 { label: 'Panelwork',      val: panelworkColour, set: setPanelworkColour },
@@ -1396,7 +1397,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                                 min="0" max="100" step="0.1" placeholder="0"
                               />
                               <span className="text-gray-400">%</span>
-                              <span className="text-gray-300">or £</span>
+                              <span className="text-gray-300 shrink-0">or £</span>
                               <Input
                                 type="number"
                                 value={sectionDiscountAmounts[section] ?? (itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : '')}

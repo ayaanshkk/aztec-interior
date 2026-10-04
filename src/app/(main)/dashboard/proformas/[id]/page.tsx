@@ -124,6 +124,7 @@ export default function ViewProformaPage() {
             <p>M: 07821 328849</p>
               <p>E: accounts@atelierluxe.co.uk</p>
             <p className="text-gray-400 mt-1">Registered in England No. 17200862</p>
+            {vatPercentage > 0 && <p className="text-gray-400">VAT Reg No: 528 7517 62</p>}
           </div>
         </div>
 
@@ -151,7 +152,7 @@ export default function ViewProformaPage() {
                 { label: "Proforma No",   value: invoice.invoice_number || '—' },
                 { label: "Date",          value: invDate },
                 { label: "Valid Until",   value: dueDate },
-                ...(invoice.room_name        ? [{ label: "Room",            value: invoice.room_name }]        : []),
+                ...(invoice.room_name        ? [{ label: "Order Ref",       value: invoice.room_name }]        : []),
                 ...(invoice.carcass_colour   ? [{ label: "Carcass Colour",  value: invoice.carcass_colour }]   : []),
                 ...(invoice.door_colour      ? [{ label: "Door Colour",     value: invoice.door_colour }]      : []),
                 ...(invoice.panelwork_colour ? [{ label: "Panelwork",       value: invoice.panelwork_colour }] : []),

@@ -392,7 +392,7 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
             value={roomFilter}
             onChange={e => { setRoomFilter(e.target.value); setPage(1); }}
           >
-            <option value="">All Rooms</option>
+            <option value="">All Order Refs</option>
             {rooms.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         )}
@@ -430,7 +430,7 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">{config.docNumberLabel}</th>
                 {config.referenceLabel && <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">{config.referenceLabel}</th>}
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Customer</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Room</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Order Ref</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">{config.amountLabel}</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Created</th>

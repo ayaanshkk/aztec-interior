@@ -736,6 +736,7 @@ export default function EditProformaPage() {
             <p>M: 07821 328849</p>
               <p>E: accounts@atelierluxe.co.uk</p>
             <p className="text-gray-400 mt-1">Registered in England No. 17200862</p>
+            {vatPercentage > 0 && <p className="text-gray-400">VAT Reg No: 528 7517 62</p>}
           </div>
         </div>
         <div className="flex items-start justify-between mb-10">
@@ -805,7 +806,7 @@ export default function EditProformaPage() {
                 { label: "Proforma No",      field: "invoice_number",   type: "text" },
                 { label: "Proforma Date",    field: "invoice_date",     type: "date" },
                 { label: "Valid Until",      field: "due_date",         type: "date" },
-                { label: "Room Name",        field: "room_name",        type: "text" },
+                { label: "Order Ref",         field: "room_name",        type: "text" },
                 { label: "Carcass Colour",   field: "carcass_colour",   type: "text" },
                 { label: "Door Colour",      field: "door_colour",      type: "text" },
                 { label: "Panelwork Colour", field: "panelwork_colour", type: "text" },
@@ -1023,7 +1024,7 @@ export default function EditProformaPage() {
                           className="border border-gray-200 rounded px-1 py-0.5 w-12 text-right text-xs h-auto"
                           min="0" max="100" step="0.1" placeholder="0" />
                         <span className="text-gray-400">%</span>
-                        <span className="text-gray-300">or £</span>
+                        <span className="text-gray-300 shrink-0">or £</span>
                         <Input
                           type="number"
                           value={sectionDiscountAmounts[section] ?? (itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : '')}

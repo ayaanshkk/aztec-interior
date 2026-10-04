@@ -836,7 +836,7 @@ export default function EditQuotePage() {
         return;
       }
       if (!roomName.trim()) {
-        alert("Room name is required");
+        alert("Order reference is required");
         return;
       }
       if (subtotal <= 0) {
@@ -1146,6 +1146,7 @@ export default function EditQuotePage() {
             <p>M: 07821 328849</p>
               <p>E: accounts@atelierluxe.co.uk</p>
             <p className="text-gray-400 mt-1">Registered in England No. 17200862</p>
+            {vatPercentage > 0 && <p className="text-gray-400">VAT Reg No: 528 7517 62</p>}
           </div>
         </div>
         <div className="flex items-start justify-between mb-10">
@@ -1291,7 +1292,7 @@ export default function EditQuotePage() {
                 </div>
               </div>
               {([
-                { label: 'Room',           val: roomName,        set: setRoomName },
+                { label: 'Order Ref',      val: roomName,        set: setRoomName },
                 { label: 'Carcass Colour', val: carcassColour,   set: setCarcassColour },
                 { label: 'Door Colour',    val: doorColour,      set: setDoorColour },
                 { label: 'Panelwork',      val: panelworkColour, set: setPanelworkColour },
@@ -1556,7 +1557,7 @@ export default function EditQuotePage() {
                               min="0" max="100" step="0.1" placeholder="0"
                             />
                             <span className="text-gray-400">%</span>
-                            <span className="text-gray-300">or £</span>
+                            <span className="text-gray-300 shrink-0">or £</span>
                             <Input
                               type="number"
                               value={

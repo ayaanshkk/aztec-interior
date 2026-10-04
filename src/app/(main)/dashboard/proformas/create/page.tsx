@@ -593,7 +593,7 @@ export default function CreateProformaPage() {
     if (!isDraft) {
       if (!formData.name?.trim())    { alert("Customer name is required");    return; }
       if (!formData.address?.trim()) { alert("Customer address is required"); return; }
-      if (!roomName.trim())          { alert("Room name is required");        return; }
+      if (!roomName.trim())          { alert("Order reference is required");  return; }
       if (subtotal <= 0)             { alert("Please add at least one item with a valid price"); return; }
     }
 
@@ -715,6 +715,7 @@ export default function CreateProformaPage() {
             <p>M: 07821 328849</p>
               <p>E: accounts@atelierluxe.co.uk</p>
             <p className="text-gray-400 mt-1">Registered in England No. 17200862</p>
+            {vatPercentage > 0 && <p className="text-gray-400">VAT Reg No: 528 7517 62</p>}
           </div>
         </div>
         <div className="flex items-start justify-between mb-10">
@@ -825,10 +826,10 @@ export default function CreateProformaPage() {
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Proforma Details</p>
             <div className="space-y-0">
               {([
-                { label: 'Proforma No',    render: <Input value={proformaNumber} onChange={e => setProformaNumber(e.target.value)} placeholder="Auto-generated" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full placeholder:text-gray-300" /> },
+                { label: 'Proforma No',    render: <Input value={proformaNumber} onChange={e => setProformaNumber(e.target.value)} placeholder="e.g. AL-PRO-000001" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full placeholder:text-gray-300" /> },
                 { label: 'Proforma Date',  render: <Input type="date" value={formData.invoice_date} onChange={e => setFormData(prev => ({ ...prev, invoice_date: e.target.value }))} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Valid Until',    render: <Input type="date" value={formData.due_date} onChange={e => setFormData(prev => ({ ...prev, due_date: e.target.value }))} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
-                { label: 'Room',           render: <Input value={roomName} onChange={e => setRoomName(e.target.value)} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+                { label: 'Order Ref',      render: <Input value={roomName} onChange={e => setRoomName(e.target.value)} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Carcass Colour', render: <Input value={carcassColour} onChange={e => setCarcassColour(e.target.value)} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Door Colour',    render: <Input value={doorColour} onChange={e => setDoorColour(e.target.value)} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Panelwork',      render: <Input value={panelworkColour} onChange={e => setPanelworkColour(e.target.value)} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
@@ -1066,7 +1067,7 @@ export default function CreateProformaPage() {
                               min="0" max="100" step="0.1" placeholder="0"
                             />
                             <span className="text-gray-400">%</span>
-                            <span className="text-gray-300">or £</span>
+                            <span className="text-gray-300 shrink-0">or £</span>
                             <Input
                               type="number"
                               value={sectionDiscountAmounts[section] ?? (itemDiscountTotal > 0 ? itemDiscountTotal.toFixed(2) : '')}

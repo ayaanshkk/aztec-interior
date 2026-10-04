@@ -795,7 +795,7 @@ export default function CreateInvoicePage() {
 
     if (!isDraft) {
         if (!formData.address?.trim()) { alert("Customer address is required"); return; }
-      if (!roomName.trim()) { alert("Room name is required"); return; }
+      if (!roomName.trim()) { alert("Order reference is required"); return; }
     }
 
     const subtotalBeforeDiscount = Math.round(SECTIONS.reduce((total, section) => {
@@ -982,6 +982,7 @@ export default function CreateInvoicePage() {
             <p>M: 07821 328849</p>
               <p>E: accounts@atelierluxe.co.uk</p>
             <p className="text-gray-400 mt-1">Registered in England No. 17200862</p>
+            {vatPercentage > 0 && <p className="text-gray-400">VAT Reg No: 528 7517 62</p>}
           </div>
         </div>
 
@@ -1104,7 +1105,7 @@ export default function CreateInvoicePage() {
             <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">Invoice Details</p>
             <div className="space-y-0">
               {([
-                { label: 'Invoice No',       content: <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Auto-generated" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+                { label: 'Invoice No',       content: <Input value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="e.g. AL-INV-000001" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Invoice Date',     content: <Input type="date" value={formData.invoice_date} onChange={(e) => setFormData(prev => ({ ...prev, invoice_date: e.target.value }))} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
               ] as const).map(({ label, content }) => (
                 <div key={label} className="flex items-center border-b border-gray-100 py-0.5">
@@ -1123,7 +1124,7 @@ export default function CreateInvoicePage() {
               </div>
               {([
                 { label: 'Due Date',         content: <Input type="date" value={formData.due_date} onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))} className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
-                { label: 'Room',             content: <Input value={roomName} onChange={(e) => setRoomName(e.target.value)} placeholder="e.g. Kitchen" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
+                { label: 'Order Ref',        content: <Input value={roomName} onChange={(e) => setRoomName(e.target.value)} placeholder="e.g. Kitchen" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Carcass Colour',   content: <Input value={carcassColour} onChange={(e) => setCarcassColour(e.target.value)} placeholder="" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Door Colour',      content: <Input value={doorColour} onChange={(e) => setDoorColour(e.target.value)} placeholder="" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
                 { label: 'Panelwork',        content: <Input value={panelworkColour} onChange={(e) => setPanelworkColour(e.target.value)} placeholder="" className="border-none focus-visible:ring-0 px-0 text-sm text-gray-700 h-auto py-1.5 w-full" /> },
@@ -1365,8 +1366,8 @@ export default function CreateInvoicePage() {
                           </div>
                         )}
                         <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
-                          <div className="flex items-center gap-2 text-gray-500">
-                            <span>Section Discount</span>
+                          <div className="flex items-center gap-2 text-gray-500 flex-nowrap whitespace-nowrap">
+                            <span className="shrink-0">Section Discount</span>
                             <Input
                               type="number"
                               value={sectionDiscountPct || ''}
@@ -1399,7 +1400,7 @@ export default function CreateInvoicePage() {
                               min="0" max="100" step="0.1" placeholder="0"
                             />
                             <span className="text-gray-400">%</span>
-                            <span className="text-gray-300">or £</span>
+                            <span className="text-gray-300 shrink-0">or £</span>
                             <Input
                               type="number"
                               value={

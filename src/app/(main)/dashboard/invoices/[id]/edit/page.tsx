@@ -779,6 +779,7 @@ export default function EditInvoicePage() {
             <p>M: 07821 328849</p>
               <p>E: accounts@atelierluxe.co.uk</p>
             <p className="text-gray-400 mt-1">Registered in England No. 17200862</p>
+            {vatPercentage > 0 && <p className="text-gray-400">VAT Reg No: 528 7517 62</p>}
           </div>
         </div>
         <div className="flex items-start justify-between mb-10">
@@ -893,7 +894,7 @@ export default function EditInvoicePage() {
                 { label: 'Invoice No',     field: 'invoice_number',   type: 'text' },
                 { label: 'Invoice Date',   field: 'invoice_date',     type: 'date' },
                 { label: 'Due Date',       field: 'due_date',         type: 'date' },
-                { label: 'Room',           field: 'room_name',        type: 'text' },
+                { label: 'Order Ref',      field: 'room_name',        type: 'text' },
                 { label: 'Carcass Colour', field: 'carcass_colour',   type: 'text' },
                 { label: 'Door Colour',    field: 'door_colour',      type: 'text' },
                 { label: 'Panelwork',      field: 'panelwork_colour', type: 'text' },
@@ -1138,8 +1139,8 @@ export default function EditInvoicePage() {
                       </div>
                     )}
                     <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
-                      <div className="flex items-center gap-2 text-gray-500">
-                        <span>Section Discount</span>
+                      <div className="flex items-center gap-2 text-gray-500 flex-nowrap whitespace-nowrap">
+                        <span className="shrink-0">Section Discount</span>
                         <Input type="number" value={sectionDiscountPct || ""}
                           onChange={(e) => {
                             const pct = parseFloat(e.target.value) || 0;
@@ -1169,7 +1170,7 @@ export default function EditInvoicePage() {
                           className="border border-gray-200 rounded px-1 py-0.5 w-12 text-right text-xs h-auto"
                           min="0" max="100" step="0.1" placeholder="0" />
                         <span className="text-gray-400">%</span>
-                        <span className="text-gray-300">or £</span>
+                        <span className="text-gray-300 shrink-0">or £</span>
                         <Input type="number"
                           value={
                             sectionDiscountAmounts[section] !== undefined && sectionDiscountAmounts[section] !== ''
