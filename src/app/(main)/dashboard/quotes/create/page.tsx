@@ -1241,7 +1241,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
                             </td>
                             {([["width","W"],["height","H"],["depth","D"]] as const).map(([dim, ph]) => {
                               const raw = item[dim as "width"|"height"|"depth"];
-                              const displayVal = raw != null && raw !== "" ? (Number(raw) % 1 === 0 ? String(Math.round(Number(raw))) : String(raw)) : "";
+                              const displayVal = raw != null ? (Number(raw) % 1 === 0 ? String(Math.round(Number(raw))) : String(raw)) : "";
                               return (
                                 <td key={dim} className="border-b border-gray-50 px-2 py-2">
                                   <Input type="number" value={displayVal} onChange={(e) => handleItemChange(item.id, dim as any, e.target.value)} placeholder={ph}
