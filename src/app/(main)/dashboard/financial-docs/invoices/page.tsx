@@ -11,7 +11,7 @@ export default function InvoicesListPage() {
         title:          "Invoices",
         docNumberLabel: "Invoice #",
         referenceLabel: "Quote Ref",
-        amountLabel:    "Total",
+        amountLabel:    "Invoice",
         createPath:     "/dashboard/invoices/create",
         draftKey:       "invoices/create",
         editPath:       (id) => `/dashboard/invoices/${id}/edit`,

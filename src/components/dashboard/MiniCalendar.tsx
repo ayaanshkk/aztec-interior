@@ -3,9 +3,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Eye, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, Loader2, CalendarDays } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import CreateTaskModal from "@/components/ui/CreateTaskModal";
 
 interface Task {
   id: string;
@@ -65,6 +66,8 @@ export function MiniCalendar() {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createModalDate, setCreateModalDate] = useState<string>("");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
     const today = new Date();
     const day = today.getDay();
@@ -155,14 +158,17 @@ export function MiniCalendar() {
   if (loading) {
     return (
       <Card>
-        <CardContent className="flex items-center justify-center h-64">
+        <CardContent className="flex items-center justify-center h-40">
           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
         </CardContent>
       </Card>
     );
   }
 
+  const hasAnyTasks = weekDays.some(day => (tasksByDate[formatDateKey(day)] || []).length > 0);
+
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -190,9 +196,11 @@ export function MiniCalendar() {
             return (
               <div
                 key={dateKey}
-                className={`min-h-[120px] rounded-lg border p-2 ${
-                  isToday(day) ? "ring-2 ring-blue-500 bg-blue-50" : "bg-white"
+                onClick={() => { setCreateModalDate(dateKey); setCreateModalOpen(true); }}
+                className={`rounded-lg border p-2 cursor-pointer transition-colors ${
+                  isToday(day) ? "ring-2 ring-blue-500 bg-blue-50 hover:bg-blue-100" : "bg-white hover:bg-gray-50"
                 }`}
+                title={`Add event on ${day.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}`}
               >
                 <div className="text-center mb-2">
                   <div className="text-xs font-medium text-gray-600">{dayName}</div>
@@ -224,17 +232,39 @@ export function MiniCalendar() {
             );
           })}
         </div>
+        {!hasAnyTasks && (
+          <div className="flex flex-col items-center justify-center text-gray-400 gap-1.5 pt-4 pb-2">
+            <CalendarDays className="h-7 w-7 opacity-30" />
+            <p className="text-xs">No tasks scheduled this week</p>
+          </div>
+        )}
       </CardContent>
       <CardFooter>
         <Button
           variant="outline"
           className="w-full"
-          onClick={() => router.push("/dashboard/schedule")}
+          onClick={() => router.push("/dashboard/calendar")}
         >
           <Eye className="mr-2 h-4 w-4" />
           View Full Schedule
         </Button>
       </CardFooter>
     </Card>
+
+    <CreateTaskModal
+      open={createModalOpen}
+      onOpenChange={setCreateModalOpen}
+      initialDate={createModalDate}
+      onSuccess={async () => {
+        setCreateModalOpen(false);
+        try {
+          const weekEnd = new Date(currentWeekStart);
+          weekEnd.setDate(currentWeekStart.getDate() + 6);
+          const data = await api.getCalendarTasks({ start_date: formatDateKey(currentWeekStart), end_date: formatDateKey(weekEnd) });
+          setTasks(Array.isArray(data) ? data : []);
+        } catch { /* ignore */ }
+      }}
+    />
+    </>
   );
 }

@@ -67,19 +67,54 @@ export interface DocTypeConfig {
   statuses: string[];
 }
 
-// ─── status badge ────────────────────────────────────────────────────────────
+// ─── status colours ───────────────────────────────────────────────────────────
 
 const STATUS_STYLES: Record<string, string> = {
-  draft:    "bg-gray-100 text-gray-700 border-gray-200",
-  sent:     "bg-blue-100 text-blue-700 border-blue-200",
-  paid:     "bg-green-100 text-green-700 border-green-200",
-  accepted: "bg-green-100 text-green-700 border-green-200",
-  rejected: "bg-red-100 text-red-700 border-red-200",
-  overdue:  "bg-red-100 text-red-700 border-red-200",
-  pending:  "bg-yellow-100 text-yellow-700 border-yellow-200",
-  issued:   "bg-blue-100 text-blue-700 border-blue-200",
-  proforma: "bg-purple-100 text-purple-700 border-purple-200",
+  draft:         "bg-gray-100 text-gray-700 border-gray-200",
+  sent:          "bg-sky-100 text-sky-800 border-sky-200",
+  senttocustomer: "bg-sky-100 text-sky-800 border-sky-200",
+  issued:        "bg-sky-100 text-sky-800 border-sky-200",
+  paid:          "bg-emerald-100 text-emerald-800 border-emerald-200",
+  accepted:      "bg-green-100 text-green-800 border-green-200",
+  approved:      "bg-green-100 text-green-800 border-green-200",
+  confirmed:     "bg-green-100 text-green-800 border-green-200",
+  received:      "bg-green-100 text-green-800 border-green-200",
+  paidpartially: "bg-orange-100 text-orange-800 border-orange-200",
+  rejected:      "bg-red-100 text-red-700 border-red-200",
+  cancelled:     "bg-red-100 text-red-700 border-red-200",
+  overdue:       "bg-orange-100 text-orange-700 border-orange-200",
+  pending:       "bg-yellow-100 text-yellow-700 border-yellow-200",
+  proforma:      "bg-purple-100 text-purple-700 border-purple-200",
 };
+
+// Row tint — matches the status summary card colors
+const ROW_BG: Record<string, string> = {
+  draft:         "",
+  sent:          "bg-sky-50 hover:bg-sky-100",
+  senttocustomer: "bg-sky-50 hover:bg-sky-100",
+  issued:        "bg-sky-50 hover:bg-sky-100",
+  paid:          "bg-emerald-50 hover:bg-emerald-100",
+  accepted:      "bg-green-50 hover:bg-green-100",
+  approved:      "bg-green-50 hover:bg-green-100",
+  confirmed:     "bg-green-50 hover:bg-green-100",
+  received:      "bg-green-50 hover:bg-green-100",
+  paidpartially: "bg-orange-50 hover:bg-orange-100",
+  rejected:      "bg-red-50 hover:bg-red-100",
+  cancelled:     "bg-red-50 hover:bg-red-100",
+  overdue:       "bg-orange-50 hover:bg-orange-100",
+  pending:       "bg-yellow-50 hover:bg-yellow-100",
+  proforma:      "bg-purple-50 hover:bg-purple-100",
+};
+
+function getRowBg(status: string): string {
+  const key = status.toLowerCase().replace(/\s+/g, "");
+  return ROW_BG[key] ?? "";
+}
+
+function getSelectStyle(status: string): string {
+  const key = status.toLowerCase().replace(/\s+/g, "");
+  return STATUS_STYLES[key] ?? "bg-gray-100 text-gray-700 border-gray-200";
+}
 
 function StatusBadge({ status }: { status: string }) {
   const key = status.toLowerCase().replace(/\s+/g, "");
@@ -330,7 +365,7 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
           const st = statusTotals.find(x => x.status === statusLabel) ?? { status: statusLabel, count: 0, total_value: 0, ref_sum: 0 };
           const s = statusLabel.toLowerCase();
           const [bg, border, text, muted] = s.includes("draft")
-            ? ["bg-amber-50", "border-amber-200", "text-amber-800", "text-amber-600"]
+            ? ["bg-gray-50", "border-gray-200", "text-gray-700", "text-gray-500"]
             : s.includes("confirm") || s.includes("received")
             ? ["bg-green-50", "border-green-200", "text-green-800", "text-green-600"]
             : s.includes("partial")
@@ -348,12 +383,12 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
               {config.referenceLabel && (
                 <div className="border-t border-black/10 pt-2 mt-2 space-y-1">
                   <div className="flex justify-between text-xs">
-                    <span className="opacity-60">Ref Value</span>
-                    <span className="font-semibold">{loading ? "—" : fmtAmount(st.ref_sum)}</span>
+                    <span className="opacity-60">{config.amountLabel} Value</span>
+                    <span className="font-semibold">{loading ? "—" : fmtAmount(st.total_value)}</span>
                   </div>
                   <div className="flex justify-between text-xs">
-                    <span className="opacity-60">Quote Value</span>
-                    <span className="font-semibold">{loading ? "—" : fmtAmount(st.total_value)}</span>
+                    <span className="opacity-60">Ref Value</span>
+                    <span className="font-semibold">{loading ? "—" : fmtAmount(st.ref_sum)}</span>
                   </div>
                 </div>
               )}
@@ -441,7 +476,7 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
               {docs.map(doc => (
                 <tr
                   key={doc.id}
-                  className="transition-colors hover:bg-gray-50 cursor-pointer"
+                  className={`transition-colors cursor-pointer ${getRowBg(doc.status) || "hover:bg-gray-50"}`}
                   onClick={() => {
                     if (config.viewPath) window.open(config.viewPath(doc.id), "_blank");
                   }}
@@ -460,7 +495,7 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
                       value={doc.status}
                       disabled={updatingStatus === doc.id}
                       onChange={e => handleStatusChange(doc, e.target.value)}
-                      className="h-7 rounded-md border border-gray-200 bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-50"
+                      className={`h-7 rounded-md border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 disabled:opacity-50 ${getSelectStyle(doc.status)}`}
                     >
                       {config.statuses.map(s => <option key={s} value={s}>{s}</option>)}
                       {!config.statuses.includes(doc.status) && (

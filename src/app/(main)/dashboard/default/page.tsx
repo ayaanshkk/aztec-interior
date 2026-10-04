@@ -1,33 +1,35 @@
 "use client";
 
-import { QuickActions } from "@/components/dashboard/QuickActions";
 import { MiniCalendar } from "@/components/dashboard/MiniCalendar";
-import { OverviewCards } from "./_components/overview-cards";
+import { FinancialInsightsCards } from "./_components/financial-insights-cards";
+import { LeadsCard, PipelineCard, ActionItemsCard } from "./_components/overview-cards";
 import { TableCards } from "./_components/table-cards";
 
 export default function Page() {
   return (
     <div className="space-y-6 p-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome back! Here's what's happening with your business today.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-muted-foreground">Welcome back! Here's what's happening with your business today.</p>
       </div>
 
-      {/* Quick Actions + Mini Calendar Row */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <QuickActions />
-        <div className="lg:col-span-2">
+      {/* Financial Insights */}
+      <FinancialInsightsCards />
+
+      {/* Two-column layout: left = Schedule + Leads, right = Action Items + Pipeline */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Left column */}
+        <div className="flex flex-col gap-6">
           <MiniCalendar />
+          <LeadsCard />
+        </div>
+        {/* Right column */}
+        <div className="flex flex-col gap-6">
+          <ActionItemsCard />
+          <PipelineCard />
         </div>
       </div>
-
-      {/* Overview Cards - New Leads, Sales Pipeline, Action Items */}
-      <OverviewCards />
 
       {/* Recent Leads Table */}
       <TableCards />

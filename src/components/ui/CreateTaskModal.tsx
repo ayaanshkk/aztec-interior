@@ -42,13 +42,15 @@ interface CreateTaskModalProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   customerId?: string;
+  initialDate?: string; // YYYY-MM-DD
 }
 
-export default function CreateTaskModal({ 
-  open, 
-  onOpenChange, 
+export default function CreateTaskModal({
+  open,
+  onOpenChange,
   onSuccess,
-  customerId 
+  customerId,
+  initialDate,
 }: CreateTaskModalProps) {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -70,6 +72,12 @@ export default function CreateTaskModal({
     notes: "",
     work_stage: "Survey",
   });
+
+  useEffect(() => {
+    if (open && initialDate) {
+      setFormData(prev => ({ ...prev, start_date: initialDate, end_date: initialDate }));
+    }
+  }, [open, initialDate]);
 
   useEffect(() => {
     if (open) {

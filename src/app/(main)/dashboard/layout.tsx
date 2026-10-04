@@ -15,6 +15,7 @@ import {
 import { ThemeSwitcher } from "@/app/(main)/dashboard/_components/sidebar/theme-switcher";
 import { DashboardAuthGuard } from "./_components/dashboard-auth-guard";
 import { ChecklistModalWrapper } from "./_components/ChecklistModalWrapper";
+import { NotificationSidebar } from "@/components/NotificationSidebar";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
@@ -43,7 +44,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
               <div className="flex items-center gap-1 lg:gap-2">
                 <SidebarTrigger className="-ml-1" />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <NotificationSidebar />
+                <div className="h-5 w-px bg-gray-200" />
                 <ThemeSwitcher />
               </div>
             </div>
