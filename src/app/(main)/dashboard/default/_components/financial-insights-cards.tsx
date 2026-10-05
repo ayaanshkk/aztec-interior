@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Send, FileCheck, Clock, CheckCircle, TrendingUp, TrendingDown, PoundSterling, X, ExternalLink, ChevronDown, AlertTriangle } from "lucide-react";
+import { Send, FileCheck, Clock, CheckCircle, TrendingUp, TrendingDown, PoundSterling, X, ExternalLink, ChevronDown, AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { fetchWithAuth } from "@/lib/api";
 
 // ─── types ────────────────────────────────────────────────────────────────────
@@ -484,6 +484,27 @@ export function FinancialInsightsCards() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<ModalType>(null);
+  const [hideEarnings, setHideEarnings] = useState<boolean>(() => {
+    try { return localStorage.getItem("dashboard_hide_earnings") === "true"; } catch { return false; }
+  });
+  const [hideProfit, setHideProfit] = useState<boolean>(() => {
+    try { return localStorage.getItem("dashboard_hide_profit") === "true"; } catch { return false; }
+  });
+
+  const toggleHideEarnings = () => {
+    setHideEarnings(prev => {
+      const next = !prev;
+      try { localStorage.setItem("dashboard_hide_earnings", String(next)); } catch {}
+      return next;
+    });
+  };
+  const toggleHideProfit = () => {
+    setHideProfit(prev => {
+      const next = !prev;
+      try { localStorage.setItem("dashboard_hide_profit", String(next)); } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetchWithAuth("financial-docs/dashboard-stats")
@@ -541,69 +562,99 @@ export function FinancialInsightsCards() {
       {(() => {
         const profit = inv?.profit ?? 0;
         const isProfitable = profit >= 0;
+        const blurEarnings = hideEarnings ? "blur-sm select-none pointer-events-none" : "";
+        const blurProfit   = hideProfit   ? "blur-sm select-none pointer-events-none" : "";
         return (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mt-3">
             {/* Total Earnings — violet */}
-            <button
-              onClick={() => setModal("earnings")}
-              className="text-left rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 transition-colors cursor-pointer p-5"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <div className="p-1.5 rounded-lg bg-violet-100">
-                  <PoundSterling className="h-4 w-4 text-violet-700" />
+            <div className="relative rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 transition-colors">
+              <button
+                onClick={e => { e.stopPropagation(); toggleHideEarnings(); }}
+                className="absolute top-3 right-3 z-10 p-1.5 rounded-md hover:bg-violet-200 transition-colors cursor-pointer"
+                title={hideEarnings ? "Show figures" : "Hide figures"}
+              >
+                {hideEarnings
+                  ? <EyeOff className="h-3.5 w-3.5 text-violet-500" />
+                  : <Eye className="h-3.5 w-3.5 text-violet-500" />
+                }
+              </button>
+              <button
+                onClick={() => !hideEarnings && setModal("earnings")}
+                className="text-left w-full p-5 cursor-pointer"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="p-1.5 rounded-lg bg-violet-100">
+                    <PoundSterling className="h-4 w-4 text-violet-700" />
+                  </div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-600 opacity-80">Total Earnings</p>
                 </div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-600 opacity-80">Total Earnings</p>
-              </div>
-              <p className="text-3xl font-bold text-violet-900 leading-none">
-                {loading ? "—" : fmt(inv?.total_earnings ?? 0)}
-              </p>
-              <p className="text-xs text-violet-500 mt-1.5 opacity-70">Click to view monthly breakdown →</p>
-            </button>
+                <p className={`text-3xl font-bold text-violet-900 leading-none transition-all ${blurEarnings}`}>
+                  {loading ? "—" : fmt(inv?.total_earnings ?? 0)}
+                </p>
+                <p className="text-xs text-violet-500 mt-1.5 opacity-70">
+                  {hideEarnings ? "Figures hidden · click eye to reveal" : "Click to view monthly breakdown →"}
+                </p>
+              </button>
+            </div>
 
             {/* Profit — green if profit, red if loss */}
-            <button
-              onClick={() => setModal("profit")}
-              className={`text-left rounded-xl border transition-colors cursor-pointer p-5 ${
-                loading
-                  ? "border-gray-200 bg-gray-50 hover:bg-gray-100"
-                  : isProfitable
-                  ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
-                  : "border-red-200 bg-red-50 hover:bg-red-100"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className={`p-1.5 rounded-lg ${loading ? "bg-gray-100" : isProfitable ? "bg-emerald-100" : "bg-red-100"}`}>
-                    {!loading && !isProfitable
-                      ? <AlertTriangle className="h-4 w-4 text-red-600" />
-                      : isProfitable
-                      ? <TrendingUp className="h-4 w-4 text-emerald-700" />
-                      : <TrendingDown className="h-4 w-4 text-gray-400" />
-                    }
+            <div className={`relative rounded-xl border transition-colors ${
+              loading
+                ? "border-gray-200 bg-gray-50 hover:bg-gray-100"
+                : isProfitable
+                ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
+                : "border-red-200 bg-red-50 hover:bg-red-100"
+            }`}>
+              <button
+                onClick={e => { e.stopPropagation(); toggleHideProfit(); }}
+                className={`absolute top-3 right-3 z-10 p-1.5 rounded-md transition-colors cursor-pointer ${
+                  loading ? "hover:bg-gray-200" : isProfitable ? "hover:bg-emerald-200" : "hover:bg-red-200"
+                }`}
+                title={hideProfit ? "Show figures" : "Hide figures"}
+              >
+                {hideProfit
+                  ? <EyeOff className={`h-3.5 w-3.5 ${loading ? "text-gray-400" : isProfitable ? "text-emerald-500" : "text-red-500"}`} />
+                  : <Eye className={`h-3.5 w-3.5 ${loading ? "text-gray-400" : isProfitable ? "text-emerald-500" : "text-red-500"}`} />
+                }
+              </button>
+              <button
+                onClick={() => !hideProfit && setModal("profit")}
+                className="text-left w-full p-5 cursor-pointer"
+              >
+                <div className="flex items-center justify-between mb-3 pr-6">
+                  <div className="flex items-center gap-2">
+                    <div className={`p-1.5 rounded-lg ${loading ? "bg-gray-100" : isProfitable ? "bg-emerald-100" : "bg-red-100"}`}>
+                      {!loading && !isProfitable
+                        ? <AlertTriangle className="h-4 w-4 text-red-600" />
+                        : isProfitable
+                        ? <TrendingUp className="h-4 w-4 text-emerald-700" />
+                        : <TrendingDown className="h-4 w-4 text-gray-400" />
+                      }
+                    </div>
+                    <p className={`text-[10px] font-semibold uppercase tracking-widest opacity-80 ${
+                      loading ? "text-gray-400" : isProfitable ? "text-emerald-600" : "text-red-600"
+                    }`}>
+                      {!loading && !isProfitable ? "Net Loss" : "Profit"}
+                    </p>
                   </div>
-                  <p className={`text-[10px] font-semibold uppercase tracking-widest opacity-80 ${
-                    loading ? "text-gray-400" : isProfitable ? "text-emerald-600" : "text-red-600"
-                  }`}>
-                    {!loading && !isProfitable ? "Net Loss" : "Profit"}
-                  </p>
+                  {!loading && !isProfitable && !hideProfit && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-red-500 bg-red-100 px-2 py-0.5 rounded-full">
+                      Loss
+                    </span>
+                  )}
                 </div>
-                {!loading && !isProfitable && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-red-500 bg-red-100 px-2 py-0.5 rounded-full">
-                    Loss
-                  </span>
-                )}
-              </div>
-              <p className={`text-3xl font-bold leading-none ${
-                loading ? "text-gray-400" : isProfitable ? "text-emerald-900" : "text-red-700"
-              }`}>
-                {loading ? "—" : (isProfitable ? "" : "−") + fmt(Math.abs(profit))}
-              </p>
-              <p className={`text-xs mt-1.5 opacity-70 ${
-                loading ? "text-gray-400" : isProfitable ? "text-emerald-500" : "text-red-400"
-              }`}>
-                Invoice total − quote reference · click for breakdown →
-              </p>
-            </button>
+                <p className={`text-3xl font-bold leading-none transition-all ${
+                  loading ? "text-gray-400" : isProfitable ? "text-emerald-900" : "text-red-700"
+                } ${blurProfit}`}>
+                  {loading ? "—" : (isProfitable ? "" : "−") + fmt(Math.abs(profit))}
+                </p>
+                <p className={`text-xs mt-1.5 opacity-70 ${
+                  loading ? "text-gray-400" : isProfitable ? "text-emerald-500" : "text-red-400"
+                }`}>
+                  {hideProfit ? "Figures hidden · click eye to reveal" : "Invoice total − quote reference · click for breakdown →"}
+                </p>
+              </button>
+            </div>
           </div>
         );
       })()}

@@ -2,6 +2,7 @@
 
 import { MiniCalendar } from "@/components/dashboard/MiniCalendar";
 import { FinancialInsightsCards } from "./_components/financial-insights-cards";
+import { AdminInsightsSection } from "./_components/admin-insights-section";
 import { LeadsCard, PipelineCard, ActionItemsCard } from "./_components/overview-cards";
 import { TableCards } from "./_components/table-cards";
 
@@ -16,6 +17,9 @@ export default function Page() {
 
       {/* Financial Insights */}
       <FinancialInsightsCards />
+
+      {/* Admin Insights: Revenue by Job Type, Confirmation Rate, Outstanding */}
+      <AdminInsightsSection />
 
       {/* Two-column layout: left = Schedule + Leads, right = Action Items + Pipeline */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
