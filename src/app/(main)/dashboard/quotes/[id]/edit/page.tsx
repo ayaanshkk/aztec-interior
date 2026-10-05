@@ -1172,6 +1172,10 @@ export default function EditQuotePage() {
             >
               <option value="Kitchen">Kitchen</option>
               <option value="Bedroom">Bedroom</option>
+              <option value="Media Wall">Media Wall</option>
+              <option value="Office/Study">Office/Study</option>
+              <option value="Display Units">Display Units</option>
+              <option value="Other">Other</option>
             </select>
           </div>
 

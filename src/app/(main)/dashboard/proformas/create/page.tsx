@@ -734,6 +734,10 @@ export default function CreateProformaPage() {
               className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="Kitchen">Kitchen</option>
               <option value="Bedroom">Bedroom</option>
+              <option value="Media Wall">Media Wall</option>
+              <option value="Office/Study">Office/Study</option>
+              <option value="Display Units">Display Units</option>
+              <option value="Other">Other</option>
             </select>
           </div>
           <div>
