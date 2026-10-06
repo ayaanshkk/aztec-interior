@@ -434,10 +434,38 @@ export default function CustomerDetailsPage() {
   const [isDeletingGenericDoc, setIsDeletingGenericDoc] = useState(false);
 
 
+  const lastLoadedAt = useRef<number>(0);
+
   useEffect(() => {
     if (!id) return;
+    lastLoadedAt.current = Date.now();
     loadCustomerData();
   }, [id, user]);
+
+  // Re-fetch when user navigates back (bfcache restore or tab refocus after a deletion elsewhere)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const changed = parseInt(localStorage.getItem("financialDocLastChanged") || "0", 10);
+        if (changed > lastLoadedAt.current) {
+          lastLoadedAt.current = Date.now();
+          loadCustomerData();
+        }
+      } catch {}
+    };
+    const handlePageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      lastLoadedAt.current = Date.now();
+      loadCustomerData();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, []);
 
   const loadCustomerData = async () => {
     setLoading(true);

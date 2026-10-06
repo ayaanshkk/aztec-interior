@@ -79,6 +79,7 @@ export default function CreateInvoicePage() {
   const [panelworkColour, setPanelworkColour] = useState('');
   const [doorStyle, setDoorStyle] = useState<string>('');
   const [roomName, setRoomName] = useState('');
+  const [showExVat, setShowExVat] = useState(true);
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [fillerType, setFillerType] = useState<string>('Basic Slab');
@@ -158,7 +159,7 @@ export default function CreateInvoicePage() {
             discounted_total: i.discounted_total,
             line_total: i.line_total,
           })));
-          localStorage.removeItem("invoiceFromQuote"); // consume immediately
+          // keep in localStorage until invoice is saved (cleared in handleSaveWithStatus)
 
           if (customerIdParam) setCustomerId(customerIdParam);
           else if (q.client_id) setCustomerId(String(q.client_id));
@@ -849,6 +850,7 @@ export default function CreateInvoicePage() {
           door_colour: doorColour,
           panelwork_colour: panelworkColour,
           section_discounts: sectionDiscounts,
+          show_ex_vat_total: showExVat,
           door_style: doorStyle,
           deposit_paid: deposit,
           total_remaining: Math.max(0, total - deposit),
@@ -903,6 +905,7 @@ export default function CreateInvoicePage() {
         const data = await response.json();
         const invoiceId = data.invoice_id || data.id;
         clearDraft();
+        localStorage.removeItem("invoiceFromQuote");
         if (isDraft) {
           alert(`✅ Invoice #${invoiceId} saved as draft!`);
           router.push(`/dashboard/invoices/${invoiceId}/edit`);
@@ -930,7 +933,7 @@ export default function CreateInvoicePage() {
 
   const subtotalAfterSectionDiscounts = Math.round(SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    const sectionTotal = sectionItems.reduce((sum, item) => {
+    const sectionItemTotal = sectionItems.reduce((sum, item) => {
       const qty = item.quantity || 1;
       const amt = item.amount || 0;
       const pct = item.discount_percent || 0;
@@ -943,7 +946,7 @@ export default function CreateInvoicePage() {
       }, 0);
       return sum + Math.round((itemTotal + subTotal) * 100) / 100;
     }, 0);
-    return total + Math.round(sectionTotal * 100) / 100;
+    return total + Math.round(sectionItemTotal * 100) / 100;
   }, 0) * 100) / 100;
 
   const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
@@ -1478,12 +1481,14 @@ export default function CreateInvoicePage() {
               </div>
               <span className="text-red-500">{globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}</span>
             </div>
-            {globalDiscountPercent > 0 && (
-              <div className="flex justify-between px-5 py-2.5 border-b border-gray-100 text-gray-600">
-                <span>After Discount</span>
-                <span>{formatCurrency(subtotal)}</span>
+            <div className={`flex justify-between px-5 py-2.5 border-b border-gray-100 ${!showExVat ? 'opacity-40' : ''}`}>
+              <div className="flex items-center gap-2 text-gray-600">
+                <input type="checkbox" checked={showExVat} onChange={e => setShowExVat(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-gray-700 cursor-pointer" />
+                <span>Ex VAT Total</span>
               </div>
-            )}
+              <span className="text-gray-600">{formatCurrency(subtotal)}</span>
+            </div>
             <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
               <div className="flex items-center gap-2 text-gray-600">
                 <span>VAT</span>

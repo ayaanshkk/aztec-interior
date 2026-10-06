@@ -243,6 +243,10 @@ export default function ViewQuotePage() {
                 <td className="border-b border-gray-100 px-4 py-2.5 text-right">{formatCurrency(subtotal)}</td>
               </tr>
               <tr>
+                <td className="border-b border-gray-100 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">EX VAT TOTAL</td>
+                <td className="border-b border-gray-100 px-4 py-2.5 text-right">{formatCurrency(subtotal)}</td>
+              </tr>
+              <tr>
                 <td className="border-b border-gray-100 py-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">VAT ({vatPercentage}%)</td>
                 <td className="border-b border-gray-100 px-4 py-2.5 text-right">{formatCurrency(vat)}</td>
               </tr>

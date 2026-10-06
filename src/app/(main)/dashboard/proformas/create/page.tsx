@@ -68,6 +68,7 @@ export default function CreateProformaPage() {
   const [panelworkColour, setPanelworkColour] = useState('');
   const [doorStyle, setDoorStyle] = useState<string>('');
   const [roomName, setRoomName] = useState('');
+  const [showExVat, setShowExVat] = useState(true);
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [fillerType, setFillerType] = useState<string>('Basic Slab');
@@ -564,7 +565,7 @@ export default function CreateProformaPage() {
   // â”€â”€ Computed totals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    return total + sectionItems.reduce((sum, item) => {
+    const sectionItemTotal = sectionItems.reduce((sum, item) => {
       const qty = item.quantity || 1;
       const amt = item.amount || 0;
       const pct = item.discount_percent || 0;
@@ -577,6 +578,7 @@ export default function CreateProformaPage() {
       }, 0);
       return sum + itemTotal + subTotal;
     }, 0);
+    return total + sectionItemTotal;
   }, 0);
 
   const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
@@ -622,6 +624,7 @@ export default function CreateProformaPage() {
           panelwork_colour: panelworkColour,
           door_style:       doorStyle,
           section_discounts: sectionDiscounts,
+          show_ex_vat_total: showExVat,
           items: items
             .filter(i => i.item || i.description || i.line_total > 0)
             .flatMap(i => [
@@ -1157,6 +1160,14 @@ export default function CreateProformaPage() {
                 <span className="text-gray-400 text-xs">%</span>
               </div>
               <span className="text-red-500">{globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}</span>
+            </div>
+            <div className={`flex justify-between px-4 py-2.5 border-b border-gray-50 ${!showExVat ? 'opacity-40' : ''}`}>
+              <div className="flex items-center gap-2 text-gray-600">
+                <input type="checkbox" checked={showExVat} onChange={e => setShowExVat(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-gray-700 cursor-pointer" />
+                <span>Ex VAT Total</span>
+              </div>
+              <span className="text-gray-600">{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50">
               <div className="flex items-center gap-2 text-gray-600">

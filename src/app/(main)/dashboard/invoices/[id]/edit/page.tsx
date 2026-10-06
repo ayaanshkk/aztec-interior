@@ -76,6 +76,7 @@ export default function EditInvoicePage() {
   const [vatPercentage,          setVatPercentage]          = useState(20);
   const [globalDiscountPercent,  setGlobalDiscountPercent]  = useState(0);
   const [deposit,                setDeposit]                = useState(0);
+  const [showExVat,              setShowExVat]              = useState(true);
   const [sectionDiscounts,       setSectionDiscounts]       = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [doorType,               setDoorType]               = useState("Carcass Only");
@@ -132,6 +133,7 @@ export default function EditInvoicePage() {
       setDeposit(data.deposit_paid || 0);
       if (data.section_discounts) setSectionDiscounts(data.section_discounts);
       if (data.global_discount_percent !== undefined && data.global_discount_percent !== null) setGlobalDiscountPercent(data.global_discount_percent);
+      if (data.show_ex_vat_total !== undefined) setShowExVat(data.show_ex_vat_total);
       setAdditionalTerms(data.additional_terms || []);
       setAdditionalNotes(data.additional_notes || '');
       if (data.signature_type && data.signature_type !== 'none') {
@@ -627,7 +629,7 @@ export default function EditInvoicePage() {
   // ── Computed totals ───────────────────────────────────────────────────────
   const subtotalAfterSectionDiscounts = Math.round(SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    const sectionTotal = sectionItems.reduce((sum, item) => {
+    const sectionItemTotal = sectionItems.reduce((sum, item) => {
       const qty = item.quantity || 1;
       const amt = item.amount || 0;
       const pct = item.discount_percent || 0;
@@ -640,7 +642,7 @@ export default function EditInvoicePage() {
       }, 0);
       return sum + Math.round((itemTotal + subTotal) * 100) / 100;
     }, 0);
-    return total + Math.round(sectionTotal * 100) / 100;
+    return total + Math.round(sectionItemTotal * 100) / 100;
   }, 0) * 100) / 100;
 
   const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
@@ -678,6 +680,7 @@ export default function EditInvoicePage() {
           section_discounts:       sectionDiscounts,
 					global_discount_percent: globalDiscountPercent,
 					global_discount_amount:  globalDiscountAmount,
+          show_ex_vat_total:       showExVat,
           additional_terms:        additionalTerms.filter(t => t.trim()),
           additional_notes:        additionalNotes,
           signature_type:          signatureData?.type || 'none',
@@ -1251,6 +1254,14 @@ export default function EditInvoicePage() {
                 <span className="text-gray-400 text-xs">%</span>
               </div>
               <span className="text-red-500">{globalDiscountAmount > 0 ? `-${fmt(globalDiscountAmount)}` : "—"}</span>
+            </div>
+            <div className={`flex justify-between px-5 py-2.5 border-b border-gray-100 ${!showExVat ? 'opacity-40' : ''}`}>
+              <div className="flex items-center gap-2 text-gray-600">
+                <input type="checkbox" checked={showExVat} onChange={e => setShowExVat(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-gray-700 cursor-pointer" />
+                <span>Ex VAT Total</span>
+              </div>
+              <span className="text-gray-600">{fmt(subtotal)}</span>
             </div>
             <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-100">
               <div className="flex items-center gap-2 text-gray-600">

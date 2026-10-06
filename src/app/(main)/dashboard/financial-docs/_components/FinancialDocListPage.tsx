@@ -299,6 +299,8 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
       if (!res.ok) throw new Error("Delete failed");
       setDeleteConfirm(null);
       fetchDocs();
+      try { localStorage.setItem("financialDocLastChanged", Date.now().toString()); } catch {}
+      router.refresh();
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : "Delete failed");
     } finally {
@@ -326,7 +328,7 @@ export default function FinancialDocListPage({ config }: { config: DocTypeConfig
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{config.title}</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage all your {config.title.toLowerCase()}</p>
+          <p className="text-sm text-gray-500">Manage all your {config.title.toLowerCase()}</p>
         </div>
         {config.createPath && (
           <Button onClick={openPicker} className="flex items-center gap-2">

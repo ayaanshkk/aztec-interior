@@ -66,6 +66,7 @@ export default function EditProformaPage() {
   const [items,                  setItems]                  = useState<ProformaItem[]>([]);
   const [vatPercentage,          setVatPercentage]          = useState(20);
   const [globalDiscountPercent,  setGlobalDiscountPercent]  = useState(0);
+  const [showExVat,              setShowExVat]              = useState(true);
   const [sectionDiscounts,       setSectionDiscounts]       = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [doorType,               setDoorType]               = useState("Carcass Only");
@@ -121,6 +122,7 @@ export default function EditProformaPage() {
 
       setVatPercentage(data.vat_rate || 20);
       if (data.section_discounts) setSectionDiscounts(data.section_discounts);
+      if (data.show_ex_vat_total !== undefined) setShowExVat(data.show_ex_vat_total);
       if (data.global_discount_percent) setGlobalDiscountPercent(data.global_discount_percent);
       setAdditionalTerms(data.additional_terms || []);
       setAdditionalNotes(data.additional_notes || '');
@@ -598,7 +600,7 @@ export default function EditProformaPage() {
   // ── Computed totals ───────────────────────────────────────────────────────
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    return total + sectionItems.reduce((sum, item) => {
+    const sectionItemTotal = sectionItems.reduce((sum, item) => {
       const qty = item.quantity || 1;
       const amt = item.amount || 0;
       const pct = item.discount_percent || 0;
@@ -611,6 +613,7 @@ export default function EditProformaPage() {
       }, 0);
       return sum + itemTotal + subTotal;
     }, 0);
+    return total + sectionItemTotal;
   }, 0);
 
   const globalDiscountAmount = Math.round(subtotalAfterSectionDiscounts * (globalDiscountPercent / 100) * 100) / 100;
@@ -644,6 +647,7 @@ export default function EditProformaPage() {
           filler_door_type:        fillerType,
           vat_rate:                vatPercentage,
           section_discounts:       sectionDiscounts,
+          show_ex_vat_total:       showExVat,
           global_discount_percent: globalDiscountPercent,
           global_discount_amount:  globalDiscountAmount,
           additional_terms:        additionalTerms.filter(t => t.trim()),
@@ -1116,6 +1120,14 @@ export default function EditProformaPage() {
                 <span className="text-gray-400 text-xs">%</span>
               </div>
               <span className="text-red-500">{globalDiscountAmount > 0 ? `-${fmt(globalDiscountAmount)}` : "—"}</span>
+            </div>
+            <div className={`flex justify-between px-4 py-2.5 border-b border-gray-50 ${!showExVat ? 'opacity-40' : ''}`}>
+              <div className="flex items-center gap-2 text-gray-600">
+                <input type="checkbox" checked={showExVat} onChange={e => setShowExVat(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-gray-700 cursor-pointer" />
+                <span>Ex VAT Total</span>
+              </div>
+              <span className="text-gray-600">{fmt(subtotal)}</span>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50">
               <div className="flex items-center gap-2 text-gray-600">

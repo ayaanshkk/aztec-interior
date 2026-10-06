@@ -77,6 +77,7 @@ export default function CreateQuotePage() {
   const [panelworkColour, setPanelworkColour] = useState('');
   const [doorStyle, setDoorStyle] = useState<string>('');
   const [roomName, setRoomName] = useState('');
+  const [showExVat, setShowExVat] = useState(true);
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const itemsLoadedFromQuote = useRef(false);
@@ -712,6 +713,7 @@ export default function CreateQuotePage() {
           door_colour: doorColour,
           panelwork_colour: panelworkColour,
           section_discounts: sectionDiscounts,
+          show_ex_vat_total: showExVat,
           door_style: doorStyle,
           items: items
             .filter(item => {
@@ -929,7 +931,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
 
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    return total + sectionItems.reduce((sum, item) => {
+    const sectionItemTotal = sectionItems.reduce((sum, item) => {
       const qty = item.quantity || 1;
       const amt = item.amount || 0;
       const pct = item.discount_percent || 0;
@@ -942,6 +944,7 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
       }, 0);
       return sum + itemTotal + subTotal;
     }, 0);
+    return total + sectionItemTotal;
   }, 0);
 
   const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
@@ -1488,12 +1491,14 @@ const handleSubItemAutoFill = async (parentId: string, subId: string, value: str
               </div>
               <span className="text-red-500">{globalDiscountPercent > 0 ? `-${formatCurrency(globalDiscountAmount)}` : '—'}</span>
             </div>
-            {globalDiscountPercent > 0 && (
-              <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
-                <span>After Discount</span>
-                <span>{formatCurrency(subtotal)}</span>
+            <div className={`flex justify-between px-5 py-3 border-b border-gray-50 ${!showExVat ? 'opacity-40' : ''}`}>
+              <div className="flex items-center gap-2 text-gray-600">
+                <input type="checkbox" checked={showExVat} onChange={e => setShowExVat(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-gray-700 cursor-pointer" />
+                <span>Ex VAT Total</span>
               </div>
-            )}
+              <span className="text-gray-600">{formatCurrency(subtotal)}</span>
+            </div>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
               <div className="flex items-center gap-2 text-gray-600">
                 <span>VAT</span>

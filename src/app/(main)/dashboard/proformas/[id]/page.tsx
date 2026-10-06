@@ -70,7 +70,7 @@ export default function ViewProformaPage() {
 
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((total, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    const sectionTotal = sectionItems.reduce((sum, item) => {
+    const sectionItemTotal = sectionItems.reduce((sum, item) => {
       const itemTotal = (item.discount_percent && item.discount_percent > 0)
         ? (item.discounted_total ?? item.discounted_amount ?? (item.amount || 0) * (item.quantity || 1))
         : (item.amount || 0) * (item.quantity || 1);
@@ -80,7 +80,7 @@ export default function ViewProformaPage() {
           : (sub.amount || 0) * (sub.quantity || 1)), 0);
       return sum + itemTotal + subTotal;
     }, 0);
-    return total + sectionTotal;
+    return total + sectionItemTotal;
   }, 0);
 
   const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
@@ -275,6 +275,11 @@ export default function ViewProformaPage() {
               <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
                 <span>Discount ({globalDiscountPercent}%)</span>
                 <span className="text-gray-800">-{fmt(globalDiscountAmount)}</span>
+              </div>
+            )}
+            {invoice.show_ex_vat_total && (
+              <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
+                <span>Ex VAT Total</span><span className="text-gray-800">{fmt(subtotal)}</span>
               </div>
             )}
             <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">

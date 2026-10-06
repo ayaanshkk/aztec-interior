@@ -122,26 +122,38 @@ export default function ViewQuotePage() {
       client_id:        quotation.client_id        || quotation.customer_id || null,
       section_discounts: quotation.section_discounts || {},
       global_discount_percent: quotation.global_discount_percent || 0,
-      items: (quotation.items || []).map((item: any) => ({
-        item:             item.item        || item.item_code || "",
-        description:      item.description || "",
-        color:            item.colour      || item.color     || "",
-        quantity:         item.quantity    || 1,
-        amount: item.amount || 0,
-        width:            item.width,
-        height:           item.height,
-        depth:            item.depth,
-        discount_percent: item.discount_percent || 0,
-        section:          item.section     || "Furniture",
-        subItems: (item.subItems || item.sub_items || []).map((sub: any) => ({
-          item:             sub.item        || sub.item_code || "",
-          description:      sub.description || "",
-          color:            sub.colour      || sub.color     || "",
-          quantity:         sub.quantity    || 1,
-          amount: sub.amount || 0,
-          discount_percent: sub.discount_percent || 0,
-        })),
-      })),
+      items: (quotation.items || []).map((item: any) => {
+        const qty = item.quantity || 1;
+        const amt = item.amount || 0;
+        const pct = item.discount_percent || 0;
+        return {
+          item:             item.item        || item.item_code || "",
+          description:      item.description || "",
+          color:            item.colour      || item.color     || "",
+          quantity:         qty,
+          amount:           amt,
+          discounted_total: item.discounted_total || (pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty),
+          width:            item.width,
+          height:           item.height,
+          depth:            item.depth,
+          discount_percent: pct,
+          section:          item.section     || "Furniture",
+          subItems: (item.subItems || item.sub_items || []).map((sub: any) => {
+            const sQty = sub.quantity || 1;
+            const sAmt = sub.amount || 0;
+            const sPct = sub.discount_percent || 0;
+            return {
+              item:             sub.item        || sub.item_code || "",
+              description:      sub.description || "",
+              color:            sub.colour      || sub.color     || "",
+              quantity:         sQty,
+              amount:           sAmt,
+              discounted_total: sub.discounted_total || (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty),
+              discount_percent: sPct,
+            };
+          }),
+        };
+      }),
     }));
 
     window.open(`/dashboard/invoices/create?fromQuote=1&customerId=${quotation.client_id || quotation.customer_id || ""}`);
@@ -171,7 +183,7 @@ export default function ViewQuotePage() {
 
   const subtotalAfterSectionDiscounts = SECTIONS.reduce((acc, section) => {
     const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
-    const sectionTotal = sectionItems.reduce((sum, item) => {
+    const sectionItemTotal = sectionItems.reduce((sum, item) => {
       const itemTotal = (item.discount_percent && item.discount_percent > 0)
         ? (item.discounted_total ?? item.discounted_amount ?? (item.amount || 0) * (item.quantity || 1))
         : (item.amount || 0) * (item.quantity || 1);
@@ -181,7 +193,7 @@ export default function ViewQuotePage() {
           : (sub.amount || 0) * (sub.quantity || 1)), 0);
       return sum + itemTotal + subTotal;
     }, 0);
-    return acc + sectionTotal;
+    return acc + sectionItemTotal;
   }, 0);
 
   const globalDiscountAmount = subtotalAfterSectionDiscounts * (globalDiscountPercent / 100);
@@ -393,6 +405,11 @@ export default function ViewQuotePage() {
             {globalDiscountPercent > 0 && (
               <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
                 <span>Discount ({globalDiscountPercent}%)</span><span className="text-gray-800">-{formatCurrency(globalDiscountAmount)}</span>
+              </div>
+            )}
+            {quotation.show_ex_vat_total && (
+              <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
+                <span>Ex VAT Total</span><span className="text-gray-800">{formatCurrency(subtotal)}</span>
               </div>
             )}
             <div className="flex justify-between px-5 py-3 border-b border-gray-50 text-gray-600">
