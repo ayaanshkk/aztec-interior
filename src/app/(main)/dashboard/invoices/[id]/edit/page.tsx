@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { BACKEND_URL } from "@/lib/api";
 import { useSessionDraft } from "@/hooks/useSessionDraft";
 import { SignatureField } from "@/components/ui/SignatureField";
+import AddToPricelistModal from "@/components/ui/AddToPricelistModal";
 
 const API_FORM = `${BACKEND_URL}/api/form`;
 
@@ -29,6 +30,7 @@ interface InvoiceItem {
   autoFitting?: boolean;
   subItems?: InvoiceItem[];
   section?: string;
+  notInPricelist?: boolean;
 }
 
 const SECTIONS = [
@@ -77,6 +79,7 @@ export default function EditInvoicePage() {
   const [globalDiscountPercent,  setGlobalDiscountPercent]  = useState(0);
   const [deposit,                setDeposit]                = useState(0);
   const [showExVat,              setShowExVat]              = useState(true);
+  const [pricelistModal, setPricelistModal] = useState<{ open: boolean; itemCode: string; description: string; amount: number; section: string }>({ open: false, itemCode: '', description: '', amount: 0, section: '' });
   const [sectionDiscounts,       setSectionDiscounts]       = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [doorType,               setDoorType]               = useState("Carcass Only");
@@ -483,6 +486,8 @@ export default function EditInvoicePage() {
             line_total: (data.price || 0) * qty,
             discounted_total: item.discount_percent ? calcDiscounted(qty, data.price || 0, item.discount_percent) : (data.price || 0) * qty };
         }));
+      } else {
+        setItems(prev => prev.map(it => it.id === id ? { ...it, notInPricelist: true } : it));
       }
     } catch (e) { console.error("Auto-price lookup failed:", e); }
     finally     { setAutoFilling(null); }
@@ -527,6 +532,10 @@ export default function EditInvoicePage() {
 
   // ── Sub-item handlers ──────────────────────────────────────────────────────
   const handleAddSubItem = (parentId: string | number) => {
+    const parentItem = itemsRef.current.find(i => i.id === parentId);
+    if (parentItem?.notInPricelist && parentItem?.item?.trim()) {
+      setPricelistModal({ open: true, itemCode: parentItem.item, description: parentItem.description, amount: parentItem.amount || 0, section: parentItem.section || '' });
+    }
     setItems(prev => prev.map(item => {
       if (item.id !== parentId) return item;
       const newSub: InvoiceItem = {
@@ -615,6 +624,10 @@ export default function EditInvoicePage() {
   };
 
   const handleAddItem = (section: string) => {
+    const notFoundItem = itemsRef.current.find(it => it.section === section && it.notInPricelist && it.item?.trim());
+    if (notFoundItem) {
+      setPricelistModal({ open: true, itemCode: notFoundItem.item, description: notFoundItem.description, amount: notFoundItem.amount || 0, section: notFoundItem.section || '' });
+    }
     setItems(prev => [...prev, {
       id: nextId, item: "", description: "", color: "",
       quantity: 1, amount: 0, line_total: 0, discount_percent: 0, discounted_total: 0, section,
@@ -1354,6 +1367,17 @@ export default function EditInvoicePage() {
 
         {/* Signature */}
         <SignatureField customerName={formData.customer_name} onChange={setSignatureData} initialData={signatureData || undefined} />
+
+        <AddToPricelistModal
+          open={pricelistModal.open}
+          onClose={() => setPricelistModal(p => ({ ...p, open: false }))}
+          itemCode={pricelistModal.itemCode}
+          description={pricelistModal.description}
+          amount={pricelistModal.amount}
+          section={pricelistModal.section}
+          doorType={doorType}
+          roomType={roomType}
+        />
 
         {/* Bottom save bar */}
         <div className="mt-10 flex justify-end gap-3 border-t pt-6">

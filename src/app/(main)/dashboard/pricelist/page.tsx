@@ -468,6 +468,7 @@ export default function PricelistPage() {
     'Fittings': 'Fittings',
     'Sink and Tap': 'Sink and Tap',
     'Worktops': 'Worktops',
+    'Doors': 'Doors',
     ...Object.fromEntries(customSections.map(s => [s, s])),
   };
 

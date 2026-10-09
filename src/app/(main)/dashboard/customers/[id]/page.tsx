@@ -1401,20 +1401,32 @@ export default function CustomerDetailsPage() {
             customer_phone: original.customer_phone,
             customer_email: original.customer_email,
             section_discounts: original.section_discounts || {},
-            items: (original.items || []).map((item: any) => ({
-              item: item.item, description: item.description, colour: item.color,
-              quantity: item.quantity, amount: item.amount, width: item.width,
-              height: item.height, depth: item.depth, needs_manual_pricing: item.needs_manual_pricing,
-              price_list_item_id: item.price_list_item_id, discount_percent: item.discount_percent,
-              section: item.section, source: item.source,
-              subItems: (item.subItems || []).map((sub: any) => ({
-                item: sub.item, description: sub.description, colour: sub.color,
-                quantity: sub.quantity, amount: sub.amount, width: sub.width,
-                height: sub.height, depth: sub.depth, needs_manual_pricing: sub.needs_manual_pricing,
-                price_list_item_id: sub.price_list_item_id, discount_percent: sub.discount_percent,
-                section: sub.section, source: sub.source,
-              })),
-            })),
+            items: (original.items || []).map((item: any) => {
+              const qty = item.quantity || 1;
+              const amt = item.amount || 0;
+              const pct = item.discount_percent || 0;
+              return {
+                item: item.item, description: item.description, colour: item.color,
+                quantity: qty, amount: amt, width: item.width,
+                height: item.height, depth: item.depth, needs_manual_pricing: item.needs_manual_pricing,
+                price_list_item_id: item.price_list_item_id, discount_percent: pct,
+                discounted_amount: item.discounted_total || (pct > 0 ? amt * qty * (1 - pct / 100) : amt * qty),
+                section: item.section, source: item.source,
+                subItems: (item.subItems || []).map((sub: any) => {
+                  const sQty = sub.quantity || 1;
+                  const sAmt = sub.amount || 0;
+                  const sPct = sub.discount_percent || 0;
+                  return {
+                    item: sub.item, description: sub.description, colour: sub.color,
+                    quantity: sQty, amount: sAmt, width: sub.width,
+                    height: sub.height, depth: sub.depth, needs_manual_pricing: sub.needs_manual_pricing,
+                    price_list_item_id: sub.price_list_item_id, discount_percent: sPct,
+                    discounted_amount: sub.discounted_total || (sPct > 0 ? sAmt * sQty * (1 - sPct / 100) : sAmt * sQty),
+                    section: sub.section, source: sub.source,
+                  };
+                }),
+              };
+            }),
           }),
         });
         if (!createRes.ok) throw new Error('Failed to create duplicate');

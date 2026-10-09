@@ -10,6 +10,7 @@ import { BACKEND_URL } from "@/lib/api";
 import Image from 'next/image';
 import { useSessionDraft } from "@/hooks/useSessionDraft";
 import { SignatureField } from "@/components/ui/SignatureField";
+import AddToPricelistModal from "@/components/ui/AddToPricelistModal";
 
 const API_FORM = `${BACKEND_URL}/api/form`;
 
@@ -29,6 +30,7 @@ interface InvoiceItem {
   autoFitting?: boolean;
   subItems?: InvoiceItem[];
   section?: string;
+  notInPricelist?: boolean;
 }
 
 const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings', 'Miscellaneous'] as const;
@@ -80,6 +82,7 @@ export default function CreateInvoicePage() {
   const [doorStyle, setDoorStyle] = useState<string>('');
   const [roomName, setRoomName] = useState('');
   const [showExVat, setShowExVat] = useState(true);
+  const [pricelistModal, setPricelistModal] = useState<{ open: boolean; itemCode: string; description: string; amount: number; section: string }>({ open: false, itemCode: '', description: '', amount: 0, section: '' });
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [fillerType, setFillerType] = useState<string>('Basic Slab');
@@ -481,7 +484,7 @@ export default function CreateInvoicePage() {
           };
         }));
       } else {
-        console.log("❌ No pricing found for code:", trimmedValue);
+        setItems(prev => prev.map(it => it.id === id ? { ...it, notInPricelist: true } : it));
       }
       } catch (error) {
         console.error("Auto-price lookup failed:", error);
@@ -638,6 +641,10 @@ export default function CreateInvoicePage() {
   };
 
   const handleAddItem = (section: string) => {
+    const notFoundItem = itemsRef.current.find(it => it.section === section && it.notInPricelist && it.item?.trim());
+    if (notFoundItem) {
+      setPricelistModal({ open: true, itemCode: notFoundItem.item, description: notFoundItem.description, amount: notFoundItem.amount || 0, section: notFoundItem.section || '' });
+    }
     setItems([
       ...items,
       {
@@ -660,6 +667,10 @@ export default function CreateInvoicePage() {
   };
 
   const handleAddSubItem = (parentId: string) => {
+    const parentItem = itemsRef.current.find(i => i.id === parentId);
+    if (parentItem?.notInPricelist && parentItem?.item?.trim()) {
+      setPricelistModal({ open: true, itemCode: parentItem.item, description: parentItem.description, amount: parentItem.amount || 0, section: parentItem.section || '' });
+    }
     setItems(prevItems => prevItems.map(item => {
       if (item.id === parentId) {
         const newSub: InvoiceItem = {
@@ -1574,6 +1585,17 @@ export default function CreateInvoicePage() {
 
         <SignatureField customerName={formData.name} onChange={setSignatureData} />
       </div>
+
+      <AddToPricelistModal
+        open={pricelistModal.open}
+        onClose={() => setPricelistModal(p => ({ ...p, open: false }))}
+        itemCode={pricelistModal.itemCode}
+        description={pricelistModal.description}
+        amount={pricelistModal.amount}
+        section={pricelistModal.section}
+        doorType={doorType}
+        roomType={roomType}
+      />
     </div>
   );
 }
