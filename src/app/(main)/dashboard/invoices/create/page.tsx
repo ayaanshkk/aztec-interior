@@ -10,7 +10,7 @@ import { BACKEND_URL } from "@/lib/api";
 import Image from 'next/image';
 import { useSessionDraft } from "@/hooks/useSessionDraft";
 import { SignatureField } from "@/components/ui/SignatureField";
-import AddToPricelistModal from "@/components/ui/AddToPricelistModal";
+import AddToPricelistModal, { PricelistEntry } from "@/components/ui/AddToPricelistModal";
 
 const API_FORM = `${BACKEND_URL}/api/form`;
 
@@ -31,6 +31,7 @@ interface InvoiceItem {
   subItems?: InvoiceItem[];
   section?: string;
   notInPricelist?: boolean;
+  doorTypeAtEntry?: string;
 }
 
 const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings', 'Miscellaneous'] as const;
@@ -82,7 +83,7 @@ export default function CreateInvoicePage() {
   const [doorStyle, setDoorStyle] = useState<string>('');
   const [roomName, setRoomName] = useState('');
   const [showExVat, setShowExVat] = useState(true);
-  const [pricelistModal, setPricelistModal] = useState<{ open: boolean; itemCode: string; description: string; amount: number; section: string }>({ open: false, itemCode: '', description: '', amount: 0, section: '' });
+  const [pricelistModal, setPricelistModal] = useState<{ open: boolean; entries: PricelistEntry[]; pendingIsDraft: boolean }>({ open: false, entries: [], pendingIsDraft: false });
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [fillerType, setFillerType] = useState<string>('Basic Slab');
@@ -95,14 +96,14 @@ export default function CreateInvoicePage() {
 
   const { saveDraft, loadDraft, clearDraft } = useSessionDraft("invoices/create");
 
-  // Restore draft on mount — skip if customer params are in the URL (fresh navigation)
+  // Restore draft only on page refresh — fresh navigation always starts clean
   useEffect(() => {
-    if (searchParams.get("customerId")) { clearDraft(); return; }
+    const isReload = typeof performance !== "undefined" && (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming)?.type === "reload";
+    if (!isReload) { clearDraft(); return; }
     const draft = loadDraft();
     if (!draft) return;
     if (draft.formData) setFormData(draft.formData as typeof formData);
     if (draft.customerId !== undefined) setCustomerId(draft.customerId as string | null);
-    if (draft.items) setItems(draft.items as typeof items);
     if (draft.doorType) setDoorType(draft.doorType as string);
     if (draft.roomType) setRoomType(draft.roomType as string);
     if (draft.vatPercentage !== undefined) setVatPercentage(draft.vatPercentage as number);
@@ -111,8 +112,6 @@ export default function CreateInvoicePage() {
     if (draft.panelworkColour !== undefined) setPanelworkColour(draft.panelworkColour as string);
     if (draft.doorStyle !== undefined) setDoorStyle(draft.doorStyle as string);
     if (draft.roomName !== undefined) setRoomName(draft.roomName as string);
-    if (draft.sectionDiscounts) setSectionDiscounts(draft.sectionDiscounts as Record<string, number>);
-    if (draft.sectionDiscountAmounts) setSectionDiscountAmounts(draft.sectionDiscountAmounts as Record<string, string>);
     if (draft.fillerType !== undefined) setFillerType(draft.fillerType as string);
     if (draft.invoiceNumber !== undefined) setInvoiceNumber(draft.invoiceNumber as string);
     if (draft.quoteReference !== undefined) setQuoteReference(draft.quoteReference as string);
@@ -121,7 +120,33 @@ export default function CreateInvoicePage() {
     if (draft.globalDiscountPercent !== undefined) setGlobalDiscountPercent(draft.globalDiscountPercent as number);
     if (draft.deposit !== undefined) setDeposit(draft.deposit as number);
     if (draft.signatureData) setSignatureData(draft.signatureData as typeof signatureData);
-    setDraftRestored(true);
+    // Recover section discounts: if amount was saved but blur hadn't fired yet (pct missing/0), recompute
+    const draftItems = (draft.items as any[]) || [];
+    const draftSectionDiscounts = { ...((draft.sectionDiscounts as Record<string, number>) || {}) };
+    const draftSectionAmounts = (draft.sectionDiscountAmounts as Record<string, string>) || {};
+    let itemsNeedUpdate = false;
+    Object.entries(draftSectionAmounts).forEach(([section, amtStr]) => {
+      const amt = parseFloat(amtStr || '0');
+      if (amt > 0 && !draftSectionDiscounts[section]) {
+        const sectionTotal = draftItems.filter((i: any) => (i.section || 'Furniture') === section).reduce((sum: number, i: any) => sum + (i.amount || 0) * (i.quantity || 1), 0);
+        if (sectionTotal > 0) { draftSectionDiscounts[section] = Math.round((amt / sectionTotal) * 10000) / 100; itemsNeedUpdate = true; }
+      }
+    });
+    setSectionDiscounts(draftSectionDiscounts);
+    if (draft.sectionDiscountAmounts) setSectionDiscountAmounts(draftSectionAmounts);
+    if (itemsNeedUpdate) {
+      setItems(draftItems.map((item: any) => {
+        const pct = draftSectionDiscounts[item.section || 'Furniture'] || 0;
+        if (pct > 0 && !item.discount_percent) { const base = (item.quantity || 1) * (item.amount || 0); return { ...item, discount_percent: pct, discounted_total: base - base * (pct / 100) }; }
+        return item;
+      }));
+    } else if (draft.items) { setItems(draftItems); }
+    const hasMeaningful = (
+      (draft.formData && ((draft.formData as any).name?.trim() || (draft.formData as any).address?.trim())) ||
+      (draft.roomName as string)?.trim() ||
+      (Array.isArray(draft.items) && (draft.items as any[]).some(it => it.item?.trim()))
+    );
+    if (hasMeaningful) setDraftRestored(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -357,6 +382,11 @@ export default function CreateInvoicePage() {
       });
       setItems(updatedItems);
 
+      if (field === 'discount_percent') {
+        const changedItem = updatedItems.find(it => it.id === id);
+        if (changedItem) setSectionDiscounts(prev => ({ ...prev, [changedItem.section || 'Furniture']: parseFloat(value) || 0 }));
+      }
+
       if (field !== 'item' || !value || value.length < 1) return;
 
       const trimmedValue = value.trim().toUpperCase();
@@ -484,7 +514,11 @@ export default function CreateInvoicePage() {
           };
         }));
       } else {
-        setItems(prev => prev.map(it => it.id === id ? { ...it, notInPricelist: true } : it));
+        setItems(prev => prev.map(it => {
+          if (it.id !== id) return it;
+          const isFillers = it.section === "Fillers and End Panels" || it.section === "Fillers & End Panels";
+          return { ...it, notInPricelist: true, doorTypeAtEntry: isFillers ? fillerType : doorType };
+        }));
       }
       } catch (error) {
         console.error("Auto-price lookup failed:", error);
@@ -641,10 +675,6 @@ export default function CreateInvoicePage() {
   };
 
   const handleAddItem = (section: string) => {
-    const notFoundItem = itemsRef.current.find(it => it.section === section && it.notInPricelist && it.item?.trim());
-    if (notFoundItem) {
-      setPricelistModal({ open: true, itemCode: notFoundItem.item, description: notFoundItem.description, amount: notFoundItem.amount || 0, section: notFoundItem.section || '' });
-    }
     setItems([
       ...items,
       {
@@ -667,10 +697,6 @@ export default function CreateInvoicePage() {
   };
 
   const handleAddSubItem = (parentId: string) => {
-    const parentItem = itemsRef.current.find(i => i.id === parentId);
-    if (parentItem?.notInPricelist && parentItem?.item?.trim()) {
-      setPricelistModal({ open: true, itemCode: parentItem.item, description: parentItem.description, amount: parentItem.amount || 0, section: parentItem.section || '' });
-    }
     setItems(prevItems => prevItems.map(item => {
       if (item.id === parentId) {
         const newSub: InvoiceItem = {
@@ -799,16 +825,23 @@ export default function CreateInvoicePage() {
     }
   };
 
-  const handleSaveDraft = () => handleSaveWithStatus(true);
-  const handleSave = () => handleSaveWithStatus(false);
+  const handleSaveDraft = () => {
+    const notFound = itemsRef.current.filter(it => it.notInPricelist && it.item?.trim());
+    if (notFound.length > 0) {
+      setPricelistModal({ open: true, entries: notFound.map(it => ({ itemCode: it.item, description: it.description, amount: it.amount, section: it.section, doorTypeAtEntry: it.doorTypeAtEntry })), pendingIsDraft: true });
+    } else { handleSaveWithStatus(true); }
+  };
+  const handleSave = () => {
+    if (!formData.address?.trim()) { alert("Customer address is required"); return; }
+    if (!roomName.trim())          { alert("Order reference is required");  return; }
+    const notFound = itemsRef.current.filter(it => it.notInPricelist && it.item?.trim());
+    if (notFound.length > 0) {
+      setPricelistModal({ open: true, entries: notFound.map(it => ({ itemCode: it.item, description: it.description, amount: it.amount, section: it.section, doorTypeAtEntry: it.doorTypeAtEntry })), pendingIsDraft: false });
+    } else { handleSaveWithStatus(false); }
+  };
 
   const handleSaveWithStatus = async (isDraft: boolean) => {
     if (savingRef.current) return;
-
-    if (!isDraft) {
-        if (!formData.address?.trim()) { alert("Customer address is required"); return; }
-      if (!roomName.trim()) { alert("Order reference is required"); return; }
-    }
 
     const subtotalBeforeDiscount = Math.round(SECTIONS.reduce((total, section) => {
       const sectionItems = items.filter(i => (i.section || 'Furniture') === section);
@@ -1427,7 +1460,7 @@ export default function CreateInvoicePage() {
                               onChange={(e) => setSectionDiscountAmounts(prev => ({ ...prev, [section]: e.target.value }))}
                               onBlur={(e) => {
                                 const amtVal = parseFloat(e.target.value) || 0;
-                                const pct = sectionRaw > 0 ? (amtVal / sectionRaw) * 100 : 0;
+                                const pct = sectionRaw > 0 ? Math.round((amtVal / sectionRaw) * 10000) / 100 : 0;
                                 const prevPct = sectionDiscounts[section] || 0;
                                 setSectionDiscounts(prev => ({ ...prev, [section]: pct }));
                                 setSectionDiscountAmounts(prev => ({ ...prev, [section]: amtVal > 0 ? amtVal.toFixed(2) : '' }));
@@ -1588,12 +1621,11 @@ export default function CreateInvoicePage() {
 
       <AddToPricelistModal
         open={pricelistModal.open}
-        onClose={() => setPricelistModal(p => ({ ...p, open: false }))}
-        itemCode={pricelistModal.itemCode}
-        description={pricelistModal.description}
-        amount={pricelistModal.amount}
-        section={pricelistModal.section}
+        entries={pricelistModal.entries}
+        onProceed={() => { setPricelistModal(p => ({ ...p, open: false })); handleSaveWithStatus(pricelistModal.pendingIsDraft); }}
+        onDismiss={() => setPricelistModal(p => ({ ...p, open: false }))}
         doorType={doorType}
+        fillerType={fillerType}
         roomType={roomType}
       />
     </div>

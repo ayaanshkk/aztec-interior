@@ -120,9 +120,9 @@ export default function KitchenChecklist() {
         setIsWalkinMode(true);
       }
 
-      // Restore saved draft if no URL customer params (i.e. returning to an in-progress form)
-      const hasCustParams = custName || custAddress || custPhone;
-      if (!hasCustParams) {
+      // Restore saved draft only on page refresh
+      const isReload = typeof performance !== "undefined" && (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming)?.type === "reload";
+      if (isReload) {
         try {
           const saved = localStorage.getItem(DRAFT_KEY) || sessionStorage.getItem(DRAFT_KEY);
           if (saved) {
@@ -147,8 +147,9 @@ export default function KitchenChecklist() {
     }
   }, [DRAFT_KEY]);
 
-  // Auto-save to sessionStorage on every change (handles refresh/internet gone)
+  // Auto-save to both storages on every change — localStorage persists across sessions, sessionStorage is fast fallback
   useEffect(() => {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); } catch {}
     try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); } catch {}
   }, [formData, DRAFT_KEY]);
 

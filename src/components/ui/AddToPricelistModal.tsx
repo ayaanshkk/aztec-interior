@@ -28,6 +28,18 @@ const SECTION_TO_CATEGORY: Record<string, string> = {
 
 const FILLER_SECTIONS = new Set(["Fillers and End Panels", "Fillers & End Panels"]);
 
+const FILLER_TYPE_TO_DOOR_TYPE: Record<string, string> = {
+  "Basic Slab":        "Slab",
+  "Acrylic Gloss/Matt": "Lacquered Slab",
+  "Timber":            "Timber",
+};
+
+function resolveDoorType(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  if (DOOR_TYPES.includes(raw)) return raw;
+  return FILLER_TYPE_TO_DOOR_TYPE[raw];
+}
+
 function detectCategory(section?: string, roomType?: string): string {
   if (section && SECTION_TO_CATEGORY[section]) return SECTION_TO_CATEGORY[section];
   if (section === "Miscellaneous") return "";
@@ -84,9 +96,10 @@ export default function AddToPricelistModal({
     setError("");
     setItemStates(entries.map(entry => {
       const isFillerSection = FILLER_SECTIONS.has(entry.section || "");
-      const activeDt = isFillerSection ? fillerType : (entry.doorTypeAtEntry || doorType);
+      const rawDt = isFillerSection ? fillerType : (entry.doorTypeAtEntry || doorType);
+      const activeDt = resolveDoorType(rawDt);
       const initPrices: Record<string, string> = {};
-      if (activeDt && DOOR_TYPES.includes(activeDt) && entry.amount && entry.amount > 0) {
+      if (activeDt && entry.amount && entry.amount > 0) {
         initPrices[activeDt] = String(entry.amount);
       }
       return {
@@ -172,7 +185,8 @@ export default function AddToPricelistModal({
               {itemStates.map((s, idx) => {
                 const entry = entries[idx];
                 const isFillerSection = FILLER_SECTIONS.has(entry.section || "");
-                const activeDt = isFillerSection ? fillerType : (entry.doorTypeAtEntry || doorType);
+                const rawDt = isFillerSection ? fillerType : (entry.doorTypeAtEntry || doorType);
+                const activeDt = resolveDoorType(rawDt);
                 const catFixed = !!(entry.section && SECTION_TO_CATEGORY[entry.section]);
 
                 return (

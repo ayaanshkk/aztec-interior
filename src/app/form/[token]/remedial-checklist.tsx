@@ -88,8 +88,8 @@ export default function RemedialChecklist() {
 
     if (modeParam === "walkin") setIsWalkinMode(true);
 
-    const hasCustParams = custName || custAddress || custPhone;
-    if (!hasCustParams) {
+    const isReload = typeof performance !== "undefined" && (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming)?.type === "reload";
+    if (isReload) {
       try {
         const saved = localStorage.getItem(DRAFT_KEY) || sessionStorage.getItem(DRAFT_KEY);
         if (saved) {
@@ -110,8 +110,9 @@ export default function RemedialChecklist() {
     }));
   }, []);
 
-  // Auto-save to sessionStorage
+  // Auto-save to both storages — localStorage persists across sessions
   useEffect(() => {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); } catch {}
     try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); } catch {}
   }, [formData]);
 
