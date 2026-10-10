@@ -103,11 +103,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, [initialized, clearAuth]); // ✅ Depend on initialized
 
-  // ✅ Redirect to login if not authenticated on protected routes
+  // Redirect based on auth state
   useEffect(() => {
-    if (!loading && !user && pathname?.startsWith('/dashboard')) {
+    if (loading) return;
+    if (!user && pathname?.startsWith('/dashboard')) {
       console.log("❌ Not authenticated, redirecting to login");
       router.replace("/login");
+    } else if (user && pathname === '/login') {
+      console.log("✅ Already authenticated, redirecting to dashboard");
+      router.replace("/dashboard");
     }
   }, [user, loading, pathname, router]);
 

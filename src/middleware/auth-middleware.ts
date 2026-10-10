@@ -1,16 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 export function authMiddleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  const isLoggedIn = req.cookies.get("auth-token");
-  
-  if (!isLoggedIn && pathname.startsWith("/dashboard")) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-
-  // if (isLoggedIn && pathname === "/auth/login") {
-  //   return NextResponse.redirect(new URL("/dashboard", req.url));
-  // }
-
+  // Auth is handled client-side by DashboardAuthGuard + AuthContext.
+  // The cookie-based check caused users to be redirected to login even when
+  // their session was valid in localStorage (cookie can expire or be missing
+  // between visits while localStorage still holds a valid token).
   return NextResponse.next();
 }
