@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
+import { getPricelistDoorTypeFromCode } from "@/lib/utils";
 
 const DOOR_TYPES = ["Carcass Only", "Slab", "Lacquered Slab", "Timber"];
 
@@ -90,14 +91,22 @@ export default function AddToPricelistModal({
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
 
+  const resolveActiveDt = (entry: PricelistEntry) => {
+    const isFillerSection = FILLER_SECTIONS.has(entry.section || "");
+    if (isFillerSection) return resolveDoorType(fillerType);
+    // Suffix on the item code always wins (e.g. 50C-LS → Lacquered Slab)
+    const suffixDt = getPricelistDoorTypeFromCode(entry.itemCode);
+    if (suffixDt) return suffixDt;
+    // Otherwise use the CURRENT doorType prop (not stale doorTypeAtEntry)
+    return resolveDoorType(doorType);
+  };
+
   useEffect(() => {
     if (!open) return;
     setDone(false);
     setError("");
     setItemStates(entries.map(entry => {
-      const isFillerSection = FILLER_SECTIONS.has(entry.section || "");
-      const rawDt = isFillerSection ? fillerType : (entry.doorTypeAtEntry || doorType);
-      const activeDt = resolveDoorType(rawDt);
+      const activeDt = resolveActiveDt(entry);
       const initPrices: Record<string, string> = {};
       if (activeDt && entry.amount && entry.amount > 0) {
         initPrices[activeDt] = String(entry.amount);
@@ -184,9 +193,7 @@ export default function AddToPricelistModal({
             <div className="overflow-y-auto flex-1 space-y-3 py-2 pr-1">
               {itemStates.map((s, idx) => {
                 const entry = entries[idx];
-                const isFillerSection = FILLER_SECTIONS.has(entry.section || "");
-                const rawDt = isFillerSection ? fillerType : (entry.doorTypeAtEntry || doorType);
-                const activeDt = resolveDoorType(rawDt);
+                const activeDt = resolveActiveDt(entry);
                 const catFixed = !!(entry.section && SECTION_TO_CATEGORY[entry.section]);
 
                 return (

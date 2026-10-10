@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { useSessionDraft } from "@/hooks/useSessionDraft";
 import { SignatureField } from "@/components/ui/SignatureField";
 import AddToPricelistModal, { PricelistEntry } from "@/components/ui/AddToPricelistModal";
+import { getDoorTypeFromItemCode, getPricelistDoorTypeFromCode } from "@/lib/utils";
  
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.aztec.techmynt.com';
 
@@ -706,6 +707,7 @@ export default function EditQuotePage() {
       })
       .then(res => res.json())
       .then(data => {
+        const detectedDoorType = getDoorTypeFromItemCode(trimmedValue);
         if (data.found) {
           let autoDescription = data.description || data.item_name || '';
           if (data.is_fitting) {
@@ -713,6 +715,7 @@ export default function EditQuotePage() {
           } else if (isApplianceCode && data.brand && data.series_level) {
             autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
           }
+          if (!autoDescription && detectedDoorType) autoDescription = detectedDoorType;
 
           setItems(prevItems => {
             const newItems = [...prevItems];
@@ -739,7 +742,13 @@ export default function EditQuotePage() {
           setItems(prev => prev.map((it, i) => {
             if (i !== index) return it;
             const isFillers = it.section === "Fillers and End Panels" || it.section === "Fillers & End Panels";
-            return { ...it, notInPricelist: true, doorTypeAtEntry: isFillers ? fillerType : doorType };
+            const suffixDoorType = getPricelistDoorTypeFromCode(trimmedValue);
+            return {
+              ...it,
+              notInPricelist: true,
+              doorTypeAtEntry: suffixDoorType || (isFillers ? fillerType : doorType),
+              description: it.description || detectedDoorType || '',
+            };
           }));
         }
       })

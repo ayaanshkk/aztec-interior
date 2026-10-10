@@ -10,6 +10,7 @@ import { BACKEND_URL } from "@/lib/api";
 import { useSessionDraft } from "@/hooks/useSessionDraft";
 import { SignatureField } from "@/components/ui/SignatureField";
 import AddToPricelistModal, { PricelistEntry } from "@/components/ui/AddToPricelistModal";
+import { getDoorTypeFromItemCode, getPricelistDoorTypeFromCode } from "@/lib/utils";
 
 const API_FORM = `${BACKEND_URL}/api/form`;
 
@@ -471,12 +472,14 @@ export default function EditProformaPage() {
         body: JSON.stringify(body),
       });
       const data = await res.json();
+      const detectedDoorType = getDoorTypeFromItemCode(trimmed);
       if (data.found) {
         let desc = data.description || data.item_name || "";
         if (data.is_fitting) desc = data.item_name || "";
         else if (isAppliance && data.brand && data.series_level) {
           desc = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ""}`;
         }
+        if (!desc && detectedDoorType) desc = detectedDoorType;
         const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
         setItems(prev => prev.map(item => {
           if (item.id !== id) return item;
@@ -490,7 +493,13 @@ export default function EditProformaPage() {
         setItems(prev => prev.map(it => {
           if (it.id !== id) return it;
           const isFillers = it.section === "Fillers and End Panels" || it.section === "Fillers & End Panels";
-          return { ...it, notInPricelist: true, doorTypeAtEntry: isFillers ? fillerType : doorType };
+          const suffixDoorType = getPricelistDoorTypeFromCode(trimmed);
+          return {
+            ...it,
+            notInPricelist: true,
+            doorTypeAtEntry: suffixDoorType || (isFillers ? fillerType : doorType),
+            description: it.description || detectedDoorType || '',
+          };
         }));
       }
     } catch (e) { console.error("Auto-price lookup failed:", e); }

@@ -77,9 +77,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           try {
             const parsedUser = JSON.parse(storedUser);
             console.log("✅ Parsed user:", parsedUser);
-            
+
             setToken(storedToken);
             setUser(parsedUser);
+            // Refresh the cookie so it doesn't expire between visits
+            document.cookie = `auth-token=${storedToken}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
             console.log("✅ Auth state restored from localStorage");
           } catch (parseError) {
             console.error("❌ Failed to parse user data:", parseError);
@@ -128,7 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem("user", JSON.stringify(data.user));
 
       // ✅ Set cookie for middleware (Option 1)
-      document.cookie = `auth-token=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+      document.cookie = `auth-token=${data.token}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 
       console.log("💾 Auth state saved:", {
         token: data.token.substring(0, 20) + "...",

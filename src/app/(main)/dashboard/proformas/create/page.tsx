@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { useSessionDraft } from "@/hooks/useSessionDraft";
 import { SignatureField } from "@/components/ui/SignatureField";
 import AddToPricelistModal, { PricelistEntry } from "@/components/ui/AddToPricelistModal";
+import { getDoorTypeFromItemCode, getPricelistDoorTypeFromCode } from "@/lib/utils";
 
 const API_FORM = `${BACKEND_URL}/api/form`;
 
@@ -414,12 +415,14 @@ export default function CreateProformaPage() {
         body: JSON.stringify(requestBody),
       });
       const data = await response.json();
+      const detectedDoorType = getDoorTypeFromItemCode(trimmedValue);
       if (data.found) {
         let autoDescription = data.description || data.item_name || '';
         if (data.is_fitting) autoDescription = data.item_name || '';
         else if (isApplianceCode && data.brand && data.series_level) {
           autoDescription = `${data.item_name} - ${data.brand} ${data.series_level}${data.series_info ? ` (${data.series_info})` : ''}`;
         }
+        if (!autoDescription && detectedDoorType) autoDescription = detectedDoorType;
         const fittingQty = data.is_fitting && data.quantity ? data.quantity : null;
         setItems(prevItems => prevItems.map(item => {
           if (item.id === id) {
@@ -427,16 +430,16 @@ export default function CreateProformaPage() {
             const price = data.price || 0;
             const lineTotal = price * qty;
             const discPct = item.discount_percent || 0;
-            return { 
-              ...item, 
-              item: trimmedValue, 
-              description: autoDescription, 
-              amount: price, 
-              quantity: qty, 
-              width: data.width, 
-              height: data.height, 
-              depth: data.depth, 
-              line_total: lineTotal, 
+            return {
+              ...item,
+              item: trimmedValue,
+              description: autoDescription,
+              amount: price,
+              quantity: qty,
+              width: data.width,
+              height: data.height,
+              depth: data.depth,
+              line_total: lineTotal,
               discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal };
           }
           return item;
@@ -445,7 +448,13 @@ export default function CreateProformaPage() {
         setItems(prev => prev.map(it => {
           if (it.id !== id) return it;
           const isFillers = it.section === "Fillers and End Panels" || it.section === "Fillers & End Panels";
-          return { ...it, notInPricelist: true, doorTypeAtEntry: isFillers ? fillerType : doorType };
+          const suffixDoorType = getPricelistDoorTypeFromCode(trimmedValue);
+          return {
+            ...it,
+            notInPricelist: true,
+            doorTypeAtEntry: suffixDoorType || (isFillers ? fillerType : doorType),
+            description: it.description || detectedDoorType || '',
+          };
         }));
       }
     } catch (error) { console.error("Auto-price lookup failed:", error); }
