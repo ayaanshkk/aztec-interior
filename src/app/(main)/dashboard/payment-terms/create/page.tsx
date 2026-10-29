@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
 import { BACKEND_URL } from "@/lib/api";
 import Image from 'next/image';
 
@@ -17,13 +17,12 @@ interface PaymentRow {
   amount_paid: number | "";
   date: string;
   signed: string;
-  editable_label: boolean; // whether label can be edited
 }
 
 const DEFAULT_ROWS: PaymentRow[] = [
-  { id: "1", label: "Deposit",                              amount_due: "", amount_paid: "", date: "", signed: "", editable_label: false },
-  { id: "2", label: "6 wks Prior to commencement of works", amount_due: "", amount_paid: "", date: "", signed: "", editable_label: false },
-  { id: "3", label: "On Completion",                        amount_due: "", amount_paid: "", date: "", signed: "", editable_label: false },
+  { id: "1", label: "Deposit",                              amount_due: "", amount_paid: "", date: "", signed: "" },
+  { id: "2", label: "6 wks Prior to commencement of works", amount_due: "", amount_paid: "", date: "", signed: "" },
+  { id: "3", label: "On Completion",                        amount_due: "", amount_paid: "", date: "", signed: "" },
 ];
 
 export default function CreatePaymentTermsPage() {
@@ -66,6 +65,15 @@ export default function CreatePaymentTermsPage() {
           ? (value === "" ? "" : Number(value))
           : value }
     ));
+  };
+
+  const addRow = () => {
+    const newId = String(Date.now());
+    setRows(prev => [...prev, { id: newId, label: "", amount_due: "", amount_paid: "", date: "", signed: "" }]);
+  };
+
+  const deleteRow = (id: string) => {
+    setRows(prev => prev.filter(r => r.id !== id));
   };
 
   const totalDue  = rows.reduce((s, r) => s + (Number(r.amount_due)  || 0), 0);
@@ -206,28 +214,26 @@ export default function CreatePaymentTermsPage() {
         </div>
 
         {/* Payment schedule table */}
-        <div className="rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+        <div className="rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-3">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "34%" }}>Description</th>
-                <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "17%" }}>Amount Due</th>
-                <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "17%" }}>Amount Paid</th>
-                <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "17%" }}>Date</th>
-                <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "15%" }}>Signed</th>
+                <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "32%" }}>Description</th>
+                <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "16%" }}>Amount Due</th>
+                <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "16%" }}>Amount Paid</th>
+                <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "16%" }}>Date</th>
+                <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "14%" }}>Signed</th>
+                <th className="py-3 px-3" style={{ width: "6%" }} />
               </tr>
             </thead>
             <tbody>
               {rows.map(row => (
                 <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-3 px-3 text-gray-700">
-                    {row.editable_label ? (
-                      <Input value={row.label}
-                        onChange={e => handleRowChange(row.id, "label", e.target.value)}
-                        className="border-none focus-visible:ring-0 text-sm p-0 h-auto bg-transparent" />
-                    ) : (
-                      <span className="whitespace-pre-line text-sm">{row.label}</span>
-                    )}
+                  <td className="py-2 px-3 text-gray-700">
+                    <Input value={row.label}
+                      onChange={e => handleRowChange(row.id, "label", e.target.value)}
+                      placeholder="Description"
+                      className="border-none focus-visible:ring-0 text-sm p-0 h-auto bg-transparent placeholder:text-gray-300" />
                   </td>
                   <td className="py-2 px-3">
                     <Input type="number" min="0" step="0.01"
@@ -254,11 +260,21 @@ export default function CreatePaymentTermsPage() {
                       placeholder="..."
                       className="border-none text-center focus-visible:ring-0 text-sm bg-transparent" />
                   </td>
+                  <td className="py-2 px-2 text-center">
+                    <button onClick={() => deleteRow(row.id)}
+                      className="text-gray-300 hover:text-red-500 transition-colors p-1 rounded">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        <button onClick={addRow}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors mb-6 px-3 py-1.5">
+          <Plus className="h-3.5 w-3.5" /> Add Line
+        </button>
 
         {/* Totals */}
         <div className="flex justify-end mb-10">

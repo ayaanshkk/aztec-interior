@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Download, Edit, X, CheckSquare, Printer } from "lucide-react";
+import { ArrowLeft, Download, Edit, X, CheckSquare, Printer, Plus, Trash2 } from "lucide-react";
 import Image from 'next/image';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://api.aztec.techmynt.com";
@@ -75,17 +75,14 @@ export default function ViewPaymentTermsPage() {
     });
 
     const savedRows = d.payment_rows || [];
-    const mapped: PaymentRow[] = DEFAULT_LABELS.map((label, i) => {
-      const saved = savedRows[i] || {};
-      return {
-        id:          String(i + 1),
-        label:       saved.label || label,
-        amount_due:  saved.amount_due  !== undefined ? saved.amount_due  : "",
-        amount_paid: saved.amount_paid !== undefined ? saved.amount_paid : "",
-        date:        saved.date    || "",
-        signed:      saved.signed  || "",
-      };
-    });
+    const mapped: PaymentRow[] = savedRows.map((saved: any, i: number) => ({
+      id:          String(i + 1),
+      label:       saved.label       ?? "",
+      amount_due:  saved.amount_due  !== undefined ? saved.amount_due  : "",
+      amount_paid: saved.amount_paid !== undefined ? saved.amount_paid : "",
+      date:        saved.date    || "",
+      signed:      saved.signed  || "",
+    }));
     setRows(mapped);
   };
 
@@ -103,6 +100,15 @@ export default function ViewPaymentTermsPage() {
 
   const totalDue  = rows.reduce((s, r) => s + (Number(r.amount_due)  || 0), 0);
   const totalPaid = rows.reduce((s, r) => s + (Number(r.amount_paid) || 0), 0);
+
+  const addRow = () => {
+    const newId = String(Date.now());
+    setRows(prev => [...prev, { id: newId, label: "", amount_due: "", amount_paid: "", date: "", signed: "" }]);
+  };
+
+  const deleteRow = (id: string) => {
+    setRows(prev => prev.filter(r => r.id !== id));
+  };
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -146,7 +152,7 @@ export default function ViewPaymentTermsPage() {
 
   // ── Display values (view mode uses saved data, edit uses working state) ───
   const displayRows = isEditing ? rows : (data?.payment_rows || []).map((r: any, i: number) => ({
-    ...r, id: String(i + 1), label: r.label || DEFAULT_LABELS[i] || `Row ${i + 1}`,
+    ...r, id: String(i + 1), label: r.label ?? "",
     amount_due: r.amount_due || "", amount_paid: r.amount_paid || "",
   }));
 
@@ -283,23 +289,33 @@ export default function ViewPaymentTermsPage() {
         </div>
 
         {/* Payment schedule table */}
-        <div className="rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+        <div className="rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-3">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "34%" }}>Description</th>
+                <th className="py-3 px-3 text-left text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: isEditing ? "30%" : "34%" }}>Description</th>
                 <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "17%" }}>Amount Due</th>
                 <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "17%" }}>Amount Paid</th>
                 <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "17%" }}>Date</th>
                 <th className="py-3 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400" style={{ width: "15%" }}>Signed</th>
+                {isEditing && <th className="py-3 px-3" style={{ width: "4%" }} />}
               </tr>
             </thead>
             <tbody>
               {displayRows.map((row: any) => (
                 <tr key={row.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-3 px-3 text-gray-700 whitespace-pre-line text-sm font-medium">
-                    {row.label}
-                  </td>
+                  {isEditing ? (
+                    <td className="py-2 px-3 text-gray-700">
+                      <Input value={row.label}
+                        onChange={e => handleRowChange(row.id, "label", e.target.value)}
+                        placeholder="Description"
+                        className="border-none focus-visible:ring-0 text-sm p-0 h-auto bg-transparent placeholder:text-gray-300" />
+                    </td>
+                  ) : (
+                    <td className="py-3 px-3 text-gray-700 whitespace-pre-line text-sm font-medium">
+                      {row.label}
+                    </td>
+                  )}
                   {isEditing ? (
                     <>
                       <td className="py-2 px-3">
@@ -322,6 +338,12 @@ export default function ViewPaymentTermsPage() {
                           onChange={e => handleRowChange(row.id, "signed", e.target.value)}
                           className="border-none text-center focus-visible:ring-0 text-sm bg-transparent" />
                       </td>
+                      <td className="py-2 px-2 text-center">
+                        <button onClick={() => deleteRow(row.id)}
+                          className="text-gray-300 hover:text-red-500 transition-colors p-1 rounded">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                     </>
                   ) : (
                     <>
@@ -342,6 +364,13 @@ export default function ViewPaymentTermsPage() {
             </tbody>
           </table>
         </div>
+        {isEditing && (
+          <button onClick={addRow}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors mb-6 px-3 py-1.5 print:hidden">
+            <Plus className="h-3.5 w-3.5" /> Add Line
+          </button>
+        )}
+        {!isEditing && <div className="mb-6" />}
 
         {/* Grand totals */}
         <div className="flex justify-end mb-10">
