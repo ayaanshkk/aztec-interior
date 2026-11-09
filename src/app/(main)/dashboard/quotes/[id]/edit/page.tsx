@@ -403,6 +403,8 @@ export default function EditQuotePage() {
           discount_percent: item.discount_percent || 0,
           discounted_total: item.discounted_total || ((item.quantity || 1) * (item.amount || 0)),
           section: item.section || 'Furniture',
+          notInPricelist: item.needs_manual_pricing || false,
+          doorTypeAtEntry: item.doorTypeAtEntry || undefined,
           subItems: (item.subItems || []).map((sub: any) => ({
             item: sub.item || '',
             description: sub.description || '',

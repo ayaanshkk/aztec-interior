@@ -97,11 +97,11 @@ export default function PricelistPage() {
 
   // Door types based on active tab
   const doorTypes: DoorType[] = activeTab === 'Kitchen'
-    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Timber']
+    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Timber']
     : activeTab === 'Bedrooms'
     ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Base Cabinet Only']
     : activeTab === 'Doors'
-    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Timber']
+    ? ['Carcass Only', 'Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Black Glass', 'Timber']
     : activeTab === 'Fillers & End Panels'
     ? ['Basic Slab', 'Acrylic Gloss/Matt', 'Vinyl Doors', 'Timber']
     : activeTab === 'Accessories' || activeTab === 'Handles' || activeTab === 'Fittings'
@@ -314,7 +314,8 @@ export default function PricelistPage() {
       width: item.width,
       height: item.height,
       depth: item.depth,
-      prices: { ...item.prices }
+      prices: { ...item.prices },
+      reassignCategory: activeTab,
     });
   };
 
@@ -406,6 +407,14 @@ export default function PricelistPage() {
       }
 
       await Promise.all(updates);
+
+      if (editForm.reassignCategory && editForm.reassignCategory !== activeTab) {
+        const newCategory = TAB_TO_CATEGORY[editForm.reassignCategory] || editForm.reassignCategory;
+        const allIds = Object.values(editForm.prices as Record<string, any>)
+          .map((d: any) => d.pricelist_id)
+          .filter(Boolean);
+        await Promise.all(allIds.map((id: number) => api.updatePricelistItem(id, { category: newCategory })));
+      }
 
       setSuccess('Item updated successfully');
       setEditingCode(null);
@@ -805,6 +814,15 @@ export default function PricelistPage() {
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   <div className="flex items-center justify-end gap-2">
+                                    <select
+                                      value={editForm.reassignCategory || activeTab}
+                                      onChange={(e) => setEditForm({ ...editForm, reassignCategory: e.target.value })}
+                                      className="text-xs border border-gray-300 rounded px-1 py-1 focus:ring-2 focus:ring-gray-900"
+                                    >
+                                      {['Kitchen','Bedrooms','Appliances','Handles','Accessories','Fillers & End Panels','Fittings','Sink and Tap','Worktops','Doors'].map(tab => (
+                                        <option key={tab} value={tab}>{tab}</option>
+                                      ))}
+                                    </select>
                                     <button onClick={() => saveEdit(item.item_code)} className="text-gray-900 hover:text-gray-700"><Save className="w-5 h-5" /></button>
                                     <button onClick={cancelEdit} className="text-gray-600 hover:text-gray-900"><X className="w-5 h-5" /></button>
                                   </div>
@@ -850,8 +868,11 @@ export default function PricelistPage() {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {paginatedItems.map((item) => {
-                        const priceData = item.prices['Standard'];
+                        const priceData = (item.prices['Standard']?.price > 0 ? item.prices['Standard'] : null)
+                          ?? Object.values(item.prices).find(p => p.price > 0)
+                          ?? Object.values(item.prices)[0];
                         const rawItem = pricelistItems.find(i => i.item_code === item.item_code);
+                        const worktopPriceKey = Object.keys(item.prices).find(k => (item.prices[k]?.price ?? 0) > 0) || Object.keys(item.prices)[0] || 'Standard';
                         return (
                           <tr key={item.item_code} className="hover:bg-gray-50">
                             {editingCode === item.item_code ? (
@@ -886,12 +907,12 @@ export default function PricelistPage() {
                                   <input
                                     type="number"
                                     step="0.01"
-                                    value={editForm.prices?.['Standard']?.price ?? ''}
+                                    value={editForm.prices?.[worktopPriceKey]?.price ?? ''}
                                     onChange={(e) => setEditForm({
                                       ...editForm,
                                       prices: {
                                         ...editForm.prices,
-                                        Standard: { ...editForm.prices?.['Standard'], price: e.target.value }
+                                        [worktopPriceKey]: { ...editForm.prices?.[worktopPriceKey], price: e.target.value }
                                       }
                                     })}
                                     className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-gray-900"
@@ -906,6 +927,15 @@ export default function PricelistPage() {
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   <div className="flex items-center justify-end gap-2">
+                                    <select
+                                      value={editForm.reassignCategory || activeTab}
+                                      onChange={(e) => setEditForm({ ...editForm, reassignCategory: e.target.value })}
+                                      className="text-xs border border-gray-300 rounded px-1 py-1 focus:ring-2 focus:ring-gray-900"
+                                    >
+                                      {['Kitchen','Bedrooms','Appliances','Handles','Accessories','Fillers & End Panels','Fittings','Sink and Tap','Worktops','Doors'].map(tab => (
+                                        <option key={tab} value={tab}>{tab}</option>
+                                      ))}
+                                    </select>
                                     <button onClick={() => saveEdit(item.item_code)} className="text-gray-900 hover:text-gray-700"><Save className="w-5 h-5" /></button>
                                     <button onClick={cancelEdit} className="text-gray-600 hover:text-gray-900"><X className="w-5 h-5" /></button>
                                   </div>
@@ -1115,6 +1145,15 @@ export default function PricelistPage() {
                               )}
                               <td className="px-4 py-3 whitespace-nowrap text-right">
                                 <div className="flex items-center justify-end gap-2">
+                                  <select
+                                    value={editForm.reassignCategory || activeTab}
+                                    onChange={(e) => setEditForm({ ...editForm, reassignCategory: e.target.value })}
+                                    className="text-xs border border-gray-300 rounded px-1 py-1 focus:ring-2 focus:ring-gray-900"
+                                  >
+                                    {['Kitchen','Bedrooms','Appliances','Handles','Accessories','Fillers & End Panels','Fittings','Sink and Tap','Worktops','Doors'].map(tab => (
+                                      <option key={tab} value={tab}>{tab}</option>
+                                    ))}
+                                  </select>
                                   <button onClick={() => saveEdit(item.item_code)} className="text-gray-900 hover:text-gray-700"><Save className="w-5 h-5" /></button>
                                   <button onClick={cancelEdit} className="text-gray-600 hover:text-gray-900"><X className="w-5 h-5" /></button>
                                 </div>

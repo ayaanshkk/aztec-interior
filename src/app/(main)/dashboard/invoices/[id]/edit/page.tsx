@@ -224,6 +224,8 @@ export default function EditInvoicePage() {
         discount_percent: i.discount_percent || 0,
         discounted_total: parseFloat((Number(i.discounted_total || 0) || Number(i.amount || 0) * Number(i.quantity || 1)).toFixed(2)),
         section:          i.section || "Furniture",
+        notInPricelist:   i.needs_manual_pricing || false,
+        doorTypeAtEntry:  i.doorTypeAtEntry || undefined,
         subItems: (subItemsByParent[idx] || []).map((s: any, si: number) => ({
           id:               `sub-loaded-${idx}-${si}`,
           item:             s.item || s.item_name || "",

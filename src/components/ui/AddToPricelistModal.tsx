@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { api } from "@/lib/api";
 import { getPricelistDoorTypeFromCode } from "@/lib/utils";
 
-const DOOR_TYPES = ["Carcass Only", "Slab", "Lacquered Slab", "Timber"];
+const DOOR_TYPES = ["Carcass Only", "Slab", "Lacquered Slab", "Vinyl Doors", "Black Glass", "Timber"];
 
 const FIXED_CATEGORIES = [
   "Kitchen", "Bedrooms", "Appliances", "Handles", "Accessories",
@@ -32,7 +32,10 @@ const FILLER_SECTIONS = new Set(["Fillers and End Panels", "Fillers & End Panels
 const FILLER_TYPE_TO_DOOR_TYPE: Record<string, string> = {
   "Basic Slab":        "Slab",
   "Acrylic Gloss/Matt": "Lacquered Slab",
+  "Vinyl Doors":       "Vinyl Doors",
+  "Black Glass":       "Black Glass",
   "Timber":            "Timber",
+  "Carcass Only":      "Carcass Only",
 };
 
 function resolveDoorType(raw: string | undefined): string | undefined {
