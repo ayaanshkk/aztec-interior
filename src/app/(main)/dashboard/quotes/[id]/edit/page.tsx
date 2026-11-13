@@ -33,6 +33,9 @@ interface QuoteItem {
   section?: string;
   notInPricelist?: boolean;
   doorTypeAtEntry?: string;
+  dimension_based?: boolean;
+  base_price_per_sqm?: number;
+  banding_type?: 'none' | 'standard' | 'premium';
 }
 
 const SECTIONS = ['Furniture', 'Fillers and End Panels', 'Accessories', 'Handles', 'Appliances', 'Sink and Tap', 'Worktops', 'Fittings', 'Miscellaneous'] as const;
@@ -564,6 +567,17 @@ export default function EditQuotePage() {
       [field]: value,
     };
 
+    if ((field === 'width' || field === 'height') && items[index].dimension_based && items[index].base_price_per_sqm) {
+      const w = Number(field === 'width' ? value : items[index].width) || 0;
+      const h = Number(field === 'height' ? value : items[index].height) || 0;
+      const newAmount = parseFloat(((w * h / 1000000) * items[index].base_price_per_sqm!).toFixed(2));
+      updatedItems[index].amount = newAmount;
+      const qty = updatedItems[index].quantity || 1;
+      const disc = updatedItems[index].discount_percent || 0;
+      updatedItems[index].line_total = qty * newAmount;
+      updatedItems[index].discounted_total = calculateDiscountedTotal(qty, newAmount, disc);
+    }
+
     if (['quantity', 'amount', 'discount_percent'].includes(field)) {
       const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItems[index].quantity || 1;
       const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItems[index].amount || 0;
@@ -737,6 +751,8 @@ export default function EditQuotePage() {
               depth: data.depth,
               line_total: lineTotal,
               discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
+              dimension_based: data.dimension_based || false,
+              base_price_per_sqm: data.base_price_per_sqm || undefined,
             };
             return newItems;
           });
@@ -757,6 +773,59 @@ export default function EditQuotePage() {
       .catch(error => console.error("Auto-price lookup failed:", error))
       .finally(() => setAutoFilling(null));
     }
+  };
+
+  const [fillersBandingType, setFillersBandingType] = useState<'none' | 'standard' | 'premium'>('none');
+
+  const handleSectionBandingChange = async (bandingType: 'none' | 'standard' | 'premium') => {
+    setFillersBandingType(bandingType);
+    if (bandingType === 'none') {
+      setItems(prev => prev.filter(item =>
+        !(item.section === 'Fillers and End Panels' && /^EB[SP]\d+$/i.test(item.item || ''))
+      ));
+      return;
+    }
+    const prefix = bandingType === 'standard' ? 'EBS' : 'EBP';
+    const bpItems = itemsRef.current.filter(item =>
+      item.section === 'Fillers and End Panels' && /^BP[A-Z0-9]+/i.test(item.item || '')
+    );
+    if (bpItems.length === 0) return;
+    const thicknesses = [...new Set(bpItems.map(item => {
+      const m = (item.item || '').match(/(19|18|38|36|50)$/);
+      return m ? m[1] : '18';
+    }))];
+    const token = localStorage.getItem('token');
+    const tenantId = localStorage.getItem('tenantId') || '7';
+    const priceMap: Record<string, { price: number; desc: string }> = {};
+    await Promise.all(thicknesses.map(async thickness => {
+      const code = `${prefix}${thickness}`;
+      try {
+        const res = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Tenant-ID': tenantId },
+          body: JSON.stringify({ description: code, door_type: 'Standard', room_type: roomType, filler_door_type: 'Standard' }),
+        });
+        const data = await res.json();
+        if (data.found) priceMap[thickness] = { price: data.price || 0, desc: data.description || data.item_name || code };
+      } catch {}
+    }));
+    setItems(prev => {
+      const withoutBanding = prev.filter(item =>
+        !(item.section === 'Fillers and End Panels' && /^EB[SP]\d+$/i.test(item.item || ''))
+      );
+      const result: QuoteItem[] = [];
+      for (const item of withoutBanding) {
+        result.push(item);
+        if (item.section === 'Fillers and End Panels' && /^BP[A-Z0-9]+/i.test(item.item || '')) {
+          const m = (item.item || '').match(/(19|18|38|36|50)$/);
+          const thickness = m ? m[1] : '18';
+          const code = `${prefix}${thickness}`;
+          const info = priceMap[thickness] || { price: 0, desc: code };
+          result.push({ item: code, description: info.desc, color: '', quantity: 1, amount: info.price, line_total: info.price, discount_percent: 0, discounted_total: info.price, section: 'Fillers and End Panels' });
+        }
+      }
+      return result;
+    });
   };
 
   const FITTING_CODES_LIST = ['KUNIT', 'BUNIT', 'ROBE', 'APPL', 'SINKTAP', 'FITDR', 'PANW'];
@@ -1206,7 +1275,7 @@ export default function EditQuotePage() {
         </div>
 
         {/* ✅ NEW: Door Type and Room Type Selection */}
-        <div className="mb-6 grid grid-cols-3 gap-4">
+        <div className="mb-6 grid grid-cols-4 gap-4">
           <div>
             <label className="mb-2 block text-sm font-semibold text-gray-700">
               Room Type <span className="text-red-600">*</span>
@@ -1257,8 +1326,22 @@ export default function EditQuotePage() {
               <option value="Timber">Timber</option>
             </select>
           </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Edge Banding Type
+            </label>
+            <select
+              value={fillersBandingType}
+              onChange={(e) => handleSectionBandingChange(e.target.value as 'none' | 'standard' | 'premium')}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="none">None</option>
+              <option value="standard">Standard – Unicolor &amp; Woodgrain (ST9-ST19)</option>
+              <option value="premium">Premium – Egger Feelwood &amp; PerfectSense</option>
+            </select>
+          </div>
         </div>
-        
+
         {/* ✅ NEW: Info Banner */}
         {(() => {
           const DOOR_TYPE_DISPLAY: Record<string, string> = {
