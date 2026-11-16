@@ -592,8 +592,10 @@ export default function EditInvoicePage() {
   const handleSectionBandingChange = async (bandingType: 'none' | 'standard' | 'premium') => {
     setFillersBandingType(bandingType);
     if (bandingType === 'none') {
-      setItems(prev => prev.filter(item =>
-        !(item.section === 'Fillers and End Panels' && /^EB[SP]\d+$/i.test(item.item || ''))
+      setItems(prev => prev.map(item =>
+        item.section === 'Fillers and End Panels' && /^BP[A-Z0-9]+/i.test(item.item || '')
+          ? { ...item, subItems: (item.subItems || []).filter(s => !/^EB[SP]\d+$/i.test(s.item || '')) }
+          : item
       ));
       return;
     }
@@ -618,23 +620,30 @@ export default function EditInvoicePage() {
         if (data.found) priceMap[thickness] = { price: data.price || 0, desc: data.description || data.item_name || code };
       } catch {}
     }));
-    setItems(prev => {
-      const withoutBanding = prev.filter(item =>
-        !(item.section === 'Fillers and End Panels' && /^EB[SP]\d+$/i.test(item.item || ''))
-      );
-      const result: InvoiceItem[] = [];
-      for (const item of withoutBanding) {
-        result.push(item);
-        if (item.section === 'Fillers and End Panels' && /^BP[A-Z0-9]+/i.test(item.item || '')) {
-          const m = (item.item || '').match(/(19|18|38|36|50)$/);
-          const thickness = m ? m[1] : '18';
-          const code = `${prefix}${thickness}`;
-          const info = priceMap[thickness] || { price: 0, desc: code };
-          result.push({ id: `banding-${Date.now()}-${Math.random()}`, item: code, description: info.desc, color: '', quantity: 1, amount: info.price, line_total: info.price, discount_percent: 0, discounted_total: info.price, section: 'Fillers and End Panels' });
-        }
-      }
-      return result;
-    });
+    setItems(prev => prev.map(item => {
+      if (!(item.section === 'Fillers and End Panels' && /^BP[A-Z0-9]+/i.test(item.item || ''))) return item;
+      const m = (item.item || '').match(/(19|18|38|36|50)$/);
+      const thickness = m ? m[1] : '18';
+      const code = `${prefix}${thickness}`;
+      const info = priceMap[thickness] || { price: 0, desc: code };
+      const w = Number(item.width) || 0;
+      const h = Number(item.height) || 0;
+      const perimeterLm = w > 0 && h > 0 ? Math.round(((w * 2 + h * 2) / 1000) * 1000) / 1000 : 1;
+      const bandingTotal = Math.round(perimeterLm * info.price * 100) / 100;
+      const ebSubItem: InvoiceItem = {
+        id: `banding-${Date.now()}-${Math.random()}`,
+        item: code,
+        description: info.desc,
+        color: '',
+        quantity: perimeterLm,
+        amount: info.price,
+        line_total: bandingTotal,
+        discount_percent: 0,
+        discounted_total: bandingTotal,
+      };
+      const existingSubs = (item.subItems || []).filter(s => !/^EB[SP]\d+$/i.test(s.item || ''));
+      return { ...item, subItems: [...existingSubs, ebSubItem] };
+    }));
   };
 
   // ── Sub-item handlers ──────────────────────────────────────────────────────
