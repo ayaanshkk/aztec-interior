@@ -602,6 +602,7 @@ export default function EditProformaPage() {
       const perimeterLm = w > 0 && h > 0 ? Math.round(((w * 2 + h * 2) / 1000) * 1000) / 1000 : 1;
       const bandingTotal = Math.round(perimeterLm * info.price * 100) / 100;
       const ebSubItem: ProformaItem = {
+        id: `banding-${Date.now()}-${Math.random()}`,
         item: code,
         description: info.desc,
         color: '',
