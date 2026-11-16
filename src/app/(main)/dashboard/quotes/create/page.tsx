@@ -71,6 +71,7 @@ export default function CreateQuotePage() {
   const itemsRef = useRef(items);
   useEffect(() => { itemsRef.current = items; }, [items]);
 
+
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [autoFilling, setAutoFilling] = useState<string | null>(null);
@@ -518,6 +519,12 @@ export default function CreateQuotePage() {
           }
           return item;
         }));
+        // If this is a BP item and banding is already set, re-trigger banding so the EB sub-item is added
+        const isBpItem = /^BP[A-Z0-9]+/i.test(trimmedValue);
+        const currentBanding = fillersBandingTypeRef.current;
+        if (isBpItem && currentBanding && currentBanding !== 'none') {
+          setTimeout(() => handleSectionBandingChange(currentBanding), 50);
+        }
       } else {
         setItems(prev => prev.map(it => {
           if (it.id !== id) return it;
@@ -542,6 +549,8 @@ export default function CreateQuotePage() {
   // BANDING - Section-level dropdown for Fillers & End Panels
   // ============================================================================
   const [fillersBandingType, setFillersBandingType] = useState<'none' | 'standard' | 'premium'>('none');
+  const fillersBandingTypeRef = useRef<'none' | 'standard' | 'premium'>('none');
+  useEffect(() => { fillersBandingTypeRef.current = fillersBandingType; }, [fillersBandingType]);
 
   const handleSectionBandingChange = async (bandingType: 'none' | 'standard' | 'premium') => {
     setFillersBandingType(bandingType);

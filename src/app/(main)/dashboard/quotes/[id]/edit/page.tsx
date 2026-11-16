@@ -756,6 +756,10 @@ export default function EditQuotePage() {
             };
             return newItems;
           });
+          // If this is a BP item and banding is already set, re-trigger so the EB sub-item is added
+          if (/^BP[A-Z0-9]+/i.test(trimmedValue) && fillersBandingTypeRef.current !== 'none') {
+            setTimeout(() => handleSectionBandingChange(fillersBandingTypeRef.current), 50);
+          }
         } else {
           setItems(prev => prev.map((it, i) => {
             if (i !== index) return it;
@@ -776,6 +780,8 @@ export default function EditQuotePage() {
   };
 
   const [fillersBandingType, setFillersBandingType] = useState<'none' | 'standard' | 'premium'>('none');
+  const fillersBandingTypeRef = useRef<'none' | 'standard' | 'premium'>('none');
+  useEffect(() => { fillersBandingTypeRef.current = fillersBandingType; }, [fillersBandingType]);
 
   const handleSectionBandingChange = async (bandingType: 'none' | 'standard' | 'premium') => {
     setFillersBandingType(bandingType);
