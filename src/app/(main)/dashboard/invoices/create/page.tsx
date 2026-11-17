@@ -88,6 +88,9 @@ export default function CreateInvoicePage() {
   const [sectionDiscounts, setSectionDiscounts] = useState<Record<string, number>>({});
   const [sectionDiscountAmounts, setSectionDiscountAmounts] = useState<Record<string, string>>({});
   const [fillerType, setFillerType] = useState<string>('Basic Slab');
+  const [fillersBandingType, setFillersBandingType] = useState<'none' | 'standard' | 'premium'>('none');
+  const fillersBandingTypeRef = useRef<'none' | 'standard' | 'premium'>('none');
+  useEffect(() => { fillersBandingTypeRef.current = fillersBandingType; }, [fillersBandingType]);
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [quoteReference, setQuoteReference] = useState('');
   const [additionalTerms, setAdditionalTerms] = useState<string[]>([]);
@@ -363,6 +366,58 @@ export default function CreateInvoicePage() {
     updateAllPrices();
   }, [doorType, roomType, fillerType]);
 
+  // ── Edge banding ─────────────────────────────────────────────────────────────
+  const handleSectionBandingChange = async (bandingType: 'none' | 'standard' | 'premium') => {
+    setFillersBandingType(bandingType);
+    if (bandingType === 'none') {
+      setItems(prev => prev.map(item =>
+        item.section === 'Fillers and End Panels' && /^BP[A-Z0-9]+/i.test(item.item || '')
+          ? { ...item, subItems: (item.subItems || []).filter(s => !/^EB[SP]\d+$/i.test(s.item || '')) }
+          : item
+      ));
+      return;
+    }
+    const prefix = bandingType === 'standard' ? 'EBS' : 'EBP';
+    const bpItems = itemsRef.current.filter(item =>
+      item.section === 'Fillers and End Panels' && /^BP[A-Z0-9]+/i.test(item.item || '')
+    );
+    if (bpItems.length === 0) return;
+    const thicknesses = [...new Set(bpItems.map(item => { const m = (item.item || '').match(/(19|18|38|36|50)$/); return m ? m[1] : '18'; }))];
+    const token = localStorage.getItem('token');
+    const tenantId = localStorage.getItem('tenantId') || '7';
+    const priceMap: Record<string, { price: number; desc: string }> = {};
+    await Promise.all(thicknesses.map(async thickness => {
+      const code = `${prefix}${thickness}`;
+      try {
+        const res = await fetch(`${BACKEND_URL}/quotations/auto-price-lookup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'X-Tenant-ID': tenantId },
+          body: JSON.stringify({ description: code, door_type: 'Standard', room_type: roomType, filler_door_type: 'Standard' }),
+        });
+        const data = await res.json();
+        if (data.found) priceMap[thickness] = { price: data.price || 0, desc: data.description || data.item_name || code };
+      } catch {}
+    }));
+    setItems(prev => prev.map(item => {
+      if (!(item.section === 'Fillers and End Panels' && /^BP[A-Z0-9]+/i.test(item.item || ''))) return item;
+      const m = (item.item || '').match(/(19|18|38|36|50)$/);
+      const thickness = m ? m[1] : '18';
+      const code = `${prefix}${thickness}`;
+      const info = priceMap[thickness] || { price: 0, desc: code };
+      const w = Number(item.width) || 0;
+      const h = Number(item.height) || 0;
+      const perimeterLm = w > 0 && h > 0 ? Math.round(((w * 2 + h * 2) / 1000) * 1000) / 1000 : 1;
+      const bandingTotal = Math.round(perimeterLm * info.price * 100) / 100;
+      const ebSubItem: InvoiceItem = {
+        id: `banding-${Date.now()}-${Math.random()}`,
+        item: code, description: info.desc, color: '', quantity: perimeterLm,
+        amount: info.price, line_total: bandingTotal, discount_percent: 0, discounted_total: bandingTotal,
+      };
+      const existingSubs = (item.subItems || []).filter(s => !/^EB[SP]\d+$/i.test(s.item || ''));
+      return { ...item, subItems: [...existingSubs, ebSubItem] };
+    }));
+  };
+
   // ============================================================================
   // SMART AUTO-FILL - Triggers when item code is entered
   // ============================================================================
@@ -370,6 +425,24 @@ export default function CreateInvoicePage() {
       const updatedItems = items.map((item) => {
         if (item.id === id) {
           const updatedItem = { ...item, [field]: value };
+          if ((field === 'width' || field === 'height') && (item as any).dimension_based && (item as any).base_price_per_sqm) {
+            const w = Number(field === 'width' ? value : item.width) || 0;
+            const h = Number(field === 'height' ? value : item.height) || 0;
+            const newAmount = parseFloat(((w * h / 1000000) * (item as any).base_price_per_sqm).toFixed(2));
+            (updatedItem as any).amount = newAmount;
+            const qty = updatedItem.quantity || 1;
+            const disc = updatedItem.discount_percent || 0;
+            updatedItem.line_total = qty * newAmount;
+            updatedItem.discounted_total = calculateDiscountedTotal(qty, newAmount, disc);
+            if (/^BP[A-Z0-9]+/i.test(item.item || '') && updatedItem.subItems?.length) {
+              const perimeterLm = w > 0 && h > 0 ? Math.round(((w * 2 + h * 2) / 1000) * 1000) / 1000 : 1;
+              updatedItem.subItems = updatedItem.subItems.map(sub =>
+                /^EB[SP]\d+$/i.test(sub.item || '')
+                  ? { ...sub, quantity: perimeterLm, line_total: Math.round(perimeterLm * (sub.amount || 0) * 100) / 100, discounted_total: Math.round(perimeterLm * (sub.amount || 0) * 100) / 100 }
+                  : sub
+              );
+            }
+          }
           if (['quantity', 'amount', 'discount_percent'].includes(field)) {
             const qty = field === 'quantity' ? parseFloat(value) || 1 : updatedItem.quantity || 1;
             const amount = field === 'amount' ? parseFloat(value) || 0 : updatedItem.amount || 0;
@@ -516,6 +589,11 @@ export default function CreateInvoicePage() {
             discounted_total: discPct > 0 ? lineTotal - lineTotal * (discPct / 100) : lineTotal,
           };
         }));
+        const isBpItem = /^BP[A-Z0-9]+/i.test(trimmedValue);
+        const currentBanding = fillersBandingTypeRef.current;
+        if (isBpItem && currentBanding && currentBanding !== 'none') {
+          setTimeout(() => handleSectionBandingChange(currentBanding), 50);
+        }
       } else {
         setItems(prev => prev.map(it => {
           if (it.id !== id) return it;
@@ -1100,6 +1178,15 @@ export default function CreateInvoicePage() {
               <option value="Acrylic Gloss/Matt">Lacquered Slab</option>
               <option value="Vinyl Doors">Vinyl Doors</option>
               <option value="Timber">Timber</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-gray-700">Edge Banding</label>
+            <select value={fillersBandingType} onChange={e => handleSectionBandingChange(e.target.value as 'none' | 'standard' | 'premium')}
+              className="w-full rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="none">None</option>
+              <option value="standard">Standard (EBS)</option>
+              <option value="premium">Premium (EBP)</option>
             </select>
           </div>
         </div>

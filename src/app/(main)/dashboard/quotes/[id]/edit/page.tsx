@@ -576,6 +576,15 @@ export default function EditQuotePage() {
       const disc = updatedItems[index].discount_percent || 0;
       updatedItems[index].line_total = qty * newAmount;
       updatedItems[index].discounted_total = calculateDiscountedTotal(qty, newAmount, disc);
+      // Recalculate EB sub-item perimeter whenever W or H changes on a BP item
+      if (/^BP[A-Z0-9]+/i.test(updatedItems[index].item || '') && updatedItems[index].subItems?.length) {
+        const perimeterLm = w > 0 && h > 0 ? Math.round(((w * 2 + h * 2) / 1000) * 1000) / 1000 : 1;
+        updatedItems[index].subItems = updatedItems[index].subItems!.map(sub =>
+          /^EB[SP]\d+$/i.test(sub.item || '')
+            ? { ...sub, quantity: perimeterLm, line_total: Math.round(perimeterLm * (sub.amount || 0) * 100) / 100, discounted_total: Math.round(perimeterLm * (sub.amount || 0) * 100) / 100 }
+            : sub
+        );
+      }
     }
 
     if (['quantity', 'amount', 'discount_percent'].includes(field)) {

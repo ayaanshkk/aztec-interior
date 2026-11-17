@@ -410,6 +410,14 @@ export default function EditProformaPage() {
         const qty = updated.quantity || 1;
         updated.line_total = qty * newAmt;
         updated.discounted_total = calcDiscounted(qty, newAmt, updated.discount_percent || 0);
+        if (/^BP[A-Z0-9]+/i.test(item.item || '') && updated.subItems?.length) {
+          const perimeterLm = w > 0 && h > 0 ? Math.round(((w * 2 + h * 2) / 1000) * 1000) / 1000 : 1;
+          updated.subItems = updated.subItems.map(sub =>
+            /^EB[SP]\d+$/i.test(sub.item || '')
+              ? { ...sub, quantity: perimeterLm, line_total: Math.round(perimeterLm * (sub.amount || 0) * 100) / 100, discounted_total: Math.round(perimeterLm * (sub.amount || 0) * 100) / 100 }
+              : sub
+          );
+        }
       }
       if (["quantity", "amount", "discount_percent"].includes(field as string)) {
         const qty = field === "quantity"         ? parseFloat(value) || 1 : updated.quantity        || 1;
@@ -505,6 +513,9 @@ export default function EditProformaPage() {
             dimension_based: data.dimension_based || false,
             base_price_per_sqm: data.base_price_per_sqm || undefined };
         }));
+        if (/^BP[A-Z0-9]+/i.test(trimmed) && fillersBandingTypeRef.current !== 'none') {
+          setTimeout(() => handleSectionBandingChange(fillersBandingTypeRef.current), 50);
+        }
       } else {
         setItems(prev => prev.map(it => {
           if (it.id !== id) return it;
@@ -559,6 +570,8 @@ export default function EditProformaPage() {
   };
 
   const [fillersBandingType, setFillersBandingType] = useState<'none' | 'standard' | 'premium'>('none');
+  const fillersBandingTypeRef = useRef<'none' | 'standard' | 'premium'>('none');
+  useEffect(() => { fillersBandingTypeRef.current = fillersBandingType; }, [fillersBandingType]);
 
   const handleSectionBandingChange = async (bandingType: 'none' | 'standard' | 'premium') => {
     setFillersBandingType(bandingType);
